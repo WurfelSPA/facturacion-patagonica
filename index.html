@@ -19,24 +19,22 @@
   --red:#ef4444;--rdim:#7f1d1d;--rbg:#1a0000;
   --blue:#3b82f6;--bbg:#0d1a2e;
   --acc:#6366f1;--accl:#818cf8;
+  --arr:#1a2535;--srv:#1f1a10;
 }
 html,body,#root{height:100%;font-family:'IBM Plex Mono',monospace;background:var(--bg);color:var(--tx);font-size:13px}
 ::-webkit-scrollbar{width:5px;height:5px}
-::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:4px}
-input,select,textarea{font-family:inherit;background:var(--bg);border:0.5px solid var(--bdr);color:var(--tx);border-radius:8px;padding:6px 12px;font-size:12px;outline:none}
+input,select{font-family:inherit;background:var(--bg);border:0.5px solid var(--bdr);color:var(--tx);border-radius:8px;padding:6px 12px;font-size:12px;outline:none}
 input:focus,select:focus{border-color:var(--acc)}
 input::placeholder{color:var(--txd)}
 button{font-family:'IBM Plex Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 @keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 .spin{display:inline-block;animation:spin 1s linear infinite}
-.fade-in{animation:fadeIn 0.25s ease}
 .fade-up{animation:fadeUp 0.3s ease}
 .row-tr{transition:background 0.1s}
-.row-tr:hover{background:var(--surf2)!important}
+.row-tr:hover td{background:var(--surf2)!important}
 .pill-btn{padding:5px 14px;border-radius:20px;font-size:11px;font-weight:500;border:0.5px solid var(--bdr);background:transparent;color:var(--txm);cursor:pointer;transition:all 0.15s}
 .pill-btn:hover:not(.active){background:var(--surf2)}
 .pill-btn.active{background:var(--acc);color:#fff;border-color:var(--acc)}
@@ -45,144 +43,109 @@ button{font-family:'IBM Plex Sans',sans-serif;cursor:pointer;transition:all 0.15
 .send-dis{background:transparent;border:0.5px solid var(--bdr);color:var(--txd);padding:5px 12px;border-radius:7px;font-size:11px;opacity:0.4;cursor:not-allowed}
 .send-sent{color:var(--green);font-size:11px;font-weight:500;display:inline-flex;align-items:center;gap:4px}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.78);display:flex;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(2px)}
-.modal{background:var(--surf);border:0.5px solid var(--bdr2);border-radius:16px;padding:28px;width:560px;max-width:95vw;animation:fadeUp 0.2s ease}
+.modal{background:var(--surf);border:0.5px solid var(--bdr2);border-radius:16px;padding:28px;width:580px;max-width:95vw;animation:fadeUp 0.2s ease}
 .notif{position:fixed;top:20px;right:20px;z-index:200;padding:11px 20px;border-radius:10px;font-size:13px;font-weight:500;animation:fadeIn 0.2s ease;pointer-events:none}
-.metric-card{background:var(--surf);padding:16px 22px}
-.step-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:0.5px solid var(--bdr)}
-.step-item:first-child{border-top:none}
-.log-box{background:var(--bg);border-radius:8px;padding:12px;font-family:monospace;font-size:11px;color:var(--txm);max-height:120px;overflow-y:auto;line-height:1.7;margin-top:14px}
+.concepto-arr{background:#1a2535;border:0.5px solid #2a4a6a;color:#60a5fa;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600;font-family:'IBM Plex Sans',sans-serif}
+.concepto-srv{background:#2a1f0a;border:0.5px solid #6a4a0a;color:#fbbf24;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600;font-family:'IBM Plex Sans',sans-serif}
+.col-ref{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;padding:1px 6px;border-radius:4px}
+.col-gs{background:#1a2535;color:#60a5fa}
+.col-gt{background:#2a1f0a;color:#fbbf24}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script>
-const {useState,useEffect,useRef,useCallback,createElement:h}=React;
+const {useState,useRef,useCallback,useEffect,createElement:h}=React;
 
-/* ── DATOS DE MUESTRA (reemplazar con datos reales al procesar) ── */
-const SAMPLE=[
-  {sitio:"5-A",cliente:"A 3 D Chile S.A.",correo:"recepcionfacturas@a3d.cl;RGUTIERREZ@a3d.cl",factura:"F-14573",ufPlan:98.7,ufPdf:98.7},
-  {sitio:"5-A",cliente:"Gallyas Telecom S.A.",correo:"afuentes@gallyas.cl;xgrandon@gallyas.cl",factura:"F-14574",ufPlan:106.64,ufPdf:106.64},
-  {sitio:"5-A",cliente:"Dräger Chile Ltda.",correo:"wendy.uzcategui@draeger.com",factura:"F-14586",ufPlan:515.2875,ufPdf:515.29},
-  {sitio:"5-A",cliente:"Sánchez Hermanos SpA.",correo:"",factura:"F-14585",ufPlan:410.17,ufPdf:410.17},
-  {sitio:"5-A",cliente:"Trane de Chile S.A.",correo:"",factura:"F-14584",ufPlan:404.43,ufPdf:404.43},
-  {sitio:"5-A",cliente:"Ingersoll Rand",correo:"thamar.guerrero@irco.com",factura:"F-14583",ufPlan:380.57,ufPdf:380.57},
-  {sitio:"5-A",cliente:"Com. Industrial W&L Ltda.",correo:"",factura:"F-14582",ufPlan:340.87,ufPdf:340.87},
-  {sitio:"5-A",cliente:"Comercial Sna-e (Chile)",correo:"Marcela.Ducaud@snaeurope.com",factura:"F-14581",ufPlan:329.0,ufPdf:329.0},
-  {sitio:"5-A",cliente:"John Crane Chile S.A.",correo:"",factura:"F-14579",ufPlan:217.06,ufPdf:217.06},
-  {sitio:"5-A",cliente:"Megamin S.A.",correo:"",factura:"F-14580",ufPlan:234.0345,ufPdf:234.03},
-  {sitio:"4-A",cliente:"Ind. y Com. Baxter de Chile",correo:"",factura:"F-14564",ufPlan:826.93,ufPdf:826.93},
-  {sitio:"4-A",cliente:"Sonepar Chile S.A.",correo:"jimena.meli@sonepar.cl",factura:"F-14563",ufPlan:692.84,ufPdf:692.84},
-  {sitio:"4-A",cliente:"Sonepar Chile S.A.",correo:"jimena.meli@sonepar.cl",factura:"F-14562",ufPlan:314.21,ufPdf:314.21},
-  {sitio:"4-A",cliente:"Olympus Corporation Chile",correo:"",factura:"F-14560",ufPlan:144.86,ufPdf:144.86},
-  {sitio:"4-A",cliente:"Fedex Express Chile SpA",correo:"jairo.cepeda@fedex.com",factura:"F-14555",ufPlan:96.25,ufPdf:96.25},
-  {sitio:"4-A",cliente:"Mediland SpA",correo:"enrique.pena@surmedical.cl",factura:"F-14559",ufPlan:138.88,ufPdf:138.88},
-  {sitio:"A-2",cliente:"Banco del Estado de Chile",correo:"mcordo93@bancoestado.cl",factura:"FEE-39",ufPlan:256.7,ufPdf:256.7},
-  {sitio:"A-2",cliente:"Banco Estado Express",correo:"mcordo93@bancoestado.cl",factura:"FEE-39",ufPlan:202.6,ufPdf:202.6},
-  {sitio:"A-2",cliente:"Caja Comp. Fam. De Los Andes",correo:"constanza.salinas@cajalosandes.cl",factura:"FEE-35",ufPlan:292.005,ufPdf:292.01},
-  {sitio:"A-2",cliente:"La Araucana CCAF",correo:"recepcion@custodium.com",factura:"FEE-36",ufPlan:87.0,ufPdf:87.0},
-  {sitio:"A-2",cliente:"Voith Turbo S.A.",correo:"Diego.Castillo@voith.com",factura:"F-14618",ufPlan:207.81,ufPdf:207.81},
-  {sitio:"A-2",cliente:"Festo S.A.",correo:"enrique.salinas@festo.com",factura:"F-14617",ufPlan:177.5,ufPdf:177.5},
-  {sitio:"A-2",cliente:"Banco Security",correo:"bco_dte@paperless.cl",factura:"—",ufPlan:125.9685,ufPdf:125.97},
-  {sitio:"A-2",cliente:"In Wasser SPA",correo:"",factura:"F-14613",ufPlan:142.56,ufPdf:142.56},
-  {sitio:"A-2",cliente:"Hydrotorc SpA",correo:"ariel.martinez@hydrotorc.cl",factura:"F-14608",ufPlan:96.05,ufPdf:96.05},
-  {sitio:"D-2",cliente:"Banco de Crédito e Inversiones",correo:"dteproveedores@bci.cl",factura:"FEE-40",ufPlan:405.0,ufPdf:405.0},
-  {sitio:"A-1",cliente:"Sánchez Hermanos Spa (DKO)",correo:"",factura:"F-14587",ufPlan:814.88,ufPdf:814.88},
-  {sitio:"B",cliente:"Banco Itau",correo:"gastoscomunes@itau.cl",factura:"F-14661",ufPlan:189.95,ufPdf:22.79},
-  {sitio:"B",cliente:"Visibility S.A.",correo:"",factura:"F-14660",ufPlan:31.7,ufPdf:3.8},
-  {sitio:"B",cliente:"Ideal S.A.",correo:"",factura:"F-14619",ufPlan:61.19,ufPdf:null},
-  {sitio:"A-2",cliente:"Claro Infraestructura 171 S.A.",correo:"clarorecepcion@custodium.com",factura:"",ufPlan:27.0,ufPdf:null},
-];
-
-const SITIO_C={"5-A":"#534AB7","4-A":"#0F6E56","A-2":"#D85A30","A-1":"#3b82f6","D-2":"#D4537E","B":"#888780"};
 const PERIODOS=["Enero 2026","Febrero 2026","Marzo 2026","Abril 2026","Mayo 2026","Junio 2026","Julio 2026","Agosto 2026","Septiembre 2026","Octubre 2026","Noviembre 2026","Diciembre 2026"];
+const SITIO_C={"5-A":"#534AB7","4-A":"#0F6E56","A-2":"#D85A30","A-1":"#3b82f6","D-2":"#D4537E","B":"#888780"};
+
+/* ── DATOS MAYO 2026 (reemplazar cada mes al procesar) ── */
+const DATOS_MAYO=[{"sitio": "5-A", "cliente": "Gallyas Telecom S.A.", "correo": "afuentes@gallyas.cl; xgrandon@gallyas.cl; vmoreno@gallyas.cl;mvaldes@gallyas.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14574", "ufPlan": 106.64, "ufPdf": 106.64}, {"sitio": "5-A", "cliente": "Gallyas Telecom S.A.", "correo": "afuentes@gallyas.cl; xgrandon@gallyas.cl; vmoreno@gallyas.cl;mvaldes@gallyas.cl", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14634", "ufPlan": 12.7968, "ufPdf": 12.8}, {"sitio": "5-A", "cliente": "Dist Sanchez 4G SpA.", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14566", "ufPlan": 23.9513, "ufPdf": 23.95}, {"sitio": "5-A", "cliente": "Sánchez Hermanos SpA.", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14585", "ufPlan": 410.17, "ufPdf": 410.17}, {"sitio": "5-A", "cliente": "Sociedad de Alimentos Leefood SpA", "correo": "dina@leefood.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14576", "ufPlan": 124.6, "ufPdf": 124.6}, {"sitio": "5-A", "cliente": "Sociedad de Alimentos Leefood SpA", "correo": "dina@leefood.cl", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14635", "ufPlan": 7.476, "ufPdf": 7.48}, {"sitio": "5-A", "cliente": "John Crane Chile S.A", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14579", "ufPlan": 217.06, "ufPdf": 217.06}, {"sitio": "5-A", "cliente": "Megamin S.A.", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14580", "ufPlan": 234.0345, "ufPdf": 234.03}, {"sitio": "5-A", "cliente": "A 3 D Chile S. A.", "correo": "recepcionfacturas@a3d.cl;RGUTIERREZ@a3d.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14573", "ufPlan": 98.7, "ufPdf": 98.7}, {"sitio": "5-A", "cliente": "A 3 D Chile S. A.", "correo": "recepcionfacturas@a3d.cl;RGUTIERREZ@a3d.cl", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14633", "ufPlan": 11.84, "ufPdf": 11.84}, {"sitio": "5-A", "cliente": "Sánchez Hermanos SpA", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14571", "ufPlan": 79.13, "ufPdf": 79.13}, {"sitio": "5-A", "cliente": "Weidmuller SpA", "correo": "nora.ibaceta@weidmueller.com;adm.chile@weidmueller.com", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14567", "ufPlan": 49.9, "ufPdf": 49.9}, {"sitio": "5-A", "cliente": "Weidmuller SpA", "correo": "nora.ibaceta@weidmueller.com;adm.chile@weidmueller.com", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14629", "ufPlan": 5.988, "ufPdf": 5.99}, {"sitio": "5-A", "cliente": "Com. Industrial W & L Ltda.", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14582", "ufPlan": 340.87, "ufPdf": 340.87}, {"sitio": "5-A", "cliente": "Com. Industrial W & L Ltda.", "correo": "", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14639", "ufPlan": 20.4522, "ufPdf": 20.45}, {"sitio": "5-A", "cliente": "Comercial Sna-e (Chile) Limitada", "correo": "manuel.perez@snaeurope.com; marcela.ducaud@snaeurope.com", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14581", "ufPlan": 329.0, "ufPdf": 329.0}, {"sitio": "5-A", "cliente": "Comercial Sna-e (Chile) Limitada", "correo": "manuel.perez@snaeurope.com; marcela.ducaud@snaeurope.com", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14638", "ufPlan": 39.48, "ufPdf": 39.48}, {"sitio": "5-A", "cliente": "Ingersoll Rand", "correo": "marisol.tapia@irco.com;jasmin.ormeno@irco.com", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14583", "ufPlan": 380.57, "ufPdf": 380.57}, {"sitio": "5-A", "cliente": "Ingersoll Rand", "correo": "marisol.tapia@irco.com;jasmin.ormeno@irco.com", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14640", "ufPlan": 11.4171, "ufPdf": 11.42}, {"sitio": "5-A", "cliente": "Dräger Chile Ltda.", "correo": "jessica.apipet@draeger.com", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14586", "ufPlan": 515.2875, "ufPdf": 515.29}, {"sitio": "5-A", "cliente": "Sánchez Hermanos SpA.", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14578", "ufPlan": 181.48, "ufPdf": 181.48}, {"sitio": "5-A", "cliente": "Sánchez Hermanos SpA.", "correo": "", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14637", "ufPlan": 10.8888, "ufPdf": 10.89}, {"sitio": "5-A", "cliente": "Trane de Chile S.A.", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14584", "ufPlan": 404.43, "ufPdf": 404.43}, {"sitio": "5-A", "cliente": "Olympus Corporation Chile Spa", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14577", "ufPlan": 154.71, "ufPdf": 154.71}, {"sitio": "5-A", "cliente": "Olympus Corporation Chile Spa", "correo": "", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14636", "ufPlan": 18.5652, "ufPdf": 18.57}, {"sitio": "5-A", "cliente": "Grupo Drop SpA", "correo": "angelica@grupodrop.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14569", "ufPlan": 64.68, "ufPdf": 64.68}, {"sitio": "5-A", "cliente": "Grupo Drop SpA", "correo": "angelica@grupodrop.cl", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14631", "ufPlan": 7.7616, "ufPdf": 7.76}, {"sitio": "5-A", "cliente": "NCH Chile S.A.", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14568", "ufPlan": 61.74, "ufPdf": 61.74}, {"sitio": "5-A", "cliente": "NCH Chile S.A.", "correo": "", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14630", "ufPlan": 7.4088, "ufPdf": 7.41}, {"sitio": "5-A", "cliente": "Alimentos Neva SpA", "correo": "ecaceres@gruponeva.com; gprieto@gruponeva.com", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14572", "ufPlan": 80.41, "ufPdf": 80.41}, {"sitio": "5-A", "cliente": "Alimentos Neva SpA", "correo": "ecaceres@gruponeva.com; gprieto@gruponeva.com", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14632", "ufPlan": 9.6492, "ufPdf": 9.65}, {"sitio": "5-A", "cliente": "Granja Marina (Patagonía Austral SpA)", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14570", "ufPlan": 64.827, "ufPdf": 64.83}, {"sitio": "5-A", "cliente": "Soc.Com. Jose Marin A. y Cia. Ltda", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14575", "ufPlan": 117.62, "ufPdf": 117.62}, {"sitio": "5-A", "cliente": "Patricio Rodrigo Olmedo Nuñez", "correo": "mavila@transolmedo.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14565", "ufPlan": 5.0, "ufPdf": 5.0}, {"sitio": "4-A", "cliente": "Sociedad de Alimentos Leefood SpA", "correo": "dina@leefood.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14561", "ufPlan": 163.0755, "ufPdf": 163.08}, {"sitio": "4-A", "cliente": "Sonepar Chile S.A.", "correo": "jimena.meli@sonepar.cl;valeria.espinoza@sonepar.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14562", "ufPlan": 314.2125, "ufPdf": 314.21}, {"sitio": "4-A", "cliente": "Sonepar Chile S.A.", "correo": "jimena.meli@sonepar.cl;valeria.espinoza@sonepar.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14563", "ufPlan": 692.8425, "ufPdf": 692.84}, {"sitio": "4-A", "cliente": "Ind. y Com. Baxter de Chile Ltda.", "correo": "orlando_adrian_caro@baxter.com", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14564", "ufPlan": 826.93, "ufPdf": 826.93}, {"sitio": "4-A", "cliente": "Ind. y Com. Baxter de Chile Ltda.", "correo": "orlando_adrian_caro@baxter.com", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14628", "ufPlan": 49.61, "ufPdf": 49.61}, {"sitio": "4-A", "cliente": "Tezman Chile SpA", "correo": "onur@tezman.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14551", "ufPlan": 85.6, "ufPdf": 85.6}, {"sitio": "4-A", "cliente": "Tezman Chile SpA", "correo": "onur@tezman.cl", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14623", "ufPlan": 10.272, "ufPdf": 10.27}, {"sitio": "4-A", "cliente": "Mediland SpA", "correo": "betty.altamiranda@surmedical.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14559", "ufPlan": 138.88, "ufPdf": 138.88}, {"sitio": "4-A", "cliente": "Mediland SpA", "correo": "betty.altamiranda@surmedical.cl", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14626", "ufPlan": 6.944, "ufPdf": 6.94}, {"sitio": "4-A", "cliente": "Perfomex Chile SpA.", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14557", "ufPlan": 112.6965, "ufPdf": 112.7}, {"sitio": "4-A", "cliente": "Parker-Hannifin Corporation Chile Ltda.", "correo": "maria.urbina@parker.com", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14556", "ufPlan": 105.903, "ufPdf": 105.9}, {"sitio": "4-A", "cliente": "Fedex Express Chile SpA", "correo": "jairo.cepeda@fedex.com; claudia.segura@fedex.com;katherine.barrera@fedex.com", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14555", "ufPlan": 96.25, "ufPdf": 96.25}, {"sitio": "4-A", "cliente": "Fedex Express Chile SpA", "correo": "jairo.cepeda@fedex.com; claudia.segura@fedex.com;katherine.barrera@fedex.com", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14625", "ufPlan": 5.775, "ufPdf": 5.78}, {"sitio": "4-A", "cliente": "Industria YKK Limitada", "correo": "dinfante@ykk.com", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14558", "ufPlan": 133.035, "ufPdf": 133.04}, {"sitio": "4-A", "cliente": "Olympus Corporation Chile Spa", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14560", "ufPlan": 144.86, "ufPdf": 144.86}, {"sitio": "4-A", "cliente": "Olympus Corporation Chile Spa", "correo": "", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "", "ufPlan": 8.6916, "ufPdf": null}, {"sitio": "4-A", "cliente": "Corsud SpA", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14553", "ufPlan": 91.5, "ufPdf": 91.5}, {"sitio": "4-A", "cliente": "Pullman Cargo S.A.", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14550", "ufPlan": 85.365, "ufPdf": 85.37}, {"sitio": "4-A", "cliente": "Pullman Cargo S.A.", "correo": "", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14622", "ufPlan": 10.2438, "ufPdf": 10.24}, {"sitio": "4-A", "cliente": "Com. Juana Cataldo e Hijos Spa", "correo": "jcataldo@jcs.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14554", "ufPlan": 94.5, "ufPdf": 94.5}, {"sitio": "4-A", "cliente": "Congo Films SA Agencia en Chile", "correo": "chile.admin@congofilms.tv", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14549", "ufPlan": 77.45, "ufPdf": 77.45}, {"sitio": "4-A", "cliente": "Congo Films SA Agencia en Chile", "correo": "chile.admin@congofilms.tv", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14552", "ufPlan": 90.0, "ufPdf": 90.0}, {"sitio": "4-A", "cliente": "Congo Films SA Agencia en Chile", "correo": "chile.admin@congofilms.tv", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14624", "ufPlan": 10.8, "ufPdf": 10.8}, {"sitio": "4-A", "cliente": "Congo Films SA Agencia en Chile", "correo": "chile.admin@congofilms.tv", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14548", "ufPlan": 16.0, "ufPdf": 16.0}, {"sitio": "A-2", "cliente": "Ind. y Com. Baxter de Chile Ltda.", "correo": "orlando_adrian_caro@baxter.com", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14609", "ufPlan": 99.29, "ufPdf": 99.29}, {"sitio": "A-2", "cliente": "Ind. y Com. Baxter de Chile Ltda.", "correo": "orlando_adrian_caro@baxter.com", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14652", "ufPlan": 5.96, "ufPdf": 5.96}, {"sitio": "A-2", "cliente": "Ind. y Com. Baxter de Chile Ltda.", "correo": "orlando_adrian_caro@baxter.com", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14607", "ufPlan": 93.53, "ufPdf": 93.53}, {"sitio": "A-2", "cliente": "Ind. y Com. Baxter de Chile Ltda.", "correo": "orlando_adrian_caro@baxter.com", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14650", "ufPlan": 5.61, "ufPdf": 5.61}, {"sitio": "A-2", "cliente": "Voith Turbo S. A.", "correo": "zzMaria.zzLabarca@voith.com;Diego.Castillo@voith.com", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14618", "ufPlan": 207.81, "ufPdf": 207.81}, {"sitio": "A-2", "cliente": "Sánchez Hermanos Spa", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14606", "ufPlan": 91.91, "ufPdf": 91.91}, {"sitio": "A-2", "cliente": "Adecco Servicios Empresariales S. A.", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14600", "ufPlan": 63.3, "ufPdf": 63.3}, {"sitio": "A-2", "cliente": "Segafredo Zanetti Chile S.A.", "correo": "segafredo@segafredochile.cl;roxana@segafredochile.cl;asistente.contable@segafredochile.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14612", "ufPlan": 138.915, "ufPdf": 138.92}, {"sitio": "A-2", "cliente": "Lab.Dental y Serv. Odontologicos  ILAB Ltda.", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14601", "ufPlan": 66.024, "ufPdf": 66.02}, {"sitio": "A-2", "cliente": "Lab.Dental y Serv. Odontologicos  ILAB Ltda.", "correo": "", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14648", "ufPlan": 7.9229, "ufPdf": 7.92}, {"sitio": "A-2", "cliente": "Patricio Rodrigo Olmedo Nuñez", "correo": "mavila@transolmedo.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14592", "ufPlan": 16.37, "ufPdf": 16.37}, {"sitio": "A-2", "cliente": "Patricio Rodrigo Olmedo Nuñez", "correo": "mavila@transolmedo.cl", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14643", "ufPlan": 1.9644, "ufPdf": 1.96}, {"sitio": "A-2", "cliente": "Comercial Hussmann Chile Ltda.", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14598", "ufPlan": 51.81, "ufPdf": 51.81}, {"sitio": "A-2", "cliente": "Comercial KPC Chile Ltda.", "correo": "mirandata@chilekpc.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14603", "ufPlan": 79.3695, "ufPdf": 79.37}, {"sitio": "A-2", "cliente": "Festo S.A.", "correo": "enrique.salinas@festo.com", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14617", "ufPlan": 177.5, "ufPdf": 177.5}, {"sitio": "A-2", "cliente": "Enlaces Regionales de Chile S.A.", "correo": "afuentes@gallyas.cl; xgrandon@gallyas.cl; vmoreno@gallyas.cl;mvaldes@gallyas.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14590", "ufPlan": 14.0, "ufPdf": 14.0}, {"sitio": "A-2", "cliente": "Rocketman SpA", "correo": "awalker@vientoclaro.cl;jwalker@vientoclaro.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14595", "ufPlan": 38.0, "ufPdf": 38.0}, {"sitio": "A-2", "cliente": "GTD Manquehue S.A.", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14588", "ufPlan": 5.8, "ufPdf": 5.8}, {"sitio": "A-2", "cliente": "In Wasser SPA", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14613", "ufPlan": 142.56, "ufPdf": 142.56}, {"sitio": "A-2", "cliente": "In Wasser SPA", "correo": "", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14657", "ufPlan": 17.11, "ufPdf": 17.11}, {"sitio": "A-2", "cliente": "Dist Sanchez 4G Spa", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14604", "ufPlan": 90.0, "ufPdf": 89.97}, {"sitio": "A-2", "cliente": "Sánchez Hermanos SpA", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "", "ufPlan": 69.37, "ufPdf": null}, {"sitio": "A-2", "cliente": "Hydrotorc SpA", "correo": "ariel.martinez@hydrotorc.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "", "ufPlan": 96.05, "ufPdf": null}, {"sitio": "A-2", "cliente": "Hydrotorc SpA", "correo": "ariel.martinez@hydrotorc.cl", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14651", "ufPlan": 11.526, "ufPdf": 11.53}, {"sitio": "A-2", "cliente": "Banco Security", "correo": "bco_dte@paperless.cl; pilar.briones@security.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "FEE-38", "ufPlan": 125.9685, "ufPdf": 125.97}, {"sitio": "A-2", "cliente": "Banco Security", "correo": "bco_dte@paperless.cl; pilar.briones@security.cl", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14655", "ufPlan": 4.0, "ufPdf": 4.0}, {"sitio": "A-2", "cliente": "Banco Estado Express", "correo": "mcordo93@bancoestado.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "FEE-39", "ufPlan": 202.6, "ufPdf": 202.6}, {"sitio": "A-2", "cliente": "Casino Imperio", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14611", "ufPlan": 132.0, "ufPdf": 132.0}, {"sitio": "A-2", "cliente": "Casino Imperio", "correo": "", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14656", "ufPlan": 15.84, "ufPdf": 15.84}, {"sitio": "A-2", "cliente": "Servicio Local de Educación Pública de los Libertadores", "correo": "oficina.partes@sleploslibertadores.gob.cl; felipe.leiva@sleploslibertadores.gob.cl;sandra.rodriguez@sleploslibertadores.gob.cl;judith.fraczinet@sleploslibertadores.gob.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14610", "ufPlan": 110.18, "ufPdf": 110.18}, {"sitio": "A-2", "cliente": "Servicio Local de Educación Pública de los Libertadores", "correo": "oficina.partes@sleploslibertadores.gob.cl; felipe.leiva@sleploslibertadores.gob.cl;sandra.rodriguez@sleploslibertadores.gob.cl;judith.fraczinet@sleploslibertadores.gob.cl", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14654", "ufPlan": 13.2216, "ufPdf": 13.22}, {"sitio": "A-2", "cliente": "Soc. fabrica y dist. De Alimentos JP ltda.", "correo": "jprojast@yahoo.es", "concepto": "Arriendo", "colRef": "GS", "factura": "", "ufPlan": 89.97, "ufPdf": null}, {"sitio": "A-2", "cliente": "Soc. fabrica y dist. De Alimentos JP ltda.", "correo": "jprojast@yahoo.es", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14649", "ufPlan": 10.7964, "ufPdf": 10.8}, {"sitio": "A-2", "cliente": "Caja de Compensación de Asignación Familiar La Araucana", "correo": "recepcion@custodium.com;nvalenzuelat@laaraucana.cl;rhgonzalesc@laaraucana.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "FEE-36", "ufPlan": 87.0, "ufPdf": 87.0}, {"sitio": "A-2", "cliente": "Banco del Estado de Chile", "correo": "mcordo93@bancoestado.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "FEE-39", "ufPlan": 256.7, "ufPdf": 256.7}, {"sitio": "A-2", "cliente": "Caja de Compensación de Asignación Familiar De Los Andes", "correo": "josue.figueroa@cajalosandes.cl; marcela.orellana@cajalosandes.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "", "ufPlan": 292.005, "ufPdf": null}, {"sitio": "A-2", "cliente": "Caja de Compensación de Asignación Familiar 18 de Septiembre", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "FEE-37", "ufPlan": 105.0, "ufPdf": 105.0}, {"sitio": "A-2", "cliente": "Caja de Compensación de Asignación Familiar 18 de Septiembre", "correo": "", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14653", "ufPlan": 12.6, "ufPdf": 12.6}, {"sitio": "A-2", "cliente": "Unex Chile Ltda.", "correo": "rbalbontin@unex.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14596", "ufPlan": 41.1, "ufPdf": 41.1}, {"sitio": "A-2", "cliente": "Unex Chile Ltda.", "correo": "rbalbontin@unex.cl", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14645", "ufPlan": 2.466, "ufPdf": 2.47}, {"sitio": "A-2", "cliente": "Servicio Local de Educación Pública de los Libertadores", "correo": "oficina.partes@sleploslibertadores.gob.cl; felipe.leiva@sleploslibertadores.gob.cl;sandra.rodriguez@sleploslibertadores.gob.cl;judith.fraczinet@sleploslibertadores.gob.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14589", "ufPlan": 13.21, "ufPdf": 13.21}, {"sitio": "A-2", "cliente": "Servicio Local de Educación Pública de los Libertadores", "correo": "oficina.partes@sleploslibertadores.gob.cl; felipe.leiva@sleploslibertadores.gob.cl;sandra.rodriguez@sleploslibertadores.gob.cl;judith.fraczinet@sleploslibertadores.gob.cl", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14641", "ufPlan": 1.5852, "ufPdf": 1.59}, {"sitio": "A-2", "cliente": "NCH Chile S.A.", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14597", "ufPlan": 41.92, "ufPdf": 41.92}, {"sitio": "A-2", "cliente": "NCH Chile S.A.", "correo": "", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14646", "ufPlan": 5.0304, "ufPdf": 5.03}, {"sitio": "A-2", "cliente": "CFMedica Limitada", "correo": "administracion@cfmedica.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14593", "ufPlan": 24.69, "ufPdf": 24.69}, {"sitio": "A-2", "cliente": "CFMedica Limitada", "correo": "administracion@cfmedica.cl", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14644", "ufPlan": 2.9628, "ufPdf": 2.96}, {"sitio": "A-2", "cliente": "Servicio Local de Educación Pública de los Libertadores", "correo": "oficina.partes@sleploslibertadores.gob.cl; felipe.leiva@sleploslibertadores.gob.cl;sandra.rodriguez@sleploslibertadores.gob.cl;judith.fraczinet@sleploslibertadores.gob.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14591", "ufPlan": 15.07, "ufPdf": 15.07}, {"sitio": "A-2", "cliente": "Servicio Local de Educación Pública de los Libertadores", "correo": "oficina.partes@sleploslibertadores.gob.cl; felipe.leiva@sleploslibertadores.gob.cl;sandra.rodriguez@sleploslibertadores.gob.cl;judith.fraczinet@sleploslibertadores.gob.cl", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14642", "ufPlan": 1.8084, "ufPdf": 1.81}, {"sitio": "A-2", "cliente": "Servicio Local de Educación Pública de los Libertadores", "correo": "oficina.partes@sleploslibertadores.gob.cl; felipe.leiva@sleploslibertadores.gob.cl;sandra.rodriguez@sleploslibertadores.gob.cl;judith.fraczinet@sleploslibertadores.gob.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14616", "ufPlan": 170.4, "ufPdf": 170.4}, {"sitio": "A-2", "cliente": "Servicio Local de Educación Pública de los Libertadores", "correo": "oficina.partes@sleploslibertadores.gob.cl; felipe.leiva@sleploslibertadores.gob.cl;sandra.rodriguez@sleploslibertadores.gob.cl;judith.fraczinet@sleploslibertadores.gob.cl", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14659", "ufPlan": 20.448, "ufPdf": 20.45}, {"sitio": "A-2", "cliente": "Servicio Local de Educación Pública de los Libertadores", "correo": "oficina.partes@sleploslibertadores.gob.cl; felipe.leiva@sleploslibertadores.gob.cl;sandra.rodriguez@sleploslibertadores.gob.cl;judith.fraczinet@sleploslibertadores.gob.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14615", "ufPlan": 167.73, "ufPdf": 167.73}, {"sitio": "A-2", "cliente": "Servicio Local de Educación Pública de los Libertadores", "correo": "oficina.partes@sleploslibertadores.gob.cl; felipe.leiva@sleploslibertadores.gob.cl;sandra.rodriguez@sleploslibertadores.gob.cl;judith.fraczinet@sleploslibertadores.gob.cl", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14658", "ufPlan": 20.1276, "ufPdf": 20.13}, {"sitio": "A-2", "cliente": "Servicio Local de Educación Pública de los Libertadores", "correo": "oficina.partes@sleploslibertadores.gob.cl; felipe.leiva@sleploslibertadores.gob.cl;sandra.rodriguez@sleploslibertadores.gob.cl;judith.fraczinet@sleploslibertadores.gob.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "", "ufPlan": 157.14, "ufPdf": null}, {"sitio": "A-2", "cliente": "Fen Ingeniería SpA", "correo": "contable@feningenieria.cl; adquisiciones@feningenieria.cl; contacto@feningenieria.cl; fcarvajal@feningenieria.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14599", "ufPlan": 59.4, "ufPdf": 59.4}, {"sitio": "A-2", "cliente": "Fen Ingeniería SpA", "correo": "contable@feningenieria.cl; adquisiciones@feningenieria.cl; contacto@feningenieria.cl; fcarvajal@feningenieria.cl", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "", "ufPlan": 7.128, "ufPdf": null}, {"sitio": "A-2", "cliente": "Visibility S.A.", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14594", "ufPlan": 32.3, "ufPdf": 32.3}, {"sitio": "A-2", "cliente": "Claro Infraestructura 171 S.A.", "correo": "clarorecepcion@custodium.com; hector.duin@e.clarovtr.cl;jose.perozo@clarovtr.cl;carlos.diaz.v@e.clarovtr.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "", "ufPlan": 27.0, "ufPdf": null}, {"sitio": "D-2", "cliente": "Banco de Crédito e Inversiones", "correo": "dteproveedores@bci.cl; daniela.arriagada@bci.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "FEE-40", "ufPlan": 405.0, "ufPdf": 405.0}, {"sitio": "A-1", "cliente": "Sánchez Hermanos Spa (Dko LC y oficinas)", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "F-14587", "ufPlan": 814.88, "ufPdf": 814.88}, {"sitio": "B", "cliente": "Ideal S.A.", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "", "ufPlan": 61.19, "ufPdf": null}, {"sitio": "B", "cliente": "Banco Itau", "correo": "gastoscomunes@itau.cl", "concepto": "Arriendo", "colRef": "GS", "factura": "", "ufPlan": 189.95, "ufPdf": null}, {"sitio": "B", "cliente": "Banco Itau", "correo": "gastoscomunes@itau.cl", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14661", "ufPlan": 22.794, "ufPdf": 22.79}, {"sitio": "B", "cliente": "Visibility S.A.", "correo": "", "concepto": "Arriendo", "colRef": "GS", "factura": "", "ufPlan": 31.7, "ufPdf": null}, {"sitio": "B", "cliente": "Visibility S.A.", "correo": "", "concepto": "Serv. Adm.", "colRef": "GT", "factura": "F-14660", "ufPlan": 3.8, "ufPdf": 3.8}];
 
 function getEstado(r){
-  if(!r.factura||r.ufPdf===null)return"missing";
+  if(!r.factura||r.ufPdf===null||r.ufPdf===undefined)return"missing";
   if(Math.abs(r.ufPdf-r.ufPlan)>0.5)return"diff";
   return"ok";
 }
 
-/* ── BADGE ESTADO ── */
 function Badge({e}){
-  const c={
-    ok:{label:"Coincide",bg:"var(--gbg)",col:"var(--green)",bdr:"var(--gdim)",icon:"✓"},
-    diff:{label:"Difiere",bg:"var(--abg)",col:"var(--amber)",bdr:"var(--adim)",icon:"△"},
-    missing:{label:"Sin PDF",bg:"var(--rbg)",col:"var(--red)",bdr:"var(--rdim)",icon:"○"}
-  }[e];
+  const c={ok:{label:"Coincide",bg:"var(--gbg)",col:"var(--green)",bdr:"var(--gdim)",icon:"✓"},
+            diff:{label:"Difiere",bg:"var(--abg)",col:"var(--amber)",bdr:"var(--adim)",icon:"△"},
+            missing:{label:"Sin PDF",bg:"var(--rbg)",col:"var(--red)",bdr:"var(--rdim)",icon:"○"}}[e];
   return h("span",{style:{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:500,background:c.bg,color:c.col,border:`0.5px solid ${c.bdr}`}},c.icon," ",c.label);
 }
 
-/* ── MODAL PROCESAMIENTO ── */
 function ProcModal({step,log,done,onClose}){
   const ref=useRef(null);
   useEffect(()=>{if(ref.current)ref.current.scrollTop=ref.current.scrollHeight;},[log]);
-  const steps=["Conectando con Google Drive","Leyendo planillas Excel","Descargando PDFs de facturas","Extrayendo montos UF","Cruzando datos y correos","Generando planilla de verificación","Guardando resultado en Drive"];
+  const steps=["Conectando con Google Drive","Leyendo planillas Excel","Descargando PDFs","Detectando tipo (Arriendo/Serv.Adm.)","Extrayendo UF según tipo (col. GS o GT)","Cruzando datos y correos","Guardando en Drive"];
   return h("div",{className:"overlay"},
     h("div",{className:"modal"},
       h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}},
         h("div",null,
           h("div",{style:{fontWeight:600,fontSize:15,fontFamily:"'IBM Plex Sans',sans-serif"}},"Procesando facturación"),
-          h("div",{style:{fontSize:11,color:"var(--txm)",marginTop:3}},"Leyendo Drive · extrayendo PDFs · cruzando datos")
+          h("div",{style:{fontSize:11,color:"var(--txm)",marginTop:3}},"Arriendo → col. GS · Serv. Adm. → col. GT")
         ),
         done&&h("button",{onClick:onClose,style:{background:"var(--acc)",color:"#fff",border:"none",borderRadius:8,padding:"7px 18px",fontSize:13,fontWeight:600}},"Ver resultados →")
       ),
-      h("div",null,steps.map((s,i)=>
-        h("div",{key:i,className:"step-item"},
-          h("span",{style:{width:24,height:24,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0,
-            background:i<step?"var(--gbg)":i===step?"var(--bbg)":"var(--bg)",
-            color:i<step?"var(--green)":i===step?"var(--blue)":"var(--txd)",
-            border:`0.5px solid ${i<step?"var(--gdim)":i===step?"var(--blue)":"var(--bdr)"}`}},
-            i<step?"✓":i===step?h("span",{className:"spin",style:{fontSize:10}},"⟳"):i+1),
-          h("span",{style:{fontSize:12,color:i<=step?"var(--tx)":"var(--txm)",fontFamily:"'IBM Plex Sans',sans-serif"}},s),
-          i===step&&h("span",{style:{marginLeft:"auto",fontSize:11,color:"var(--blue)",animation:"pulse 1.5s infinite"}},"en curso...")
-        )
+      steps.map((s,i)=>h("div",{key:i,style:{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderTop:i>0?"0.5px solid var(--bdr)":"none"}},
+        h("span",{style:{width:24,height:24,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0,
+          background:i<step?"var(--gbg)":i===step?"var(--bbg)":"var(--bg)",
+          color:i<step?"var(--green)":i===step?"var(--blue)":"var(--txd)",
+          border:`0.5px solid ${i<step?"var(--gdim)":i===step?"var(--blue)":"var(--bdr)"}`}},
+          i<step?"✓":i===step?h("span",{className:"spin",style:{fontSize:10}},"⟳"):i+1),
+        h("span",{style:{fontSize:12,color:i<=step?"var(--tx)":"var(--txm)",fontFamily:"'IBM Plex Sans',sans-serif"}},s),
+        i===step&&h("span",{style:{marginLeft:"auto",fontSize:11,color:"var(--blue)"}},"en curso...")
       )),
-      h("div",{ref,className:"log-box"},log.map((l,i)=>h("div",{key:i},l)))
-    )
-  );
-}
-
-/* ── MODAL VISTA PREVIA CORREO ── */
-function EmailModal({row,periodo,onClose,onConfirm}){
-  const mes=periodo.toLowerCase();
-  return h("div",{className:"overlay"},
-    h("div",{className:"modal",style:{width:600}},
-      h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}},
-        h("div",null,
-          h("div",{style:{fontWeight:600,fontSize:14,fontFamily:"'IBM Plex Sans',sans-serif"}},"Vista previa del correo"),
-          h("div",{style:{fontSize:11,color:"var(--txm)",marginTop:2}},row.cliente)
-        ),
-        h("button",{onClick:onClose,style:{background:"none",border:"none",color:"var(--txm)",fontSize:22,lineHeight:1,cursor:"pointer"}},"×")
-      ),
-      h("div",{style:{background:"var(--bg)",borderRadius:10,padding:18,fontSize:12,lineHeight:1.9}},
-        h("div",{style:{borderBottom:"0.5px solid var(--bdr)",paddingBottom:12,marginBottom:14}},
-          h("div",{style:{marginBottom:4}},h("span",{style:{color:"var(--txd)"}},"Para: "),h("span",{style:{color:"var(--accl)"}},row.correo)),
-          h("div",{style:{marginBottom:4}},h("span",{style:{color:"var(--txd)"}},"Asunto: "),`Factura ${row.factura} — Arriendo y Servicios ${mes.charAt(0).toUpperCase()+mes.slice(1)} — Patagónica Inmobiliaria SpA`),
-          h("div",{style:{fontSize:11}},h("span",{style:{color:"var(--txd)"}},"Adjunto: "),h("span",{style:{color:"var(--green)"}},`${row.factura}.pdf`))
-        ),
-        h("div",{style:{color:"var(--tx)",fontFamily:"'IBM Plex Sans',sans-serif",lineHeight:2}},
-          h("p",null,"Estimado(a) cliente,"),
-          h("p",{style:{marginTop:10}},`Junto con saludar, hacemos envío de la factura correspondiente al arriendo y servicios de administración del mes de ${mes}, por un monto de `,h("strong",{style:{color:"var(--accl)"}},`${row.ufPlan.toFixed(4)} UF`),`, factura N° ${row.factura}.`),
-          h("p",{style:{marginTop:10}},"Adjunto encontrará el documento para su registro y gestión de pago."),
-          h("p",{style:{marginTop:10}},"Ante cualquier consulta, no dude en contactarnos."),
-          h("p",{style:{marginTop:10,color:"var(--txm)"}},"Atentamente,",h("br"),h("em",null,"Área de Administración — Patagónica Inmobiliaria SpA"))
-        )
-      ),
-      h("div",{style:{display:"flex",gap:10,marginTop:18,justifyContent:"flex-end"}},
-        h("button",{onClick:onClose,style:{padding:"8px 18px",borderRadius:8,border:"0.5px solid var(--bdr)",background:"transparent",color:"var(--txm)",fontSize:12}},"Cancelar"),
-        h("button",{onClick:onConfirm,style:{padding:"8px 20px",borderRadius:8,border:"none",background:"var(--green)",color:"#0d2818",fontSize:12,fontWeight:700,fontFamily:"'IBM Plex Sans',sans-serif"}},"✉ Confirmar envío")
+      h("div",{ref,style:{background:"var(--bg)",borderRadius:8,padding:12,fontFamily:"monospace",fontSize:11,color:"var(--txm)",maxHeight:110,overflowY:"auto",lineHeight:1.7,marginTop:14}},
+        log.map((l,i)=>h("div",{key:i},l))
       )
     )
   );
 }
 
-/* ── APP PRINCIPAL ── */
+function EmailModal({row,periodo,onClose,onConfirm}){
+  const mes=periodo.toLowerCase();
+  const concepto=row.concepto||"Arriendo";
+  return h("div",{className:"overlay"},
+    h("div",{className:"modal",style:{width:600}},
+      h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}},
+        h("div",null,
+          h("div",{style:{fontWeight:600,fontSize:14,fontFamily:"'IBM Plex Sans',sans-serif"}},"Vista previa del correo"),
+          h("div",{style:{fontSize:11,color:"var(--txm)",marginTop:2}},row.cliente," · ",concepto)
+        ),
+        h("button",{onClick:onClose,style:{background:"none",border:"none",color:"var(--txm)",fontSize:22,lineHeight:1,cursor:"pointer"}},"×")
+      ),
+      h("div",{style:{background:"var(--bg)",borderRadius:10,padding:16,fontSize:12,lineHeight:1.9}},
+        h("div",{style:{borderBottom:"0.5px solid var(--bdr)",paddingBottom:10,marginBottom:12}},
+          h("div",{style:{marginBottom:3}},h("span",{style:{color:"var(--txd)"}},"Para: "),h("span",{style:{color:"var(--accl)"}},row.correo)),
+          h("div",{style:{marginBottom:3}},h("span",{style:{color:"var(--txd)"}},"Asunto: "),`Factura ${row.factura} — ${concepto} ${mes.charAt(0).toUpperCase()+mes.slice(1)} — Patagónica Inmobiliaria SpA`),
+          h("div",{style:{fontSize:11}},h("span",{style:{color:"var(--txd)"}},"Adjunto: "),h("span",{style:{color:"var(--green)"}},`${row.factura}.pdf`))
+        ),
+        h("div",{style:{color:"var(--tx)",fontFamily:"'IBM Plex Sans',sans-serif",lineHeight:2}},
+          h("p",null,"Estimado(a) cliente,"),
+          h("p",{style:{marginTop:10}},`Junto con saludar, hacemos envío de la factura correspondiente al ${concepto.toLowerCase()} del mes de ${mes}, por un monto de `,
+            h("strong",{style:{color:"var(--accl)"}},`${row.ufPlan.toFixed(4)} UF`),`, factura N° ${row.factura}.`),
+          h("p",{style:{marginTop:10}},"Adjunto encontrará el documento PDF para su registro y gestión de pago."),
+          h("p",{style:{marginTop:10,color:"var(--txm)"}},"Atentamente,",h("br"),h("em",null,"Área de Administración — Patagónica Inmobiliaria SpA"))
+        )
+      ),
+      h("div",{style:{display:"flex",gap:10,marginTop:16,justifyContent:"flex-end"}},
+        h("button",{onClick:onClose,style:{padding:"7px 16px",borderRadius:8,border:"0.5px solid var(--bdr)",background:"transparent",color:"var(--txm)",fontSize:12}},"Cancelar"),
+        h("button",{onClick:onConfirm,style:{padding:"7px 18px",borderRadius:8,border:"none",background:"var(--green)",color:"#0d2818",fontSize:12,fontWeight:700,fontFamily:"'IBM Plex Sans',sans-serif"}},"✉ Confirmar envío")
+      )
+    )
+  );
+}
+
 function App(){
   const [view,setView]=useState("idle");
   const [data,setData]=useState([]);
   const [periodo,setPeriodo]=useState("Mayo 2026");
   const [filter,setFilter]=useState("all");
   const [search,setSearch]=useState("");
+  const [concFilter,setConcFilter]=useState("all");
   const [sentSet,setSentSet]=useState(new Set());
   const [sendingSet,setSendingSet]=useState(new Set());
   const [showProc,setShowProc]=useState(false);
@@ -199,40 +162,35 @@ function App(){
     const mm=periodo.split(" ")[0].slice(0,3).toUpperCase();
     const yy=periodo.split(" ")[1];
     const logs=[
-      [`▶ Conectando con Google Drive...`,`▶ Cuenta: amelendez@patagonica.cl`,`✓ Sesión iniciada correctamente`],
-      [`▶ Buscando carpeta 'Facturación Mensual/${mm}-${yy}'...`,`✓ Carpeta encontrada — subcarpetas detectadas`,`▶ Identificando archivos de planillas...`],
-      [`▶ Descargando Planilla_Facturacion_${mm}_${yy}.xlsx`,`▶ Descargando Detalle_envío_facturas_Inpasa_y_Pisa.xlsx`,`✓ Planillas descargadas correctamente`],
-      [`▶ Escaneando PDFs de facturas...`,`✓ 128 archivos PDF encontrados`,`▶ Filtrando facturas de ${periodo} (excluyendo meses anteriores)...`,`✓ 118 PDFs de ${periodo} identificados`],
-      [`▶ Extrayendo UF planilla (col. GS — hoja Flujo)...`,`✓ 82 clientes con UF > 0`,`▶ Cruzando correos desde planilla de envío...`,`✓ 52 correos mapeados correctamente`],
-      [`▶ Cruzando PDFs con planilla por sitio + monto UF...`,`✓ 77 facturas cruzadas sin diferencias`,`⚠ 5 clientes requieren revisión manual`,`▶ Generando planilla de verificación...`],
-      [`▶ Subiendo Verificacion_Facturacion_${mm}-${yy}.xlsx a Drive...`,`✓ Archivo guardado en 'Facturación Mensual/${mm}-${yy}/'`,`✓ Proceso completado exitosamente — ${new Date().toLocaleString('es-CL')}`],
+      [`▶ Conectando con Google Drive...`,`✓ Cuenta amelendez@patagonica.cl`],
+      [`▶ Leyendo Planilla_Facturacion_${mm}_${yy}.xlsx`,`▶ Leyendo Detalle_envío_facturas.xlsx`,`✓ Planillas descargadas`],
+      [`▶ Escaneando PDFs en carpeta ${mm}-${yy}/...`,`✓ PDFs de ${periodo} identificados`],
+      [`▶ Detectando tipo por descripción COD...`,`✓ Arriendo: busca "UF X,XX x valor_dia"`,`✓ Serv.Adm.: busca "X,XX UF valor_dia"`],
+      [`▶ Arriendo → compara con col. GS de planilla`,`▶ Serv.Adm. → compara con col. GT de planilla`,`✓ ${data.length||122} filas procesadas`],
+      [`▶ Cruzando correos desde planilla de envío...`,`✓ Correos mapeados por cliente`],
+      [`▶ Guardando Verificacion_${mm}-${yy}.xlsx en Drive...`,`✓ Proceso completado`],
     ];
     for(let i=0;i<logs.length;i++){
-      await new Promise(r=>setTimeout(r,800+Math.random()*400));
+      await new Promise(r=>setTimeout(r,750+Math.random()*350));
       setProcStep(i+1);
       setProcLog(prev=>[...prev,...logs[i]]);
     }
     setProcDone(true);
-  },[periodo]);
+  },[periodo,data.length]);
 
   const finishProc=()=>{
-    setShowProc(false);
-    setData(SAMPLE);
-    setView("table");
-    setSentSet(new Set());
-    setSendingSet(new Set());
-    setFilter("all");
-    setSearch("");
-    notify(`${SAMPLE.length} clientes cargados — ${periodo}`);
+    setShowProc(false);setView("table");
+    setData(DATOS_MAYO);
+    setSentSet(new Set());setSendingSet(new Set());
+    setFilter("all");setSearch("");setConcFilter("all");
+    notify(`${DATOS_MAYO.length} filas cargadas — ${periodo}`);
   };
 
   const doSend=i=>setPreview({row:data[i],idx:i});
-
   const confirmSend=async()=>{
-    const{idx,row}=preview;
-    setPreview(null);
+    const{idx,row}=preview;setPreview(null);
     setSendingSet(p=>new Set([...p,idx]));
-    await new Promise(r=>setTimeout(r,1200));
+    await new Promise(r=>setTimeout(r,1100));
     setSendingSet(p=>{const s=new Set(p);s.delete(idx);return s;});
     setSentSet(p=>new Set([...p,idx]));
     notify(`Correo enviado → ${row.correo.split(";")[0].trim()}`);
@@ -247,7 +205,7 @@ function App(){
       setSendingSet(p=>{const s=new Set(p);s.delete(i);return s;});
       setSentSet(p=>new Set([...p,i]));
     }
-    notify(`${pend.length} correos enviados exitosamente`);
+    notify(`${pend.length} correos enviados`);
   };
 
   const enriched=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
@@ -256,30 +214,22 @@ function App(){
     ok:enriched.filter(r=>r.estado==="ok").length,
     diff:enriched.filter(r=>r.estado!=="ok").length,
     sent:sentSet.size,
+    arr:enriched.filter(r=>r.concepto==="Arriendo").length,
+    srv:enriched.filter(r=>r.concepto==="Serv. Adm.").length,
   };
   const filtered=enriched.filter(r=>{
-    const mf=filter==="all"
-      ||(filter==="ok"&&r.estado==="ok"&&!sentSet.has(r.i))
-      ||(filter==="diff"&&r.estado!=="ok")
-      ||(filter==="sent"&&sentSet.has(r.i));
+    const mf=filter==="all"||(filter==="ok"&&r.estado==="ok"&&!sentSet.has(r.i))||(filter==="diff"&&r.estado!=="ok")||(filter==="sent"&&sentSet.has(r.i));
+    const mc=concFilter==="all"||(concFilter==="arr"&&r.concepto==="Arriendo")||(concFilter==="srv"&&r.concepto==="Serv. Adm.");
     const ms=!search||r.cliente.toLowerCase().includes(search.toLowerCase())||r.sitio.includes(search.toUpperCase());
-    return mf&&ms;
+    return mf&&mc&&ms;
   });
 
   return h("div",{style:{minHeight:"100vh",display:"flex",flexDirection:"column"}},
-
-    /* NOTIFICACIÓN */
-    notif&&h("div",{className:"notif",style:{
-      background:notif.t==="ok"?"var(--gbg)":"var(--abg)",
-      border:`0.5px solid ${notif.t==="ok"?"var(--gdim)":"var(--adim)"}`,
-      color:notif.t==="ok"?"var(--green)":"var(--amber)"
-    }},(notif.t==="ok"?"✓ ":"△ ")+notif.msg),
-
-    /* MODALES */
+    notif&&h("div",{className:"notif",style:{background:notif.t==="ok"?"var(--gbg)":"var(--abg)",border:`0.5px solid ${notif.t==="ok"?"var(--gdim)":"var(--adim)"}`,color:notif.t==="ok"?"var(--green)":"var(--amber)"}},
+      (notif.t==="ok"?"✓ ":"△ ")+notif.msg),
     showProc&&h(ProcModal,{step:procStep,log:procLog,done:procDone,onClose:finishProc}),
     preview&&h(EmailModal,{row:preview.row,periodo,onClose:()=>setPreview(null),onConfirm:confirmSend}),
 
-    /* HEADER */
     h("header",{style:{background:"var(--surf)",borderBottom:"0.5px solid var(--bdr)",padding:"13px 24px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:50}},
       h("div",{style:{display:"flex",alignItems:"center",gap:14}},
         h("div",{style:{width:34,height:34,background:"var(--acc)",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,color:"#fff",fontWeight:700,flexShrink:0}},"⬡"),
@@ -287,42 +237,34 @@ function App(){
           h("div",{style:{fontSize:14,fontWeight:600,fontFamily:"'IBM Plex Sans',sans-serif",letterSpacing:"-0.3px"}},"Patagónica Inmobiliaria"),
           h("div",{style:{fontSize:10,color:"var(--txm)"}},"agente de facturación mensual")
         ),
-        view==="table"&&h("span",{className:"fade-in",style:{background:"var(--bbg)",border:"0.5px solid var(--blue)",color:"var(--blue)",fontSize:11,padding:"3px 11px",borderRadius:20,marginLeft:4}},periodo)
+        view==="table"&&h("span",{style:{background:"var(--bbg)",border:"0.5px solid var(--blue)",color:"var(--blue)",fontSize:11,padding:"3px 11px",borderRadius:20,marginLeft:4}},periodo)
       ),
       h("div",{style:{display:"flex",gap:8,alignItems:"center"}},
         view==="table"&&h("select",{value:periodo,onChange:e=>{setPeriodo(e.target.value);setView("idle");},style:{fontSize:12,cursor:"pointer"}},
-          PERIODOS.map(p=>h("option",{key:p,value:p},p))
-        ),
-        view==="table"&&h("button",{
-          onClick:()=>runProcess(),
-          style:{background:"transparent",border:"0.5px solid var(--bdr)",color:"var(--txm)",borderRadius:8,padding:"6px 14px",fontSize:12}
-        },"⟳ Reprocesar"),
-        h("button",{
-          onClick:view==="table"?sendAll:runProcess,
-          style:{background:view==="table"?"var(--green)":"var(--acc)",color:view==="table"?"#0d2818":"#fff",border:"none",borderRadius:8,padding:"7px 18px",fontSize:12,fontWeight:700,fontFamily:"'IBM Plex Sans',sans-serif"}
-        },view==="table"?"✉ Enviar todos":"▶ Procesar Drive")
+          PERIODOS.map(p=>h("option",{key:p,value:p},p))),
+        view==="table"&&h("button",{onClick:()=>runProcess(),style:{background:"transparent",border:"0.5px solid var(--bdr)",color:"var(--txm)",borderRadius:8,padding:"6px 14px",fontSize:12}},"⟳ Reprocesar"),
+        h("button",{onClick:view==="table"?sendAll:runProcess,
+          style:{background:view==="table"?"var(--green)":"var(--acc)",color:view==="table"?"#0d2818":"#fff",border:"none",borderRadius:8,padding:"7px 18px",fontSize:12,fontWeight:700,fontFamily:"'IBM Plex Sans',sans-serif"}},
+          view==="table"?"✉ Enviar todos":"▶ Procesar Drive")
       )
     ),
 
-    /* IDLE */
     view==="idle"&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:24,padding:40}},
       h("div",{style:{width:64,height:64,background:"var(--surf)",border:"0.5px solid var(--bdr)",borderRadius:16,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28}},"⬡"),
       h("div",{style:{textAlign:"center"}},
         h("h1",{style:{fontSize:20,fontWeight:600,fontFamily:"'IBM Plex Sans',sans-serif",marginBottom:8}},"Listo para procesar"),
-        h("p",{style:{fontSize:13,color:"var(--txm)",maxWidth:400,lineHeight:1.8}},
-          "Sube los archivos a ",h("code",{style:{color:"var(--accl)",fontSize:12}},"Facturación Mensual/MM-AAAA/")," en Google Drive y presiona el botón para iniciar."
-        )
+        h("p",{style:{fontSize:13,color:"var(--txm)",maxWidth:440,lineHeight:1.8}},
+          "Sube los archivos a ",h("code",{style:{color:"var(--accl)",fontSize:12}},"Facturación Mensual/MM-AAAA/")," en Drive. El agente detecta automáticamente el tipo (Arriendo/Serv. Adm.) y compara con la columna correcta (GS o GT).")
       ),
-      h("div",{style:{background:"var(--surf)",border:"0.5px solid var(--bdr)",borderRadius:12,padding:20,width:"100%",maxWidth:440}},
-        h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}},
-          h("span",{style:{fontSize:12,color:"var(--txm)",fontFamily:"'IBM Plex Sans',sans-serif",fontWeight:500}},"Archivos esperados en Drive"),
+      h("div",{style:{background:"var(--surf)",border:"0.5px solid var(--bdr)",borderRadius:12,padding:20,width:"100%",maxWidth:460}},
+        h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}},
+          h("span",{style:{fontSize:12,color:"var(--txm)",fontFamily:"'IBM Plex Sans',sans-serif",fontWeight:500}},"Archivos esperados"),
           h("select",{value:periodo,onChange:e=>setPeriodo(e.target.value),style:{fontSize:11,padding:"4px 8px"}},
-            PERIODOS.map(p=>h("option",{key:p,value:p},p))
-          )
+            PERIODOS.map(p=>h("option",{key:p,value:p},p)))
         ),
-        [["⊞","Planilla_Facturacion_MM-AAAA.xlsx","col. G (sitio) · J (cliente) · GS (UF)"],
+        [["⊞","Planilla_Facturacion_MM-AAAA.xlsx","GS=Arriendo · GT=Serv.Adm."],
          ["⊞","Detalle_envío_facturas_Inpasa_y_Pisa.xlsx","col. E (cliente) · F (correo)"],
-         ["⊟","MM-AAAA/  (carpeta con PDFs de facturas)","subcarpetas por sitio: 5A · 4A · A2 · A1 · B · D2"]
+         ["⊟","MM-AAAA/  (carpeta PDFs)","subcarpetas 5A · 4A · A2 · A1 · B · D2"]
         ].map(([ic,name,desc],i)=>
           h("div",{key:i,style:{display:"flex",alignItems:"flex-start",gap:10,padding:"9px 0",borderTop:i>0?"0.5px solid var(--bdr)":"none"}},
             h("span",{style:{color:"var(--acc)",fontSize:16,marginTop:1,flexShrink:0}},ic),
@@ -331,81 +273,85 @@ function App(){
               h("div",{style:{fontSize:11,color:"var(--txd)",marginTop:2}},desc)
             )
           )
+        ),
+        h("div",{style:{marginTop:14,borderTop:"0.5px solid var(--bdr)",paddingTop:12,display:"flex",gap:16}},
+          h("div",{style:{fontSize:11,color:"var(--txm)"}},
+            h("span",{className:"concepto-arr"},"Arriendo")," → UF en descripción antes de ",h("code",{style:{fontSize:10,color:"var(--accl)"}},"x valor_dia"),", compara con ",h("span",{className:"col-ref col-gs"},"GS")),
+          h("div",{style:{fontSize:11,color:"var(--txm)",marginTop:6}},
+            h("span",{className:"concepto-srv"},"Serv. Adm.")," → UF en ",h("code",{style:{fontSize:10,color:"var(--accl)"}},"Cant/Unidad"),", compara con ",h("span",{className:"col-ref col-gt"},"GT"))
         )
       ),
-      h("button",{onClick:runProcess,style:{background:"var(--acc)",color:"#fff",border:"none",borderRadius:10,padding:"12px 36px",fontSize:14,fontWeight:700,fontFamily:"'IBM Plex Sans',sans-serif",letterSpacing:"-0.2px"}},"▶ Procesar facturación")
+      h("button",{onClick:runProcess,style:{background:"var(--acc)",color:"#fff",border:"none",borderRadius:10,padding:"12px 36px",fontSize:14,fontWeight:700,fontFamily:"'IBM Plex Sans',sans-serif"}},"▶ Procesar facturación")
     ),
 
-    /* TABLE */
     view==="table"&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflowX:"hidden"},className:"fade-up"},
-
-      /* MÉTRICAS */
-      h("div",{style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",borderBottom:"0.5px solid var(--bdr)"}},
-        [{label:"Total clientes",val:stats.total,col:"var(--tx)",sub:""},{label:"UF coinciden",val:stats.ok,col:"var(--green)",sub:"listos para enviar"},{label:"Para revisar",val:stats.diff,col:"var(--amber)",sub:"diferencia detectada"},{label:"Enviados",val:stats.sent,col:"var(--accl)",sub:"correos despachados"}]
-        .map((m,i)=>h("div",{key:i,className:"metric-card",style:{borderRight:i<3?"0.5px solid var(--bdr)":"none"}},
-          h("div",{style:{fontSize:10,color:"var(--txm)",marginBottom:6,fontFamily:"'IBM Plex Sans',sans-serif",fontWeight:500}},m.label),
-          h("div",{style:{fontSize:28,fontWeight:700,color:m.col,lineHeight:1}},m.val),
-          m.sub&&h("div",{style:{fontSize:10,color:"var(--txd)",marginTop:4}},m.sub)
+      h("div",{style:{display:"grid",gridTemplateColumns:"repeat(5,1fr)",borderBottom:"0.5px solid var(--bdr)"}},
+        [{label:"Total filas",val:stats.total,col:"var(--tx)",sub:""},{label:"Arriendo",val:stats.arr,col:"#60a5fa",sub:"col. GS"},{label:"Serv. Adm.",val:stats.srv,col:"#fbbf24",sub:"col. GT"},{label:"Coinciden",val:stats.ok,col:"var(--green)",sub:"listos para enviar"},{label:"Enviados",val:stats.sent,col:"var(--accl)",sub:"correos despachados"}]
+        .map((m,i)=>h("div",{key:i,style:{background:"var(--surf)",padding:"14px 18px",borderRight:i<4?"0.5px solid var(--bdr)":"none"}},
+          h("div",{style:{fontSize:10,color:"var(--txm)",marginBottom:5,fontFamily:"'IBM Plex Sans',sans-serif",fontWeight:500}},m.label),
+          h("div",{style:{fontSize:24,fontWeight:700,color:m.col,lineHeight:1}},m.val),
+          m.sub&&h("div",{style:{fontSize:10,color:"var(--txd)",marginTop:3}},m.sub)
         ))
       ),
-
-      /* FILTROS */
-      h("div",{style:{background:"var(--surf)",borderBottom:"0.5px solid var(--bdr)",padding:"10px 22px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
-        [{k:"all",l:`Todos (${stats.total})`},{k:"ok",l:`Coinciden (${stats.ok})`},{k:"diff",l:`Revisar (${stats.diff})`},{k:"sent",l:`Enviados (${stats.sent})`}]
+      h("div",{style:{background:"var(--surf)",borderBottom:"0.5px solid var(--bdr)",padding:"9px 20px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
+        [{k:"all",l:`Todos (${stats.total})`},{k:"ok",l:`Coinciden (${stats.ok})`},{k:"diff",l:`Revisar (${stats.total-stats.ok})`},{k:"sent",l:`Enviados (${stats.sent})`}]
         .map(f=>h("button",{key:f.k,className:`pill-btn${filter===f.k?" active":""}`,onClick:()=>setFilter(f.k)},f.l)),
-        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente o sitio...",style:{marginLeft:"auto",width:200}})
+        h("span",{style:{color:"var(--txd)",fontSize:11,marginLeft:4}},"·"),
+        [{k:"all",l:"Ambos"},{k:"arr",l:"Arriendo"},{k:"srv",l:"Serv. Adm."}]
+        .map(f=>h("button",{key:f.k,className:`pill-btn${concFilter===f.k?" active":""}`,onClick:()=>setConcFilter(f.k),style:{fontSize:10}},f.l)),
+        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente o sitio...",style:{marginLeft:"auto",width:180}})
       ),
-
-      /* TABLA */
       h("div",{style:{flex:1,overflowX:"auto"}},
-        h("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:800}},
+        h("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:900}},
           h("colgroup",null,
-            h("col",{style:{width:64}}),h("col",{style:{width:"17%"}}),h("col",{style:{width:"20%"}}),
-            h("col",{style:{width:96}}),h("col",{style:{width:88}}),h("col",{style:{width:88}}),
-            h("col",{style:{width:108}}),h("col",{style:{width:88}})
+            h("col",{style:{width:60}}),h("col",{style:{width:"16%"}}),h("col",{style:{width:"18%"}}),
+            h("col",{style:{width:92}}),h("col",{style:{width:52}}),h("col",{style:{width:96}}),
+            h("col",{style:{width:88}}),h("col",{style:{width:88}}),h("col",{style:{width:100}})
           ),
           h("thead",null,h("tr",{style:{background:"var(--surf)"}},
-            ["Sitio","Cliente","Correo","Factura","UF planilla","UF PDF","Estado","Acción"].map(hd=>
-              h("th",{key:hd,style:{padding:"9px 13px",textAlign:"left",fontSize:10,fontWeight:600,color:"var(--txd)",letterSpacing:"0.06em",borderBottom:"0.5px solid var(--bdr)",fontFamily:"'IBM Plex Sans',sans-serif"}},hd.toUpperCase())
+            ["Sitio","Cliente","Correo","Concepto","Col.","Factura","UF planilla","UF PDF","Estado/Acción"].map(hd=>
+              h("th",{key:hd,style:{padding:"8px 12px",textAlign:"left",fontSize:10,fontWeight:600,color:"var(--txd)",letterSpacing:"0.06em",borderBottom:"0.5px solid var(--bdr)",fontFamily:"'IBM Plex Sans',sans-serif"}},hd.toUpperCase())
             )
           )),
           h("tbody",null,filtered.length===0
-            ?h("tr",null,h("td",{colSpan:8,style:{padding:"40px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados para este filtro"))
+            ?h("tr",null,h("td",{colSpan:9,style:{padding:"40px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados"))
             :filtered.map(row=>{
               const i=row.i;
               const sent=sentSet.has(i),sending=sendingSet.has(i),noEmail=!row.correo;
-              const diff=row.ufPdf!==null&&Math.abs(row.ufPdf-row.ufPlan)>0.5;
-              return h("tr",{key:i,className:"row-tr",style:{borderBottom:"0.5px solid var(--bdr)",background:sent?"rgba(13,40,24,0.5)":"transparent"}},
-                h("td",{style:{padding:"10px 13px"}},
-                  h("span",{style:{display:"inline-block",padding:"2px 8px",borderRadius:5,fontSize:10,fontWeight:700,fontFamily:"'IBM Plex Sans',sans-serif",background:`${SITIO_C[row.sitio]||"#888"}22`,color:SITIO_C[row.sitio]||"#888",border:`0.5px solid ${SITIO_C[row.sitio]||"#888"}44`}},row.sitio)
-                ),
-                h("td",{style:{padding:"10px 13px"}},h("span",{style:{fontSize:12,fontWeight:500,fontFamily:"'IBM Plex Sans',sans-serif"}},row.cliente)),
-                h("td",{style:{padding:"10px 13px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},
-                  h("span",{style:{fontSize:11,color:row.correo?"var(--accl)":"var(--txd)"}},row.correo||"— sin correo registrado")
-                ),
-                h("td",{style:{padding:"10px 13px"}},h("span",{style:{fontSize:11,fontFamily:"monospace",color:"var(--txm)"}},row.factura||"—")),
-                h("td",{style:{padding:"10px 13px"}},h("span",{style:{fontSize:12,fontFamily:"monospace"}},row.ufPlan.toFixed(4))),
-                h("td",{style:{padding:"10px 13px"}},
+              const diff=row.ufPdf!==null&&row.ufPdf!==undefined&&Math.abs(row.ufPdf-row.ufPlan)>0.5;
+              const esArr=row.concepto==="Arriendo";
+              const rowBg=esArr?"rgba(26,37,53,0.5)":"rgba(31,26,16,0.5)";
+              return h("tr",{key:i,className:"row-tr"},
+                h("td",{style:{padding:"9px 12px",background:sent?"rgba(13,40,24,0.5)":rowBg}},
+                  h("span",{style:{display:"inline-block",padding:"2px 7px",borderRadius:5,fontSize:10,fontWeight:700,fontFamily:"'IBM Plex Sans',sans-serif",background:`${SITIO_C[row.sitio]||"#888"}22`,color:SITIO_C[row.sitio]||"#888",border:`0.5px solid ${SITIO_C[row.sitio]||"#888"}44`}},row.sitio)),
+                h("td",{style:{padding:"9px 12px",background:sent?"rgba(13,40,24,0.5)":rowBg}},h("span",{style:{fontSize:12,fontWeight:500,fontFamily:"'IBM Plex Sans',sans-serif"}},row.cliente)),
+                h("td",{style:{padding:"9px 12px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",background:sent?"rgba(13,40,24,0.5)":rowBg}},
+                  h("span",{style:{fontSize:11,color:row.correo?"var(--accl)":"var(--txd)"}},row.correo||"— sin correo")),
+                h("td",{style:{padding:"9px 12px",background:sent?"rgba(13,40,24,0.5)":rowBg}},
+                  h("span",{className:esArr?"concepto-arr":"concepto-srv"},row.concepto)),
+                h("td",{style:{padding:"9px 12px",background:sent?"rgba(13,40,24,0.5)":rowBg}},
+                  h("span",{className:`col-ref ${esArr?"col-gs":"col-gt"}`},row.colRef)),
+                h("td",{style:{padding:"9px 12px",background:sent?"rgba(13,40,24,0.5)":rowBg}},
+                  h("span",{style:{fontSize:11,fontFamily:"monospace",color:"var(--txm)"}},row.factura||"—")),
+                h("td",{style:{padding:"9px 12px",background:sent?"rgba(13,40,24,0.5)":rowBg}},
+                  h("span",{style:{fontSize:12,fontFamily:"monospace"}},row.ufPlan.toFixed(4))),
+                h("td",{style:{padding:"9px 12px",background:sent?"rgba(13,40,24,0.5)":rowBg}},
                   h("span",{style:{fontSize:12,fontFamily:"monospace",color:diff?"var(--amber)":"var(--tx)"}},
-                    row.ufPdf!==null?row.ufPdf.toFixed(4):"—")
-                ),
-                h("td",{style:{padding:"10px 13px"}},h(Badge,{e:sent?"ok":row.estado})),
-                h("td",{style:{padding:"10px 13px"}},
+                    row.ufPdf!==null&&row.ufPdf!==undefined?row.ufPdf.toFixed(4):"—")),
+                h("td",{style:{padding:"9px 12px",background:sent?"rgba(13,40,24,0.5)":rowBg}},
                   sent?h("span",{className:"send-sent"},"✓ Enviado"):
                   sending?h("span",{style:{fontSize:11,color:"var(--blue)",display:"inline-flex",alignItems:"center",gap:5}},h("span",{className:"spin"},"⟳")," Enviando..."):
                   row.estado==="ok"&&!noEmail?h("button",{className:"send-ready",onClick:()=>doSend(i)},"✉ Enviar"):
-                  h("button",{className:"send-dis",disabled:true,title:noEmail?"Sin correo registrado":"Monto difiere — revisar primero"},"✉ Enviar")
+                  h(Badge,{e:row.estado})
                 )
               );
             })
           )
         )
       ),
-
-      /* FOOTER */
-      h("footer",{style:{background:"var(--surf)",borderTop:"0.5px solid var(--bdr)",padding:"11px 22px",display:"flex",alignItems:"center",justifyContent:"space-between"}},
-        h("span",{style:{fontSize:11,color:"var(--txd)"}},`${filtered.length} de ${data.length} clientes · ${stats.sent} enviados · ${periodo}`),
-        h("button",{onClick:sendAll,style:{background:"var(--gbg)",border:"0.5px solid var(--gdim)",color:"var(--green)",borderRadius:8,padding:"7px 18px",fontSize:12,fontWeight:700,fontFamily:"'IBM Plex Sans',sans-serif",display:"flex",alignItems:"center",gap:6}},
+      h("footer",{style:{background:"var(--surf)",borderTop:"0.5px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}},
+        h("span",{style:{fontSize:11,color:"var(--txd)"}},`${filtered.length} de ${data.length} filas · ${stats.sent} enviados · ${periodo}`),
+        h("button",{onClick:sendAll,style:{background:"var(--gbg)",border:"0.5px solid var(--gdim)",color:"var(--green)",borderRadius:8,padding:"7px 16px",fontSize:12,fontWeight:700,fontFamily:"'IBM Plex Sans',sans-serif",display:"flex",alignItems:"center",gap:6}},
           `✉ Enviar todos los que coinciden (${Math.max(0,stats.ok-stats.sent)})`)
       )
     )
