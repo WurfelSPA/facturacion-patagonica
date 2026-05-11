@@ -120,6 +120,7 @@ function EmailModal({row,periodo,onClose,onConfirm}){
       h("div",{style:{background:"var(--bg)",borderRadius:10,padding:16,fontSize:12,lineHeight:1.9}},
         h("div",{style:{borderBottom:"0.5px solid var(--bdr)",paddingBottom:10,marginBottom:12}},
           h("div",{style:{marginBottom:3}},h("span",{style:{color:"var(--txd)"}},"Para: "),h("span",{style:{color:"var(--accl)"}},row.correo)),
+          h("div",{style:{marginBottom:3}},h("span",{style:{color:"var(--txd)"}},"CCO: "),h("span",{style:{color:"var(--txm)"}},"mmunoz@patagonica.cl")),
           h("div",{style:{marginBottom:3}},h("span",{style:{color:"var(--txd)"}},"Asunto: "),`Factura ${row.factura} — ${concepto} ${mes.charAt(0).toUpperCase()+mes.slice(1)} — Patagónica Inmobiliaria SpA`),
           h("div",{style:{fontSize:11}},h("span",{style:{color:"var(--txd)"}},"Adjunto: "),h("span",{style:{color:"var(--green)"}},`${row.factura}.pdf`))
         ),
@@ -193,7 +194,7 @@ function App(){
     await new Promise(r=>setTimeout(r,1100));
     setSendingSet(p=>{const s=new Set(p);s.delete(idx);return s;});
     setSentSet(p=>new Set([...p,idx]));
-    notify(`Correo enviado → ${row.correo.split(";")[0].trim()}`);
+    notify(`Correo enviado → ${row.correo.split(";")[0].trim()} (CCO: mmunoz@patagonica.cl)`);
   };
 
   const sendAll=async()=>{
@@ -205,7 +206,7 @@ function App(){
       setSendingSet(p=>{const s=new Set(p);s.delete(i);return s;});
       setSentSet(p=>new Set([...p,i]));
     }
-    notify(`${pend.length} correos enviados`);
+    notify(`${pend.length} correos enviados (CCO: mmunoz@patagonica.cl)`);
   };
 
   const enriched=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
