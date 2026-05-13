@@ -74,7 +74,7 @@ const REMITENTE="amelendez@patagonica.cl";
 const CCO="alexricardomelendez@hotmail.com";
 const TEST_DEST="alexricardomelendez@hotmail.com";
 const MODO_PRUEBA=TEST_DEST!=="";
-const VER="v2.2.0";
+const VER="v2.3.0";
 const PERIODOS=["Enero 2026","Febrero 2026","Marzo 2026","Abril 2026","Mayo 2026","Junio 2026","Julio 2026","Agosto 2026","Septiembre 2026","Octubre 2026","Noviembre 2026","Diciembre 2026"];
 const SITIO_C={"5-A":"#7c3aed","4-A":"#0d9488","A-2":"#ea580c","A-1":"#2563eb","D-2":"#db2777","B":"#64748b"};
 const MES_NUM={"Enero":1,"Febrero":2,"Marzo":3,"Abril":4,"Mayo":5,"Junio":6,"Julio":7,"Agosto":8,"Septiembre":9,"Octubre":10,"Noviembre":11,"Diciembre":12};
@@ -131,16 +131,20 @@ async function procesarPlanillaFacturacion(file, periodo){
 
   function esTargetMes(val){
     if(val===null||val===undefined)return false;
-    // Caso 1: número serial de Excel
+    // XLSX.js devuelve fechas como números seriales de Excel
+    // Comparar directamente con el serial calculado para el 1er día del mes
     if(typeof val==="number"&&val>40000&&val<50000){
-      const d=serialToDate(val);
-      return d.getUTCFullYear()===anio&&(d.getUTCMonth()+1)===mesNum&&d.getUTCDate()===1;
+      // Reconstruir fecha desde serial evitando problemas de timezone
+      // Excel serial: días desde 1899-12-30 (con bug bisiesto 1900)
+      const msPerDay=86400000;
+      const excelEpoch=new Date(Date.UTC(1899,11,30));
+      const dateMs=excelEpoch.getTime()+Math.round(val)*msPerDay;
+      const d=new Date(dateMs);
+      return d.getUTCFullYear()===anio&&(d.getUTCMonth()+1)===mesNum;
     }
-    // Caso 2: objeto Date (algunos parsers de XLSX)
     if(val instanceof Date){
       return val.getFullYear()===anio&&(val.getMonth()+1)===mesNum;
     }
-    // Caso 3: string
     if(typeof val==="string"){
       try{const d=new Date(val);return d.getFullYear()===anio&&(d.getMonth()+1)===mesNum;}catch(e){}
     }
@@ -148,10 +152,6 @@ async function procesarPlanillaFacturacion(file, periodo){
   }
 
   const fila3=data[3]||[];
-  // DEBUG: mostrar primeros valores con fecha para diagnóstico
-  const debugFechas=fila3.slice(185).map((v,i)=>({col:185+i,tipo:typeof v,val:v})).filter(x=>x.val!==null&&x.val!==undefined&&x.val!=="");
-  console.log("FILA3 valores no nulos desde col 185:", JSON.stringify(debugFechas.slice(0,20)));
-  addLog("DEBUG fila3[200]="+JSON.stringify(fila3[200])+" tipo="+typeof fila3[200],"info");
   for(let i=0;i<fila3.length;i++){
     if(esTargetMes(fila3[i])){colGS=i;colGT=i+1;break;}
   }
