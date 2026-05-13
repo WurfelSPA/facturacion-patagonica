@@ -9,7 +9,7 @@
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://unpkg.com/pdfjs-dist@2.16.105/build/pdf.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -64,6 +64,7 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 </head>
 <body>
 <div id="root"></div>
+<script src="/api/config"></script>
 <script>
 const {useState,useRef,useCallback,useEffect,createElement:h}=React;
 
@@ -74,8 +75,10 @@ const REMITENTE="amelendez@patagonica.cl";
 const CCO="alexricardomelendez@hotmail.com";
 const TEST_DEST="alexricardomelendez@hotmail.com";
 const MODO_PRUEBA=TEST_DEST!=="";
-const VER="v2.4.1";
+const VER="v2.7.0";
 const GMAIL_SCOPES="https://www.googleapis.com/auth/gmail.send";
+const PRESET_KEY=window.__PAT_KEY__||"";
+const PRESET_GID=window.__PAT_GID__||"";
 
 /* ── Gmail OAuth ── */
 function loadGapiScript(){
@@ -115,10 +118,11 @@ async function getGmailToken(clientId){
 
 function makeEmail(to,cco,from,subject,body,pdfBase64,pdfName){
   const boundary="PAT_BOUNDARY_"+Date.now();
+  const fromHeader=`=?UTF-8?B?${btoa(unescape(encodeURIComponent("Patagónica Inmobiliaria")))}?= <${from}>`;
   let msg;
   if(pdfBase64&&pdfName){
     msg=[
-      `From: Patagonica Inmobiliaria <${from}>`,
+      `From: ${fromHeader}`,
       `To: ${to}`,
       `Bcc: ${cco}`,
       `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
@@ -142,7 +146,7 @@ function makeEmail(to,cco,from,subject,body,pdfBase64,pdfName){
     ].join("\r\n");
   } else {
     msg=[
-      `From: Patagonica Inmobiliaria <${from}>`,
+      `From: ${fromHeader}`,
       `To: ${to}`,
       `Bcc: ${cco}`,
       `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
@@ -325,7 +329,7 @@ async function procesarPlanillaEnvio(file){
 
 async function extraerTextoPDF(arrayBuffer){
   try{
-    pdfjsLib.GlobalWorkerOptions.workerSrc="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+    pdfjsLib.GlobalWorkerOptions.workerSrc="";
     const pdf=await pdfjsLib.getDocument({data:arrayBuffer}).promise;
     let texto="";
     for(let i=1;i<=pdf.numPages;i++){
@@ -355,17 +359,14 @@ async function procesarPDFs(zipFile, addLog){
       const texto=await extraerTextoPDF(pdfBuf);
       const textoJ=texto.replace(/\s+/g," ");
 
-      // Fecha → detectar abril
       const fechaM=textoJ.match(/Fecha Emisi[oó]n\s+(.{5,30})/i);
       const esAbril=fechaM&&/abril/i.test(fechaM[1]);
       if(esAbril)continue;
 
-      // Número factura
       const nroM=textoJ.match(/N[º°]\s*(\d+)/);
       const nro=nroM?nroM[1]:"";
       const nroFact=nombre.startsWith("FEE")?(nro?`FEE-${nro}`:""):(nro?`F-${nro}`:"");
 
-      // Tipo y UF
       const esSrv=/COD:.*?-\s*Serv\.?\s*Adm\./i.test(textoJ);
       const esArr=/COD:.*?-\s*Arriendo/i.test(textoJ)&&!esSrv;
       let tipo=esSrv?"serv_adm":esArr?"arriendo":"desconocido";
@@ -385,18 +386,29 @@ async function procesarPDFs(zipFile, addLog){
       }
 
       if(nroFact&&tipo!=="desconocido"){
-        // Convertir arraybuffer a base64 para adjuntar al correo
-        const bytes=new Uint8Array(pdfBuf);
-        let binary="";
-        for(let b=0;b<bytes.byteLength;b++)binary+=String.fromCharCode(bytes[b]);
-        const pdfBase64=btoa(binary);
-        pdfs.push({sitio,nroFact,tipo,ufPdf:totalUF>0?Math.round(totalUF*10000)/10000:null,
-          pdfBase64,pdfNombre:nombre});
+        // Solo guardar la ruta dentro del ZIP, no el base64 (evita memory overflow)
+        pdfs.push({sitio,nroFact,tipo,
+          ufPdf:totalUF>0?Math.round(totalUF*10000)/10000:null,
+          zipPath:path,pdfNombre:nombre});
       }
     }catch(e){}
   }
   addLog(`✓ ${pdfs.length} facturas procesadas (Arriendo + Serv.Adm.)`,"ok");
   return pdfs;
+}
+
+/* Leer PDF del ZIP al momento de enviar */
+async function getPdfBase64FromZip(zipFile, zipPath){
+  const buf=await readFileAsBuffer(zipFile);
+  const zip=await JSZip.loadAsync(buf);
+  const pdfBuf=await zip.files[zipPath].async("uint8array");
+  // Convertir Uint8Array a base64 de forma segura
+  let binary="";
+  const chunkSize=8192;
+  for(let i=0;i<pdfBuf.length;i+=chunkSize){
+    binary+=String.fromCharCode(...pdfBuf.slice(i,i+chunkSize));
+  }
+  return btoa(binary);
 }
 
 /* ═══════════════════════════════════
@@ -589,8 +601,8 @@ function EmailModal({row,periodo,onClose,onConfirm,sending}){
    APP PRINCIPAL
 ═══════════════════════════════════ */
 function App(){
-  const [apiKey,setApiKey]=useState(()=>localStorage.getItem("pat_key")||"");
-  const [clientId,setClientId]=useState(()=>localStorage.getItem("pat_gid")||"");
+  const [apiKey,setApiKey]=useState(()=>PRESET_KEY||localStorage.getItem("pat_key")||"");
+  const [clientId,setClientId]=useState(()=>PRESET_GID||localStorage.getItem("pat_gid")||"");
   const [gmailToken,setGmailToken]=useState(null);
   const [view,setView]=useState("upload"); // upload | processing | table
   const [periodo,setPeriodo]=useState("Mayo 2026");
@@ -669,7 +681,7 @@ function App(){
       const nuevoMapa={};
       for(const p of pdfs){
         if(p.nroFact&&p.pdfBase64){
-          nuevoMapa[p.nroFact]={base64:p.pdfBase64,nombre:p.pdfNombre};
+          nuevoMapa[p.nroFact]={zipPath:p.zipPath,nombre:p.pdfNombre};
         }
       }
       setPdfMap(nuevoMapa);
@@ -694,12 +706,16 @@ function App(){
     const dest=MODO_PRUEBA?TEST_DEST:row.correo;
     try{
       const token=await getToken();
-      const subject="Factura "+row.factura+" — "+row.concepto+" "+periodo+" — Patagonica Inmobiliaria SpA";
+      const subject="Factura "+row.factura+" — "+row.concepto+" "+periodo+" — Patagónica Inmobiliaria SpA";
       const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura);
       const pdf=pdfMap[row.factura];
-      await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdf?.base64,pdf?.nombre);
+      let pdfB64=null;
+      if(pdf?.zipPath&&files.zip){
+        try{pdfB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}
+      }
+      await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);
       setSentSet(p=>new Set([...p,idx]));
-      notify("✓ Correo enviado"+(MODO_PRUEBA?" (PRUEBA)":"")+" → "+dest+(pdf?" · PDF adjunto":""));
+      notify("✓ Correo enviado"+(MODO_PRUEBA?" (PRUEBA)":"")+" → "+dest+(pdfB64?" · con PDF adjunto":"· sin PDF"));
     }catch(e){
       if(e.message.includes("invalid_grant")||e.message.includes("Token"))setGmailToken(null);
       notify("Error: "+e.message,"err");
@@ -717,11 +733,15 @@ function App(){
       let enviados=0;
       for(const row of pend){
         const dest=MODO_PRUEBA?TEST_DEST:row.correo;
-        const subject="Factura "+row.factura+" — "+row.concepto+" "+periodo+" — Patagonica Inmobiliaria SpA";
+        const subject="Factura "+row.factura+" — "+row.concepto+" "+periodo+" — Patagónica Inmobiliaria SpA";
         const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura);
         const pdf=pdfMap[row.factura];
+        let pdfB64=null;
+        if(pdf?.zipPath&&files.zip){
+          try{pdfB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}
+        }
         try{
-          await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdf?.base64,pdf?.nombre);
+          await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);
           setSentSet(p=>new Set([...p,row.i]));
           enviados++;
           await new Promise(r=>setTimeout(r,400));
