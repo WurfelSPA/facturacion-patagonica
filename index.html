@@ -74,7 +74,7 @@ const REMITENTE="amelendez@patagonica.cl";
 const CCO="alexricardomelendez@hotmail.com";
 const TEST_DEST="alexricardomelendez@hotmail.com";
 const MODO_PRUEBA=TEST_DEST!=="";
-const VER="v2.0.0";
+const VER="v2.1.0";
 const PERIODOS=["Enero 2026","Febrero 2026","Marzo 2026","Abril 2026","Mayo 2026","Junio 2026","Julio 2026","Agosto 2026","Septiembre 2026","Octubre 2026","Noviembre 2026","Diciembre 2026"];
 const SITIO_C={"5-A":"#7c3aed","4-A":"#0d9488","A-2":"#ea580c","A-1":"#2563eb","D-2":"#db2777","B":"#64748b"};
 const MES_NUM={"Enero":1,"Febrero":2,"Marzo":3,"Abril":4,"Mayo":5,"Junio":6,"Julio":7,"Agosto":8,"Septiembre":9,"Octubre":10,"Noviembre":11,"Diciembre":12};
@@ -116,26 +116,41 @@ async function procesarPlanillaFacturacion(file, periodo){
   if(!ws)throw new Error("No se encontró la hoja 'Flujo' en la planilla de facturación");
   const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
 
-  // Detectar columnas GS/GT dinámicamente buscando la fecha del mes en fila 3
+  // Detectar columnas GS/GT dinámicamente
+  // XLSX.js devuelve fechas como números seriales de Excel
+  // Base Excel: 1 = 1900-01-01 (con bug del año bisiesto de Lotus)
+  // Formula: fecha_serial = dias desde 1899-12-30
   const mesNum=MES_NUM[periodo.split(" ")[0]];
   const anio=parseInt(periodo.split(" ")[1]);
+
+  function serialToDate(serial){
+    // Ajuste por bug de Lotus 1-2-3 (Excel considera 1900 como bisiesto)
+    const d=new Date(Math.round((serial-25569)*86400*1000));
+    return d;
+  }
+
+  function esTargetMes(val){
+    if(val===null||val===undefined)return false;
+    // Caso 1: número serial de Excel
+    if(typeof val==="number"&&val>40000&&val<50000){
+      const d=serialToDate(val);
+      return d.getUTCFullYear()===anio&&(d.getUTCMonth()+1)===mesNum&&d.getUTCDate()===1;
+    }
+    // Caso 2: objeto Date (algunos parsers de XLSX)
+    if(val instanceof Date){
+      return val.getFullYear()===anio&&(val.getMonth()+1)===mesNum;
+    }
+    // Caso 3: string
+    if(typeof val==="string"){
+      try{const d=new Date(val);return d.getFullYear()===anio&&(d.getMonth()+1)===mesNum;}catch(e){}
+    }
+    return false;
+  }
+
   let colGS=-1,colGT=-1;
   const fila3=data[3]||[];
   for(let i=0;i<fila3.length;i++){
-    const v=fila3[i];
-    if(v instanceof Date||typeof v==="number"){
-      let d=v instanceof Date?v:new Date(Math.round((v-25569)*86400*1000));
-      if(d.getFullYear()===anio&&(d.getMonth()+1)===mesNum){
-        colGS=i;colGT=i+1;break;
-      }
-    }
-    // XLSX puede devolver fechas como strings también
-    if(typeof v==="string"&&v.includes(anio)){
-      try{
-        const d=new Date(v);
-        if(d.getFullYear()===anio&&(d.getMonth()+1)===mesNum){colGS=i;colGT=i+1;break;}
-      }catch(e){}
-    }
+    if(esTargetMes(fila3[i])){colGS=i;colGT=i+1;break;}
   }
   if(colGS===-1)throw new Error(`No se encontró columna para ${periodo} en la fila de fechas`);
 
