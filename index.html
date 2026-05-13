@@ -93,8 +93,7 @@ async function callClaude(apiKey, prompt, mcpServers=[]){
   });
   if(!res.ok){const e=await res.json();throw new Error(e.error?.message||"Error API");}
   const data=await res.json();
-  return data.content.filter(b=>b.type==="text").map(b=>b.text).join("
-");
+  return data.content.filter(b=>b.type==="text").map(b=>b.text).join("\n");
 }
 
 function getEstado(r){
