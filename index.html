@@ -75,7 +75,7 @@ const REMITENTE="amelendez@patagonica.cl";
 const CCO="alexricardomelendez@hotmail.com";
 const TEST_DEST="alexricardomelendez@hotmail.com";
 const MODO_PRUEBA=TEST_DEST!=="";
-const VER="v2.7.0";
+const VER="v2.8.0";
 const GMAIL_SCOPES="https://www.googleapis.com/auth/gmail.send";
 const PRESET_KEY=window.__PAT_KEY__||"";
 const PRESET_GID=window.__PAT_GID__||"";
@@ -624,6 +624,13 @@ function App(){
   const notify=(msg,t="ok")=>{setNotif({msg,t});setTimeout(()=>setNotif(null),4000);};
   const addLog=(txt,t="")=>setProcLogs(p=>[...p,{txt,t}]);
 
+  const getToken=useCallback(async()=>{
+    if(gmailToken)return gmailToken;
+    const token=await getGmailToken(clientId);
+    setGmailToken(token);
+    return token;
+  },[gmailToken,clientId]);
+
   const todosSubidos=files.planilla&&files.envio&&files.zip;
 
   /* ── PROCESAR ARCHIVOS ── */
@@ -764,6 +771,8 @@ function App(){
     sent:sentSet.size,
     arr:enriched.filter(r=>r.concepto==="Arriendo").length,
     srv:enriched.filter(r=>r.concepto==="Serv. Adm.").length,
+    conPdf:enriched.filter(r=>r.factura&&r.ufPdf!==null).length,
+    sinPdf:enriched.filter(r=>!r.factura||r.ufPdf===null).length,
   };
   const filtered=enriched.filter(r=>{
     const mf=filter==="all"||(filter==="ok"&&r.estado==="ok"&&!sentSet.has(r.i))||(filter==="diff"&&r.estado!=="ok")||(filter==="sent"&&sentSet.has(r.i));
@@ -813,33 +822,51 @@ function App(){
     /* UPLOAD VIEW */
     view==="upload"&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:24,padding:32},className:"fade-up"},
       h("div",{style:{textAlign:"center"}},
-        h("h1",{style:{fontSize:20,fontWeight:700,letterSpacing:"-0.4px",marginBottom:6}},"Subir archivos del mes"),
+        h("h1",{style:{fontSize:20,fontWeight:700,letterSpacing:"-0.4px",marginBottom:6}},"Facturación mensual"),
         h("p",{style:{fontSize:12,color:"var(--txm)"}},
-          "Todo se procesa localmente en tu navegador — ningún archivo se sube a servidores externos.")
+          "Selecciona el período y sube los 3 archivos desde tu carpeta de descargas.")
       ),
-      h("div",{style:{width:"100%",maxWidth:480}},
-        h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}},
-          h("span",{style:{fontSize:12,fontWeight:600}},"Período"),
-          h("select",{value:periodo,onChange:e=>setPeriodo(e.target.value),style:{fontSize:12,padding:"5px 10px"}},
+      h("div",{style:{width:"100%",maxWidth:500}},
+        /* Selector de período destacado */
+        h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr2)",borderRadius:12,padding:"16px 20px",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between"}},
+          h("div",null,
+            h("div",{style:{fontSize:13,fontWeight:600,marginBottom:2}},"Período a facturar"),
+            h("div",{style:{fontSize:11,color:"var(--txm)"}},"Las columnas GS/GT se detectan automáticamente")
+          ),
+          h("select",{value:periodo,onChange:e=>{setPeriodo(e.target.value);setFiles({planilla:null,envio:null,zip:null});},
+            style:{fontSize:13,fontWeight:600,padding:"7px 12px",background:"var(--acc)",color:"#fff",border:"none",borderRadius:8,cursor:"pointer"}},
             PERIODOS.map(p=>h("option",{key:p,value:p},p)))
         ),
+        /* Archivos */
         h("div",{style:{display:"flex",flexDirection:"column",gap:10}},
           h(FileUpload,{label:"Planilla_Facturacion_"+periodo.replace(" ","_")+".xlsx",
-            desc:"Hoja Flujo · columnas GS (Arriendo) y GT (Serv.Adm.)",
+            desc:"Hoja Flujo · columnas GS (Arriendo) y GT (Serv.Adm.) · desde tu carpeta Descargas",
             accept:".xlsx,.xls",file:files.planilla,done:!!files.planilla,
             onFile:f=>setFiles(p=>({...p,planilla:f}))}),
           h(FileUpload,{label:"Detalle_envío_facturas_Inpasa_y_Pisa.xlsx",
-            desc:"Columna E (cliente) · F (correo)",
+            desc:"Columna E (cliente) · F (correo) · desde tu carpeta Descargas",
             accept:".xlsx,.xls",file:files.envio,done:!!files.envio,
             onFile:f=>setFiles(p=>({...p,envio:f}))}),
-          h(FileUpload,{label:"Carpeta PDFs (ZIP)",
-            desc:"Comprime la carpeta con las subcarpetas 5A · 4A · A2 · A1 · B · D2",
+          h(FileUpload,{label:"PDFs facturas (ZIP)",
+            desc:"Carpeta comprimida con subcarpetas 5A · 4A · A2 · A1 · B · D2 · desde tu carpeta Descargas",
             accept:".zip",file:files.zip,done:!!files.zip,
             onFile:f=>setFiles(p=>({...p,zip:f}))})
         ),
-        h("div",{style:{marginTop:20,display:"flex",justifyContent:"center"}},
+        /* Estado de carga */
+        h("div",{style:{marginTop:14,display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}},
+          [{label:"Planilla facturación",ok:!!files.planilla},
+           {label:"Planilla correos",ok:!!files.envio},
+           {label:"ZIP de PDFs",ok:!!files.zip}
+          ].map((f,i)=>h("span",{key:i,style:{
+            fontSize:11,padding:"3px 10px",borderRadius:20,
+            background:f.ok?"var(--gbg)":"var(--surf2)",
+            color:f.ok?"var(--green)":"var(--txd)",
+            border:`1px solid ${f.ok?"var(--gdim)":"var(--bdr)"}`
+          }},f.ok?"✓ ":"○ ",f.label))
+        ),
+        h("div",{style:{marginTop:16,display:"flex",justifyContent:"center"}},
           h("button",{onClick:procesar,disabled:!todosSubidos||!apiKey,className:"btn-primary",
-            style:{opacity:todosSubidos?1:0.5}},
+            style:{opacity:todosSubidos?1:0.45,minWidth:220}},
             todosSubidos?"▶ Procesar archivos":"Sube los 3 archivos para continuar")
         )
       )
@@ -848,7 +875,7 @@ function App(){
     /* TABLE VIEW */
     view==="table"&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflowX:"hidden"},className:"fade-up"},
       h("div",{style:{display:"grid",gridTemplateColumns:"repeat(5,1fr)",borderBottom:"1px solid var(--bdr)"}},
-        [{label:"Total",val:stats.total,col:"var(--tx)",sub:""},{label:"Arriendo",val:stats.arr,col:"var(--blue)",sub:"col. GS"},{label:"Serv. Adm.",val:stats.srv,col:"var(--amber)",sub:"col. GT"},{label:"Coinciden",val:stats.ok,col:"var(--green)",sub:"listos"},{label:"Enviados",val:stats.sent,col:"var(--accl)",sub:"esta sesión"}]
+        [{label:"Total",val:stats.total,col:"var(--tx)",sub:""},{label:"Con PDF",val:stats.conPdf,col:"var(--green)",sub:"facturas cruzadas"},{label:"Sin PDF",val:stats.sinPdf,col:"var(--red)",sub:"revisar"},{label:"Coinciden",val:stats.ok,col:"var(--accl)",sub:"listos para enviar"},{label:"Enviados",val:stats.sent,col:"var(--amber)",sub:MODO_PRUEBA?"→ "+TEST_DEST:"esta sesión"}]
         .map((m,i)=>h("div",{key:i,style:{background:"var(--surf)",padding:"13px 16px",borderRight:i<4?"1px solid var(--bdr)":"none"}},
           h("div",{style:{fontSize:10,fontWeight:600,color:"var(--txm)",marginBottom:4,letterSpacing:"0.06em"}},m.label.toUpperCase()),
           h("div",{style:{fontSize:24,fontWeight:700,color:m.col,lineHeight:1,fontFamily:"'DM Mono',monospace"}},m.val),
