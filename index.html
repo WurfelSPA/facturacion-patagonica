@@ -75,8 +75,10 @@ const REMITENTE="amelendez@patagonica.cl";
 const CCO="mmunoz@patagonica.cl";
 const TEST_DEST="";
 const MODO_PRUEBA=TEST_DEST!=="";
-const VER="v3.0.0";
+const VER="v3.1.0";
 const GMAIL_SCOPES="https://www.googleapis.com/auth/gmail.send";
+const TG_BOT=window.__TG_BOT__||"";
+const TG_CHAT=window.__TG_CHAT__||"";
 const PRESET_KEY=window.__PAT_KEY__||"";
 const PRESET_GID=window.__PAT_GID__||"";
 
@@ -112,7 +114,7 @@ async function getGmailToken(clientId){
         else res(resp.access_token);
       }
     });
-    client.requestAccessToken({prompt:"consent"});
+    client.requestAccessToken({prompt:""});
   });
 }
 
@@ -169,6 +171,17 @@ async function sendGmail(token,to,cco,from,subject,htmlBody,pdfBase64,pdfName){
   });
   if(!res.ok){const e=await res.json();throw new Error(e.error?.message||"Error Gmail API");}
   return await res.json();
+}
+
+async function sendTelegram(botToken,chatId,mensaje){
+  if(!botToken||!chatId)return;
+  try{
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({chat_id:chatId,text:mensaje,parse_mode:"Markdown"})
+    });
+  }catch(e){console.warn("Telegram error:",e.message);}
 }
 
 function buildEmailHtml(cliente,concepto,periodo,ufPlan,factura){
@@ -613,6 +626,20 @@ function App(){
   const [concFilter,setConcFilter]=useState("all");
   const [search,setSearch]=useState("");
   const [sentSet,setSentSet]=useState(new Set());
+  const [sentKeys,setSentKeys]=useState(()=>{
+    try{return new Set(JSON.parse(localStorage.getItem("pat_sent")||"[]"));}
+    catch{return new Set();}
+  });
+
+  // Guardar enviados en localStorage cuando cambia sentSet
+  const marcarEnviado=useCallback((idx,key)=>{
+    setSentSet(p=>new Set([...p,idx]));
+    setSentKeys(p=>{
+      const s=new Set([...p,key]);
+      localStorage.setItem("pat_sent",JSON.stringify([...s]));
+      return s;
+    });
+  },[]);
   const [sendingIdx,setSendingIdx]=useState(null);
   const [showProc,setShowProc]=useState(false);
   const [procLogs,setProcLogs]=useState([]);
@@ -696,7 +723,14 @@ function App(){
       setProcProgress(100);
       setProcDone(true);
       setData(filas);
-      setSentSet(new Set());
+      // Recuperar enviados previos desde localStorage
+      const prevSent=new Set();
+      filas.forEach((f,i)=>{
+        const key=`${periodo}|${f.cliente}|${f.concepto}`;
+        if(sentKeys.has(key))prevSent.add(i);
+      });
+      setSentSet(prevSent);
+      if(prevSent.size>0)addLog(`✓ ${prevSent.size} correos ya enviados en sesiones anteriores`,"ok");
     }catch(e){
       addLog("✗ Error: "+e.message,"err");
       setProcDone(true);
@@ -721,8 +755,9 @@ function App(){
         try{pdfB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}
       }
       await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);
-      setSentSet(p=>new Set([...p,idx]));
-      notify("✓ Correo enviado"+(MODO_PRUEBA?" (PRUEBA)":"")+" → "+dest+(pdfB64?" · con PDF adjunto":"· sin PDF"));
+      const key=`${periodo}|${row.cliente}|${row.concepto}`;
+      marcarEnviado(idx,key);
+      notify("✓ Correo enviado"+(MODO_PRUEBA?" (PRUEBA)":"")+" → "+dest+(pdfB64?" · con PDF":""));
     }catch(e){
       if(e.message.includes("invalid_grant")||e.message.includes("Token"))setGmailToken(null);
       notify("Error: "+e.message,"err");
@@ -738,6 +773,7 @@ function App(){
       const token=await getToken();
       notify("Enviando "+pend.length+" correos vía Gmail...","info");
       let enviados=0;
+      const fallidos=[];
       for(const row of pend){
         const dest=MODO_PRUEBA?TEST_DEST:row.correo;
         const subject="Factura "+row.factura+" — "+row.concepto+" "+periodo+" — Patagónica Inmobiliaria SpA";
@@ -749,14 +785,32 @@ function App(){
         }
         try{
           await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);
-          setSentSet(p=>new Set([...p,row.i]));
+          const key=`${periodo}|${row.cliente}|${row.concepto}`;
+          marcarEnviado(row.i,key);
           enviados++;
           await new Promise(r=>setTimeout(r,400));
-        }catch(e){notify("Error en "+row.cliente+": "+e.message,"err");}
+        }catch(e){
+          fallidos.push(row);
+          notify("Error en "+row.cliente+": "+e.message,"err");
+        }
       }
       notify("✓ "+enviados+"/"+pend.length+" correos enviados"+(MODO_PRUEBA?" (PRUEBA → "+TEST_DEST+")":""));
+
+      // Reporte Telegram con los que NO se enviaron
+      if(TG_BOT&&TG_CHAT){
+        const sinEnviar=enriched.filter(r=>(r.estado!=="ok"||!r.correo)&&!sentSet.has(r.i));
+        const todosFallidos=[...fallidos,...sinEnviar.filter(r=>r.estado!=="ok"||!r.correo)];
+        if(todosFallidos.length>0){
+          const lineas=todosFallidos.map(r=>
+            `• ${r.sitio} | ${r.cliente} | ${r.factura||"Sin factura"} | ${r.ufPlan.toFixed(4)} UF plan | ${r.ufPdf?r.ufPdf.toFixed(4)+" UF PDF":"Sin PDF"}`
+          ).join("\n");
+          const msg=`*Envío Facturación Webhook — ${periodo}*\n\n*Pendientes de revisión manual (${todosFallidos.length}):*\n${lineas}`;
+          await sendTelegram(TG_BOT,TG_CHAT,msg);
+          notify("Resumen enviado a Telegram ("+todosFallidos.length+" pendientes)","info");
+        }
+      }
     }catch(e){
-      notify(e.message.includes("popup")?"Autorización cancelada — intenta de nuevo":"Error: "+e.message,"warn");
+      notify(e.message.includes("popup")?"Autorización cancelada":"Error: "+e.message,"warn");
     }
   };
 
