@@ -165,7 +165,8 @@ function SetupPanel({onSave}){
     ),
     h("div",{style:{fontSize:11,color:"var(--txd)",textAlign:"center",maxWidth:320}},
       "La key nunca sale de tu navegador — no se envía a ningún servidor externo."
-    )
+    ),
+    h("div",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace",marginTop:4}},"v1.4.0")
   );
 }
 
@@ -409,7 +410,8 @@ Confirma el envío respondiendo: ENVIADO_OK`;
         h("div",{style:{width:32,height:32,background:"linear-gradient(135deg,var(--acc),var(--acc2))",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:"#fff",fontWeight:700,flexShrink:0}},"⬡"),
         h("div",null,
           h("div",{style:{fontSize:14,fontWeight:700,letterSpacing:"-0.4px"}},"Patagónica Inmobiliaria"),
-          h("div",{style:{fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},REMITENTE)
+          h("div",{style:{fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},REMITENTE),
+          h("div",{style:{fontSize:9,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},"v1.4.0 · claude-sonnet-4-5")
         ),
         view==="table"&&h("span",{style:{background:"var(--bbg)",border:"1px solid var(--blue)",color:"var(--blue)",fontSize:10,fontWeight:600,padding:"3px 10px",borderRadius:20,marginLeft:4,fontFamily:"'DM Mono',monospace"}},periodo)
       ),
