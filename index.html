@@ -75,7 +75,7 @@ const REMITENTE="amelendez@patagonica.cl";
 const CCO="alexricardomelendez@hotmail.com";
 const TEST_DEST="alexricardomelendez@hotmail.com";
 const MODO_PRUEBA=TEST_DEST!=="";
-const VER="v2.8.0";
+const VER="v2.9.0";
 const GMAIL_SCOPES="https://www.googleapis.com/auth/gmail.send";
 const PRESET_KEY=window.__PAT_KEY__||"";
 const PRESET_GID=window.__PAT_GID__||"";
@@ -684,10 +684,10 @@ function App(){
         }
         filas.push({sitio:c.sitio,cliente:c.cliente,correo,concepto,colRef,factura,ufPlan:c.uf,ufPdf,enviado:false});
       }
-      // Construir mapa factura -> PDF base64
+      // Construir mapa factura -> zipPath para adjuntar al enviar
       const nuevoMapa={};
       for(const p of pdfs){
-        if(p.nroFact&&p.pdfBase64){
+        if(p.nroFact&&p.zipPath){
           nuevoMapa[p.nroFact]={zipPath:p.zipPath,nombre:p.pdfNombre};
         }
       }
