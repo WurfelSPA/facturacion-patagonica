@@ -351,16 +351,8 @@ Confirma el envío respondiendo: ENVIADO_OK`;
       factura:r.factura,concepto:r.concepto,ufPlan:r.ufPlan
     }));
     try{
-      const prompt=`Usando Gmail, envía los siguientes ${lista.length} correos, uno por uno:
-${lista.map((r,n)=>`${n+1}. Para: ${r.destEnvio} | Asunto: Factura ${r.factura} — ${r.concepto} ${periodo} — Patagónica Inmobiliaria SpA | Cliente: ${r.cliente} | UF: ${r.ufPlan.toFixed(4)}`).join("
-")}
-
-Para cada correo:
-- De: ${REMITENTE}
-- CCO: ${CCO}
-- Cuerpo HTML profesional con saludo, descripción del cobro, monto en UF destacado, mención del PDF adjunto y firma "Área de Administración — Patagónica Inmobiliaria SpA"
-${MODO_PRUEBA?"⚠ MODO PRUEBA: todos van a "+TEST_DEST+" (destinatarios reales son los correos originales de cada cliente)":""}
-Al finalizar responde: ENVIADOS_OK:N donde N es la cantidad enviada`;
+      const listaStr=lista.map((r,n)=>`${n+1}. Para: ${r.destEnvio} | Asunto: Factura ${r.factura} — ${r.concepto} ${periodo} — Patagónica Inmobiliaria SpA | Cliente: ${r.cliente} | UF: ${r.ufPlan.toFixed(4)}`).join("\n");
+      const prompt="Usando Gmail, envía los siguientes "+lista.length+" correos, uno por uno:\n"+listaStr+"\n\nPara cada correo:\n- De: "+REMITENTE+"\n- CCO: "+CCO+"\n- Cuerpo HTML profesional con saludo, descripción del cobro, monto en UF destacado, mención del PDF adjunto y firma 'Área de Administración — Patagónica Inmobiliaria SpA'\n"+(MODO_PRUEBA?"MODO PRUEBA: todos van a "+TEST_DEST+" (destinatarios reales son los correos originales)\n":"")+"\nAl finalizar responde: ENVIADOS_OK:N donde N es la cantidad enviada";
       const res=await callClaude(apiKey,prompt,[{type:"url",url:MCP_GMAIL,name:"google-gmail"}]);
       const match=res.match(/ENVIADOS_OK:(\d+)/);
       const enviados=match?parseInt(match[1]):pend.length;
