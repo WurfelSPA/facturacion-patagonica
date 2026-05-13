@@ -113,32 +113,57 @@ async function getGmailToken(clientId){
   });
 }
 
-function makeEmail(to,cco,from,subject,body){
-  const msg=[
-    `From: Patagónica Inmobiliaria <${from}>`,
-    `To: ${to}`,
-    `Bcc: ${cco}`,
-    `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
-    `MIME-Version: 1.0`,
-    `Content-Type: text/html; charset=UTF-8`,
-    `Content-Transfer-Encoding: base64`,
-    ``,
-    btoa(unescape(encodeURIComponent(body)))
-  ].join("\r\n");
+function makeEmail(to,cco,from,subject,body,pdfBase64,pdfName){
+  const boundary="PAT_BOUNDARY_"+Date.now();
+  let msg;
+  if(pdfBase64&&pdfName){
+    msg=[
+      `From: Patagonica Inmobiliaria <${from}>`,
+      `To: ${to}`,
+      `Bcc: ${cco}`,
+      `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
+      `MIME-Version: 1.0`,
+      `Content-Type: multipart/mixed; boundary="${boundary}"`,
+      ``,
+      `--${boundary}`,
+      `Content-Type: text/html; charset=UTF-8`,
+      `Content-Transfer-Encoding: base64`,
+      ``,
+      btoa(unescape(encodeURIComponent(body))),
+      ``,
+      `--${boundary}`,
+      `Content-Type: application/pdf; name="${pdfName}"`,
+      `Content-Disposition: attachment; filename="${pdfName}"`,
+      `Content-Transfer-Encoding: base64`,
+      ``,
+      pdfBase64,
+      ``,
+      `--${boundary}--`
+    ].join("\r\n");
+  } else {
+    msg=[
+      `From: Patagonica Inmobiliaria <${from}>`,
+      `To: ${to}`,
+      `Bcc: ${cco}`,
+      `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
+      `MIME-Version: 1.0`,
+      `Content-Type: text/html; charset=UTF-8`,
+      `Content-Transfer-Encoding: base64`,
+      ``,
+      btoa(unescape(encodeURIComponent(body)))
+    ].join("\r\n");
+  }
   return btoa(unescape(encodeURIComponent(msg))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
 
-async function sendGmail(token,to,cco,from,subject,htmlBody){
-  const raw=makeEmail(to,cco,from,subject,htmlBody);
+async function sendGmail(token,to,cco,from,subject,htmlBody,pdfBase64,pdfName){
+  const raw=makeEmail(to,cco,from,subject,htmlBody,pdfBase64,pdfName);
   const res=await fetch("https://www.googleapis.com/gmail/v1/users/me/messages/send",{
     method:"POST",
     headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},
     body:JSON.stringify({raw})
   });
-  if(!res.ok){
-    const e=await res.json();
-    throw new Error(e.error?.message||"Error Gmail API");
-  }
+  if(!res.ok){const e=await res.json();throw new Error(e.error?.message||"Error Gmail API");}
   return await res.json();
 }
 
@@ -360,7 +385,13 @@ async function procesarPDFs(zipFile, addLog){
       }
 
       if(nroFact&&tipo!=="desconocido"){
-        pdfs.push({sitio,nroFact,tipo,ufPdf:totalUF>0?Math.round(totalUF*10000)/10000:null});
+        // Convertir arraybuffer a base64 para adjuntar al correo
+        const bytes=new Uint8Array(pdfBuf);
+        let binary="";
+        for(let b=0;b<bytes.byteLength;b++)binary+=String.fromCharCode(bytes[b]);
+        const pdfBase64=btoa(binary);
+        pdfs.push({sitio,nroFact,tipo,ufPdf:totalUF>0?Math.round(totalUF*10000)/10000:null,
+          pdfBase64,pdfNombre:nombre});
       }
     }catch(e){}
   }
@@ -565,6 +596,7 @@ function App(){
   const [periodo,setPeriodo]=useState("Mayo 2026");
   const [files,setFiles]=useState({planilla:null,envio:null,zip:null});
   const [data,setData]=useState([]);
+  const [pdfMap,setPdfMap]=useState({}); // factura -> {base64, nombre}
   const [filter,setFilter]=useState("all");
   const [concFilter,setConcFilter]=useState("all");
   const [search,setSearch]=useState("");
@@ -625,10 +657,22 @@ function App(){
               if(d<bestDiff&&d<0.5){bestDiff=d;bestIdx=idx;}
             }
           }
-          if(bestIdx>=0){pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;}
+          if(bestIdx>=0){
+            pdfUsado.add(bestIdx);
+            factura=pdfs[bestIdx].nroFact;
+            ufPdf=pdfs[bestIdx].ufPdf;
+          }
         }
         filas.push({sitio:c.sitio,cliente:c.cliente,correo,concepto,colRef,factura,ufPlan:c.uf,ufPdf,enviado:false});
       }
+      // Construir mapa factura -> PDF base64
+      const nuevoMapa={};
+      for(const p of pdfs){
+        if(p.nroFact&&p.pdfBase64){
+          nuevoMapa[p.nroFact]={base64:p.pdfBase64,nombre:p.pdfNombre};
+        }
+      }
+      setPdfMap(nuevoMapa);
       addLog(`✓ ${filas.filter(f=>f.factura).length}/${filas.length} facturas cruzadas`,"ok");
       setProcProgress(100);
       setProcDone(true);
@@ -644,28 +688,20 @@ function App(){
   const finishProc=()=>{setShowProc(false);setView("table");notify(`${data.length} filas procesadas — ${periodo}`);};
 
   /* ── ENVÍO ── */
-  const getToken=async()=>{
-    if(gmailToken)return gmailToken;
-    const token=await getGmailToken(clientId);
-    setGmailToken(token);
-    return token;
-  };
-
   const confirmSend=async()=>{
     const{idx,row}=preview;setPreview(null);
     setSendingIdx(idx);
     const dest=MODO_PRUEBA?TEST_DEST:row.correo;
     try{
       const token=await getToken();
-      const subject="Factura "+row.factura+" — "+row.concepto+" "+periodo+" — Patagónica Inmobiliaria SpA";
+      const subject="Factura "+row.factura+" — "+row.concepto+" "+periodo+" — Patagonica Inmobiliaria SpA";
       const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura);
-      await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody);
+      const pdf=pdfMap[row.factura];
+      await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdf?.base64,pdf?.nombre);
       setSentSet(p=>new Set([...p,idx]));
-      notify("✓ Correo enviado"+(MODO_PRUEBA?" (PRUEBA)":"")+" → "+dest);
+      notify("✓ Correo enviado"+(MODO_PRUEBA?" (PRUEBA)":"")+" → "+dest+(pdf?" · PDF adjunto":""));
     }catch(e){
-      if(e.message.includes("invalid_grant")||e.message.includes("Token")){
-        setGmailToken(null);
-      }
+      if(e.message.includes("invalid_grant")||e.message.includes("Token"))setGmailToken(null);
       notify("Error: "+e.message,"err");
     }
     setSendingIdx(null);
@@ -681,24 +717,19 @@ function App(){
       let enviados=0;
       for(const row of pend){
         const dest=MODO_PRUEBA?TEST_DEST:row.correo;
-        const subject="Factura "+row.factura+" — "+row.concepto+" "+periodo+" — Patagónica Inmobiliaria SpA";
+        const subject="Factura "+row.factura+" — "+row.concepto+" "+periodo+" — Patagonica Inmobiliaria SpA";
         const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura);
+        const pdf=pdfMap[row.factura];
         try{
-          await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody);
+          await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdf?.base64,pdf?.nombre);
           setSentSet(p=>new Set([...p,row.i]));
           enviados++;
-          await new Promise(r=>setTimeout(r,300)); // evitar rate limit
-        }catch(e){
-          notify("Error en "+row.cliente+": "+e.message,"err");
-        }
+          await new Promise(r=>setTimeout(r,400));
+        }catch(e){notify("Error en "+row.cliente+": "+e.message,"err");}
       }
       notify("✓ "+enviados+"/"+pend.length+" correos enviados"+(MODO_PRUEBA?" (PRUEBA → "+TEST_DEST+")":""));
     }catch(e){
-      if(e.message.includes("popup")||e.message.includes("closed")){
-        notify("Autorización cancelada — intenta de nuevo","warn");
-      } else {
-        notify("Error: "+e.message,"err");
-      }
+      notify(e.message.includes("popup")?"Autorización cancelada — intenta de nuevo":"Error: "+e.message,"warn");
     }
   };
 
