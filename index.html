@@ -81,7 +81,7 @@ const DATOS_MAYO=[{"sitio": "5-A", "cliente": "Gallyas Telecom S.A.", "correo": 
 /* ── API Claude con MCP ── */
 async function callClaude(apiKey, prompt, mcpServers=[]){
   const body={
-    model:"claude-sonnet-4-20250514",
+    model:"claude-sonnet-4-5",
     max_tokens:4096,
     messages:[{role:"user",content:prompt}],
   };
