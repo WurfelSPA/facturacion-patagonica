@@ -75,7 +75,7 @@ const REMITENTE="amelendez@patagonica.cl";
 const CCO="";
 const TEST_DEST="amelendez@patagonica.cl";
 const MODO_PRUEBA=TEST_DEST!=="";
-const VER="v3.2.0-test";
+const VER="v3.3.0-test";
 const GMAIL_SCOPES="https://www.googleapis.com/auth/gmail.send";
 const TG_BOT=window.__TG_BOT__||"";
 const TG_CHAT=window.__TG_CHAT__||"";
@@ -731,6 +731,38 @@ function App(){
       });
       setSentSet(prevSent);
       if(prevSent.size>0)addLog(`✓ ${prevSent.size} correos ya enviados en sesiones anteriores`,"ok");
+
+      // Resumen Telegram al terminar el análisis
+      if(TG_BOT&&TG_CHAT){
+        const sinCorreo=filas.filter(f=>!f.correo);
+        const sinPdf=filas.filter(f=>!f.factura||f.ufPdf===null);
+        const difiere=filas.filter(f=>f.factura&&f.ufPdf!==null&&Math.abs(f.ufPdf-f.ufPlan)>0.5);
+        const listos=filas.filter(f=>f.correo&&f.factura&&f.ufPdf!==null&&Math.abs(f.ufPdf-f.ufPlan)<=0.5);
+
+        let msg=`📋 *Análisis Facturación — ${periodo}*\n\n`;
+        msg+=`✅ Listos para enviar: *${listos.length}*\n`;
+        msg+=`📭 Sin correo registrado: *${sinCorreo.length}*\n`;
+        msg+=`📄 Sin PDF / sin cruce: *${sinPdf.length}*\n`;
+        msg+=`⚠️ UF no coincide: *${difiere.length}*\n`;
+        msg+=`📊 Total filas: *${filas.length}*\n`;
+
+        if(sinCorreo.length>0){
+          msg+=`\n*Sin correo:*\n`;
+          msg+=sinCorreo.slice(0,10).map(f=>`• ${f.sitio} | ${f.cliente}`).join("\n");
+          if(sinCorreo.length>10)msg+=`\n_...y ${sinCorreo.length-10} más_`;
+        }
+        if(sinPdf.length>0){
+          msg+=`\n\n*Sin PDF:*\n`;
+          msg+=sinPdf.slice(0,10).map(f=>`• ${f.sitio} | ${f.cliente} | ${f.concepto}`).join("\n");
+          if(sinPdf.length>10)msg+=`\n_...y ${sinPdf.length-10} más_`;
+        }
+        if(difiere.length>0){
+          msg+=`\n\n*UF difiere:*\n`;
+          msg+=difiere.slice(0,10).map(f=>`• ${f.sitio} | ${f.cliente} | Plan: ${f.ufPlan.toFixed(4)} | PDF: ${f.ufPdf.toFixed(4)}`).join("\n");
+        }
+        await sendTelegram(TG_BOT,TG_CHAT,msg);
+        addLog("✓ Resumen enviado a Telegram","ok");
+      }
     }catch(e){
       addLog("✗ Error: "+e.message,"err");
       setProcDone(true);
@@ -795,20 +827,6 @@ function App(){
         }
       }
       notify("✓ "+enviados+"/"+pend.length+" correos enviados"+(MODO_PRUEBA?" (PRUEBA → "+TEST_DEST+")":""));
-
-      // Reporte Telegram con los que NO se enviaron
-      if(TG_BOT&&TG_CHAT){
-        const sinEnviar=enriched.filter(r=>(r.estado!=="ok"||!r.correo)&&!sentSet.has(r.i));
-        const todosFallidos=[...fallidos,...sinEnviar.filter(r=>r.estado!=="ok"||!r.correo)];
-        if(todosFallidos.length>0){
-          const lineas=todosFallidos.map(r=>
-            `• ${r.sitio} | ${r.cliente} | ${r.factura||"Sin factura"} | ${r.ufPlan.toFixed(4)} UF plan | ${r.ufPdf?r.ufPdf.toFixed(4)+" UF PDF":"Sin PDF"}`
-          ).join("\n");
-          const msg=`*Envío Facturación Webhook — ${periodo}*\n\n*Pendientes de revisión manual (${todosFallidos.length}):*\n${lineas}`;
-          await sendTelegram(TG_BOT,TG_CHAT,msg);
-          notify("Resumen enviado a Telegram ("+todosFallidos.length+" pendientes)","info");
-        }
-      }
     }catch(e){
       notify(e.message.includes("popup")?"Autorización cancelada":"Error: "+e.message,"warn");
     }
