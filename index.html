@@ -75,7 +75,7 @@ const REMITENTE="amelendez@patagonica.cl";
 const CCO="";
 const TEST_DEST="amelendez@patagonica.cl";
 const MODO_PRUEBA=TEST_DEST!=="";
-const VER="v3.3.0-test";
+const VER="v3.4.0-test";
 const GMAIL_SCOPES="https://www.googleapis.com/auth/gmail.send";
 const TG_BOT=window.__TG_BOT__||"";
 const TG_CHAT=window.__TG_CHAT__||"";
@@ -744,22 +744,7 @@ function App(){
         msg+=`📭 Sin correo registrado: *${sinCorreo.length}*\n`;
         msg+=`📄 Sin PDF / sin cruce: *${sinPdf.length}*\n`;
         msg+=`⚠️ UF no coincide: *${difiere.length}*\n`;
-        msg+=`📊 Total filas: *${filas.length}*\n`;
-
-        if(sinCorreo.length>0){
-          msg+=`\n*Sin correo:*\n`;
-          msg+=sinCorreo.slice(0,10).map(f=>`• ${f.sitio} | ${f.cliente}`).join("\n");
-          if(sinCorreo.length>10)msg+=`\n_...y ${sinCorreo.length-10} más_`;
-        }
-        if(sinPdf.length>0){
-          msg+=`\n\n*Sin PDF:*\n`;
-          msg+=sinPdf.slice(0,10).map(f=>`• ${f.sitio} | ${f.cliente} | ${f.concepto}`).join("\n");
-          if(sinPdf.length>10)msg+=`\n_...y ${sinPdf.length-10} más_`;
-        }
-        if(difiere.length>0){
-          msg+=`\n\n*UF difiere:*\n`;
-          msg+=difiere.slice(0,10).map(f=>`• ${f.sitio} | ${f.cliente} | Plan: ${f.ufPlan.toFixed(4)} | PDF: ${f.ufPdf.toFixed(4)}`).join("\n");
-        }
+        msg+=`📊 Total filas: *${filas.length}*`;
         await sendTelegram(TG_BOT,TG_CHAT,msg);
         addLog("✓ Resumen enviado a Telegram","ok");
       }
