@@ -251,7 +251,7 @@ async function parsePlanillaParaDashboard(file){
     const row=raw[ri];
     if(!row)continue;
     const rut=row[9];
-    const nombre=row[11];
+    const nombre=row[11]||row[10]; /* Col L o K según la fila */
     if(!rut||!nombre||typeof rut!=="string")continue;
     if(!rut.match(/\d+\.\d+/))continue;
     const name=String(nombre).trim();
@@ -271,7 +271,7 @@ async function parsePlanillaParaDashboard(file){
     clients.push({
       ri,nombre:name,rut:String(rut).trim(),
       arrendadora:String(row[5]||"").trim(),
-      sitio:String(row[7]||"").trim(),
+      sitio:String(row[7]||"").replace(/\s+/g," ").trim(),
       edificio:String(row[8]||"").trim(),
       email:String(row[12]||"").trim(),
       termContrato:serialToDate(row[14]),   /* Col O: Fecha Término Contrato */
@@ -290,7 +290,7 @@ async function parsePlanillaParaDashboard(file){
   }
   const siteMap={};
   for(const c of clients){
-    const s=c.sitio||"Otro";
+    const s=(c.sitio||"Otro").trim();
     if(!siteMap[s])siteMap[s]={count:0,ufArr:0,ufSrv:0};
     siteMap[s].count++;
     siteMap[s].ufArr=Math.round((siteMap[s].ufArr+c.ufArr)*100)/100;
@@ -893,7 +893,7 @@ function App(){
         /* Clientes filtrados */
         const dashClients2=dashData.clients.filter(c=>{
           const ms=!dashSearch||c.nombre.toLowerCase().includes(dashSearch.toLowerCase())||c.rut.includes(dashSearch);
-          const msite=dashSitio==="all"||c.sitio===dashSitio;
+          const msite=dashSitio==="all"||c.sitio.trim()===dashSitio.trim();
           return ms&&msite;
         });
         /* UF label */
