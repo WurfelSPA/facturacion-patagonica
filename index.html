@@ -60,6 +60,32 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 .pbar-fill{height:100%;background:linear-gradient(90deg,var(--acc),var(--accl));border-radius:2px;transition:width 0.5s ease}
 .test-banner{background:var(--abg);border-bottom:1px solid var(--adim);padding:8px 24px;font-size:11px;color:var(--amber);display:flex;align-items:center;gap:8px;font-weight:500}
 .key-input{font-family:'DM Mono',monospace;letter-spacing:0.04em;font-size:11px}
+
+/* ═══ DASHBOARD ════════════════════════════════════════════════ */
+.dash-card{background:var(--surf);border:1px solid var(--bdr);border-radius:12px;padding:16px 20px}
+.dash-card-lbl{font-size:10px;font-weight:700;color:var(--txd);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.dash-card-val{font-size:30px;font-weight:700;font-family:'DM Mono',monospace;line-height:1;letter-spacing:-1px}
+.dash-card-sub{font-size:11px;color:var(--txm);margin-top:6px}
+.site-bar-wrap{background:var(--surf3);border-radius:4px;height:5px;flex:1;min-width:40px}
+.site-bar-fill{height:100%;border-radius:4px;transition:width .5s cubic-bezier(.16,1,.3,1)}
+.month-col{display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;width:46px;cursor:default}
+.month-bar-wrap{display:flex;flex-direction:column;justify-content:flex-end;height:110px;width:28px;gap:1px}
+.month-seg-arr{width:28px;background:var(--blue);border-radius:3px 3px 0 0;transition:height .4s}
+.month-seg-srv{width:28px;background:var(--amber);opacity:.75;transition:height .4s}
+.month-lbl{font-size:9px;color:var(--txd);font-family:'DM Mono',monospace;text-align:center}
+.month-val{font-size:9px;color:var(--txm);font-family:'DM Mono',monospace;text-align:center}
+.month-col:hover .month-seg-arr{background:var(--accl)}
+.month-col:hover .month-val{color:var(--tx)}
+.dash-client-hdr{display:grid;grid-template-columns:68px 1fr 105px 100px 105px 72px 180px;border-bottom:2px solid var(--bdr);background:var(--surf)}
+.dash-client-hdr>div{padding:8px 12px;font-size:10px;font-weight:700;color:var(--txd);letter-spacing:.07em;text-transform:uppercase}
+.dash-client-row{display:grid;grid-template-columns:68px 1fr 105px 100px 105px 72px 180px;border-bottom:1px solid var(--bdr);transition:background .1s;cursor:default}
+.dash-client-row:hover>div{background:var(--surf2)}
+.dash-client-row>div{padding:9px 12px;font-size:12px;display:flex;align-items:center}
+.nav-btn{background:transparent;border:1px solid var(--bdr);color:var(--txm);border-radius:8px;padding:5px 14px;font-size:11px;font-weight:500;display:flex;align-items:center;gap:5px}
+.nav-btn:hover{background:var(--surf2);color:var(--tx)}
+.nav-btn.active{background:var(--surf3);border-color:var(--acc);color:var(--accl)}
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+@media(max-width:900px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
 </style>
 </head>
 <body>
@@ -67,7 +93,6 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 <script src="/api/config"></script>
 <script>
 const {useState,useRef,useCallback,useEffect,createElement:h}=React;
-
 /* ═══════════════════════════════════
    CONFIGURACIÓN
 ═══════════════════════════════════ */
@@ -75,253 +100,214 @@ const REMITENTE="amelendez@patagonica.cl";
 const CCO="";
 const TEST_DEST="amelendez@patagonica.cl";
 const MODO_PRUEBA=TEST_DEST!=="";
-const VER="v3.4.0-test";
+const VER="v4.0.0-dashboard";
 const GMAIL_SCOPES="https://www.googleapis.com/auth/gmail.send";
 const TG_BOT=window.__TG_BOT__||"";
 const TG_CHAT=window.__TG_CHAT__||"";
 const PRESET_KEY=window.__PAT_KEY__||"";
 const PRESET_GID=window.__PAT_GID__||"";
-
 /* ── Gmail OAuth ── */
-function loadGapiScript(){
-  return new Promise(res=>{
-    if(window.gapi){res();return;}
-    const s=document.createElement("script");
-    s.src="https://apis.google.com/js/api.js";
-    s.onload=res;
-    document.head.appendChild(s);
-  });
-}
-
-function loadGisScript(){
-  return new Promise(res=>{
-    if(window.google?.accounts){res();return;}
-    const s=document.createElement("script");
-    s.src="https://accounts.google.com/gsi/client";
-    s.onload=res;
-    document.head.appendChild(s);
-  });
-}
-
+function loadGapiScript(){return new Promise(res=>{if(window.gapi){res();return;}const s=document.createElement("script");s.src="https://apis.google.com/js/api.js";s.onload=res;document.head.appendChild(s);});}
+function loadGisScript(){return new Promise(res=>{if(window.google?.accounts){res();return;}const s=document.createElement("script");s.src="https://accounts.google.com/gsi/client";s.onload=res;document.head.appendChild(s);});}
 async function getGmailToken(clientId){
   await loadGisScript();
   return new Promise((res,rej)=>{
-    const client=google.accounts.oauth2.initTokenClient({
-      client_id:clientId,
-      scope:GMAIL_SCOPES,
-      callback:(resp)=>{
-        if(resp.error)rej(new Error(resp.error));
-        else res(resp.access_token);
-      }
-    });
+    const client=google.accounts.oauth2.initTokenClient({client_id:clientId,scope:GMAIL_SCOPES,callback:(resp)=>{if(resp.error)rej(new Error(resp.error));else res(resp.access_token);}});
     client.requestAccessToken({prompt:""});
   });
 }
-
 function makeEmail(to,cco,from,subject,body,pdfBase64,pdfName){
   const boundary="PAT_BOUNDARY_"+Date.now();
   const fromHeader=`=?UTF-8?B?${btoa(unescape(encodeURIComponent("Patagónica Inmobiliaria")))}?= <${from}>`;
   let msg;
   if(pdfBase64&&pdfName){
-    msg=[
-      `From: ${fromHeader}`,
-      `To: ${to}`,
-      `Bcc: ${cco}`,
-      `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
-      `MIME-Version: 1.0`,
-      `Content-Type: multipart/mixed; boundary="${boundary}"`,
-      ``,
-      `--${boundary}`,
-      `Content-Type: text/html; charset=UTF-8`,
-      `Content-Transfer-Encoding: base64`,
-      ``,
-      btoa(unescape(encodeURIComponent(body))),
-      ``,
-      `--${boundary}`,
-      `Content-Type: application/pdf; name="${pdfName}"`,
-      `Content-Disposition: attachment; filename="${pdfName}"`,
-      `Content-Transfer-Encoding: base64`,
-      ``,
-      pdfBase64,
-      ``,
-      `--${boundary}--`
-    ].join("\r\n");
+    msg=[`From: ${fromHeader}`,`To: ${to}`,`Bcc: ${cco}`,`Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,`MIME-Version: 1.0`,`Content-Type: multipart/mixed; boundary="${boundary}"`,``,`--${boundary}`,`Content-Type: text/html; charset=UTF-8`,`Content-Transfer-Encoding: base64`,``,btoa(unescape(encodeURIComponent(body))),``,`--${boundary}`,`Content-Type: application/pdf; name="${pdfName}"`,`Content-Disposition: attachment; filename="${pdfName}"`,`Content-Transfer-Encoding: base64`,``,pdfBase64,``,`--${boundary}--`].join("\r\n");
   } else {
-    msg=[
-      `From: ${fromHeader}`,
-      `To: ${to}`,
-      `Bcc: ${cco}`,
-      `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
-      `MIME-Version: 1.0`,
-      `Content-Type: text/html; charset=UTF-8`,
-      `Content-Transfer-Encoding: base64`,
-      ``,
-      btoa(unescape(encodeURIComponent(body)))
-    ].join("\r\n");
+    msg=[`From: ${fromHeader}`,`To: ${to}`,`Bcc: ${cco}`,`Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,`MIME-Version: 1.0`,`Content-Type: text/html; charset=UTF-8`,`Content-Transfer-Encoding: base64`,``,btoa(unescape(encodeURIComponent(body)))].join("\r\n");
   }
   return btoa(unescape(encodeURIComponent(msg))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
-
 async function sendGmail(token,to,cco,from,subject,htmlBody,pdfBase64,pdfName){
   const raw=makeEmail(to,cco,from,subject,htmlBody,pdfBase64,pdfName);
-  const res=await fetch("https://www.googleapis.com/gmail/v1/users/me/messages/send",{
-    method:"POST",
-    headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},
-    body:JSON.stringify({raw})
-  });
+  const res=await fetch("https://www.googleapis.com/gmail/v1/users/me/messages/send",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({raw})});
   if(!res.ok){const e=await res.json();throw new Error(e.error?.message||"Error Gmail API");}
   return await res.json();
 }
-
 async function sendTelegram(botToken,chatId,mensaje){
   if(!botToken||!chatId)return;
-  try{
-    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({chat_id:chatId,text:mensaje,parse_mode:"Markdown"})
-    });
-  }catch(e){console.warn("Telegram error:",e.message);}
+  try{await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({chat_id:chatId,text:mensaje,parse_mode:"Markdown"})});}catch(e){console.warn("Telegram error:",e.message);}
 }
-
 function buildEmailHtml(cliente,concepto,periodo,ufPlan,factura){
   const mes=periodo.toLowerCase();
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head>
-<body style="margin:0;padding:0;background:#f4f4f4;font-family:Helvetica,Arial,sans-serif">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:28px 0">
-<tr><td align="center">
-<table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;border:1px solid #e0e0e0;overflow:hidden">
-<tr><td style="background:#0f1117;padding:22px 32px">
-  <div style="font-size:18px;font-weight:700;color:#fff">Patagónica Inmobiliaria SpA</div>
-  <div style="font-size:11px;color:#7b8299;margin-top:4px">Av. Américo Vespucio 2680, Conchalí, Santiago</div>
-</td></tr>
-<tr><td style="padding:28px 32px">
-  <p style="font-size:14px;color:#333;margin:0 0 16px">Estimado(a) cliente,</p>
-  <p style="font-size:14px;color:#333;line-height:1.7;margin:0 0 20px">
-    Junto con saludar, hacemos envío de la factura correspondiente al <strong>${concepto.toLowerCase()} del mes de ${mes}</strong>:
-  </p>
-  <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e8e8;border-radius:6px;margin:0 0 20px">
-    <tr style="background:#f8f8f8"><td style="padding:10px 16px;font-size:11px;font-weight:600;color:#999;border-bottom:1px solid #e8e8e8">CONCEPTO</td><td style="padding:10px 16px;font-size:11px;font-weight:600;color:#999;border-bottom:1px solid #e8e8e8">DETALLE</td></tr>
-    <tr><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">N° Factura</td><td style="padding:11px 16px;font-size:13px;color:#111;font-weight:600;font-family:monospace;border-bottom:1px solid #f0f0f0">${factura}</td></tr>
-    <tr style="background:#fafafa"><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">Cliente</td><td style="padding:11px 16px;font-size:13px;color:#111;border-bottom:1px solid #f0f0f0">${cliente}</td></tr>
-    <tr><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">Período</td><td style="padding:11px 16px;font-size:13px;color:#111;border-bottom:1px solid #f0f0f0">${periodo}</td></tr>
-    <tr><td style="padding:14px 16px;font-size:13px;color:#555">Monto</td><td style="padding:14px 16px"><span style="font-size:20px;font-weight:700;color:#111">${ufPlan.toFixed(4)} UF</span></td></tr>
-  </table>
-  <p style="font-size:14px;color:#333;line-height:1.7;margin:0 0 20px">Adjunto encontrará el documento PDF para su registro y gestión de pago.</p>
-  <p style="font-size:13px;color:#666;margin:0">Ante cualquier consulta, no dude en contactarnos.</p>
-</td></tr>
-<tr><td style="background:#f8f8f8;border-top:1px solid #e8e8e8;padding:18px 32px">
-  <p style="font-size:13px;font-weight:600;color:#111;margin:0 0 2px">Área de Administración</p>
-  <p style="font-size:12px;color:#666;margin:0">Patagónica Inmobiliaria SpA · RUT 96.673.250-4</p>
-  <p style="font-size:11px;color:#999;margin:6px 0 0">Correo generado automáticamente.</p>
-</td></tr>
-</table>
-</td></tr>
-</table>
-</body></html>`;
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#f4f4f4;font-family:Helvetica,Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:28px 0"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;border:1px solid #e0e0e0;overflow:hidden"><tr><td style="background:#0f1117;padding:22px 32px"><div style="font-size:18px;font-weight:700;color:#fff">Patagónica Inmobiliaria SpA</div><div style="font-size:11px;color:#7b8299;margin-top:4px">Av. Américo Vespucio 2680, Conchalí, Santiago</div></td></tr><tr><td style="padding:28px 32px"><p style="font-size:14px;color:#333;margin:0 0 16px">Estimado(a) cliente,</p><p style="font-size:14px;color:#333;line-height:1.7;margin:0 0 20px">Junto con saludar, hacemos envío de la factura correspondiente al <strong>${concepto.toLowerCase()} del mes de ${mes}</strong>:</p><table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e8e8;border-radius:6px;margin:0 0 20px"><tr style="background:#f8f8f8"><td style="padding:10px 16px;font-size:11px;font-weight:600;color:#999;border-bottom:1px solid #e8e8e8">CONCEPTO</td><td style="padding:10px 16px;font-size:11px;font-weight:600;color:#999;border-bottom:1px solid #e8e8e8">DETALLE</td></tr><tr><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">N° Factura</td><td style="padding:11px 16px;font-size:13px;color:#111;font-weight:600;font-family:monospace;border-bottom:1px solid #f0f0f0">${factura}</td></tr><tr style="background:#fafafa"><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">Cliente</td><td style="padding:11px 16px;font-size:13px;color:#111;border-bottom:1px solid #f0f0f0">${cliente}</td></tr><tr><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">Período</td><td style="padding:11px 16px;font-size:13px;color:#111;border-bottom:1px solid #f0f0f0">${periodo}</td></tr><tr><td style="padding:14px 16px;font-size:13px;color:#555">Monto</td><td style="padding:14px 16px"><span style="font-size:20px;font-weight:700;color:#111">${ufPlan.toFixed(4)} UF</span></td></tr></table><p style="font-size:14px;color:#333;line-height:1.7;margin:0 0 20px">Adjunto encontrará el documento PDF para su registro y gestión de pago.</p><p style="font-size:13px;color:#666;margin:0">Ante cualquier consulta, no dude en contactarnos.</p></td></tr><tr><td style="background:#f8f8f8;border-top:1px solid #e8e8e8;padding:18px 32px"><p style="font-size:13px;font-weight:600;color:#111;margin:0 0 2px">Área de Administración</p><p style="font-size:12px;color:#666;margin:0">Patagónica Inmobiliaria SpA · RUT 96.673.250-4</p><p style="font-size:11px;color:#999;margin:6px 0 0">Correo generado automáticamente.</p></td></tr></table></td></tr></table></body></html>`;
 }
 const PERIODOS=["Enero 2026","Febrero 2026","Marzo 2026","Abril 2026","Mayo 2026","Junio 2026","Julio 2026","Agosto 2026","Septiembre 2026","Octubre 2026","Noviembre 2026","Diciembre 2026"];
-const SITIO_C={"5-A":"#7c3aed","4-A":"#0d9488","A-2":"#ea580c","A-1":"#2563eb","D-2":"#db2777","B":"#64748b"};
+const SITIO_C={"5-A":"#7c3aed","4-A":"#0d9488","A-2":"#ea580c","A-1":"#2563eb","D-2":"#db2777","B":"#64748b","J":"#b45309","D-3":"#0891b2","24.0":"#6d28d9"};
 const MES_NUM={"Enero":1,"Febrero":2,"Marzo":3,"Abril":4,"Mayo":5,"Junio":6,"Julio":7,"Agosto":8,"Septiembre":9,"Octubre":10,"Noviembre":11,"Diciembre":12};
 const SITIO_MAP={"5A":"5-A","4A":"4-A","A1":"A-1","A2":"A-2","B":"B","D2":"D-2"};
-
 /* ═══════════════════════════════════
    PROXY CLAUDE API
 ═══════════════════════════════════ */
 async function callClaude(apiKey,prompt){
   const body={model:"claude-sonnet-4-5",max_tokens:4096,messages:[{role:"user",content:prompt}]};
-  const res=await fetch("/api/claude",{
-    method:"POST",
-    headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01"},
-    body:JSON.stringify(body)
-  });
+  const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01"},body:JSON.stringify(body)});
   const text=await res.text();
   let data;
   try{data=JSON.parse(text);}catch(e){throw new Error("Respuesta no JSON: "+text.slice(0,150));}
   if(!res.ok)throw new Error(data.error?.message||JSON.stringify(data));
   return data.content.filter(b=>b.type==="text").map(b=>b.text).join("\n");
 }
-
 /* ═══════════════════════════════════
    PROCESAMIENTO LOCAL DE ARCHIVOS
 ═══════════════════════════════════ */
 function readFileAsBuffer(file){
-  return new Promise((res,rej)=>{
-    const fr=new FileReader();
-    fr.onload=e=>res(e.target.result);
-    fr.onerror=rej;
-    fr.readAsArrayBuffer(file);
-  });
+  return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=e=>res(e.target.result);fr.onerror=rej;fr.readAsArrayBuffer(file);});
 }
 
-async function procesarPlanillaFacturacion(file, periodo){
+/* ═══════════════════════════════════
+   DASHBOARD: parsear planilla F→BJ
+═══════════════════════════════════ */
+async function parsePlanillaParaDashboard(file){
+  const buf=await readFileAsBuffer(file);
+  const wb=XLSX.read(buf,{type:"array"});
+  const ws=wb.Sheets["Flujo"];
+  if(!ws)throw new Error("No se encontró la hoja 'Flujo' en la planilla");
+  const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+
+  const row3=raw[2]||[];  // Row 3 (0-indexed)
+  const MES_L=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+
+  // Convertir serial Excel a fecha UTC
+  function serialToYM(serial){
+    const d=new Date(new Date(Date.UTC(1899,11,30)).getTime()+Math.round(serial)*86400000);
+    return{y:d.getUTCFullYear(),m:d.getUTCMonth()+1};
+  }
+
+  // Detectar columnas de meses en row 3 (desde índice 64 = col BM)
+  const monthCols=[];
+  for(let ci=64;ci<Math.min(row3.length,220);ci++){
+    const v=row3[ci];
+    if(typeof v==="number"&&v>40000&&v<50000){
+      const{y,m}=serialToYM(v);
+      if(y>=2024&&y<=2026){
+        monthCols.push({key:`${y}-${String(m).padStart(2,"0")}`,label:`${MES_L[m-1]} ${String(y).slice(2)}`,col:ci});
+      }
+    }
+  }
+
+  // Parsear clientes (filas 5+ → índice 4+)
+  const SKIP=/^(Total|VACANTE|Vacante|Area|Arrendado|En negociación|Para confirmar|#|\d+$)/;
+  const clients=[];
+  for(let ri=4;ri<raw.length;ri++){
+    const row=raw[ri];
+    if(!row)continue;
+    const rut=row[9];      // Col J
+    const nombre=row[11];  // Col L
+    if(!rut||!nombre||typeof rut!=="string")continue;
+    if(!rut.match(/\d+\.\d+/))continue;
+    const name=String(nombre).trim();
+    if(SKIP.test(name)||name.includes("Total")||name.startsWith("#")||name==="")continue;
+
+    const ufArr=typeof row[47]==="number"?row[47]:0;  // Col AV: UF Arriendo s/ctto
+    const pctAdm=row[51];                              // Col AZ: % adm
+    let ufSrv=0;
+    if(typeof pctAdm==="number"&&pctAdm>0&&pctAdm<1)  ufSrv=ufArr*pctAdm;
+    else if(typeof pctAdm==="number"&&pctAdm>=1&&pctAdm<=10) ufSrv=pctAdm;
+
+    // Arriendo planificado por mes
+    const monthly={};
+    for(const mc of monthCols){
+      const v=row[mc.col];
+      if(typeof v==="number"&&v>0&&v<15000) monthly[mc.key]=Math.round(v*100)/100;
+    }
+
+    clients.push({
+      ri, nombre:name, rut:String(rut).trim(),
+      arrendadora:String(row[5]||"").trim(),  // F
+      sitio:String(row[7]||"").trim(),         // H
+      edificio:String(row[8]||"").trim(),      // I
+      email:String(row[12]||"").trim(),        // M
+      renovacion:String(row[16]||"").trim(),   // Q
+      aviso:String(row[17]||"").trim(),        // R
+      ufArr:Math.round(ufArr*100)/100,
+      ufSrv:Math.round(ufSrv*100)/100,
+      ufTotal:Math.round((ufArr+ufSrv)*100)/100,
+      afecto:String(row[48]||"").trim(),       // AW
+      pctReaj:row[53]!=null?String(row[53]):"",// BB
+      ufInicio:typeof row[61]==="number"?Math.round(row[61]*100)/100:0, // BJ
+      monthly,
+    });
+  }
+
+  // Desglose por sitio
+  const siteMap={};
+  for(const c of clients){
+    const s=c.sitio||"Otro";
+    if(!siteMap[s])siteMap[s]={count:0,ufArr:0,ufSrv:0};
+    siteMap[s].count++;
+    siteMap[s].ufArr=Math.round((siteMap[s].ufArr+c.ufArr)*100)/100;
+    siteMap[s].ufSrv=Math.round((siteMap[s].ufSrv+c.ufSrv)*100)/100;
+  }
+
+  // Totales mensuales
+  const monthTotals={};
+  for(const mc of monthCols){
+    let totalArr=0;
+    for(const c of clients){const v=c.monthly[mc.key];if(v)totalArr+=v;}
+    const totalSrv=clients.reduce((s,c)=>s+c.ufSrv,0);
+    monthTotals[mc.key]={
+      label:mc.label,
+      arr:Math.round(totalArr*100)/100,
+      srv:Math.round(totalSrv*100)/100,
+      total:Math.round((totalArr+totalSrv)*100)/100,
+    };
+  }
+
+  return{clients,siteMap,monthTotals,monthCols};
+}
+
+/* ═══════════════════════════════════
+   PROCESAMIENTO DE BILLING (sin cambios)
+═══════════════════════════════════ */
+async function procesarPlanillaFacturacion(file,periodo){
   const buf=await readFileAsBuffer(file);
   const wb=XLSX.read(buf,{type:"array"});
   const ws=wb.Sheets["Flujo"];
   if(!ws)throw new Error("No se encontró la hoja 'Flujo' en la planilla de facturación");
   const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
-
-  // Detectar columnas GS/GT dinámicamente
-  // XLSX.js devuelve fechas como números seriales de Excel
-  // Base Excel: 1 = 1900-01-01 (con bug del año bisiesto de Lotus)
-  // Formula: fecha_serial = dias desde 1899-12-30
   const mesNum=MES_NUM[periodo.split(" ")[0]];
   const anio=parseInt(periodo.split(" ")[1]);
-
-  function serialToDate(serial){
-    // Ajuste por bug de Lotus 1-2-3 (Excel considera 1900 como bisiesto)
-    const d=new Date(Math.round((serial-25569)*86400*1000));
-    return d;
-  }
-
+  let colGS=-1,colGT=-1;
   function esTargetMes(val){
     if(val===null||val===undefined)return false;
-    // XLSX.js devuelve fechas como números seriales de Excel
-    // Comparar directamente con el serial calculado para el 1er día del mes
     if(typeof val==="number"&&val>40000&&val<50000){
-      // Reconstruir fecha desde serial evitando problemas de timezone
-      // Excel serial: días desde 1899-12-30 (con bug bisiesto 1900)
       const msPerDay=86400000;
       const excelEpoch=new Date(Date.UTC(1899,11,30));
       const dateMs=excelEpoch.getTime()+Math.round(val)*msPerDay;
       const d=new Date(dateMs);
       return d.getUTCFullYear()===anio&&(d.getUTCMonth()+1)===mesNum;
     }
-    if(val instanceof Date){
-      return val.getFullYear()===anio&&(val.getMonth()+1)===mesNum;
-    }
-    if(typeof val==="string"){
-      try{const d=new Date(val);return d.getFullYear()===anio&&(d.getMonth()+1)===mesNum;}catch(e){}
-    }
+    if(val instanceof Date)return val.getFullYear()===anio&&(val.getMonth()+1)===mesNum;
+    if(typeof val==="string"){try{const d=new Date(val);return d.getFullYear()===anio&&(d.getMonth()+1)===mesNum;}catch(e){}}
     return false;
   }
-
   const fila3=data[3]||[];
-  for(let i=0;i<fila3.length;i++){
-    if(esTargetMes(fila3[i])){colGS=i;colGT=i+1;break;}
-  }
+  for(let i=0;i<fila3.length;i++){if(esTargetMes(fila3[i])){colGS=i;colGT=i+1;break;}}
   if(colGS===-1)throw new Error(`No se encontró columna para ${periodo} en la fila de fechas`);
-
   const excl=["","VACANTE","Nombre Cliente","Areas Comunes Edificio","Areas comunes Edificio (Subterraneos)","Area Comun"];
   const clientes=[];
   for(let i=5;i<data.length;i++){
-    const row=data[i];
-    if(!row)continue;
+    const row=data[i];if(!row)continue;
     const sitio=row[6];const cliente=row[9];
     const ufGS=row[colGS];const ufGT=row[colGT];
     if(!cliente||excl.includes(String(cliente).trim()))continue;
     const sName=String(cliente).trim();
     const sito=sitio?String(sitio).trim():"";
-    if(typeof ufGS==="number"&&ufGS>0){
-      clientes.push({sitio:sito,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000});
-    }
-    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=500){
-      clientes.push({sitio:sito,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000});
-    }
+    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000});
+    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=500)clientes.push({sitio:sito,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000});
   }
   return clientes;
 }
-
 async function procesarPlanillaEnvio(file){
   const buf=await readFileAsBuffer(file);
   const wb=XLSX.read(buf,{type:"array"});
@@ -339,28 +325,21 @@ async function procesarPlanillaEnvio(file){
   }
   return emailMap;
 }
-
 async function extraerTextoPDF(arrayBuffer){
   try{
     pdfjsLib.GlobalWorkerOptions.workerSrc="";
     const pdf=await pdfjsLib.getDocument({data:arrayBuffer}).promise;
     let texto="";
-    for(let i=1;i<=pdf.numPages;i++){
-      const page=await pdf.getPage(i);
-      const content=await page.getTextContent();
-      texto+=content.items.map(it=>it.str).join(" ")+"\n";
-    }
+    for(let i=1;i<=pdf.numPages;i++){const page=await pdf.getPage(i);const content=await page.getTextContent();texto+=content.items.map(it=>it.str).join(" ")+"\n";}
     return texto;
-  }catch(e){return "";}
+  }catch(e){return"";}
 }
-
-async function procesarPDFs(zipFile, addLog){
+async function procesarPDFs(zipFile,addLog){
   const buf=await readFileAsBuffer(zipFile);
   const zip=await JSZip.loadAsync(buf);
   const pdfs=[];
   const archivos=Object.keys(zip.files).filter(f=>f.toLowerCase().endsWith(".pdf"));
   addLog(`▶ ${archivos.length} PDFs encontrados en el ZIP`,"info");
-
   const UFD=/(3[89]|4[012])[.,\d]+/;
   for(const path of archivos){
     const parts=path.split("/");
@@ -371,192 +350,109 @@ async function procesarPDFs(zipFile, addLog){
       const pdfBuf=await zip.files[path].async("arraybuffer");
       const texto=await extraerTextoPDF(pdfBuf);
       const textoJ=texto.replace(/\s+/g," ");
-
       const fechaM=textoJ.match(/Fecha Emisi[oó]n\s+(.{5,30})/i);
       const esAbril=fechaM&&/abril/i.test(fechaM[1]);
       if(esAbril)continue;
-
       const nroM=textoJ.match(/N[º°]\s*(\d+)/);
       const nro=nroM?nroM[1]:"";
       const nroFact=nombre.startsWith("FEE")?(nro?`FEE-${nro}`:""):(nro?`F-${nro}`:"");
-
       const esSrv=/COD:.*?-\s*Serv\.?\s*Adm\./i.test(textoJ);
       const esArr=/COD:.*?-\s*Arriendo/i.test(textoJ)&&!esSrv;
       let tipo=esSrv?"serv_adm":esArr?"arriendo":"desconocido";
       let totalUF=0;
-
-      if(esArr){
-        const m1=textoJ.match(new RegExp(`UF\\s+([\\d.,]+)\\s+x\\s+${UFD.source}`));
-        const m2=textoJ.match(new RegExp(`([\\d]+[.,]\\d+)\\s+UF\\s+${UFD.source}`));
-        const m3=textoJ.match(new RegExp(`\\b(\\d+)\\s+UF\\s+${UFD.source}`));
-        const match=m1||m2||m3;
-        if(match)totalUF=parseFloat(match[1].replace(/\./g,"").replace(",","."));
-      } else if(esSrv){
-        const m1=textoJ.match(new RegExp(`([\\d]+[.,]\\d+)\\s+UF\\s+${UFD.source}`));
-        const m2=textoJ.match(new RegExp(`\\b(\\d+)\\s+UF\\s+${UFD.source}`));
-        const match=m1||m2;
-        if(match)totalUF=parseFloat(match[1].replace(/\./g,"").replace(",","."));
-      }
-
-      if(nroFact&&tipo!=="desconocido"){
-        // Solo guardar la ruta dentro del ZIP, no el base64 (evita memory overflow)
-        pdfs.push({sitio,nroFact,tipo,
-          ufPdf:totalUF>0?Math.round(totalUF*10000)/10000:null,
-          zipPath:path,pdfNombre:nombre});
-      }
+      if(esArr){const m1=textoJ.match(new RegExp(`UF\\s+([\\d.,]+)\\s+x\\s+${UFD.source}`));const m2=textoJ.match(new RegExp(`([\\d]+[.,]\\d+)\\s+UF\\s+${UFD.source}`));const m3=textoJ.match(new RegExp(`\\b(\\d+)\\s+UF\\s+${UFD.source}`));const match=m1||m2||m3;if(match)totalUF=parseFloat(match[1].replace(/\./g,"").replace(",","."));}
+      else if(esSrv){const m1=textoJ.match(new RegExp(`([\\d]+[.,]\\d+)\\s+UF\\s+${UFD.source}`));const m2=textoJ.match(new RegExp(`\\b(\\d+)\\s+UF\\s+${UFD.source}`));const match=m1||m2;if(match)totalUF=parseFloat(match[1].replace(/\./g,"").replace(",","."));}
+      if(nroFact&&tipo!=="desconocido")pdfs.push({sitio,nroFact,tipo,ufPdf:totalUF>0?Math.round(totalUF*10000)/10000:null,zipPath:path,pdfNombre:nombre});
     }catch(e){}
   }
   addLog(`✓ ${pdfs.length} facturas procesadas (Arriendo + Serv.Adm.)`,"ok");
   return pdfs;
 }
-
-/* Leer PDF del ZIP al momento de enviar */
-async function getPdfBase64FromZip(zipFile, zipPath){
+async function getPdfBase64FromZip(zipFile,zipPath){
   const buf=await readFileAsBuffer(zipFile);
   const zip=await JSZip.loadAsync(buf);
   const pdfBuf=await zip.files[zipPath].async("uint8array");
-  // Convertir Uint8Array a base64 de forma segura
-  let binary="";
-  const chunkSize=8192;
-  for(let i=0;i<pdfBuf.length;i+=chunkSize){
-    binary+=String.fromCharCode(...pdfBuf.slice(i,i+chunkSize));
-  }
+  let binary="";const chunkSize=8192;
+  for(let i=0;i<pdfBuf.length;i+=chunkSize)binary+=String.fromCharCode(...pdfBuf.slice(i,i+chunkSize));
   return btoa(binary);
 }
 
 /* ═══════════════════════════════════
-   NOMBRE_KEY_MAP para correos
+   NOMBRE_KEY_MAP
 ═══════════════════════════════════ */
 const NOMBRE_KEY={
-  "A 3 D Chile S. A.":"A3D","Gallyas Telecom S.A.":"GALLYAS","Dist Sanchez 4G SpA.":null,"Dist Sanchez 4G Spa":null,
-  "Sánchez Hermanos SpA.":null,"Sánchez Hermanos SpA":null,"Sánchez Hermanos Spa":null,"Sánchez Hermanos Spa (Dko LC y oficinas)":null,
-  "Sociedad de Alimentos Leefood SpA":"LEEFOOD","John Crane Chile S.A":null,"Megamin S.A.":null,
-  "Weidmuller SpA":"WEIDMULLER","Com. Industrial W & L Ltda.":null,"Comercial Sna-e (Chile) Limitada":"SNA-E",
-  "Ingersoll Rand":"INGERSOLL-RAM","Dräger Chile Ltda.":"DRAGER","Trane de Chile S.A.":null,
-  "Olympus Corporation Chile Spa":null,"Grupo Drop SpA":"DROP","NCH Chile S.A.":null,
-  "Alimentos Neva SpA":"ALIMENTOS NEVA","Granja Marina (Patagonía Austral SpA)":null,
-  "Soc.Com. Jose Marin A. y Cia. Ltda":null,"Patricio Rodrigo Olmedo Nuñez":"PATRICIO OLMEDO",
+  "A 3 D Chile S. A.":"A3D","Gallyas Telecom S.A.":"GALLYAS","Sociedad de Alimentos Leefood SpA":"LEEFOOD",
+  "Weidmuller SpA":"WEIDMULLER","Comercial Sna-e (Chile) Limitada":"SNA-E","Ingersoll Rand":"INGERSOLL-RAM",
+  "Dräger Chile Ltda.":"DRAGER","Grupo Drop SpA":"DROP","NCH Chile S.A.":null,
+  "Alimentos Neva SpA":"ALIMENTOS NEVA","Patricio Rodrigo Olmedo Nuñez":"PATRICIO OLMEDO",
   "Sonepar Chile S.A.":"SONEPAR","Ind. y Com. Baxter de Chile Ltda.":"BAXTER","Tezman Chile SpA":"TEZMAN",
-  "Mediland SpA":"MEDILAND","Perfomex Chile SpA.":null,"Parker-Hannifin Corporation Chile Ltda.":"PARKER",
-  "Fedex Express Chile SpA":"FEDEX","Industria YKK Limitada":"YKK","Corsud SpA":null,"Pullman Cargo S.A.":null,
-  "Com. Juana Cataldo e Hijos Spa":"JUANA CATALDO","Congo Films SA Agencia en Chile":"CONGO FILMS",
-  "Voith Turbo S. A.":"VOITH","Adecco Servicios Empresariales S. A.":null,"Segafredo Zanetti Chile S.A.":"SEGAFREDO",
-  "Lab.Dental y Serv. Odontologicos  ILAB Ltda.":null,"Comercial Hussmann Chile Ltda.":null,
+  "Mediland SpA":"MEDILAND","Parker-Hannifin Corporation Chile Ltda.":"PARKER","Fedex Express Chile SpA":"FEDEX",
+  "Industria YKK Limitada":"YKK","Com. Juana Cataldo e Hijos Spa":"JUANA CATALDO",
+  "Congo Films SA Agencia en Chile":"CONGO FILMS","Voith Turbo S. A.":"VOITH","Segafredo Zanetti Chile S.A.":"SEGAFREDO",
   "Comercial KPC Chile Ltda.":"KPC","Festo S.A.":"FESTO","Enlaces Regionales de Chile S.A.":"ENLACES REGIONALES",
-  "Rocketman SpA":"ROCKETMAN","GTD Manquehue S.A.":null,"In Wasser SPA":null,"Hydrotorc SpA":"HYDROTORC",
-  "Banco Security":"BANCO SECURITY","Banco Estado Express":"BANCO ESTADO","Casino Imperio":null,
-  "Servicio Local de Educación Pública de los Libertadores":"SLEP LOS LIBERTADORES",
-  "Soc. fabrica y dist. De Alimentos JP ltda.":"ALIMENTOS JP",
-  "Caja de Compensación de Asignación Familiar La Araucana":"LA ARAUCANA",
+  "Rocketman SpA":"ROCKETMAN","Hydrotorc SpA":"HYDROTORC","Banco Security":"BANCO SECURITY",
+  "Banco Estado Express":"BANCO ESTADO","Servicio Local de Educación Pública de los Libertadores":"SLEP LOS LIBERTADORES",
+  "Soc. fabrica y dist. De Alimentos JP ltda.":"ALIMENTOS JP","Caja de Compensación de Asignación Familiar La Araucana":"LA ARAUCANA",
   "Banco del Estado de Chile":"BANCO ESTADO","Caja de Compensación de Asignación Familiar De Los Andes":"CAJA LOS ANDES",
-  "Caja de Compensación de Asignación Familiar 18 de Septiembre":null,
   "Unex Chile Ltda.":"UNEX","CFMedica Limitada":"CFMEDICA","Fen Ingeniería SpA":"FEN INGENIERIA",
-  "Visibility S.A.":null,"Claro Infraestructura 171 S.A.":"CLARO",
-  "Banco de Crédito e Inversiones":"BCI","Ideal S.A.":null,"Banco Itau":"BANCO ITAU",
+  "Claro Infraestructura 171 S.A.":"CLARO","Banco de Crédito e Inversiones":"BCI","Banco Itau":"BANCO ITAU",
 };
-function getEmail(cliente,emailMap){
-  const key=NOMBRE_KEY[cliente];
-  if(!key)return "";
-  return emailMap[key]||emailMap[key.toUpperCase()]||"";
-}
-
-function getEstado(r){
-  if(!r.factura||r.ufPdf===null||r.ufPdf===undefined)return"missing";
-  if(Math.abs(r.ufPdf-r.ufPlan)>0.5)return"diff";
-  return"ok";
-}
+function getEmail(cliente,emailMap){const key=NOMBRE_KEY[cliente];if(!key)return"";return emailMap[key]||emailMap[key.toUpperCase()]||"";}
+function getEstado(r){if(!r.factura||r.ufPdf===null||r.ufPdf===undefined)return"missing";if(Math.abs(r.ufPdf-r.ufPlan)>0.5)return"diff";return"ok";}
 
 /* ═══════════════════════════════════
    COMPONENTES UI
 ═══════════════════════════════════ */
 function Badge({e}){
-  const c={
-    ok:{l:"Coincide",bg:"var(--gbg)",col:"var(--green)",bdr:"var(--gdim)",ic:"✓"},
-    diff:{l:"Difiere",bg:"var(--abg)",col:"var(--amber)",bdr:"var(--adim)",ic:"△"},
-    missing:{l:"Sin PDF",bg:"var(--rbg)",col:"var(--red)",bdr:"var(--rdim)",ic:"○"}
-  }[e];
+  const c={ok:{l:"Coincide",bg:"var(--gbg)",col:"var(--green)",bdr:"var(--gdim)",ic:"✓"},diff:{l:"Difiere",bg:"var(--abg)",col:"var(--amber)",bdr:"var(--adim)",ic:"△"},missing:{l:"Sin PDF",bg:"var(--rbg)",col:"var(--red)",bdr:"var(--rdim)",ic:"○"}}[e];
   return h("span",{style:{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 9px",borderRadius:20,fontSize:10,fontWeight:600,background:c.bg,color:c.col,border:`1px solid ${c.bdr}`}},c.ic," ",c.l);
 }
-
 function FileUpload({label,desc,accept,file,onFile,done}){
-  const [drag,setDrag]=useState(false);
-  const ref=useRef();
+  const [drag,setDrag]=useState(false);const ref=useRef();
   const onDrop=e=>{e.preventDefault();setDrag(false);const f=e.dataTransfer.files[0];if(f)onFile(f);};
-  return h("div",{
-    className:`drop-zone${drag?" drag":""}${done?" done":""}`,
-    onDragOver:e=>{e.preventDefault();setDrag(true);},
-    onDragLeave:()=>setDrag(false),
-    onDrop,onClick:()=>ref.current.click()
-  },
+  return h("div",{className:`drop-zone${drag?" drag":""}${done?" done":""}`,onDragOver:e=>{e.preventDefault();setDrag(true);},onDragLeave:()=>setDrag(false),onDrop,onClick:()=>ref.current.click()},
     h("input",{ref,type:"file",accept,style:{display:"none"},onChange:e=>e.target.files[0]&&onFile(e.target.files[0])}),
-    done
-      ?h("div",null,h("div",{style:{color:"var(--green)",fontWeight:600,fontSize:13,marginBottom:3}},"✓ "+file.name),h("div",{style:{fontSize:11,color:"var(--txm)"}},Math.round(file.size/1024)+" KB"))
-      :h("div",null,
-          h("div",{style:{fontSize:13,fontWeight:600,color:"var(--tx)",marginBottom:4}},"⊞ "+label),
-          h("div",{style:{fontSize:11,color:"var(--txm)"}},desc)
-        )
+    done?h("div",null,h("div",{style:{color:"var(--green)",fontWeight:600,fontSize:13,marginBottom:3}},"✓ "+file.name),h("div",{style:{fontSize:11,color:"var(--txm)"}},Math.round(file.size/1024)+" KB")):
+    h("div",null,h("div",{style:{fontSize:13,fontWeight:600,color:"var(--tx)",marginBottom:4}},"⊞ "+label),h("div",{style:{fontSize:11,color:"var(--txm)"}},desc))
   );
 }
-
 function SetupPanel({onSave}){
-  const [key,setKey]=useState("");
-  const [clientId,setClientId]=useState(()=>localStorage.getItem("pat_gid")||"");
-  const [show,setShow]=useState(false);
-  const [testing,setTesting]=useState(false);
-  const [err,setErr]=useState("");
+  const [key,setKey]=useState("");const [clientId,setClientId]=useState(()=>localStorage.getItem("pat_gid")||"");
+  const [show,setShow]=useState(false);const [testing,setTesting]=useState(false);const [err,setErr]=useState("");
   const test=async()=>{
     if(!key.startsWith("sk-ant-"))return setErr("API key debe comenzar con sk-ant-");
-    if(!clientId.includes(".apps.googleusercontent.com"))return setErr("Client ID de Gmail inválido — debe terminar en .apps.googleusercontent.com");
+    if(!clientId.includes(".apps.googleusercontent.com"))return setErr("Client ID de Gmail inválido");
     setTesting(true);setErr("");
-    try{
-      await callClaude(key,"Responde solo: OK");
-      localStorage.setItem("pat_key",key);
-      localStorage.setItem("pat_gid",clientId);
-      onSave(key,clientId);
-    }catch(e){setErr("Error: "+e.message);}
+    try{await callClaude(key,"Responde solo: OK");localStorage.setItem("pat_key",key);localStorage.setItem("pat_gid",clientId);onSave(key,clientId);}
+    catch(e){setErr("Error: "+e.message);}
     setTesting(false);
   };
   return h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",gap:24,padding:32}},
     h("div",{style:{width:56,height:56,background:"linear-gradient(135deg,var(--acc),var(--acc2))",borderRadius:14,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#fff",fontWeight:700,boxShadow:"0 0 40px rgba(91,76,219,0.35)"}},"⬡"),
-    h("div",{style:{textAlign:"center"}},
-      h("h1",{style:{fontSize:22,fontWeight:700,letterSpacing:"-0.5px",marginBottom:6}},"Patagónica Inmobiliaria"),
-      h("p",{style:{fontSize:12,color:"var(--txm)"}},"Agente de facturación mensual")
-    ),
+    h("div",{style:{textAlign:"center"}},h("h1",{style:{fontSize:22,fontWeight:700,letterSpacing:"-0.5px",marginBottom:6}},"Patagónica Inmobiliaria"),h("p",{style:{fontSize:12,color:"var(--txm)"}},"Agente de facturación mensual")),
     h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr2)",borderRadius:14,padding:24,width:"100%",maxWidth:440}},
       h("div",{style:{fontSize:13,fontWeight:600,marginBottom:5}},"API Key de Anthropic"),
-      h("div",{style:{fontSize:11,color:"var(--txm)",marginBottom:10}},
-        "Obtén una en ",h("a",{href:"https://console.anthropic.com/settings/keys",target:"_blank",style:{color:"var(--accl)"}},"console.anthropic.com")
-      ),
+      h("div",{style:{fontSize:11,color:"var(--txm)",marginBottom:10}},"Obtén una en ",h("a",{href:"https://console.anthropic.com/settings/keys",target:"_blank",style:{color:"var(--accl)"}},"console.anthropic.com")),
       h("div",{style:{position:"relative",marginBottom:18}},
-        h("input",{type:show?"text":"password",value:key,onChange:e=>setKey(e.target.value),
-          placeholder:"sk-ant-api03-...",className:"key-input",style:{width:"100%",paddingRight:76}}),
+        h("input",{type:show?"text":"password",value:key,onChange:e=>setKey(e.target.value),placeholder:"sk-ant-api03-...",className:"key-input",style:{width:"100%",paddingRight:76}}),
         h("button",{onClick:()=>setShow(!show),style:{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"var(--txm)",fontSize:11,cursor:"pointer"}},show?"Ocultar":"Mostrar")
       ),
       h("div",{style:{fontSize:13,fontWeight:600,marginBottom:5}},"Gmail Client ID"),
-      h("div",{style:{fontSize:11,color:"var(--txm)",marginBottom:10}},
-        "Del JSON descargado en ",h("a",{href:"https://console.cloud.google.com",target:"_blank",style:{color:"var(--accl)"}},"Google Cloud Console")," → campo ",h("code",{style:{fontSize:10,color:"var(--accl)"}},"client_id")
-      ),
-      h("input",{type:"text",value:clientId,onChange:e=>setClientId(e.target.value),
-        placeholder:"123456789-abc.apps.googleusercontent.com",
-        className:"key-input",style:{width:"100%",marginBottom:18}}),
+      h("div",{style:{fontSize:11,color:"var(--txm)",marginBottom:10}},"Del JSON descargado en ",h("a",{href:"https://console.cloud.google.com",target:"_blank",style:{color:"var(--accl)"}},"Google Cloud Console")," → campo ",h("code",{style:{fontSize:10,color:"var(--accl)"}},"client_id")),
+      h("input",{type:"text",value:clientId,onChange:e=>setClientId(e.target.value),placeholder:"123456789-abc.apps.googleusercontent.com",className:"key-input",style:{width:"100%",marginBottom:18}}),
       err&&h("div",{style:{color:"var(--red)",fontSize:11,marginBottom:10}},err),
-      h("button",{onClick:test,disabled:!key||!clientId||testing,className:"btn-primary",style:{width:"100%"}},
-        testing?h("span",null,h("span",{className:"spin"},"⟳")," Verificando..."):"Guardar y continuar →")
+      h("button",{onClick:test,disabled:!key||!clientId||testing,className:"btn-primary",style:{width:"100%"}},testing?h("span",null,h("span",{className:"spin"},"⟳")," Verificando..."):"Guardar y continuar →")
     ),
     h("div",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace",marginTop:4}},VER)
   );
 }
-
 function ProcModal({logs,progress,done,onClose}){
   const ref=useRef();
   useEffect(()=>{if(ref.current)ref.current.scrollTop=ref.current.scrollHeight;},[logs]);
   return h("div",{className:"overlay"},
     h("div",{className:"modal"},
       h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:18}},
-        h("div",null,
-          h("div",{style:{fontWeight:700,fontSize:15,letterSpacing:"-0.3px"}},done?"✓ Proceso completado":"Procesando archivos..."),
-          h("div",{style:{fontSize:11,color:"var(--txm)",marginTop:3}},"Planilla → PDFs → Cruce UF → Correos")
-        ),
+        h("div",null,h("div",{style:{fontWeight:700,fontSize:15,letterSpacing:"-0.3px"}},done?"✓ Proceso completado":"Procesando archivos..."),h("div",{style:{fontSize:11,color:"var(--txm)",marginTop:3}},"Planilla → PDFs → Cruce UF → Correos")),
         done&&h("button",{onClick:onClose,style:{background:"linear-gradient(135deg,var(--acc),var(--acc2))",color:"#fff",border:"none",borderRadius:9,padding:"7px 18px",fontSize:13,fontWeight:700}},"Ver resultados →")
       ),
       h("div",{className:"pbar"},h("div",{className:"pbar-fill",style:{width:progress+"%"}})),
@@ -566,22 +462,16 @@ function ProcModal({logs,progress,done,onClose}){
     )
   );
 }
-
 function EmailModal({row,periodo,onClose,onConfirm,sending}){
   const mes=periodo.toLowerCase();
   const dest=MODO_PRUEBA?TEST_DEST:row.correo;
   return h("div",{className:"overlay"},
     h("div",{className:"modal",style:{width:620}},
       h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}},
-        h("div",null,
-          h("div",{style:{fontWeight:700,fontSize:14,letterSpacing:"-0.3px"}},"Vista previa del correo"),
-          h("div",{style:{fontSize:11,color:"var(--txm)",marginTop:2}},row.cliente," · ",row.concepto)
-        ),
+        h("div",null,h("div",{style:{fontWeight:700,fontSize:14,letterSpacing:"-0.3px"}},"Vista previa del correo"),h("div",{style:{fontSize:11,color:"var(--txm)",marginTop:2}},row.cliente," · ",row.concepto)),
         !sending&&h("button",{onClick:onClose,style:{background:"none",border:"none",color:"var(--txm)",fontSize:22,lineHeight:1,cursor:"pointer"}},"×")
       ),
-      MODO_PRUEBA&&h("div",{style:{background:"var(--abg)",border:"1px solid var(--adim)",borderRadius:8,padding:"8px 14px",marginBottom:14,fontSize:11,color:"var(--amber)",fontWeight:500}},
-        "⚠ MODO PRUEBA → ",h("strong",null,TEST_DEST)," (cliente real: ",h("span",{style:{color:"var(--txd)"}},row.correo),")"
-      ),
+      MODO_PRUEBA&&h("div",{style:{background:"var(--abg)",border:"1px solid var(--adim)",borderRadius:8,padding:"8px 14px",marginBottom:14,fontSize:11,color:"var(--amber)",fontWeight:500}},"⚠ MODO PRUEBA → ",h("strong",null,TEST_DEST)),
       h("div",{style:{background:"var(--bg)",borderRadius:10,padding:16,fontSize:12,border:"1px solid var(--bdr)"}},
         h("div",{style:{borderBottom:"1px solid var(--bdr)",paddingBottom:10,marginBottom:12,fontFamily:"'DM Mono',monospace",fontSize:11,lineHeight:2}},
           h("div",null,h("span",{style:{color:"var(--txd)"}},"De:      "),h("span",{style:{color:"var(--accl)"}},REMITENTE)),
@@ -599,12 +489,7 @@ function EmailModal({row,periodo,onClose,onConfirm,sending}){
       ),
       h("div",{style:{display:"flex",gap:10,marginTop:16,justifyContent:"flex-end"}},
         !sending&&h("button",{onClick:onClose,style:{padding:"7px 16px",borderRadius:8,border:"1px solid var(--bdr)",background:"transparent",color:"var(--txm)",fontSize:12}},"Cancelar"),
-        h("button",{onClick:sending?null:onConfirm,disabled:sending,style:{
-          padding:"8px 20px",borderRadius:8,border:"none",
-          background:sending?"var(--surf3)":MODO_PRUEBA?"var(--amber)":"linear-gradient(135deg,var(--green),#059669)",
-          color:sending?"var(--txm)":"#031c15",fontSize:12,fontWeight:700,
-          display:"flex",alignItems:"center",gap:6
-        }},sending?h("span",null,h("span",{className:"spin"},"⟳")," Enviando..."):"✉ Confirmar envío")
+        h("button",{onClick:sending?null:onConfirm,disabled:sending,style:{padding:"8px 20px",borderRadius:8,border:"none",background:sending?"var(--surf3)":MODO_PRUEBA?"var(--amber)":"linear-gradient(135deg,var(--green),#059669)",color:sending?"var(--txm)":"#031c15",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:6}},sending?h("span",null,h("span",{className:"spin"},"⟳")," Enviando..."):"✉ Confirmar envío")
       )
     )
   );
@@ -617,29 +502,17 @@ function App(){
   const [apiKey,setApiKey]=useState(()=>PRESET_KEY||localStorage.getItem("pat_key")||"");
   const [clientId,setClientId]=useState(()=>PRESET_GID||localStorage.getItem("pat_gid")||"");
   const [gmailToken,setGmailToken]=useState(null);
-  const [view,setView]=useState("upload"); // upload | processing | table
+  const [view,setView]=useState("dashboard"); // dashboard | upload | processing | table
   const [periodo,setPeriodo]=useState("Mayo 2026");
   const [files,setFiles]=useState({planilla:null,envio:null,zip:null});
   const [data,setData]=useState([]);
-  const [pdfMap,setPdfMap]=useState({}); // factura -> {base64, nombre}
+  const [pdfMap,setPdfMap]=useState({});
   const [filter,setFilter]=useState("all");
   const [concFilter,setConcFilter]=useState("all");
   const [search,setSearch]=useState("");
   const [sentSet,setSentSet]=useState(new Set());
-  const [sentKeys,setSentKeys]=useState(()=>{
-    try{return new Set(JSON.parse(localStorage.getItem("pat_sent")||"[]"));}
-    catch{return new Set();}
-  });
-
-  // Guardar enviados en localStorage cuando cambia sentSet
-  const marcarEnviado=useCallback((idx,key)=>{
-    setSentSet(p=>new Set([...p,idx]));
-    setSentKeys(p=>{
-      const s=new Set([...p,key]);
-      localStorage.setItem("pat_sent",JSON.stringify([...s]));
-      return s;
-    });
-  },[]);
+  const [sentKeys,setSentKeys]=useState(()=>{try{return new Set(JSON.parse(localStorage.getItem("pat_sent")||"[]"));}catch{return new Set();}});
+  const marcarEnviado=useCallback((idx,key)=>{setSentSet(p=>new Set([...p,idx]));setSentKeys(p=>{const s=new Set([...p,key]);localStorage.setItem("pat_sent",JSON.stringify([...s]));return s;});},[]);
   const [sendingIdx,setSendingIdx]=useState(null);
   const [showProc,setShowProc]=useState(false);
   const [procLogs,setProcLogs]=useState([]);
@@ -648,43 +521,44 @@ function App(){
   const [preview,setPreview]=useState(null);
   const [notif,setNotif]=useState(null);
 
+  /* ── DASHBOARD STATE ── */
+  const [dashData,setDashData]=useState(null);
+  const [dashLoading,setDashLoading]=useState(false);
+  const [dashSearch,setDashSearch]=useState("");
+  const [dashSitio,setDashSitio]=useState("all");
+
   const notify=(msg,t="ok")=>{setNotif({msg,t});setTimeout(()=>setNotif(null),4000);};
   const addLog=(txt,t="")=>setProcLogs(p=>[...p,{txt,t}]);
 
-  const getToken=useCallback(async()=>{
-    if(gmailToken)return gmailToken;
-    const token=await getGmailToken(clientId);
-    setGmailToken(token);
-    return token;
-  },[gmailToken,clientId]);
+  /* Auto-parsear planilla para dashboard cuando se carga */
+  useEffect(()=>{
+    if(!files.planilla)return;
+    setDashLoading(true);
+    setDashData(null);
+    parsePlanillaParaDashboard(files.planilla)
+      .then(d=>{setDashData(d);setDashLoading(false);})
+      .catch(e=>{console.error(e);setDashLoading(false);notify("Error leyendo planilla: "+e.message,"err");});
+  },[files.planilla]);
 
+  const getToken=useCallback(async()=>{if(gmailToken)return gmailToken;const token=await getGmailToken(clientId);setGmailToken(token);return token;},[gmailToken,clientId]);
   const todosSubidos=files.planilla&&files.envio&&files.zip;
 
-  /* ── PROCESAR ARCHIVOS ── */
+  /* ── PROCESAR ── */
   const procesar=useCallback(async()=>{
     if(!todosSubidos)return;
     setShowProc(true);setProcDone(false);setProcLogs([]);setProcProgress(5);
     try{
       addLog("▶ Leyendo planilla de facturación...","info");
       const clientes=await procesarPlanillaFacturacion(files.planilla,periodo);
-      addLog(`✓ ${clientes.length} filas detectadas (Arriendo + Serv.Adm.) para ${periodo}`,"ok");
-      setProcProgress(25);
-
+      addLog(`✓ ${clientes.length} filas detectadas para ${periodo}`,"ok");setProcProgress(25);
       addLog("▶ Leyendo correos desde planilla de envío...","info");
       const emailMap=await procesarPlanillaEnvio(files.envio);
-      addLog(`✓ ${Object.keys(emailMap).length} correos mapeados`,"ok");
-      setProcProgress(40);
-
+      addLog(`✓ ${Object.keys(emailMap).length} correos mapeados`,"ok");setProcProgress(40);
       addLog("▶ Procesando PDFs del ZIP...","info");
-      const pdfs=await procesarPDFs(files.zip,addLog);
-      setProcProgress(75);
-
+      const pdfs=await procesarPDFs(files.zip,addLog);setProcProgress(75);
       addLog("▶ Cruzando datos planilla vs PDFs...","info");
       const pdfUsado=new Set();
-      const MANUAL={
-        "A-2|Banco Estado Express|202.6|arriendo":"FEE-39",
-        "A-2|Banco del Estado de Chile|256.7|arriendo":"FEE-39",
-      };
+      const MANUAL={"A-2|Banco Estado Express|202.6|arriendo":"FEE-39","A-2|Banco del Estado de Chile|256.7|arriendo":"FEE-39"};
       const filas=[];
       for(const c of clientes){
         const correo=getEmail(c.cliente,emailMap);
@@ -698,87 +572,48 @@ function App(){
           for(let idx=0;idx<pdfs.length;idx++){
             if(pdfUsado.has(idx))continue;
             const p=pdfs[idx];
-            if(p.sitio===c.sitio&&p.tipo===c.tipo&&p.ufPdf!==null){
-              const d=Math.abs(p.ufPdf-c.uf);
-              if(d<bestDiff&&d<0.5){bestDiff=d;bestIdx=idx;}
-            }
+            if(p.sitio===c.sitio&&p.tipo===c.tipo&&p.ufPdf!==null){const d=Math.abs(p.ufPdf-c.uf);if(d<bestDiff&&d<0.5){bestDiff=d;bestIdx=idx;}}
           }
-          if(bestIdx>=0){
-            pdfUsado.add(bestIdx);
-            factura=pdfs[bestIdx].nroFact;
-            ufPdf=pdfs[bestIdx].ufPdf;
-          }
+          if(bestIdx>=0){pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;}
         }
         filas.push({sitio:c.sitio,cliente:c.cliente,correo,concepto,colRef,factura,ufPlan:c.uf,ufPdf,enviado:false});
       }
-      // Construir mapa factura -> zipPath para adjuntar al enviar
       const nuevoMapa={};
-      for(const p of pdfs){
-        if(p.nroFact&&p.zipPath){
-          nuevoMapa[p.nroFact]={zipPath:p.zipPath,nombre:p.pdfNombre};
-        }
-      }
+      for(const p of pdfs){if(p.nroFact&&p.zipPath)nuevoMapa[p.nroFact]={zipPath:p.zipPath,nombre:p.pdfNombre};}
       setPdfMap(nuevoMapa);
-      addLog(`✓ ${filas.filter(f=>f.factura).length}/${filas.length} facturas cruzadas`,"ok");
-      setProcProgress(100);
-      setProcDone(true);
+      addLog(`✓ ${filas.filter(f=>f.factura).length}/${filas.length} facturas cruzadas`,"ok");setProcProgress(100);setProcDone(true);
       setData(filas);
-      // Recuperar enviados previos desde localStorage
       const prevSent=new Set();
-      filas.forEach((f,i)=>{
-        const key=`${periodo}|${f.cliente}|${f.concepto}`;
-        if(sentKeys.has(key))prevSent.add(i);
-      });
+      filas.forEach((f,i)=>{const key=`${periodo}|${f.cliente}|${f.concepto}`;if(sentKeys.has(key))prevSent.add(i);});
       setSentSet(prevSent);
       if(prevSent.size>0)addLog(`✓ ${prevSent.size} correos ya enviados en sesiones anteriores`,"ok");
-
-      // Resumen Telegram al terminar el análisis
       if(TG_BOT&&TG_CHAT){
-        const sinCorreo=filas.filter(f=>!f.correo);
-        const sinPdf=filas.filter(f=>!f.factura||f.ufPdf===null);
+        const sinCorreo=filas.filter(f=>!f.correo);const sinPdf=filas.filter(f=>!f.factura||f.ufPdf===null);
         const difiere=filas.filter(f=>f.factura&&f.ufPdf!==null&&Math.abs(f.ufPdf-f.ufPlan)>0.5);
         const listos=filas.filter(f=>f.correo&&f.factura&&f.ufPdf!==null&&Math.abs(f.ufPdf-f.ufPlan)<=0.5);
-
-        let msg=`📋 *Análisis Facturación — ${periodo}*\n\n`;
-        msg+=`✅ Listos para enviar: *${listos.length}*\n`;
-        msg+=`📭 Sin correo registrado: *${sinCorreo.length}*\n`;
-        msg+=`📄 Sin PDF / sin cruce: *${sinPdf.length}*\n`;
-        msg+=`⚠️ UF no coincide: *${difiere.length}*\n`;
-        msg+=`📊 Total filas: *${filas.length}*`;
-        await sendTelegram(TG_BOT,TG_CHAT,msg);
-        addLog("✓ Resumen enviado a Telegram","ok");
+        let msg=`📋 *Análisis Facturación — ${periodo}*\n\n✅ Listos: *${listos.length}*\n📭 Sin correo: *${sinCorreo.length}*\n📄 Sin PDF: *${sinPdf.length}*\n⚠️ UF no coincide: *${difiere.length}*\n📊 Total: *${filas.length}*`;
+        await sendTelegram(TG_BOT,TG_CHAT,msg);addLog("✓ Resumen enviado a Telegram","ok");
       }
-    }catch(e){
-      addLog("✗ Error: "+e.message,"err");
-      setProcDone(true);
-      notify("Error: "+e.message,"err");
-    }
+    }catch(e){addLog("✗ Error: "+e.message,"err");setProcDone(true);notify("Error: "+e.message,"err");}
   },[files,periodo]);
 
   const finishProc=()=>{setShowProc(false);setView("table");notify(`${data.length} filas procesadas — ${periodo}`);};
 
   /* ── ENVÍO ── */
   const confirmSend=async()=>{
-    const{idx,row}=preview;setPreview(null);
-    setSendingIdx(idx);
+    const{idx,row}=preview;setPreview(null);setSendingIdx(idx);
     const dest=MODO_PRUEBA?TEST_DEST:row.correo;
     try{
       const token=await getToken();
       const subject="Factura "+row.factura+" — "+row.concepto+" "+periodo+" — Patagónica Inmobiliaria SpA";
       const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura);
-      const pdf=pdfMap[row.factura];
-      let pdfB64=null;
-      if(pdf?.zipPath&&files.zip){
-        try{pdfB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}
-      }
+      const pdf=pdfMap[row.factura];let pdfB64=null;
+      if(pdf?.zipPath&&files.zip){try{pdfB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}}
       await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);
       const key=`${periodo}|${row.cliente}|${row.concepto}`;
       marcarEnviado(idx,key);
       notify("✓ Correo enviado"+(MODO_PRUEBA?" (PRUEBA)":"")+" → "+dest+(pdfB64?" · con PDF":""));
-    }catch(e){
-      if(e.message.includes("invalid_grant")||e.message.includes("Token"))setGmailToken(null);
-      notify("Error: "+e.message,"err");
-    }
+    }catch(e){if(e.message.includes("invalid_grant")||e.message.includes("Token"))setGmailToken(null);notify("Error: "+e.message,"err");}
     setSendingIdx(null);
   };
 
@@ -787,50 +622,26 @@ function App(){
     const pend=enriched.filter(r=>r.estado==="ok"&&r.correo&&!sentSet.has(r.i));
     if(!pend.length)return notify("No hay correos pendientes","warn");
     try{
-      const token=await getToken();
-      notify("Enviando "+pend.length+" correos vía Gmail...","info");
+      const token=await getToken();notify("Enviando "+pend.length+" correos vía Gmail...","info");
       let enviados=0;
-      const fallidos=[];
       for(const row of pend){
         const dest=MODO_PRUEBA?TEST_DEST:row.correo;
         const subject="Factura "+row.factura+" — "+row.concepto+" "+periodo+" — Patagónica Inmobiliaria SpA";
         const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura);
-        const pdf=pdfMap[row.factura];
-        let pdfB64=null;
-        if(pdf?.zipPath&&files.zip){
-          try{pdfB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}
-        }
-        try{
-          await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);
-          const key=`${periodo}|${row.cliente}|${row.concepto}`;
-          marcarEnviado(row.i,key);
-          enviados++;
-          await new Promise(r=>setTimeout(r,400));
-        }catch(e){
-          fallidos.push(row);
-          notify("Error en "+row.cliente+": "+e.message,"err");
-        }
+        const pdf=pdfMap[row.factura];let pdfB64=null;
+        if(pdf?.zipPath&&files.zip){try{pdfB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}}
+        try{await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(row.i,key);enviados++;await new Promise(r=>setTimeout(r,400));}
+        catch(e){notify("Error en "+row.cliente+": "+e.message,"err");}
       }
       notify("✓ "+enviados+"/"+pend.length+" correos enviados"+(MODO_PRUEBA?" (PRUEBA → "+TEST_DEST+")":""));
-    }catch(e){
-      notify(e.message.includes("popup")?"Autorización cancelada":"Error: "+e.message,"warn");
-    }
+    }catch(e){notify(e.message.includes("popup")?"Autorización cancelada":"Error: "+e.message,"warn");}
   };
 
-  /* ── RENDER ── */
+  /* ── SETUP ── */
   if(!apiKey||!clientId)return h(SetupPanel,{onSave:(k,gid)=>{setApiKey(k);setClientId(gid);notify("Configuración guardada ✓");}});
 
   const enriched=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
-  const stats={
-    total:enriched.length,
-    ok:enriched.filter(r=>r.estado==="ok").length,
-    diff:enriched.filter(r=>r.estado!=="ok").length,
-    sent:sentSet.size,
-    arr:enriched.filter(r=>r.concepto==="Arriendo").length,
-    srv:enriched.filter(r=>r.concepto==="Serv. Adm.").length,
-    conPdf:enriched.filter(r=>r.factura&&r.ufPdf!==null).length,
-    sinPdf:enriched.filter(r=>!r.factura||r.ufPdf===null).length,
-  };
+  const stats={total:enriched.length,ok:enriched.filter(r=>r.estado==="ok").length,diff:enriched.filter(r=>r.estado!=="ok").length,sent:sentSet.size,conPdf:enriched.filter(r=>r.factura&&r.ufPdf!==null).length,sinPdf:enriched.filter(r=>!r.factura||r.ufPdf===null).length};
   const filtered=enriched.filter(r=>{
     const mf=filter==="all"||(filter==="ok"&&r.estado==="ok"&&!sentSet.has(r.i))||(filter==="diff"&&r.estado!=="ok")||(filter==="sent"&&sentSet.has(r.i));
     const mc=concFilter==="all"||(concFilter==="arr"&&r.concepto==="Arriendo")||(concFilter==="srv"&&r.concepto==="Serv. Adm.");
@@ -838,98 +649,270 @@ function App(){
     return mf&&mc&&ms;
   });
 
+  /* ══════════════════════════════════════════════════════════
+     RENDER DASHBOARD: KPIs + Sitios + Gráfico + Tabla
+  ══════════════════════════════════════════════════════════ */
+  const renderDashboard=()=>{
+    const totalUfArr=dashData?Math.round(dashData.clients.reduce((s,c)=>s+c.ufArr,0)*100)/100:0;
+    const totalUfSrv=dashData?Math.round(dashData.clients.reduce((s,c)=>s+c.ufSrv,0)*100)/100:0;
+    const totalUf=Math.round((totalUfArr+totalUfSrv)*100)/100;
+    const afectoCount=dashData?dashData.clients.filter(c=>c.afecto==="Afecto").length:0;
+
+    // Gráfico: últimos 15 meses con datos
+    const chartMonths=dashData?Object.entries(dashData.monthTotals).filter(([,v])=>v.arr>0).sort((a,b)=>a[0].localeCompare(b[0])).slice(-15):[];
+    const maxVal=chartMonths.length?Math.max(...chartMonths.map(([,v])=>v.arr+v.srv)):1;
+    const CHART_H=110;
+
+    // Filtrado clientes dashboard
+    const dashClients=dashData?dashData.clients.filter(c=>{
+      const ms=!dashSearch||c.nombre.toLowerCase().includes(dashSearch.toLowerCase())||c.rut.includes(dashSearch);
+      const msite=dashSitio==="all"||c.sitio===dashSitio;
+      return ms&&msite;
+    }):[];
+
+    return h("main",{style:{flex:1,overflowY:"auto",padding:"18px 22px",display:"flex",flexDirection:"column",gap:16},className:"fade-up"},
+
+      /* ── Fila 1: KPIs ── */
+      h("div",{className:"kpi-grid"},
+        /* Total clientes */
+        h("div",{className:"dash-card"},
+          h("div",{className:"dash-card-lbl"},"Total Clientes"),
+          h("div",{className:"dash-card-val",style:{color:"var(--accl)"}},dashData?dashData.clients.length:"—"),
+          h("div",{className:"dash-card-sub"},dashData?`${Object.keys(dashData.siteMap).filter(s=>dashData.siteMap[s].count>0).length} sitios activos`:"Carga la planilla")
+        ),
+        /* UF Arriendo */
+        h("div",{className:"dash-card"},
+          h("div",{className:"dash-card-lbl"},"UF Arriendo Mensual"),
+          h("div",{className:"dash-card-val",style:{color:"var(--blue)"}},dashData?totalUfArr.toLocaleString("es-CL",{minimumFractionDigits:0,maximumFractionDigits:0}):"—"),
+          h("div",{className:"dash-card-sub"},"UF/mes s/contrato")
+        ),
+        /* UF Serv Adm */
+        h("div",{className:"dash-card"},
+          h("div",{className:"dash-card-lbl"},"UF Serv. Administrativos"),
+          h("div",{className:"dash-card-val",style:{color:"var(--amber)"}},dashData?totalUfSrv.toLocaleString("es-CL",{minimumFractionDigits:0,maximumFractionDigits:0}):"—"),
+          h("div",{className:"dash-card-sub"},"cálculo base mensual")
+        ),
+        /* Total UF */
+        h("div",{className:"dash-card"},
+          h("div",{className:"dash-card-lbl"},"Total UF Mensual"),
+          h("div",{className:"dash-card-val",style:{color:"var(--green)"}},dashData?totalUf.toLocaleString("es-CL",{minimumFractionDigits:0,maximumFractionDigits:0}):"—"),
+          h("div",{className:"dash-card-sub"},"arriendo + serv. adm.")
+        ),
+        /* Afecto/Exento */
+        h("div",{className:"dash-card"},
+          h("div",{className:"dash-card-lbl"},"Afecto IVA"),
+          h("div",{className:"dash-card-val",style:{color:"var(--amber)"}},dashData?afectoCount:"—"),
+          h("div",{className:"dash-card-sub"},dashData?`${dashData.clients.filter(c=>c.afecto==="Exento").length} exentos de IVA`:"")
+        )
+      ),
+
+      /* ── Fila 2: Sitios + Gráfico ── */
+      h("div",{style:{display:"grid",gridTemplateColumns:"300px 1fr",gap:16}},
+
+        /* Desglose por sitio */
+        h("div",{className:"dash-card",style:{display:"flex",flexDirection:"column",gap:12}},
+          h("div",{style:{fontWeight:700,fontSize:12,color:"var(--tx)",marginBottom:2}},"Clientes por Sitio"),
+          dashData?
+            Object.entries(dashData.siteMap).sort((a,b)=>b[1].count-a[1].count).map(([sitio,info])=>{
+              const maxCnt=Math.max(...Object.values(dashData.siteMap).map(s=>s.count));
+              const color=SITIO_C[sitio]||"#888";
+              return h("div",{key:sitio,style:{display:"flex",flexDirection:"column",gap:5}},
+                h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}},
+                  h("button",{onClick:()=>setDashSitio(dashSitio===sitio?"all":sitio),style:{
+                    padding:"2px 9px",borderRadius:10,fontSize:10,fontWeight:700,
+                    background:`${color}${dashSitio===sitio?"55":"1a"}`,
+                    color,border:`1px solid ${color}${dashSitio===sitio?"":"40"}`,
+                    cursor:"pointer",transition:"all .15s",flexShrink:0
+                  }},sitio),
+                  h("div",{style:{fontSize:11,color:"var(--txm)",fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap"}},
+                    `${info.count} cli · `,h("span",{style:{color:"var(--blue)"}},(info.ufArr+info.ufSrv).toFixed(0))," UF"
+                  )
+                ),
+                h("div",{className:"site-bar-wrap"},
+                  h("div",{className:"site-bar-fill",style:{width:`${(info.count/maxCnt)*100}%`,background:color}})
+                )
+              );
+            }):
+            h("div",{style:{color:"var(--txd)",fontSize:12,textAlign:"center",padding:"20px 0"}},"Sin datos")
+        ),
+
+        /* Gráfico mensual */
+        h("div",{className:"dash-card"},
+          h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}},
+            h("div",{style:{fontWeight:700,fontSize:12}},"Arriendo Planificado Mensual (UF)"),
+            h("div",{style:{display:"flex",gap:14,fontSize:10,color:"var(--txm)"}},
+              h("span",null,h("span",{style:{display:"inline-block",width:8,height:8,background:"var(--blue)",borderRadius:2,marginRight:4,verticalAlign:"middle"}}),"Arriendo"),
+              h("span",null,h("span",{style:{display:"inline-block",width:8,height:8,background:"var(--amber)",borderRadius:2,marginRight:4,verticalAlign:"middle"}}),"Serv. Adm. (est.)")
+            )
+          ),
+          chartMonths.length>0?
+            h("div",{style:{overflowX:"auto",paddingBottom:4}},
+              h("div",{style:{display:"flex",gap:4,alignItems:"flex-end",paddingBottom:2,minWidth:"fit-content"}},
+                chartMonths.map(([key,val])=>{
+                  const hArr=Math.max(2,Math.round((val.arr/maxVal)*CHART_H));
+                  const hSrv=Math.round((val.srv/maxVal)*CHART_H);
+                  const total=(val.arr+val.srv).toFixed(0);
+                  const isRecent=key>=new Date().toISOString().slice(0,7).replace("-","").slice(0,7);
+                  return h("div",{key,className:"month-col",title:`${val.label}: ${val.arr} UF arr + ${val.srv} UF srv = ${total} UF`},
+                    h("div",{className:"month-bar-wrap"},
+                      hSrv>0&&h("div",{className:"month-seg-srv",style:{height:hSrv+"px"}}),
+                      h("div",{className:"month-seg-arr",style:{height:hArr+"px",opacity:isRecent?1:.7}})
+                    ),
+                    h("div",{className:"month-lbl"},val.label),
+                    h("div",{className:"month-val"},total)
+                  );
+                })
+              )
+            ):
+            h("div",{style:{color:"var(--txd)",fontSize:12,textAlign:"center",padding:"30px 0"}},
+              dashLoading?"Cargando...":"Sin datos — carga la planilla de facturación"
+            )
+        )
+      ),
+
+      /* ── Fila 3: Upload planilla (si no hay) ── */
+      !files.planilla&&!dashLoading&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,padding:20}},
+        h("div",{style:{fontSize:12,fontWeight:600,marginBottom:10,color:"var(--txm)"}},"📂 Carga la Planilla de Facturación para ver el dashboard completo"),
+        h(FileUpload,{label:"Planilla_Facturación.xlsx",desc:"Hoja Flujo · Columnas F a BJ",accept:".xlsx,.xls",file:files.planilla,done:!!files.planilla,onFile:f=>setFiles(p=>({...p,planilla:f}))})
+      ),
+      dashLoading&&h("div",{style:{textAlign:"center",padding:"20px 0",color:"var(--txm)",fontSize:13}},
+        h("span",{className:"spin",style:{fontSize:18,marginRight:8}},"⟳"),"Procesando planilla..."
+      ),
+
+      /* ── Fila 4: Tabla de clientes ── */
+      dashData&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
+        /* Barra de búsqueda y filtros */
+        h("div",{style:{padding:"12px 16px",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",background:"var(--surf)"}},
+          h("span",{style:{fontWeight:700,fontSize:12,color:"var(--tx)",marginRight:4}},"Clientes"),
+          h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},dashClients.length+" / "+dashData.clients.length),
+          h("input",{value:dashSearch,onChange:e=>setDashSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:210,marginLeft:4}}),
+          h("span",{style:{color:"var(--txd)",fontSize:12,marginLeft:2}},"·"),
+          /* Pills de sitio */
+          ["all",...Object.keys(dashData.siteMap).sort()].map(s=>
+            h("button",{key:s,className:`pill${dashSitio===s?" active":""}`,onClick:()=>setDashSitio(s),style:{fontSize:10}},s==="all"?"Todos los sitios":s)
+          )
+        ),
+        /* Header tabla */
+        h("div",{className:"dash-client-hdr"},
+          ["Sitio","Cliente / RUT","UF Arriendo","UF Serv.Adm.","UF Total","IVA","Correo"].map(col=>
+            h("div",{key:col},col)
+          )
+        ),
+        /* Filas */
+        h("div",{style:{maxHeight:380,overflowY:"auto"}},
+          dashClients.length===0?
+            h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados"):
+            dashClients.map(c=>{
+              const color=SITIO_C[c.sitio]||"#888";
+              return h("div",{key:c.rut+c.nombre+c.sitio,className:"dash-client-row"},
+                h("div",null,
+                  h("span",{style:{padding:"2px 8px",borderRadius:6,fontSize:10,fontWeight:700,background:`${color}1a`,color,border:`1px solid ${color}40`}},c.sitio||"—")
+                ),
+                h("div",{style:{flexDirection:"column",alignItems:"flex-start",gap:2}},
+                  h("div",{style:{fontWeight:600,fontSize:12,lineHeight:1.3}},c.nombre),
+                  h("div",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},c.rut)
+                ),
+                h("div",{style:{fontFamily:"'DM Mono',monospace",color:"var(--blue)",fontWeight:600}},c.ufArr>0?c.ufArr.toFixed(2):"—"),
+                h("div",{style:{fontFamily:"'DM Mono',monospace",color:"var(--amber)"}},c.ufSrv>0?c.ufSrv.toFixed(2):"—"),
+                h("div",{style:{fontFamily:"'DM Mono',monospace",fontWeight:700}},c.ufTotal>0?c.ufTotal.toFixed(2):"—"),
+                h("div",null,
+                  c.afecto?h("span",{style:{padding:"2px 8px",borderRadius:8,fontSize:10,fontWeight:600,background:c.afecto==="Afecto"?"var(--abg)":"var(--bbg)",color:c.afecto==="Afecto"?"var(--amber)":"var(--blue)",border:`1px solid ${c.afecto==="Afecto"?"var(--adim)":"#1e3a6a"}`}},c.afecto):h("span",{style:{color:"var(--txd)"}},"—")
+                ),
+                h("div",{style:{overflow:"hidden"}},
+                  h("span",{style:{fontSize:10,fontFamily:"'DM Mono',monospace",color:c.email?"var(--txm)":"var(--txd)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"block"}},c.email||"—")
+                )
+              );
+            })
+        )
+      ),
+
+      /* ── Botón principal: ir a Facturación ── */
+      h("div",{style:{display:"flex",justifyContent:"center",paddingTop:4,paddingBottom:8}},
+        h("button",{
+          onClick:()=>setView("upload"),
+          style:{background:"linear-gradient(135deg,var(--acc),var(--acc2))",color:"#fff",border:"none",borderRadius:12,padding:"14px 44px",fontSize:14,fontWeight:700,boxShadow:"0 4px 24px rgba(91,76,219,0.35)",display:"flex",alignItems:"center",gap:10,letterSpacing:"-0.2px"}
+        },
+          h("span",{style:{fontSize:18}},"📋"),
+          "Ir al Módulo de Facturación Mensual",
+          h("span",{style:{opacity:.7}},"→")
+        )
+      )
+    );
+  };
+
+  /* ══════════════════════════════════════════════════════════
+     RENDER PRINCIPAL
+  ══════════════════════════════════════════════════════════ */
   return h("div",{style:{minHeight:"100vh",display:"flex",flexDirection:"column"}},
-    notif&&h("div",{className:"notif",style:{
-      background:notif.t==="ok"?"var(--gbg)":notif.t==="err"?"var(--rbg)":"var(--abg)",
-      border:`1px solid ${notif.t==="ok"?"var(--gdim)":notif.t==="err"?"var(--rdim)":"var(--adim)"}`,
-      color:notif.t==="ok"?"var(--green)":notif.t==="err"?"var(--red)":"var(--amber)"
-    }},(notif.t==="ok"?"✓ ":notif.t==="err"?"✗ ":"△ ")+notif.msg),
+    notif&&h("div",{className:"notif",style:{background:notif.t==="ok"?"var(--gbg)":notif.t==="err"?"var(--rbg)":"var(--abg)",border:`1px solid ${notif.t==="ok"?"var(--gdim)":notif.t==="err"?"var(--rdim)":"var(--adim)"}`,color:notif.t==="ok"?"var(--green)":notif.t==="err"?"var(--red)":"var(--amber)"}},
+      (notif.t==="ok"?"✓ ":notif.t==="err"?"✗ ":"△ ")+notif.msg
+    ),
     showProc&&h(ProcModal,{logs:procLogs,progress:procProgress,done:procDone,onClose:finishProc}),
     preview&&h(EmailModal,{row:preview.row,periodo,onClose:()=>setPreview(null),onConfirm:confirmSend,sending:sendingIdx===preview.idx}),
+    MODO_PRUEBA&&h("div",{className:"test-banner"},"⚠",h("strong",null,"MODO PRUEBA"),"— correos van a",h("strong",{style:{marginLeft:4}},TEST_DEST),h("span",{style:{marginLeft:"auto",fontSize:10,color:"var(--txd)"}},'Producción: TEST_DEST="" en el código')),
 
-    MODO_PRUEBA&&h("div",{className:"test-banner"},
-      "⚠",h("strong",null,"MODO PRUEBA"),"— correos van a",h("strong",{style:{marginLeft:4}},TEST_DEST),
-      h("span",{style:{marginLeft:"auto",fontSize:10,color:"var(--txd)"}},'Producción: TEST_DEST="" en el código')
-    ),
-
-    /* HEADER */
-    h("header",{style:{background:"var(--surf)",borderBottom:"1px solid var(--bdr)",padding:"11px 22px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:50}},
+    /* ── HEADER ── */
+    h("header",{style:{background:"var(--surf)",borderBottom:"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:50}},
+      /* Logo + nombre */
       h("div",{style:{display:"flex",alignItems:"center",gap:12}},
         h("div",{style:{width:30,height:30,background:"linear-gradient(135deg,var(--acc),var(--acc2))",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"#fff",fontWeight:700}},"⬡"),
         h("div",null,
           h("div",{style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px"}},"Patagónica Inmobiliaria"),
           h("div",{style:{fontSize:9,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},REMITENTE+" · "+VER)
         ),
-        view==="table"&&h("span",{style:{background:"var(--bbg)",border:"1px solid var(--blue)",color:"var(--blue)",fontSize:10,fontWeight:600,padding:"2px 10px",borderRadius:20,marginLeft:4,fontFamily:"'DM Mono',monospace"}},periodo)
+        /* Indicador de período en billing */
+        (view==="table"||view==="upload")&&h("span",{style:{background:"var(--bbg)",border:"1px solid var(--blue)",color:"var(--blue)",fontSize:10,fontWeight:600,padding:"2px 10px",borderRadius:20,marginLeft:4,fontFamily:"'DM Mono',monospace"}},periodo)
       ),
+      /* Navegación */
       h("div",{style:{display:"flex",gap:8,alignItems:"center"}},
-        view==="table"&&h("button",{onClick:()=>{setView("upload");setData([]);},
-          style:{background:"transparent",border:"1px solid var(--bdr)",color:"var(--txm)",borderRadius:8,padding:"5px 12px",fontSize:11}},"⊞ Nuevos archivos"),
-        view==="table"&&h("button",{onClick:()=>setApiKey(""),
-          style:{background:"transparent",border:"1px solid var(--bdr)",color:"var(--txm)",borderRadius:8,padding:"5px 12px",fontSize:11}},"🔑"),
-        view==="table"&&h("button",{onClick:sendAll,style:{
-          background:MODO_PRUEBA?"var(--abg)":"linear-gradient(135deg,var(--green),#059669)",
-          border:MODO_PRUEBA?"1px solid var(--adim)":"none",
-          color:MODO_PRUEBA?"var(--amber)":"#031c15",
-          borderRadius:9,padding:"6px 16px",fontSize:12,fontWeight:700
-        }},MODO_PRUEBA?"⚠ Enviar todos (PRUEBA)":"✉ Enviar todos")
+        /* Botón Dashboard */
+        h("button",{onClick:()=>setView("dashboard"),className:`nav-btn${view==="dashboard"?" active":""}`,style:{fontSize:11}},
+          "📊 Dashboard"
+        ),
+        /* Botón Facturación */
+        h("button",{onClick:()=>setView("upload"),className:`nav-btn${view!=="dashboard"?" active":""}`,style:{fontSize:11}},
+          "📋 Facturación"
+        ),
+        /* Separador */
+        h("span",{style:{color:"var(--txd)",fontSize:12}},"·"),
+        /* Botones de tabla */
+        view==="table"&&h("button",{onClick:()=>{setView("upload");setData([]);},className:"nav-btn",style:{fontSize:11}},"⊞ Nuevos archivos"),
+        view==="table"&&h("button",{onClick:()=>setApiKey(""),className:"nav-btn",style:{fontSize:11,padding:"5px 10px"}},"🔑"),
+        view==="table"&&h("button",{onClick:sendAll,style:{background:MODO_PRUEBA?"var(--abg)":"linear-gradient(135deg,var(--green),#059669)",border:MODO_PRUEBA?"1px solid var(--adim)":"none",color:MODO_PRUEBA?"var(--amber)":"#031c15",borderRadius:9,padding:"6px 16px",fontSize:12,fontWeight:700}},MODO_PRUEBA?"⚠ Enviar todos (PRUEBA)":"✉ Enviar todos")
       )
     ),
 
-    /* UPLOAD VIEW */
+    /* ── DASHBOARD VIEW ── */
+    view==="dashboard"&&renderDashboard(),
+
+    /* ── UPLOAD VIEW ── */
     view==="upload"&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:24,padding:32},className:"fade-up"},
       h("div",{style:{textAlign:"center"}},
         h("h1",{style:{fontSize:20,fontWeight:700,letterSpacing:"-0.4px",marginBottom:6}},"Facturación mensual"),
-        h("p",{style:{fontSize:12,color:"var(--txm)"}},
-          "Selecciona el período y sube los 3 archivos desde tu carpeta de descargas.")
+        h("p",{style:{fontSize:12,color:"var(--txm)"}},"Selecciona el período y sube los 3 archivos desde tu carpeta de descargas.")
       ),
       h("div",{style:{width:"100%",maxWidth:500}},
-        /* Selector de período destacado */
         h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr2)",borderRadius:12,padding:"16px 20px",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between"}},
-          h("div",null,
-            h("div",{style:{fontSize:13,fontWeight:600,marginBottom:2}},"Período a facturar"),
-            h("div",{style:{fontSize:11,color:"var(--txm)"}},"Las columnas GS/GT se detectan automáticamente")
-          ),
-          h("select",{value:periodo,onChange:e=>{setPeriodo(e.target.value);setFiles({planilla:null,envio:null,zip:null});},
-            style:{fontSize:13,fontWeight:600,padding:"7px 12px",background:"var(--acc)",color:"#fff",border:"none",borderRadius:8,cursor:"pointer"}},
+          h("div",null,h("div",{style:{fontSize:13,fontWeight:600,marginBottom:2}},"Período a facturar"),h("div",{style:{fontSize:11,color:"var(--txm)"}},"Las columnas GS/GT se detectan automáticamente")),
+          h("select",{value:periodo,onChange:e=>{setPeriodo(e.target.value);setFiles({planilla:null,envio:null,zip:null});setDashData(null);},style:{fontSize:13,fontWeight:600,padding:"7px 12px",background:"var(--acc)",color:"#fff",border:"none",borderRadius:8,cursor:"pointer"}},
             PERIODOS.map(p=>h("option",{key:p,value:p},p)))
         ),
-        /* Archivos */
         h("div",{style:{display:"flex",flexDirection:"column",gap:10}},
-          h(FileUpload,{label:"Planilla_Facturacion_"+periodo.replace(" ","_")+".xlsx",
-            desc:"Hoja Flujo · columnas GS (Arriendo) y GT (Serv.Adm.) · desde tu carpeta Descargas",
-            accept:".xlsx,.xls",file:files.planilla,done:!!files.planilla,
-            onFile:f=>setFiles(p=>({...p,planilla:f}))}),
-          h(FileUpload,{label:"Detalle_envío_facturas_Inpasa_y_Pisa.xlsx",
-            desc:"Columna E (cliente) · F (correo) · desde tu carpeta Descargas",
-            accept:".xlsx,.xls",file:files.envio,done:!!files.envio,
-            onFile:f=>setFiles(p=>({...p,envio:f}))}),
-          h(FileUpload,{label:"PDFs facturas (ZIP)",
-            desc:"Carpeta comprimida con subcarpetas 5A · 4A · A2 · A1 · B · D2 · desde tu carpeta Descargas",
-            accept:".zip",file:files.zip,done:!!files.zip,
-            onFile:f=>setFiles(p=>({...p,zip:f}))})
+          h(FileUpload,{label:"Planilla_Facturacion_"+periodo.replace(" ","_")+".xlsx",desc:"Hoja Flujo · columnas GS (Arriendo) y GT (Serv.Adm.)",accept:".xlsx,.xls",file:files.planilla,done:!!files.planilla,onFile:f=>setFiles(p=>({...p,planilla:f}))}),
+          h(FileUpload,{label:"Detalle_envío_facturas_Inpasa_y_Pisa.xlsx",desc:"Columna E (cliente) · F (correo)",accept:".xlsx,.xls",file:files.envio,done:!!files.envio,onFile:f=>setFiles(p=>({...p,envio:f}))}),
+          h(FileUpload,{label:"PDFs facturas (ZIP)",desc:"Carpeta comprimida con subcarpetas 5A · 4A · A2 · A1 · B · D2",accept:".zip",file:files.zip,done:!!files.zip,onFile:f=>setFiles(p=>({...p,zip:f}))})
         ),
-        /* Estado de carga */
         h("div",{style:{marginTop:14,display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}},
-          [{label:"Planilla facturación",ok:!!files.planilla},
-           {label:"Planilla correos",ok:!!files.envio},
-           {label:"ZIP de PDFs",ok:!!files.zip}
-          ].map((f,i)=>h("span",{key:i,style:{
-            fontSize:11,padding:"3px 10px",borderRadius:20,
-            background:f.ok?"var(--gbg)":"var(--surf2)",
-            color:f.ok?"var(--green)":"var(--txd)",
-            border:`1px solid ${f.ok?"var(--gdim)":"var(--bdr)"}`
-          }},f.ok?"✓ ":"○ ",f.label))
+          [{label:"Planilla facturación",ok:!!files.planilla},{label:"Planilla correos",ok:!!files.envio},{label:"ZIP de PDFs",ok:!!files.zip}]
+          .map((f,i)=>h("span",{key:i,style:{fontSize:11,padding:"3px 10px",borderRadius:20,background:f.ok?"var(--gbg)":"var(--surf2)",color:f.ok?"var(--green)":"var(--txd)",border:`1px solid ${f.ok?"var(--gdim)":"var(--bdr)"}`}},f.ok?"✓ ":"○ ",f.label))
         ),
         h("div",{style:{marginTop:16,display:"flex",justifyContent:"center"}},
-          h("button",{onClick:procesar,disabled:!todosSubidos||!apiKey,className:"btn-primary",
-            style:{opacity:todosSubidos?1:0.45,minWidth:220}},
-            todosSubidos?"▶ Procesar archivos":"Sube los 3 archivos para continuar")
+          h("button",{onClick:procesar,disabled:!todosSubidos||!apiKey,className:"btn-primary",style:{opacity:todosSubidos?1:0.45,minWidth:220}},todosSubidos?"▶ Procesar archivos":"Sube los 3 archivos para continuar")
         )
       )
     ),
 
-    /* TABLE VIEW */
+    /* ── TABLE VIEW ── */
     view==="table"&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflowX:"hidden"},className:"fade-up"},
       h("div",{style:{display:"grid",gridTemplateColumns:"repeat(5,1fr)",borderBottom:"1px solid var(--bdr)"}},
         [{label:"Total",val:stats.total,col:"var(--tx)",sub:""},{label:"Con PDF",val:stats.conPdf,col:"var(--green)",sub:"facturas cruzadas"},{label:"Sin PDF",val:stats.sinPdf,col:"var(--red)",sub:"revisar"},{label:"Coinciden",val:stats.ok,col:"var(--accl)",sub:"listos para enviar"},{label:"Enviados",val:stats.sent,col:"var(--amber)",sub:MODO_PRUEBA?"→ "+TEST_DEST:"esta sesión"}]
@@ -949,38 +932,29 @@ function App(){
       ),
       h("div",{style:{flex:1,overflowX:"auto"}},
         h("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:880}},
-          h("colgroup",null,
-            h("col",{style:{width:58}}),h("col",{style:{width:"16%"}}),h("col",{style:{width:"18%"}}),
-            h("col",{style:{width:88}}),h("col",{style:{width:48}}),h("col",{style:{width:92}}),
-            h("col",{style:{width:86}}),h("col",{style:{width:86}}),h("col",{style:{width:102}})
+          h("colgroup",null,h("col",{style:{width:58}}),h("col",{style:{width:"16%"}}),h("col",{style:{width:"18%"}}),h("col",{style:{width:88}}),h("col",{style:{width:48}}),h("col",{style:{width:92}}),h("col",{style:{width:86}}),h("col",{style:{width:86}}),h("col",{style:{width:102}})
           ),
           h("thead",null,h("tr",{style:{background:"var(--surf)"}},
             ["Sitio","Cliente","Correo","Concepto","Col.","Factura","UF planilla","UF PDF","Estado/Acción"].map(hd=>
               h("th",{key:hd,style:{padding:"8px 11px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:"0.07em",borderBottom:"1px solid var(--bdr)"}},hd.toUpperCase())
             )
           )),
-          h("tbody",null,filtered.length===0
-            ?h("tr",null,h("td",{colSpan:9,style:{padding:"48px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados"))
-            :filtered.map(row=>{
+          h("tbody",null,filtered.length===0?
+            h("tr",null,h("td",{colSpan:9,style:{padding:"48px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados")):
+            filtered.map(row=>{
               const i=row.i,sent=sentSet.has(i),sending=sendingIdx===i,noEmail=!row.correo;
               const diff=row.ufPdf!==null&&row.ufPdf!==undefined&&Math.abs(row.ufPdf-row.ufPlan)>0.5;
               const esArr=row.concepto==="Arriendo";
               const bg=sent?"rgba(3,28,21,0.5)":esArr?"rgba(15,30,53,0.3)":"rgba(26,18,0,0.3)";
               return h("tr",{key:i,className:"row-tr"},
-                h("td",{style:{padding:"8px 11px",background:bg}},
-                  h("span",{style:{display:"inline-block",padding:"2px 7px",borderRadius:5,fontSize:10,fontWeight:700,
-                    background:`${SITIO_C[row.sitio]||"#888"}1a`,color:SITIO_C[row.sitio]||"#888",
-                    border:`1px solid ${SITIO_C[row.sitio]||"#888"}40`}},row.sitio)),
+                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{display:"inline-block",padding:"2px 7px",borderRadius:5,fontSize:10,fontWeight:700,background:`${SITIO_C[row.sitio]||"#888"}1a`,color:SITIO_C[row.sitio]||"#888",border:`1px solid ${SITIO_C[row.sitio]||"#888"}40`}},row.sitio)),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontWeight:600}},row.cliente)),
-                h("td",{style:{padding:"8px 11px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",background:bg}},
-                  h("span",{style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:row.correo?"var(--accl)":"var(--txd)"}},row.correo||"— sin correo")),
+                h("td",{style:{padding:"8px 11px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",background:bg}},h("span",{style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:row.correo?"var(--accl)":"var(--txd)"}},row.correo||"— sin correo")),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{className:esArr?"tag-arr":"tag-srv"},row.concepto)),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{className:esArr?"col-gs":"col-gt"},row.colRef)),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:"var(--txm)"}},row.factura||"—")),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace"}},row.ufPlan.toFixed(4))),
-                h("td",{style:{padding:"8px 11px",background:bg}},
-                  h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",color:diff?"var(--amber)":"var(--tx)"}},
-                    row.ufPdf!==null&&row.ufPdf!==undefined?row.ufPdf.toFixed(4):"—")),
+                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",color:diff?"var(--amber)":"var(--tx)"}},row.ufPdf!==null&&row.ufPdf!==undefined?row.ufPdf.toFixed(4):"—")),
                 h("td",{style:{padding:"8px 11px",background:bg}},
                   sent?h("span",{style:{color:"var(--green)",fontSize:11,fontWeight:600}},"✓ Enviado"):
                   sending?h("span",{style:{color:"var(--blue)",fontSize:11,display:"inline-flex",alignItems:"center",gap:4}},h("span",{className:"spin"},"⟳")," Enviando..."):
@@ -993,20 +967,12 @@ function App(){
         )
       ),
       h("footer",{style:{background:"var(--surf)",borderTop:"1px solid var(--bdr)",padding:"9px 18px",display:"flex",alignItems:"center",justifyContent:"space-between"}},
-        h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},
-          `${filtered.length}/${stats.total} · ${stats.sent} enviados · ${periodo}`),
-        h("button",{onClick:sendAll,style:{
-          background:MODO_PRUEBA?"var(--abg)":"var(--gbg)",
-          border:`1px solid ${MODO_PRUEBA?"var(--adim)":"var(--gdim)"}`,
-          color:MODO_PRUEBA?"var(--amber)":"var(--green)",
-          borderRadius:8,padding:"7px 16px",fontSize:12,fontWeight:700,
-          display:"flex",alignItems:"center",gap:6}},
-          MODO_PRUEBA?`⚠ Enviar todos (PRUEBA → ${TEST_DEST})`:`✉ Enviar todos (${Math.max(0,stats.ok-stats.sent)})`)
+        h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},`${filtered.length}/${stats.total} · ${stats.sent} enviados · ${periodo}`),
+        h("button",{onClick:sendAll,style:{background:MODO_PRUEBA?"var(--abg)":"var(--gbg)",border:`1px solid ${MODO_PRUEBA?"var(--adim)":"var(--gdim)"}`,color:MODO_PRUEBA?"var(--amber)":"var(--green)",borderRadius:8,padding:"7px 16px",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:6}},MODO_PRUEBA?`⚠ Enviar todos (PRUEBA → ${TEST_DEST})`:`✉ Enviar todos (${Math.max(0,stats.ok-stats.sent)})`)
       )
     )
   );
 }
-
 ReactDOM.createRoot(document.getElementById("root")).render(h(App));
 </script>
 </body>
