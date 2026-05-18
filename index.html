@@ -889,7 +889,7 @@ function App(){
       ),
 
       /* ── TABLA CLIENTES: filtros sitio + mes + columnas contrato ── */
-      dashData&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
+      dashData&&h("div",{key:"tbl-"+curSitio+"-"+curMes,style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
         /* Barra de controles */
         h("div",{style:{padding:"10px 14px",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",background:"var(--surf)"}},
           h("span",{style:{fontWeight:700,fontSize:12,color:"var(--tx)"}},"Clientes"),
@@ -916,7 +916,7 @@ function App(){
         h("div",{className:"dash-client-hdr"},
           ["Sitio","Cliente / RUT","Arriendo CLP","Serv.Adm. CLP","Total CLP","IVA","Término","Antelac.","Aviso","F.Reajuste","% Reaj."].map(col=>h("div",{key:col},col))
         ),
-        h("div",{style:{maxHeight:420,overflowY:"auto",overflowX:"auto"}},
+        h("div",{key:"rows-"+curSitio+"-"+tblClients.length,style:{maxHeight:420,overflowY:"auto",overflowX:"auto"}},
           tblClients.length===0?
             h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados"):
             tblClients.map(c=>{
