@@ -206,9 +206,9 @@ const SITIO_C={"5-A":"#7c3aed","4-A":"#0d9488","A-2":"#ea580c","A-1":"#2563eb","
 const MES_NUM={"Enero":1,"Febrero":2,"Marzo":3,"Abril":4,"Mayo":5,"Junio":6,"Julio":7,"Agosto":8,"Septiembre":9,"Octubre":10,"Noviembre":11,"Diciembre":12};
 const SITIO_MAP={"5A":"5-A","4A":"4-A","A1":"A-1","A2":"A-2","B":"B","D2":"D-2"};
 
-async function callClaude(apiKey,prompt){
+async function callClaude(prompt){
   const body={model:"claude-sonnet-4-5",max_tokens:4096,messages:[{role:"user",content:prompt}]};
-  const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01"},body:JSON.stringify(body)});
+  const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json","anthropic-version":"2023-06-01"},body:JSON.stringify(body)});
   const text=await res.text();
   let data;
   try{data=JSON.parse(text);}catch(e){throw new Error("Respuesta no JSON: "+text.slice(0,150));}
@@ -455,36 +455,7 @@ function FileUpload({label,desc,accept,file,onFile,done}){
     h("div",null,h("div",{style:{fontSize:13,fontWeight:600,color:"var(--tx)",marginBottom:4}},"⊞ "+label),h("div",{style:{fontSize:11,color:"var(--txm)"}},desc))
   );
 }
-function SetupPanel({onSave}){
-  const [key,setKey]=useState("");const [clientId,setClientId]=useState(()=>localStorage.getItem("pat_gid")||"");
-  const [show,setShow]=useState(false);const [testing,setTesting]=useState(false);const [err,setErr]=useState("");
-  const test=async()=>{
-    if(!key.startsWith("sk-ant-"))return setErr("API key debe comenzar con sk-ant-");
-    if(!clientId.includes(".apps.googleusercontent.com"))return setErr("Client ID de Gmail inválido");
-    setTesting(true);setErr("");
-    try{await callClaude(key,"Responde solo: OK");localStorage.setItem("pat_key",key);localStorage.setItem("pat_gid",clientId);onSave(key,clientId);}
-    catch(e){setErr("Error: "+e.message);}
-    setTesting(false);
-  };
-  return h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",gap:24,padding:32}},
-    h("div",{style:{width:56,height:56,background:"linear-gradient(135deg,var(--acc),var(--acc2))",borderRadius:14,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#fff",fontWeight:700,boxShadow:"0 0 32px rgba(91,76,219,0.25)"}},"⬡"),
-    h("div",{style:{textAlign:"center"}},h("h1",{style:{fontSize:22,fontWeight:700,letterSpacing:"-0.5px",marginBottom:6}},"Patagónica Inmobiliaria"),h("p",{style:{fontSize:12,color:"var(--txm)"}},"Agente de facturación mensual")),
-    h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr2)",borderRadius:14,padding:24,width:"100%",maxWidth:440}},
-      h("div",{style:{fontSize:13,fontWeight:600,marginBottom:5}},"API Key de Anthropic"),
-      h("div",{style:{fontSize:11,color:"var(--txm)",marginBottom:10}},"Obtén una en ",h("a",{href:"https://console.anthropic.com/settings/keys",target:"_blank",style:{color:"var(--accl)"}},"console.anthropic.com")),
-      h("div",{style:{position:"relative",marginBottom:18}},
-        h("input",{type:show?"text":"password",value:key,onChange:e=>setKey(e.target.value),placeholder:"sk-ant-api03-...",className:"key-input",style:{width:"100%",paddingRight:76}}),
-        h("button",{onClick:()=>setShow(!show),style:{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"var(--txm)",fontSize:11,cursor:"pointer"}},show?"Ocultar":"Mostrar")
-      ),
-      h("div",{style:{fontSize:13,fontWeight:600,marginBottom:5}},"Gmail Client ID"),
-      h("div",{style:{fontSize:11,color:"var(--txm)",marginBottom:10}},"Del JSON descargado en ",h("a",{href:"https://console.cloud.google.com",target:"_blank",style:{color:"var(--accl)"}},"Google Cloud Console")," → campo ",h("code",{style:{fontSize:10,color:"var(--accl)"}},"client_id")),
-      h("input",{type:"text",value:clientId,onChange:e=>setClientId(e.target.value),placeholder:"123456789-abc.apps.googleusercontent.com",className:"key-input",style:{width:"100%",marginBottom:18}}),
-      err&&h("div",{style:{color:"var(--red)",fontSize:11,marginBottom:10}},err),
-      h("button",{onClick:test,disabled:!key||!clientId||testing,className:"btn-primary",style:{width:"100%"}},testing?h("span",null,h("span",{className:"spin"},"⟳")," Verificando..."):"Guardar y continuar →")
-    ),
-    h("div",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace",marginTop:4}},VER)
-  );
-}
+/* SetupPanel eliminado — config viene de env vars Vercel */
 function ProcModal({logs,progress,done,onClose}){
   const ref=useRef();
   useEffect(()=>{if(ref.current)ref.current.scrollTop=ref.current.scrollHeight;},[logs]);
@@ -538,8 +509,9 @@ function EmailModal({row,periodo,onClose,onConfirm,sending}){
    APP PRINCIPAL
 ═══════════════════════════════════ */
 function App(){
-  const [apiKey,setApiKey]=useState(()=>PRESET_KEY||localStorage.getItem("pat_key")||"");
-  const [clientId,setClientId]=useState(()=>PRESET_GID||localStorage.getItem("pat_gid")||"");
+  /* Config viene 100% de env vars Vercel — no hay setup manual */
+  const apiKey=PRESET_KEY;
+  const clientId=PRESET_GID;
   const [gmailToken,setGmailToken]=useState(null);
   const [view,setView]=useState("dashboard");
   const [periodo,setPeriodo]=useState("Mayo 2026");
@@ -718,7 +690,7 @@ function App(){
     }catch(e){notify(e.message.includes("popup")?"Autorización cancelada":"Error: "+e.message,"warn");}
   };
 
-  if(!apiKey||!clientId)return h(SetupPanel,{onSave:(k,gid)=>{setApiKey(k);setClientId(gid);notify("Configuración guardada ✓");}});
+  /* Sin SetupPanel — siempre va al dashboard */
 
   const enriched=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
   const stats={total:enriched.length,ok:enriched.filter(r=>r.estado==="ok").length,diff:enriched.filter(r=>r.estado!=="ok").length,sent:sentSet.size,conPdf:enriched.filter(r=>r.factura&&r.ufPdf!==null).length,sinPdf:enriched.filter(r=>!r.factura||r.ufPdf===null).length};
@@ -989,7 +961,7 @@ function App(){
         h("button",{onClick:()=>setView("upload"),className:`nav-btn${view!=="dashboard"?" active":""}`,style:{fontSize:11}},"📋 Facturación"),
         h("span",{style:{color:"var(--txd)",fontSize:12}},"·"),
         view==="table"&&h("button",{onClick:()=>{setView("upload");setData([]);},className:"nav-btn",style:{fontSize:11}},"⊞ Nuevos archivos"),
-        view==="table"&&h("button",{onClick:()=>setApiKey(""),className:"nav-btn",style:{fontSize:11,padding:"5px 10px"}},"🔑"),
+
         view==="table"&&h("button",{onClick:sendAll,style:{background:"var(--gbg)",border:"1px solid var(--gdim)",color:"var(--green)",borderRadius:9,padding:"6px 16px",fontSize:12,fontWeight:700}},MODO_PRUEBA?"⚠ Enviar todos (PRUEBA)":"✉ Enviar todos")
       )
     ),
