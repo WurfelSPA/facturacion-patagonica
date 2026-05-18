@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Patagónica Inmobiliaria - Facturación</title>
+<title>Facturación — Patagónica Inmobiliaria</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -95,8 +95,9 @@ const REMITENTE="amelendez@patagonica.cl";
 const CCO="";
 const TEST_DEST="amelendez@patagonica.cl";
 const MODO_PRUEBA=TEST_DEST!=="";
-const VER="v4.1.0-clp";
-const GMAIL_SCOPES="https://www.googleapis.com/auth/gmail.send";
+const VER="v4.2.0-drive";
+const DRIVE_PLANILLA_ID="1rAGS-b1MoPpEhMgN2BR9Hvg4cTYdcQDu";
+const GOOGLE_SCOPES="https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.readonly";
 const TG_BOT=window.__TG_BOT__||"";
 const TG_CHAT=window.__TG_CHAT__||"";
 const PRESET_KEY=window.__PAT_KEY__||"";
@@ -159,14 +160,21 @@ function formatCLPCompact(pesos){
   return"$"+n.toLocaleString("es-CL");
 }
 
-/* ── Gmail OAuth ── */
+/* ── Google OAuth (Gmail + Drive) ── */
 function loadGisScript(){return new Promise(res=>{if(window.google?.accounts){res();return;}const s=document.createElement("script");s.src="https://accounts.google.com/gsi/client";s.onload=res;document.head.appendChild(s);});}
-async function getGmailToken(clientId){
+async function getGoogleToken(clientId){
   await loadGisScript();
   return new Promise((res,rej)=>{
-    const client=google.accounts.oauth2.initTokenClient({client_id:clientId,scope:GMAIL_SCOPES,callback:(resp)=>{if(resp.error)rej(new Error(resp.error));else res(resp.access_token);}});
+    const client=google.accounts.oauth2.initTokenClient({client_id:clientId,scope:GOOGLE_SCOPES,callback:(resp)=>{if(resp.error)rej(new Error(resp.error));else res(resp.access_token);}});
     client.requestAccessToken({prompt:""});
   });
+}
+async function descargarPlanillaDrive(token){
+  const url=`https://www.googleapis.com/drive/v3/files/${DRIVE_PLANILLA_ID}?alt=media`;
+  const res=await fetch(url,{headers:{Authorization:"Bearer "+token}});
+  if(!res.ok){const txt=await res.text();throw new Error(`Drive ${res.status}: ${txt.slice(0,120)}`);}
+  const blob=await res.blob();
+  return new File([blob],"Planilla Facturación.xlsx",{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
 }
 function makeEmail(to,cco,from,subject,body,pdfBase64,pdfName){
   const boundary="PAT_BOUNDARY_"+Date.now();
@@ -561,8 +569,25 @@ function App(){
   /* CAMBIO 1: estado para UF y conversión a CLP */
   const [ufActual,setUfActual]=useState(null);
   const [ufLoading,setUfLoading]=useState(false);
-  /* Cache de UF por mes para el gráfico */
   const [monthlyUF,setMonthlyUF]=useState({});
+  const [driveLoading,setDriveLoading]=useState(false);
+
+  /* Cargar planilla desde Drive automáticamente cuando hay token */
+  useEffect(()=>{
+    if(!gmailToken||files.planilla)return;
+    setDriveLoading(true);
+    descargarPlanillaDrive(gmailToken)
+      .then(f=>{
+        setFiles(p=>({...p,planilla:f}));
+        setDriveLoading(false);
+        notify("✓ Planilla cargada desde Drive");
+      })
+      .catch(e=>{
+        console.error("Drive error:",e);
+        setDriveLoading(false);
+        notify("No se pudo cargar desde Drive: "+e.message,"err");
+      });
+  },[gmailToken]);
 
   const notify=(msg,t="ok")=>{setNotif({msg,t});setTimeout(()=>setNotif(null),4000);};
   const addLog=(txt,t="")=>setProcLogs(p=>[...p,{txt,t}]);
@@ -603,7 +628,7 @@ function App(){
       .catch(e=>{console.error(e);setDashLoading(false);notify("Error leyendo planilla: "+e.message,"err");});
   },[files.planilla]);
 
-  const getToken=useCallback(async()=>{if(gmailToken)return gmailToken;const token=await getGmailToken(clientId);setGmailToken(token);return token;},[gmailToken,clientId]);
+  const getToken=useCallback(async()=>{if(gmailToken)return gmailToken;const token=await getGoogleToken(clientId);setGmailToken(token);return token;},[gmailToken,clientId]);
   const todosSubidos=files.planilla&&files.envio&&files.zip;
 
   /* ── PROCESAR ── */
@@ -749,11 +774,14 @@ function App(){
 
     return h("main",{style:{flex:1,overflowY:"auto",padding:"18px 22px",display:"flex",flexDirection:"column",gap:16},className:"fade-up"},
 
-      /* Indicador UF vigente */
-      ufActual&&h("div",{style:{display:"flex",alignItems:"center",gap:8,fontSize:11,color:"var(--txm)"}},
-        h("span",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:6,padding:"3px 10px",fontFamily:"'DM Mono',monospace",fontSize:11}},"UF hoy: "+ufActual.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})),
+      /* Barra de estado: UF + fuente planilla */
+      h("div",{style:{display:"flex",alignItems:"center",gap:8,fontSize:11,color:"var(--txm)",flexWrap:"wrap"}},
+        ufActual&&h("span",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:6,padding:"3px 10px",fontFamily:"'DM Mono',monospace",fontSize:11}},"UF hoy: "+ufActual.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})),
         ufLoading&&h("span",{className:"spin",style:{fontSize:14}},"⟳"),
-        h("span",{style:{color:"var(--txd)"}},"Montos en pesos chilenos · fuente: mindicador.cl")
+        driveLoading&&h("span",{style:{display:"flex",alignItems:"center",gap:5,color:"var(--blue)"}},h("span",{className:"spin",style:{fontSize:13}},"⟳"),"Cargando planilla desde Drive..."),
+        files.planilla&&!driveLoading&&h("span",{style:{background:"var(--gbg)",border:"1px solid var(--gdim)",borderRadius:6,padding:"3px 10px",color:"var(--green)",fontWeight:600,fontSize:11}},"✓ Planilla Facturación · Drive"),
+        h("span",{style:{color:"var(--txd)",marginLeft:2}},"Montos en CLP · mindicador.cl"),
+        files.planilla&&h("button",{onClick:async()=>{if(!gmailToken)return;setFiles(p=>({...p,planilla:null}));setDashData(null);setDriveLoading(true);try{const f=await descargarPlanillaDrive(gmailToken);setFiles(p=>({...p,planilla:f}));notify("✓ Planilla actualizada desde Drive");}catch(e){notify("Error actualizando: "+e.message,"err");}setDriveLoading(false);},style:{marginLeft:"auto",fontSize:10,padding:"2px 10px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--txm)",cursor:"pointer"}},"↻ Actualizar")
       ),
 
       /* ── KPIs en CLP ── */
@@ -854,10 +882,25 @@ function App(){
         )
       ),
 
-      /* Upload planilla si no hay */
-      !files.planilla&&!dashLoading&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,padding:20}},
-        h("div",{style:{fontSize:12,fontWeight:600,marginBottom:10,color:"var(--txm)"}},"📂 Carga la Planilla de Facturación para ver el dashboard completo"),
-        h(FileUpload,{label:"Planilla_Facturación.xlsx",desc:"Hoja Flujo · Columnas F a BJ",accept:".xlsx,.xls",file:files.planilla,done:!!files.planilla,onFile:f=>setFiles(p=>({...p,planilla:f}))})
+      /* Estado carga Drive o upload manual fallback */
+      (!files.planilla)&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,padding:20}},
+        driveLoading?
+          h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},
+            h("span",{className:"spin",style:{fontSize:18}},"⟳"),
+            "Cargando Planilla Facturación desde Google Drive..."
+          ):
+          !gmailToken?
+          h("div",null,
+            h("div",{style:{fontSize:12,fontWeight:600,marginBottom:8,color:"var(--txm)"}},"📋 Autoriza Google para cargar la planilla automáticamente desde Drive"),
+            h("button",{
+              onClick:async()=>{try{const t=await getToken();setGmailToken(t);}catch(e){notify("Error de autorización: "+e.message,"err");}},
+              className:"btn-primary",style:{fontSize:12,padding:"8px 20px"}
+            },"Autorizar con Google →")
+          ):
+          h("div",null,
+            h("div",{style:{fontSize:12,fontWeight:600,marginBottom:10,color:"var(--txm)"}},"📂 O sube la planilla manualmente"),
+            h(FileUpload,{label:"Planilla_Facturación.xlsx",desc:"Hoja Flujo · Columnas F a BJ",accept:".xlsx,.xls",file:files.planilla,done:!!files.planilla,onFile:f=>setFiles(p=>({...p,planilla:f}))})
+          )
       ),
       dashLoading&&h("div",{style:{textAlign:"center",padding:"20px 0",color:"var(--txm)",fontSize:13}},
         h("span",{className:"spin",style:{fontSize:18,marginRight:8}},"⟳"),"Procesando planilla..."
@@ -966,7 +1009,13 @@ function App(){
             PERIODOS.map(p=>h("option",{key:p,value:p},p)))
         ),
         h("div",{style:{display:"flex",flexDirection:"column",gap:10}},
-          h(FileUpload,{label:"Planilla_Facturacion_"+periodo.replace(" ","_")+".xlsx",desc:"Hoja Flujo · columnas GS (Arriendo) y GT (Serv.Adm.)",accept:".xlsx,.xls",file:files.planilla,done:!!files.planilla,onFile:f=>setFiles(p=>({...p,planilla:f}))}),
+          /* Planilla: si viene de Drive se muestra como done sin opción de cambiar; si no, se sube */
+          files.planilla&&gmailToken?
+            h("div",{className:"drop-zone done",style:{cursor:"default"}},
+              h("div",{style:{color:"var(--green)",fontWeight:600,fontSize:13,marginBottom:3}},"✓ Planilla Facturación.xlsx"),
+              h("div",{style:{fontSize:11,color:"var(--txm)"}},"Cargada desde Google Drive · "+Math.round(files.planilla.size/1024)+" KB")
+            ):
+            h(FileUpload,{label:"Planilla_Facturación.xlsx",desc:"Hoja Flujo · columnas GS (Arriendo) y GT (Serv.Adm.)",accept:".xlsx,.xls",file:files.planilla,done:!!files.planilla,onFile:f=>setFiles(p=>({...p,planilla:f}))}),
           h(FileUpload,{label:"Detalle_envío_facturas_Inpasa_y_Pisa.xlsx",desc:"Columna E (cliente) · F (correo)",accept:".xlsx,.xls",file:files.envio,done:!!files.envio,onFile:f=>setFiles(p=>({...p,envio:f}))}),
           h(FileUpload,{label:"PDFs facturas (ZIP)",desc:"Carpeta comprimida con subcarpetas 5A · 4A · A2 · A1 · B · D2",accept:".zip",file:files.zip,done:!!files.zip,onFile:f=>setFiles(p=>({...p,zip:f}))})
         ),
