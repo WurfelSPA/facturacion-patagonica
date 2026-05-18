@@ -733,13 +733,6 @@ function App(){
     const maxVal=chartData.length?Math.max(...chartData.map(v=>v.arr+v.srv)):1;
     const CHART_H=110;
 
-    /* CAMBIO 2: filtro de sitio — ahora dashSitio filtra correctamente */
-    const dashClients=dashData?dashData.clients.filter(c=>{
-      const ms=!dashSearch||c.nombre.toLowerCase().includes(dashSearch.toLowerCase())||c.rut.includes(dashSearch);
-      const msite=dashSitio==="all"||c.sitio===dashSitio; /* CAMBIO 2: comparación exacta */
-      return ms&&msite;
-    }):[];
-
     /* Totales por sitio en CLP para el desglose */
     const siteMapCLP=dashData?Object.fromEntries(
       Object.entries(dashData.siteMap).map(([sitio,info])=>([sitio,{
@@ -888,14 +881,20 @@ function App(){
       dashData&&(()=>{
         /* Opciones de mes para el selector */
         const mesOpts=[{k:"current",l:"Mes actual"},...Object.entries(dashData.monthTotals).filter(([,v])=>v.arr>0).sort((a,b)=>b[0].localeCompare(a[0])).map(([k,v])=>({k,l:v.label}))];
-        /* UF del mes seleccionado */
+        /* UF del mes seleccionado — si no está en caché la cargamos */
         const ufMes=dashMes==="current"?ufRef:(monthlyUF[dashMes]||ufRef);
-        /* Clientes filtrados */
+        if(dashMes!=="current"&&!monthlyUF[dashMes]){
+          const[yr,mo]=dashMes.split("-").map(Number);
+          getUFForMonth(yr,mo).then(v=>{if(v){setMonthlyUF(p=>({...p,[dashMes]:v}));}});
+        }
+        /* Clientes filtrados — sitio comparación exacta tras trim */
         const dashClients2=dashData.clients.filter(c=>{
           const ms=!dashSearch||c.nombre.toLowerCase().includes(dashSearch.toLowerCase())||c.rut.includes(dashSearch);
-          const msite=dashSitio==="all"||c.sitio.trim()===dashSitio.trim();
+          const msite=dashSitio==="all"||(c.sitio||"").trim()===(dashSitio||"").trim();
           return ms&&msite;
         });
+        /* DEBUG temporal en consola */
+        if(dashSitio!=="all"){console.log("Filtrando por sitio:",JSON.stringify(dashSitio),"Matches:",dashClients2.length,"Ejemplo sitios:",[...new Set(dashData.clients.map(c=>JSON.stringify(c.sitio)))].slice(0,8));}
         /* UF label */
         const ufLabel=dashMes==="current"?`UF hoy: ${ufMes.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`:`UF ${mesOpts.find(m=>m.k===dashMes)?.l||""}: ${ufMes.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
         return h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
