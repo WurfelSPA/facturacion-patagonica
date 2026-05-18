@@ -241,7 +241,7 @@ async function parsePlanillaParaDashboard(file){
     if(typeof v==="number"&&v>40000&&v<50000){
       const{y,m}=serialToYM(v);
       if(y>=2024&&y<=2026){
-        monthCols.push({key:`${y}-${String(m).padStart(2,"0")}`,label:`${MES_L[m-1]} ${String(y).slice(2)}`,col:ci,year:y,month:m});
+        monthCols.push({key:`${y}-${String(m).padStart(2,"0")}`,label:`${MES_L[m-1]} ${y}`,col:ci,year:y,month:m});
       }
     }
   }
@@ -798,7 +798,7 @@ function App(){
         h("div",{className:"dash-card",style:{display:"flex",flexDirection:"column",gap:12}},
           h("div",{style:{fontWeight:700,fontSize:12,color:"var(--tx)",marginBottom:2}},"Clientes por Sitio"),
           dashData?
-            Object.entries(siteMapCLP).sort((a,b)=>b[1].count-a[1].count).map(([sitio,info])=>{
+            Object.entries(siteMapCLP).filter(([s])=>s&&!/^\d+$/.test(s)).sort((a,b)=>b[1].count-a[1].count).map(([sitio,info])=>{
               const maxCnt=Math.max(...Object.values(dashData.siteMap).map(s=>s.count));
               const color=SITIO_C[sitio]||"#888";
               const isActive=dashSitio===sitio;
@@ -887,7 +887,7 @@ function App(){
       /* ── TABLA CLIENTES: filtros sitio + mes + columnas contrato ── */
       dashData&&(()=>{
         /* Opciones de mes para el selector */
-        const mesOpts=[{k:"current",l:"Mes actual"},...Object.entries(dashData.monthTotals).filter(([,v])=>v.arr>0).sort((a,b)=>b[0].localeCompare(a[0])).map(([k,v])=>({k,l:v.label+" "+(k.slice(0,4))}))];
+        const mesOpts=[{k:"current",l:"Mes actual"},...Object.entries(dashData.monthTotals).filter(([,v])=>v.arr>0).sort((a,b)=>b[0].localeCompare(a[0])).map(([k,v])=>({k,l:v.label}))];
         /* UF del mes seleccionado */
         const ufMes=dashMes==="current"?ufRef:(monthlyUF[dashMes]||ufRef);
         /* Clientes filtrados */
@@ -909,7 +909,7 @@ function App(){
                 onClick:()=>setDashSitio("all"),
                 className:`pill${dashSitio==="all"?" active":""}`,style:{fontSize:10,padding:"3px 10px"}
               },"Ver todos"),
-              ...Object.keys(dashData.siteMap).sort().map(s=>
+              ...Object.keys(dashData.siteMap).filter(s=>s&&!/^\d+$/.test(s)).sort().map(s=>
                 h("button",{
                   key:s,
                   onClick:()=>setDashSitio(dashSitio===s?"all":s),
