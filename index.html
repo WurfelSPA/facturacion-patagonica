@@ -95,7 +95,7 @@ const REMITENTE="amelendez@patagonica.cl";
 const CCO="";
 const TEST_DEST="amelendez@patagonica.cl";
 const MODO_PRUEBA=TEST_DEST!=="";
-const VER="v4.2.0-drive";
+const VER="v4.3.0";
 const DRIVE_PLANILLA_ID="1rAGS-b1MoPpEhMgN2BR9Hvg4cTYdcQDu";
 const GOOGLE_SCOPES="https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.readonly";
 const TG_BOT=window.__TG_BOT__||"";
@@ -710,7 +710,7 @@ function App(){
   /* ══════════════════════════════════════════════════════════
      RENDER DASHBOARD
   ══════════════════════════════════════════════════════════ */
-  const renderDashboard=()=>{
+  const renderDashboard=(curSitio,curMes,curSearch)=>{
     /* CAMBIO 1: todos los totales en CLP usando ufActual */
     const ufRef=ufActual||37000; /* fallback si no cargó */
     const totalUfArr=dashData?Math.round(dashData.clients.reduce((s,c)=>s+c.ufArr,0)*100)/100:0;
@@ -745,14 +745,14 @@ function App(){
 
     /* Variables tabla clientes — calculadas en el scope de renderDashboard */
     const tblMesOpts=[{k:"current",l:"Mes actual"},...Object.entries(dashData?dashData.monthTotals:{}).filter(([,v])=>v.arr>0).sort((a,b)=>b[0].localeCompare(a[0])).map(([k,v])=>({k,l:v.label}))];
-    const tblUf=dashMes==="current"?ufRef:(monthlyUF[dashMes]||ufRef);
-    if(dashData&&dashMes!=="current"&&!monthlyUF[dashMes]){const[yr,mo]=dashMes.split("-").map(Number);getUFForMonth(yr,mo).then(v=>{if(v)setMonthlyUF(p=>({...p,[dashMes]:v}));});}
+    const tblUf=curMes==="current"?ufRef:(monthlyUF[curMes]||ufRef);
+    if(dashData&&curMes!=="current"&&!monthlyUF[curMes]){const[yr,mo]=curMes.split("-").map(Number);getUFForMonth(yr,mo).then(v=>{if(v)setMonthlyUF(p=>({...p,[curMes]:v}));});}
     const tblClients=dashData?dashData.clients.filter(c=>{
-      const ms=!dashSearch||c.nombre.toLowerCase().includes(dashSearch.toLowerCase())||c.rut.includes(dashSearch);
-      const msite=dashSitio==="all"||(c.sitio||"").trim()===(dashSitio||"").trim();
+      const ms=!curSearch||c.nombre.toLowerCase().includes(curSearch.toLowerCase())||c.rut.includes(curSearch);
+      const msite=curSitio==="all"||(c.sitio||"").trim()===(curSitio||"").trim();
       return ms&&msite;
     }):[];
-    const tblUfLabel=dashMes==="current"?`UF hoy: ${tblUf.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`:`UF ${tblMesOpts.find(m=>m.k===dashMes)?.l||""}: ${tblUf.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+    const tblUfLabel=curMes==="current"?`UF hoy: ${tblUf.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`:`UF ${tblMesOpts.find(m=>m.k===dashMes)?.l||""}: ${tblUf.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 
     return h("main",{style:{flex:1,overflowY:"auto",padding:"18px 22px",display:"flex",flexDirection:"column",gap:16},className:"fade-up"},
 
@@ -805,7 +805,7 @@ function App(){
             Object.entries(siteMapCLP).filter(([s])=>s&&!/^\d+$/.test(s)).sort((a,b)=>b[1].count-a[1].count).map(([sitio,info])=>{
               const maxCnt=Math.max(...Object.values(dashData.siteMap).map(s=>s.count));
               const color=SITIO_C[sitio]||"#888";
-              const isActive=dashSitio===sitio;
+              const isActive=curSitio===sitio;
               return h("div",{key:sitio,style:{display:"flex",flexDirection:"column",gap:5}},
                 h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}},
                   /* CAMBIO 2: botón de filtro — onClick actualiza dashSitio */
@@ -895,18 +895,18 @@ function App(){
           h("span",{style:{fontWeight:700,fontSize:12,color:"var(--tx)"}},"Clientes"),
           h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},tblClients.length+" / "+dashData.clients.length),
           h("div",{style:{display:"flex",gap:4,flexWrap:"wrap",marginLeft:4}},
-            h("button",{onClick:()=>setDashSitio("all"),className:`pill${dashSitio==="all"?" active":""}`,style:{fontSize:10,padding:"3px 10px"}},"Ver todos"),
+            h("button",{onClick:()=>setDashSitio("all"),className:`pill${curSitio==="all"?" active":""}`,style:{fontSize:10,padding:"3px 10px"}},"Ver todos"),
             ...Object.keys(dashData.siteMap).filter(s=>s&&!/^\d+$/.test(s)).sort().map(s=>
-              h("button",{key:s,onClick:()=>setDashSitio(dashSitio===s?"all":s),
+              h("button",{key:s,onClick:()=>setDashSitio(curSitio===s?"all":s),
                 style:{padding:"3px 9px",borderRadius:10,fontSize:10,fontWeight:700,
-                  background:dashSitio===s?(SITIO_C[s]||"#888"):`${SITIO_C[s]||"#888"}18`,
-                  color:dashSitio===s?"#fff":(SITIO_C[s]||"#888"),
-                  border:`1px solid ${SITIO_C[s]||"#888"}${dashSitio===s?"":"40"}`,
+                  background:curSitio===s?(SITIO_C[s]||"#888"):`${SITIO_C[s]||"#888"}18`,
+                  color:curSitio===s?"#fff":(SITIO_C[s]||"#888"),
+                  border:`1px solid ${SITIO_C[s]||"#888"}${curSitio===s?"":"40"}`,
                   cursor:"pointer",transition:"all .15s"}
               },s)
             )
           ),
-          h("select",{value:dashMes,onChange:e=>setDashMes(e.target.value),
+          h("select",{value:curMes,onChange:e=>{setDashMes(e.target.value);},
             style:{fontSize:11,padding:"4px 8px",borderRadius:7,border:"1px solid var(--bdr)",background:"var(--surf)",color:"var(--tx)",fontFamily:"'DM Mono',monospace",marginLeft:4}},
             tblMesOpts.map(m=>h("option",{key:m.k,value:m.k},m.l))
           ),
@@ -990,7 +990,7 @@ function App(){
     ),
 
     /* VIEWS */
-    view==="dashboard"&&renderDashboard(),
+    view==="dashboard"&&renderDashboard(dashSitio,dashMes,dashSearch),
 
     view==="upload"&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:24,padding:32},className:"fade-up"},
       h("div",{style:{textAlign:"center"}},
