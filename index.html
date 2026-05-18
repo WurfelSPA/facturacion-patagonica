@@ -74,11 +74,11 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 .month-val{font-size:9px;color:var(--txm);font-family:'DM Mono',monospace;text-align:center}
 .month-col:hover .month-seg-arr{background:#185fa5}
 .month-col:hover .month-val{color:var(--tx)}
-.dash-client-hdr{display:grid;grid-template-columns:68px 1fr 115px 115px 115px 72px 180px;border-bottom:2px solid var(--bdr);background:var(--surf)}
-.dash-client-hdr>div{padding:8px 12px;font-size:10px;font-weight:700;color:var(--txd);letter-spacing:.07em;text-transform:uppercase}
-.dash-client-row{display:grid;grid-template-columns:68px 1fr 115px 115px 115px 72px 180px;border-bottom:1px solid var(--bdr);transition:background .1s;cursor:default}
+.dash-client-hdr{display:grid;grid-template-columns:58px minmax(140px,1fr) 100px 100px 100px 60px 95px 80px 65px 80px 60px;border-bottom:2px solid var(--bdr);background:var(--surf)}
+.dash-client-hdr>div{padding:7px 8px;font-size:9px;font-weight:700;color:var(--txd);letter-spacing:.06em;text-transform:uppercase}
+.dash-client-row{display:grid;grid-template-columns:58px minmax(140px,1fr) 100px 100px 100px 60px 95px 80px 65px 80px 60px;border-bottom:1px solid var(--bdr);transition:background .1s;cursor:default}
 .dash-client-row:hover>div{background:var(--surf2)}
-.dash-client-row>div{padding:9px 12px;font-size:12px;display:flex;align-items:center}
+.dash-client-row>div{padding:8px 8px;font-size:11px;display:flex;align-items:center}
 .nav-btn{background:transparent;border:1px solid var(--bdr);color:var(--txm);border-radius:8px;padding:5px 14px;font-size:11px;font-weight:500;display:flex;align-items:center;gap:5px}
 .nav-btn:hover{background:var(--surf2);color:var(--tx)}
 .nav-btn.active{background:var(--surf3);border-color:var(--acc);color:var(--accl)}
@@ -266,19 +266,24 @@ async function parsePlanillaParaDashboard(file){
       const v=row[mc.col];
       if(typeof v==="number"&&v>0&&v<15000) monthly[mc.key]=Math.round(v*100)/100;
     }
+    /* Conversión serial Excel → fecha legible */
+    function serialToDate(v){if(!v||typeof v!=="number")return"";try{const d=new Date(new Date(Date.UTC(1899,11,30)).getTime()+Math.round(v)*86400000);return`${d.getUTCDate().toString().padStart(2,"0")}/${(d.getUTCMonth()+1).toString().padStart(2,"0")}/${d.getUTCFullYear()}`;}catch(e){return"";}}
     clients.push({
       ri,nombre:name,rut:String(rut).trim(),
       arrendadora:String(row[5]||"").trim(),
       sitio:String(row[7]||"").trim(),
       edificio:String(row[8]||"").trim(),
       email:String(row[12]||"").trim(),
-      renovacion:String(row[16]||"").trim(),
-      aviso:String(row[17]||"").trim(),
+      termContrato:serialToDate(row[14]),   /* Col O: Fecha Término Contrato */
+      renovacion:row[16]!=null?String(row[16]).trim():"",  /* Col Q: Antelación renovación */
+      aviso:row[17]!=null?String(row[17]).trim():"",        /* Col R: Aviso */
+      fechaReajuste:serialToDate(row[18]),  /* Col S: Fecha Reajuste */
+      pctReaj:row[53]!=null?String(row[53]):"",            /* Col BB: % Reajuste */
+      cadaAnios:row[19]!=null?String(row[19]).trim():"",   /* Col T: Cada cuántos años */
       ufArr:Math.round(ufArr*100)/100,
       ufSrv:Math.round(ufSrv*100)/100,
       ufTotal:Math.round((ufArr+ufSrv)*100)/100,
       afecto:String(row[48]||"").trim(),
-      pctReaj:row[53]!=null?String(row[53]):"",
       ufInicio:typeof row[61]==="number"?Math.round(row[61]*100)/100:0,
       monthly,
     });
@@ -537,6 +542,7 @@ function App(){
   const [dashLoading,setDashLoading]=useState(false);
   const [dashSearch,setDashSearch]=useState("");
   const [dashSitio,setDashSitio]=useState("all");
+  const [dashMes,setDashMes]=useState("current"); /* "current" = UF actual, o "YYYY-MM" */
 
   /* CAMBIO 1: estado para UF y conversión a CLP */
   const [ufActual,setUfActual]=useState(null);
@@ -878,48 +884,89 @@ function App(){
         h("span",{className:"spin",style:{fontSize:18,marginRight:8}},"⟳"),"Procesando planilla..."
       ),
 
-      /* Tabla de clientes — CAMBIO 1: CLP + CAMBIO 2: filtro funcional */
-      dashData&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
-        h("div",{style:{padding:"12px 16px",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",background:"var(--surf)"}},
-          h("span",{style:{fontWeight:700,fontSize:12,color:"var(--tx)",marginRight:4}},"Clientes"),
-          h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},dashClients.length+" / "+dashData.clients.length),
-          dashSitio!=="all"&&h("span",{style:{fontSize:11,background:`${SITIO_C[dashSitio]||"#888"}18`,color:SITIO_C[dashSitio]||"#888",border:`1px solid ${SITIO_C[dashSitio]||"#888"}40`,padding:"2px 10px",borderRadius:10,fontWeight:600}},dashSitio),
-          h("input",{value:dashSearch,onChange:e=>setDashSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:200,marginLeft:4}}),
-          dashSitio!=="all"&&h("button",{onClick:()=>setDashSitio("all"),style:{fontSize:11,padding:"3px 10px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--txm)",cursor:"pointer"}},"× Ver todos")
-        ),
-        /* Header */
-        h("div",{className:"dash-client-hdr"},
-          ["Sitio","Cliente / RUT","Arriendo CLP","Serv.Adm. CLP","Total CLP","IVA","Correo"].map(col=>h("div",{key:col},col))
-        ),
-        /* Filas */
-        h("div",{style:{maxHeight:380,overflowY:"auto"}},
-          dashClients.length===0?
-            h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados"):
-            dashClients.map(c=>{
-              const color=SITIO_C[c.sitio]||"#888";
-              /* CAMBIO 1: convertir UF a CLP por cliente */
-              const clpArr=c.ufArr>0?Math.round(c.ufArr*ufRef):null;
-              const clpSrv=c.ufSrv>0?Math.round(c.ufSrv*ufRef):null;
-              const clpTotal=c.ufTotal>0?Math.round(c.ufTotal*ufRef):null;
-              return h("div",{key:c.rut+c.nombre+c.sitio,className:"dash-client-row"},
-                h("div",null,h("span",{style:{padding:"2px 8px",borderRadius:6,fontSize:10,fontWeight:700,background:`${color}18`,color,border:`1px solid ${color}40`}},c.sitio||"—")),
-                h("div",{style:{flexDirection:"column",alignItems:"flex-start",gap:2}},
-                  h("div",{style:{fontWeight:600,fontSize:12,lineHeight:1.3}},c.nombre),
-                  h("div",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},c.rut)
-                ),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",color:"var(--blue)",fontWeight:600,fontSize:11}},clpArr?formatCLP(clpArr):"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",color:"var(--amber)",fontSize:11}},clpSrv?formatCLP(clpSrv):"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontWeight:700,fontSize:11}},clpTotal?formatCLP(clpTotal):"—"),
-                h("div",null,
-                  c.afecto?h("span",{style:{padding:"2px 8px",borderRadius:8,fontSize:10,fontWeight:600,background:c.afecto==="Afecto"?"var(--abg)":"var(--bbg)",color:c.afecto==="Afecto"?"var(--amber)":"var(--blue)",border:`1px solid ${c.afecto==="Afecto"?"var(--adim)":"#b5d0f0"}`}},c.afecto):h("span",{style:{color:"var(--txd)"}},"—")
-                ),
-                h("div",{style:{overflow:"hidden"}},
-                  h("span",{style:{fontSize:10,fontFamily:"'DM Mono',monospace",color:c.email?"var(--txm)":"var(--txd)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"block"}},c.email||"—")
-                )
-              );
-            })
-        )
-      ),
+      /* ── TABLA CLIENTES: filtros sitio + mes + columnas contrato ── */
+      dashData&&(()=>{
+        /* Opciones de mes para el selector */
+        const mesOpts=[{k:"current",l:"Mes actual"},...Object.entries(dashData.monthTotals).filter(([,v])=>v.arr>0).sort((a,b)=>b[0].localeCompare(a[0])).map(([k,v])=>({k,l:v.label+" "+(k.slice(0,4))}))];
+        /* UF del mes seleccionado */
+        const ufMes=dashMes==="current"?ufRef:(monthlyUF[dashMes]||ufRef);
+        /* Clientes filtrados */
+        const dashClients2=dashData.clients.filter(c=>{
+          const ms=!dashSearch||c.nombre.toLowerCase().includes(dashSearch.toLowerCase())||c.rut.includes(dashSearch);
+          const msite=dashSitio==="all"||c.sitio===dashSitio;
+          return ms&&msite;
+        });
+        /* UF label */
+        const ufLabel=dashMes==="current"?`UF hoy: ${ufMes.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`:`UF ${mesOpts.find(m=>m.k===dashMes)?.l||""}: ${ufMes.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+        return h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
+          /* Barra de controles */
+          h("div",{style:{padding:"10px 14px",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",background:"var(--surf)"}},
+            h("span",{style:{fontWeight:700,fontSize:12,color:"var(--tx)"}},"Clientes"),
+            h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},dashClients2.length+" / "+dashData.clients.length),
+            /* Pills de sitio */
+            h("div",{style:{display:"flex",gap:4,flexWrap:"wrap",marginLeft:4}},
+              h("button",{
+                onClick:()=>setDashSitio("all"),
+                className:`pill${dashSitio==="all"?" active":""}`,style:{fontSize:10,padding:"3px 10px"}
+              },"Ver todos"),
+              ...Object.keys(dashData.siteMap).sort().map(s=>
+                h("button",{
+                  key:s,
+                  onClick:()=>setDashSitio(dashSitio===s?"all":s),
+                  style:{padding:"3px 9px",borderRadius:10,fontSize:10,fontWeight:700,
+                    background:dashSitio===s?(SITIO_C[s]||"#888"):`${SITIO_C[s]||"#888"}18`,
+                    color:dashSitio===s?"#fff":(SITIO_C[s]||"#888"),
+                    border:`1px solid ${SITIO_C[s]||"#888"}${dashSitio===s?"":"40"}`,
+                    cursor:"pointer",transition:"all .15s"}
+                },s)
+              )
+            ),
+            /* Selector de mes */
+            h("select",{
+              value:dashMes,
+              onChange:e=>setDashMes(e.target.value),
+              style:{fontSize:11,padding:"4px 8px",borderRadius:7,border:"1px solid var(--bdr)",background:"var(--surf)",color:"var(--tx)",fontFamily:"'DM Mono',monospace",marginLeft:4}
+            },mesOpts.map(m=>h("option",{key:m.k,value:m.k},m.l))),
+            h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},ufLabel),
+            /* Buscador */
+            h("input",{value:dashSearch,onChange:e=>setDashSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:180,marginLeft:"auto"}})
+          ),
+          /* Header columnas */
+          h("div",{className:"dash-client-hdr"},
+            ["Sitio","Cliente / RUT","Arriendo CLP","Serv.Adm. CLP","Total CLP","IVA","Término","Antelac.","Aviso","F.Reajuste","% Reaj."].map(col=>h("div",{key:col},col))
+          ),
+          /* Filas */
+          h("div",{style:{maxHeight:420,overflowY:"auto",overflowX:"auto"}},
+            dashClients2.length===0?
+              h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados"):
+              dashClients2.map(c=>{
+                const color=SITIO_C[c.sitio]||"#888";
+                /* Montos con UF del mes seleccionado */
+                const clpArr=c.ufArr>0?Math.round(c.ufArr*ufMes):null;
+                const clpSrv=c.ufSrv>0?Math.round(c.ufSrv*ufMes):null;
+                const clpTotal=c.ufTotal>0?Math.round(c.ufTotal*ufMes):null;
+                return h("div",{key:c.rut+c.nombre+c.sitio,className:"dash-client-row"},
+                  h("div",null,h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${color}18`,color,border:`1px solid ${color}40`}},c.sitio||"—")),
+                  h("div",{style:{flexDirection:"column",alignItems:"flex-start",gap:1}},
+                    h("div",{style:{fontWeight:600,fontSize:11,lineHeight:1.3}},c.nombre),
+                    h("div",{style:{fontSize:9,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},c.rut)
+                  ),
+                  h("div",{style:{fontFamily:"'DM Mono',monospace",color:"var(--blue)",fontWeight:600,fontSize:10}},clpArr?formatCLP(clpArr):"—"),
+                  h("div",{style:{fontFamily:"'DM Mono',monospace",color:"var(--amber)",fontSize:10}},clpSrv?formatCLP(clpSrv):"—"),
+                  h("div",{style:{fontFamily:"'DM Mono',monospace",fontWeight:700,fontSize:10}},clpTotal?formatCLP(clpTotal):"—"),
+                  h("div",null,
+                    c.afecto?h("span",{style:{padding:"2px 6px",borderRadius:6,fontSize:9,fontWeight:600,background:c.afecto==="Afecto"?"var(--abg)":"var(--bbg)",color:c.afecto==="Afecto"?"var(--amber)":"var(--blue)",border:`1px solid ${c.afecto==="Afecto"?"var(--adim)":"#b5d0f0"}`}},c.afecto):h("span",{style:{color:"var(--txd)"}},"—")
+                  ),
+                  h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:c.termContrato?"var(--tx)":"var(--txd)"}},c.termContrato||"—"),
+                  h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.renovacion||"—"),
+                  h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.aviso||"—"),
+                  h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:c.fechaReajuste?"var(--tx)":"var(--txd)"}},c.fechaReajuste||"—"),
+                  h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.pctReaj||"—")
+                );
+              })
+          )
+        );
+      })(),
 
       /* Botón ir a Facturación */
       h("div",{style:{display:"flex",justifyContent:"center",paddingTop:4,paddingBottom:8}},
