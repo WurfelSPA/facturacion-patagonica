@@ -71,21 +71,13 @@ export default async function handler(req, res) {
     const serviceAccount = JSON.parse(saJson);
     const token = await getAccessToken(serviceAccount);
 
-    // Buscar carpeta del mes dentro de Facturacion Mensual
-    const folders = await driveList(token, FACTURACION_FOLDER_ID);
-    const monthFolder = folders.find(f =>
-      f.mimeType === "application/vnd.google-apps.folder" && f.name === folderName
-    );
-    if (!monthFolder) {
-      return res.status(404).json({ error: `Carpeta ${folderName} no encontrada en Drive` });
-    }
-
-    // Buscar el ZIP dentro de la carpeta del mes
-    const files = await driveList(token, monthFolder.id);
-    const zipFile = files.find(f => f.name.toLowerCase().endsWith(".zip"));
+    // Buscar el ZIP directamente en Facturacion Mensual con formato "YYYY-MM.zip"
+    const zipName = `${anio}-${mesNum}.zip`; // ej: "2026-05.zip"
+    const files = await driveList(token, FACTURACION_FOLDER_ID);
+    const zipFile = files.find(f => f.name.toLowerCase() === zipName.toLowerCase());
     if (!zipFile) {
       return res.status(404).json({
-        error: `No se encontro archivo .zip en ${folderName}. Sube el ZIP con los PDFs del mes.`
+        error: `No se encontro ${zipName} en Drive. Sube el ZIP con el nombre ${zipName}.`
       });
     }
 
