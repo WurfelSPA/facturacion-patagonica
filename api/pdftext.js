@@ -1,3 +1,4 @@
+import JSZip from "jszip";
 export const config = { api: { bodyParser: false, responseLimit: '60mb' } };
 
 const FACTURACION_FOLDER_ID = "1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u";
@@ -119,7 +120,6 @@ export default async function handler(req, res) {
     if (!zipRes.ok) throw new Error(`Drive error ${zipRes.status}`);
     const zipBuffer = Buffer.from(await zipRes.arrayBuffer());
 
-    const { default: JSZip } = await import("jszip");
     const zip = await JSZip.loadAsync(zipBuffer);
 
     const SITIO_MAP = {"5A":"5-A","4A":"4-A","A1":"A-1","A2":"A-2","B":"B","D2":"D-2"};
