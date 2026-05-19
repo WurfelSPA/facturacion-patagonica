@@ -368,30 +368,44 @@ async function procesarPDFs(zipFile,addLog){
   const pdfs=[];
   const archivos=Object.keys(zip.files).filter(f=>f.toLowerCase().endsWith(".pdf"));
   addLog(`▶ ${archivos.length} PDFs encontrados en el ZIP`,"info");
-  const UFD=/(3[89]|4[012])[.,\d]+/;
+
   for(const path of archivos){
     const parts=path.split("/");
-    const carpeta=parts.length>2?parts[parts.length-2]:parts[0];
+    const carpeta=parts.length>1?parts[parts.length-2]:"";
     const nombre=parts[parts.length-1];
     const sitio=SITIO_MAP[carpeta]||carpeta;
+
+    /* Número de factura desde el nombre del archivo: "F-14548 Congo Films.pdf" → "F-14548" */
+    const nroMatch=nombre.match(/^(F(?:EE)?-\d+)/i);
+    if(!nroMatch)continue;
+    const nroFact=nroMatch[1].toUpperCase();
+
+    /* Tipo: FEE = serv_adm, F = arriendo */
+    const tipo=nroFact.startsWith("FEE-")?"serv_adm":"arriendo";
+
+    /* Extraer monto UF del PDF para el cruce */
+    let ufPdf=null;
     try{
       const pdfBuf=await zip.files[path].async("arraybuffer");
       const texto=await extraerTextoPDF(pdfBuf);
       const textoJ=texto.replace(/\s+/g," ");
-      const fechaM=textoJ.match(/Fecha Emisi[oó]n\s+(.{5,30})/i);
-      const esAbril=fechaM&&/abril/i.test(fechaM[1]);
-      if(esAbril)continue;
-      const nroM=textoJ.match(/N[º°]\s*(\d+)/);
-      const nro=nroM?nroM[1]:"";
-      const nroFact=nombre.startsWith("FEE")?(nro?`FEE-${nro}`:""):(nro?`F-${nro}`:"");
-      const esSrv=/COD:.*?-\s*Serv\.?\s*Adm\./i.test(textoJ);
-      const esArr=/COD:.*?-\s*Arriendo/i.test(textoJ)&&!esSrv;
-      let tipo=esSrv?"serv_adm":esArr?"arriendo":"desconocido";
-      let totalUF=0;
-      if(esArr){const m1=textoJ.match(new RegExp(`UF\\s+([\\d.,]+)\\s+x\\s+${UFD.source}`));const m2=textoJ.match(new RegExp(`([\\d]+[.,]\\d+)\\s+UF\\s+${UFD.source}`));const m3=textoJ.match(new RegExp(`\\b(\\d+)\\s+UF\\s+${UFD.source}`));const match=m1||m2||m3;if(match)totalUF=parseFloat(match[1].replace(/\./g,"").replace(",","."));}
-      else if(esSrv){const m1=textoJ.match(new RegExp(`([\\d]+[.,]\\d+)\\s+UF\\s+${UFD.source}`));const m2=textoJ.match(new RegExp(`\\b(\\d+)\\s+UF\\s+${UFD.source}`));const match=m1||m2;if(match)totalUF=parseFloat(match[1].replace(/\./g,"").replace(",","."));}
-      if(nroFact&&tipo!=="desconocido")pdfs.push({sitio,nroFact,tipo,ufPdf:totalUF>0?Math.round(totalUF*10000)/10000:null,zipPath:path,pdfNombre:nombre});
+      /* Buscar monto en UF: patrones comunes en facturas chilenas */
+      const patterns=[
+        /Total\s+UF[:\s]+([\d.,]+)/i,
+        /([\d]+[.,]\d{2,4})\s*UF/i,
+        /UF\s+([\d]+[.,]\d{2,4})/i,
+        /\b([\d]+[.,]\d{4})\b/,
+      ];
+      for(const pat of patterns){
+        const m=textoJ.match(pat);
+        if(m){
+          const v=parseFloat(m[1].replace(/\./g,"").replace(",","."));
+          if(v>0&&v<15000){ufPdf=Math.round(v*10000)/10000;break;}
+        }
+      }
     }catch(e){}
+
+    pdfs.push({sitio,nroFact,tipo,ufPdf,zipPath:path,pdfNombre:nombre});
   }
   addLog(`✓ ${pdfs.length} facturas procesadas (Arriendo + Serv.Adm.)`,"ok");
   return pdfs;
@@ -645,10 +659,22 @@ function App(){
         if(MANUAL[mk]){factura=MANUAL[mk];ufPdf=c.uf;}
         else{
           let bestIdx=-1,bestDiff=9999;
+          /* Paso 1: match por sitio + tipo + monto UF (tolerancia 0.5 UF) */
           for(let idx=0;idx<pdfs.length;idx++){
             if(pdfUsado.has(idx))continue;
             const p=pdfs[idx];
-            if(p.sitio===c.sitio&&p.tipo===c.tipo&&p.ufPdf!==null){const d=Math.abs(p.ufPdf-c.uf);if(d<bestDiff&&d<0.5){bestDiff=d;bestIdx=idx;}}
+            if(p.sitio===c.sitio&&p.tipo===c.tipo&&p.ufPdf!==null){
+              const d=Math.abs(p.ufPdf-c.uf);
+              if(d<bestDiff&&d<0.5){bestDiff=d;bestIdx=idx;}
+            }
+          }
+          /* Paso 2: si no hubo match por monto, match solo por sitio + tipo (primer disponible) */
+          if(bestIdx===-1){
+            for(let idx=0;idx<pdfs.length;idx++){
+              if(pdfUsado.has(idx))continue;
+              const p=pdfs[idx];
+              if(p.sitio===c.sitio&&p.tipo===c.tipo){bestIdx=idx;break;}
+            }
           }
           if(bestIdx>=0){pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;}
         }
