@@ -96,7 +96,7 @@ const REMITENTE="amelendez@patagonica.cl";
 const CCO="";
 const TEST_DEST="amelendez@patagonica.cl";
 const MODO_PRUEBA=TEST_DEST!=="";
-const VER="v4.7.0";
+const VER="v4.8.0";
 const DRIVE_PLANILLA_ID="1rAGS-b1MoPpEhMgN2BR9Hvg4cTYdcQDu";
 const GOOGLE_SCOPES="https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.readonly";
 const TG_BOT=window.__TG_BOT__||"";
@@ -658,6 +658,8 @@ function App(){
       for(const p of pdfs){if(p.nroFact&&p.zipPath)nuevoMapa[p.nroFact]={zipPath:p.zipPath,nombre:p.pdfNombre};}
       setPdfMap(nuevoMapa);
       addLog(`✓ ${filas.filter(f=>f.factura).length}/${filas.length} facturas cruzadas`,"ok");setProcProgress(100);setProcDone(true);
+      /* Auto-cerrar y mostrar tabla si no hubo errores */
+      setTimeout(()=>{setShowProc(false);setView("table");},1800);
       setData(filas);
       const prevSent=new Set();
       filas.forEach((f,i)=>{const key=`${periodo}|${f.cliente}|${f.concepto}`;if(sentKeys.has(key))prevSent.add(i);});
@@ -1014,7 +1016,7 @@ function App(){
     /* VIEWS */
     view==="dashboard"&&renderDashboard(dashSitio,dashMes,dashSearch),
 
-    view==="upload"&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:24,padding:32},className:"fade-up"},
+    view==="upload"&&!files.zip&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:24,padding:32},className:"fade-up"},
       h("div",{style:{textAlign:"center"}},
         h("h1",{style:{fontSize:20,fontWeight:700,letterSpacing:"-0.4px",marginBottom:6}},"Facturación mensual"),
         h("p",{style:{fontSize:12,color:"var(--txm)"}},"Selecciona el período y sube los 3 archivos desde tu carpeta de descargas.")
