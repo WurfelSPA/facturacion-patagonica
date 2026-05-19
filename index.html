@@ -357,8 +357,9 @@ async function procesarPlanillaFacturacion(file,periodo){
     const sName=String(cliente).trim();
     const sito=sitio?String(sitio).trim():"";
     const emailBilling=row[12]?String(row[12]).trim():"";
-    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling});
-    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=500)clientes.push({sitio:sito,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling});
+    const rutBilling=row[9]?String(row[9]).replace(/\./g,"").trim().toLowerCase():""; /* Col J: RUT normalizado */
+    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling});
+    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=500)clientes.push({sitio:sito,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling});
   }
   return clientes;
 }
@@ -659,18 +660,21 @@ function App(){
         const ufRes=await fetch(`/api/pdftext?periodo=${encodeURIComponent(periodo)}`);
         if(ufRes.ok){
           const ufData=await ufRes.json();
-          let conUF=0;
+          let conUF=0,conRUT=0;
           for(const p of pdfs){
             if(ufData.pdfs&&ufData.pdfs[p.nroFact]){
-              p.ufPdf=ufData.pdfs[p.nroFact].uf;
+              const d=ufData.pdfs[p.nroFact];
+              p.ufPdf=d.uf;
+              p.rutPdf=d.rut;
               if(p.ufPdf!==null)conUF++;
+              if(p.rutPdf)conRUT++;
             }
           }
-          addLog(`✓ UF extraídas: ${conUF}/${pdfs.length} PDFs con monto`,"ok");
+          addLog(`✓ Datos extraídos: ${conRUT} RUTs, ${conUF} montos UF de ${pdfs.length} PDFs`,"ok");
         }else{
-          addLog("⚠ No se pudieron extraer UF del servidor, usando solo nombre","warn");
+          addLog("⚠ No se pudieron extraer datos del servidor","warn");
         }
-      }catch(e){addLog("⚠ Error extrayendo UF: "+e.message,"warn");}
+      }catch(e){addLog("⚠ Error extrayendo datos: "+e.message,"warn");}
       setProcProgress(75);
       addLog("▶ Cruzando datos planilla vs PDFs...","info");
       const pdfUsado=new Set();
@@ -685,28 +689,22 @@ function App(){
         if(MANUAL[mk]){factura=MANUAL[mk];ufPdf=c.uf;}
         else{
           let bestIdx=-1,bestScore=0;
-          const clienteNorm=c.cliente.toLowerCase()
-            .replace(/s\.a\./g,"sa").replace(/spa/g,"").replace(/ltda\.?/g,"")
-            .replace(/limitada/g,"").replace(/chile/g,"").replace(/comercial/g,"")
-            .replace(/[^a-z0-9\s]/g," ").replace(/\s+/g," ").trim();
+          const rutNorm=c.rut||"";
 
           for(let idx=0;idx<pdfs.length;idx++){
             if(pdfUsado.has(idx))continue;
             const p=pdfs[idx];
             if(p.sitio!==c.sitio||p.tipo!==c.tipo)continue;
             let score=0;
-            /* Bonus por coincidencia de UF (máxima prioridad) */
-            if(p.ufPdf!==null&&Math.abs(p.ufPdf-c.uf)<0.01) score+=10;
-            else if(p.ufPdf!==null&&Math.abs(p.ufPdf-c.uf)<0.5) score+=5;
-            /* Score por similitud de nombre */
-            const pNorm=(p.nombreEnArchivo||"").replace(/[^a-z0-9\s]/g," ").replace(/\s+/g," ").trim();
-            const words=clienteNorm.split(" ").filter(w=>w.length>2);
-            const matches=words.filter(w=>pNorm.includes(w)).length;
-            if(words.length>0) score+=matches/words.length*3;
+            /* 1. RUT exacto — prioridad máxima (100 puntos) */
+            if(rutNorm&&p.rutPdf&&p.rutPdf===rutNorm) score+=100;
+            /* 2. UF exacta — alta prioridad (50 puntos) */
+            if(p.ufPdf!==null&&Math.abs(p.ufPdf-c.uf)<0.01) score+=50;
+            else if(p.ufPdf!==null&&Math.abs(p.ufPdf-c.uf)<0.5) score+=20;
             if(score>bestScore){bestScore=score;bestIdx=idx;}
           }
-          /* Fallback por sitio+tipo si no hay match */
-          if(bestIdx===-1){
+          /* Fallback por sitio+tipo si no hubo match */
+          if(bestScore===0){
             for(let idx=0;idx<pdfs.length;idx++){
               if(pdfUsado.has(idx))continue;
               const p=pdfs[idx];
