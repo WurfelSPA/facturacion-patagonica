@@ -1118,10 +1118,10 @@ function App(){
       h("div",{style:{display:"flex",alignItems:"center",gap:12}},
         h("div",{style:{width:30,height:30,background:"linear-gradient(135deg,var(--acc),var(--acc2))",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"#fff",fontWeight:700}},"⬡"),
         h("div",null,
-          h("div",{style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px"}},"Patagónica Inmobiliaria"),
-          h("div",{style:{fontSize:9,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},REMITENTE+" · "+VER)
+          h("div",{style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px",color:view==="table"?"#fff":"var(--tx)"}},"Patagónica Inmobiliaria"),
+          h("div",{style:{fontSize:9,color:view==="table"?"#93b5d4":"var(--txm)",fontFamily:"'DM Mono',monospace"}},REMITENTE+" · "+VER)
         ),
-        (view==="table"||view==="upload")&&h("span",{style:{background:"var(--bbg)",border:"1px solid #b5d0f0",color:"var(--blue)",fontSize:10,fontWeight:600,padding:"2px 10px",borderRadius:20,marginLeft:4,fontFamily:"'DM Mono',monospace"}},periodo)
+        (view==="table"||view==="upload")&&h("span",{style:{background:view==="table"?"rgba(255,255,255,0.12)":"var(--bbg)",border:view==="table"?"1px solid rgba(255,255,255,0.25)":"1px solid #b5d0f0",color:view==="table"?"#d0e8ff":"var(--blue)",fontSize:10,fontWeight:600,padding:"2px 10px",borderRadius:20,marginLeft:4,fontFamily:"'DM Mono',monospace"}},periodo)
       ),
       h("div",{style:{display:"flex",gap:8,alignItems:"center"}},
         h("button",{onClick:()=>setView("dashboard"),className:view==="table"?`nav-btn-navy`:`nav-btn${view==="dashboard"?" active":""}`,style:{fontSize:11}},"📊 Dashboard"),
