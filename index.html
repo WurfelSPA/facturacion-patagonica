@@ -988,7 +988,7 @@ function App(){
         /* Selector período siempre visible en header */
         h("select",{value:periodo,onChange:e=>{setPeriodo(e.target.value);setFiles(p=>({...p,zip:null}));},
           style:{fontSize:11,fontWeight:600,padding:"5px 10px",background:"linear-gradient(135deg,var(--acc),var(--acc2))",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}},
-          PERIODOS.map(p=>h("option",{key:p,value:p},p))
+          PERIODOS.map(p=>h("option",{key:p,value:p,style:{background:"#fff",color:"#1a1a1a"}},p))
         ),
         h("span",{style:{color:"var(--txd)",fontSize:12}},"·"),
         view==="table"&&h("button",{onClick:()=>{setView("upload");setData([]);},className:"nav-btn",style:{fontSize:11}},"⊞ Nuevos archivos"),
