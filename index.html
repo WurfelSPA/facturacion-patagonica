@@ -590,14 +590,7 @@ function App(){
       });
   },[periodo]);
 
-  /* Auto-procesar cuando planilla + ZIP están listos */
-  useEffect(()=>{
-    if(files.planilla&&files.zip&&!showProc&&data.length===0){
-      /* Pequeño delay para asegurar que el estado esté estabilizado */
-      const t=setTimeout(()=>procesar(),300);
-      return()=>clearTimeout(t);
-    }
-  },[files.planilla,files.zip]);
+  /* NO auto-procesar — el usuario decide cuándo ir a Facturación */
 
   /* Cargar UF del mes actual al inicio */
   useEffect(()=>{
