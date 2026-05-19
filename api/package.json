@@ -1,0 +1,8 @@
+{
+  "name": "facturacion-patagonica",
+  "version": "1.6.0",
+  "private": true,
+  "dependencies": {
+    "jszip": "^3.10.1"
+  }
+}
