@@ -189,10 +189,15 @@ export default async function handler(req, res) {
       const nroMatch = nombre.match(/^(F(?:EE)?-\d+)/i);
       if (!nroMatch) continue;
       const nroFact = nroMatch[1].toUpperCase();
-      const tipo = nroFact.startsWith("FEE-") ? "serv_adm" : "arriendo";
 
+      // FIX: detectar tipo por contenido del PDF, no solo por prefijo del nombre.
+      // F-14633 empieza con "F-" pero su descripción dice "Serv. Adm." → debe ser serv_adm.
       const pdfBuffer = Buffer.from(await entry.async("arraybuffer"));
       const text = extractPDFText(pdfBuffer);
+      const tipo = text.includes("Serv. Adm.") || text.includes("Serv.Adm.")
+        ? "serv_adm"
+        : nroFact.startsWith("FEE-") ? "serv_adm" : "arriendo";
+
       const { rut, uf } = extractData(text, tipo);
       result[nroFact] = { rut, uf, tipo, sitio };
     }
