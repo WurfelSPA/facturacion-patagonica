@@ -395,18 +395,24 @@ async function procesarPDFs(zipFile,addLog){
     if(!nroMatch)continue;
     const nroFact=nroMatch[1].toUpperCase();
     const nombreEnArchivo=(nroMatch[2]||"").trim().toLowerCase();
-    const tipo=nroFact.startsWith("FEE-")?"serv_adm":"arriendo";
+    /* FIX: detectar tipo por contenido del PDF, no por prefijo del nombre.
+       F-14633 empieza con "F-" pero su descripción dice "Serv. Adm." → debe ser serv_adm. */
 
     /* Extraer UF del texto del PDF */
     let ufPdf=null;
+    let tipo="arriendo";
     try{
       const pdfBuf=await zip.files[path].async("arraybuffer");
       const texto=await extraerTextoPDF(pdfBuf);
+      const textoJ=texto.replace(/\s+/g," ");
+      /* Detectar tipo por contenido primero, luego por prefijo como fallback */
+      tipo=textoJ.includes("Serv. Adm.")||textoJ.includes("Serv.Adm.")
+        ?"serv_adm"
+        :nroFact.startsWith("FEE-")?"serv_adm":"arriendo";
       if(texto.length>10){
-        const textoJ=texto.replace(/\s+/g," ");
         /* Arriendo: "UF 380,57 x 39.841,72" */
         const mArr=textoJ.match(/UF\s+([\d]+[,.]\d+)\s+x\s+[\d]/);
-        /* Serv.Adm: "11,84 UF" */
+        /* Serv.Adm: "11,84 UF" o "11,84 UF40.186" */
         const mSrv=textoJ.match(/([\d]+[,.]\d+)\s*UF/i);
         if(tipo==="arriendo"&&mArr) ufPdf=parseFloat(mArr[1].replace(",","."));
         else if(tipo==="serv_adm"&&mSrv) ufPdf=parseFloat(mSrv[1].replace(",","."));
