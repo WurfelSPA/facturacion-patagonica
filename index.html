@@ -368,7 +368,6 @@ async function procesarPDFs(zipFile,addLog){
   const pdfs=[];
   const archivos=Object.keys(zip.files).filter(f=>f.toLowerCase().endsWith(".pdf"));
   addLog(`▶ ${archivos.length} PDFs encontrados en el ZIP`,"info");
-  if(archivos.length>0){addLog(`  Ejemplo: ${archivos.slice(0,3).join(" | ")}`,"info");}
 
   for(const path of archivos){
     const parts=path.split("/");
@@ -376,41 +375,48 @@ async function procesarPDFs(zipFile,addLog){
     const nombre=parts[parts.length-1];
     const sitio=SITIO_MAP[carpeta]||carpeta;
 
-    /* Número de factura desde el nombre del archivo: "F-14548 Congo Films.pdf" → "F-14548" */
+    /* Número de factura desde el nombre del archivo */
     const nroMatch=nombre.match(/^(F(?:EE)?-\d+)/i);
     if(!nroMatch)continue;
     const nroFact=nroMatch[1].toUpperCase();
 
-    /* Tipo: FEE = serv_adm, F = arriendo */
-    const tipo=nroFact.startsWith("FEE-")?"serv_adm":"arriendo";
-
-    /* Extraer monto UF del PDF para el cruce */
+    /* Extraer UF y tipo del texto del PDF */
     let ufPdf=null;
+    let tipo="arriendo";
     try{
       const pdfBuf=await zip.files[path].async("arraybuffer");
       const texto=await extraerTextoPDF(pdfBuf);
       const textoJ=texto.replace(/\s+/g," ");
-      /* Buscar monto en UF: patrones comunes en facturas chilenas */
-      const patterns=[
-        /Total\s+UF[:\s]+([\d.,]+)/i,
-        /([\d]+[.,]\d{2,4})\s*UF/i,
-        /UF\s+([\d]+[.,]\d{2,4})/i,
-        /\b([\d]+[.,]\d{4})\b/,
-      ];
-      for(const pat of patterns){
-        const m=textoJ.match(pat);
-        if(m){
-          const v=parseFloat(m[1].replace(/\./g,"").replace(",","."));
-          if(v>0&&v<15000){ufPdf=Math.round(v*10000)/10000;break;}
-        }
+
+      /* Detectar tipo por descripción */
+      const esServ=/Serv\.?\s*Adm/i.test(textoJ);
+      const esArr=/Arriendo/i.test(textoJ);
+      if(esServ&&!esArr) tipo="serv_adm";
+      else if(esServ&&esArr){
+        /* Tiene ambos — determinar por nombre de archivo */
+        tipo=nroFact.startsWith("FEE-")?"serv_adm":"arriendo";
       }
+
+      if(tipo==="arriendo"){
+        /* Formato: "UF 380,57 x 39.841,72" o "UF 64,83 x 40186,79" */
+        const m=textoJ.match(/UF\s+([\d]+[,.]\d+)\s+x\s+[\d]/);
+        if(m) ufPdf=parseFloat(m[1].replace(",","."));
+      } else {
+        /* Formato Serv.Adm: "11,84 UF" en Cant/Unidad */
+        const m=textoJ.match(/([\d]+[,.]\d+)\s*UF/i);
+        if(m) ufPdf=parseFloat(m[1].replace(",","."));
+      }
+      if(ufPdf) ufPdf=Math.round(ufPdf*10000)/10000;
     }catch(e){}
 
     pdfs.push({sitio,nroFact,tipo,ufPdf,zipPath:path,pdfNombre:nombre});
   }
+
   const sinUF=pdfs.filter(p=>p.ufPdf===null).length;
-  addLog(`✓ ${pdfs.length} PDFs: ${pdfs.length-sinUF} con monto UF, ${sinUF} sin monto`,"ok");
-  if(pdfs.length>0){addLog(`  Sitios detectados: ${[...new Set(pdfs.map(p=>p.sitio))].join(", ")}`,"info");}
+  addLog(`✓ ${pdfs.length} PDFs: ${pdfs.length-sinUF} con UF, ${sinUF} sin UF`,"ok");
+  addLog(`  Sitios: ${[...new Set(pdfs.map(p=>p.sitio))].join(", ")}`,"info");
+  /* Muestra los primeros 3 con su UF para verificar */
+  pdfs.slice(0,3).forEach(p=>addLog(`  ${p.nroFact} ${p.sitio} ${p.tipo} UF=${p.ufPdf}`,"info"));
   return pdfs;
 }
 async function getPdfBase64FromZip(zipFile,zipPath){
