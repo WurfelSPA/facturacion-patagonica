@@ -134,7 +134,7 @@ function extractData(text, tipo) {
 
   let uf = null;
   if (tipo === "arriendo") {
-    const m = text.match(/UF\s*([\d]+[,.][\d]+)\s*x\s*[\d]/);
+    const m = text.match(/UF\s*([\d]+(?:[,.][\d]+)?)\s*x\s*[\d]/);
     if (m) uf = parseFloat(m[1].replace(",", "."));
   } else {
     // Serv.Adm: buscar "X,XX UF" en descripción
@@ -196,6 +196,8 @@ export default async function handler(req, res) {
       const text = extractPDFText(pdfBuffer);
       const tipo = text.includes("Serv. Adm.") || text.includes("Serv.Adm.")
         ? "serv_adm"
+        : text.includes("Arriendo")
+        ? "arriendo"
         : nroFact.startsWith("FEE-") ? "serv_adm" : "arriendo";
 
       const { rut, uf } = extractData(text, tipo);
