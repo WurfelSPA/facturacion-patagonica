@@ -362,6 +362,20 @@ async function procesarPlanillaFacturacion(file,periodo){
   }
   return clientes;
 }
+async function extraerTextoPDF(arrayBuffer){
+  try{
+    pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js";
+    const pdf=await pdfjsLib.getDocument({data:arrayBuffer}).promise;
+    let texto="";
+    for(let i=1;i<=pdf.numPages;i++){
+      const page=await pdf.getPage(i);
+      const content=await page.getTextContent();
+      texto+=content.items.map(it=>it.str).join(" ")+"\n";
+    }
+    return texto;
+  }catch(e){console.warn("pdfjs error:",e.message);return"";}
+}
+
 async function procesarPDFs(zipFile,addLog){
   const buf=await readFileAsBuffer(zipFile);
   const zip=await JSZip.loadAsync(buf);
@@ -375,48 +389,37 @@ async function procesarPDFs(zipFile,addLog){
     const nombre=parts[parts.length-1];
     const sitio=SITIO_MAP[carpeta]||carpeta;
 
-    /* Número de factura desde el nombre del archivo */
-    const nroMatch=nombre.match(/^(F(?:EE)?-\d+)/i);
+    /* Número y nombre desde archivo: "F-14540 Ingersoll Rand.pdf" */
+    const nroMatch=nombre.match(/^(F(?:EE)?-\d+)\s*(.+)?\.pdf$/i);
     if(!nroMatch)continue;
     const nroFact=nroMatch[1].toUpperCase();
+    const nombreEnArchivo=(nroMatch[2]||"").trim().toLowerCase();
+    const tipo=nroFact.startsWith("FEE-")?"serv_adm":"arriendo";
 
-    /* Extraer UF y tipo del texto del PDF */
+    /* Extraer UF del texto del PDF */
     let ufPdf=null;
-    let tipo="arriendo";
     try{
       const pdfBuf=await zip.files[path].async("arraybuffer");
       const texto=await extraerTextoPDF(pdfBuf);
-      const textoJ=texto.replace(/\s+/g," ");
-
-      /* Detectar tipo por descripción */
-      const esServ=/Serv\.?\s*Adm/i.test(textoJ);
-      const esArr=/Arriendo/i.test(textoJ);
-      if(esServ&&!esArr) tipo="serv_adm";
-      else if(esServ&&esArr){
-        /* Tiene ambos — determinar por nombre de archivo */
-        tipo=nroFact.startsWith("FEE-")?"serv_adm":"arriendo";
+      if(texto.length>10){
+        const textoJ=texto.replace(/\s+/g," ");
+        /* Arriendo: "UF 380,57 x 39.841,72" */
+        const mArr=textoJ.match(/UF\s+([\d]+[,.]\d+)\s+x\s+[\d]/);
+        /* Serv.Adm: "11,84 UF" */
+        const mSrv=textoJ.match(/([\d]+[,.]\d+)\s*UF/i);
+        if(tipo==="arriendo"&&mArr) ufPdf=parseFloat(mArr[1].replace(",","."));
+        else if(tipo==="serv_adm"&&mSrv) ufPdf=parseFloat(mSrv[1].replace(",","."));
+        if(ufPdf) ufPdf=Math.round(ufPdf*10000)/10000;
       }
-
-      if(tipo==="arriendo"){
-        /* Formato: "UF 380,57 x 39.841,72" o "UF 64,83 x 40186,79" */
-        const m=textoJ.match(/UF\s+([\d]+[,.]\d+)\s+x\s+[\d]/);
-        if(m) ufPdf=parseFloat(m[1].replace(",","."));
-      } else {
-        /* Formato Serv.Adm: "11,84 UF" en Cant/Unidad */
-        const m=textoJ.match(/([\d]+[,.]\d+)\s*UF/i);
-        if(m) ufPdf=parseFloat(m[1].replace(",","."));
-      }
-      if(ufPdf) ufPdf=Math.round(ufPdf*10000)/10000;
     }catch(e){}
 
-    pdfs.push({sitio,nroFact,tipo,ufPdf,zipPath:path,pdfNombre:nombre});
+    pdfs.push({sitio,nroFact,tipo,ufPdf,nombreEnArchivo,zipPath:path,pdfNombre:nombre});
   }
 
-  const sinUF=pdfs.filter(p=>p.ufPdf===null).length;
-  addLog(`✓ ${pdfs.length} PDFs: ${pdfs.length-sinUF} con UF, ${sinUF} sin UF`,"ok");
+  const conUF=pdfs.filter(p=>p.ufPdf!==null).length;
+  addLog(`✓ ${pdfs.length} PDFs: ${conUF} con UF, ${pdfs.length-conUF} sin UF`,"ok");
   addLog(`  Sitios: ${[...new Set(pdfs.map(p=>p.sitio))].join(", ")}`,"info");
-  /* Muestra los primeros 3 con su UF para verificar */
-  pdfs.slice(0,3).forEach(p=>addLog(`  ${p.nroFact} ${p.sitio} ${p.tipo} UF=${p.ufPdf}`,"info"));
+  pdfs.slice(0,2).forEach(p=>addLog(`  ${p.nroFact} ${p.sitio} ${p.tipo} UF=${p.ufPdf} "${p.nombreEnArchivo}"`,"info"));
   return pdfs;
 }
 async function getPdfBase64FromZip(zipFile,zipPath){
@@ -662,17 +665,28 @@ function App(){
         let factura="",ufPdf=null;
         if(MANUAL[mk]){factura=MANUAL[mk];ufPdf=c.uf;}
         else{
-          let bestIdx=-1,bestDiff=9999;
-          /* Paso 1: match por sitio + tipo + monto UF (tolerancia 0.5 UF) */
+          let bestIdx=-1,bestScore=0;
+          const clienteNorm=c.cliente.toLowerCase()
+            .replace(/s\.a\./g,"sa").replace(/spa/g,"").replace(/ltda\.?/g,"")
+            .replace(/limitada/g,"").replace(/chile/g,"").replace(/comercial/g,"")
+            .replace(/[^a-z0-9\s]/g," ").replace(/\s+/g," ").trim();
+
           for(let idx=0;idx<pdfs.length;idx++){
             if(pdfUsado.has(idx))continue;
             const p=pdfs[idx];
-            if(p.sitio===c.sitio&&p.tipo===c.tipo&&p.ufPdf!==null){
-              const d=Math.abs(p.ufPdf-c.uf);
-              if(d<bestDiff&&d<0.5){bestDiff=d;bestIdx=idx;}
-            }
+            if(p.sitio!==c.sitio||p.tipo!==c.tipo)continue;
+            let score=0;
+            /* Bonus por coincidencia de UF (máxima prioridad) */
+            if(p.ufPdf!==null&&Math.abs(p.ufPdf-c.uf)<0.01) score+=10;
+            else if(p.ufPdf!==null&&Math.abs(p.ufPdf-c.uf)<0.5) score+=5;
+            /* Score por similitud de nombre */
+            const pNorm=(p.nombreEnArchivo||"").replace(/[^a-z0-9\s]/g," ").replace(/\s+/g," ").trim();
+            const words=clienteNorm.split(" ").filter(w=>w.length>2);
+            const matches=words.filter(w=>pNorm.includes(w)).length;
+            if(words.length>0) score+=matches/words.length*3;
+            if(score>bestScore){bestScore=score;bestIdx=idx;}
           }
-          /* Paso 2: si no hubo match por monto, match solo por sitio + tipo (primer disponible) */
+          /* Fallback por sitio+tipo si no hay match */
           if(bestIdx===-1){
             for(let idx=0;idx<pdfs.length;idx++){
               if(pdfUsado.has(idx))continue;
@@ -690,8 +704,8 @@ function App(){
       const sinPdf=filas.filter(f=>!f.factura);
       addLog(`✓ ${filas.filter(f=>f.factura).length}/${filas.length} facturas cruzadas`,"ok");
       if(sinPdf.length>0){addLog(`  Sin PDF: ${sinPdf.slice(0,3).map(f=>f.sitio+"/"+f.cliente.slice(0,20)).join(" | ")}`,"info");}setProcProgress(100);setProcDone(true);
-      /* Auto-cerrar DESACTIVADO temporalmente para debug */
-      // setTimeout(()=>{setShowProc(false);setView("table");},1800);
+      /* Auto-cerrar y mostrar tabla si no hubo errores */
+      setTimeout(()=>{setShowProc(false);setView("table");},1800);
       setData(filas);
       const prevSent=new Set();
       filas.forEach((f,i)=>{const key=`${periodo}|${f.cliente}|${f.concepto}`;if(sentKeys.has(key))prevSent.add(i);});
