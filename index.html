@@ -690,8 +690,8 @@ function App(){
       const sinPdf=filas.filter(f=>!f.factura);
       addLog(`✓ ${filas.filter(f=>f.factura).length}/${filas.length} facturas cruzadas`,"ok");
       if(sinPdf.length>0){addLog(`  Sin PDF: ${sinPdf.slice(0,3).map(f=>f.sitio+"/"+f.cliente.slice(0,20)).join(" | ")}`,"info");}setProcProgress(100);setProcDone(true);
-      /* Auto-cerrar y mostrar tabla si no hubo errores */
-      setTimeout(()=>{setShowProc(false);setView("table");},1800);
+      /* Auto-cerrar DESACTIVADO temporalmente para debug */
+      // setTimeout(()=>{setShowProc(false);setView("table");},1800);
       setData(filas);
       const prevSent=new Set();
       filas.forEach((f,i)=>{const key=`${periodo}|${f.cliente}|${f.concepto}`;if(sentKeys.has(key))prevSent.add(i);});
