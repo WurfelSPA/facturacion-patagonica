@@ -1,4 +1,4 @@
-export const config = { api: { bodyParser: false } };
+export const config = { api: { bodyParser: false, responseLimit: '50mb' } };
 
 const FACTURACION_FOLDER_ID = "1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u";
 
@@ -8,7 +8,6 @@ const MES_NUM = {
   "Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12"
 };
 
-// Reutiliza la misma lógica de firma JWT que planilla.js
 async function signJWT(payload, privateKey) {
   const header = { alg: "RS256", typ: "JWT" };
   const encode = obj => btoa(JSON.stringify(obj)).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
@@ -40,105 +39,13 @@ async function getAccessToken(serviceAccount) {
   return data.access_token;
 }
 
-async function driveList(token, folderId, mimeType = null) {
-  let q = `'${folderId}' in parents and trashed=false`;
-  if (mimeType) q += ` and mimeType='${mimeType}'`;
-  const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType,size)&pageSize=50`;
+async function driveList(token, folderId) {
+  const q = `'${folderId}' in parents and trashed=false`;
+  const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType,size)&pageSize=100`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   const data = await res.json();
   if (!res.ok) throw new Error("Drive list error: " + JSON.stringify(data));
   return data.files || [];
-}
-
-async function downloadFile(token, fileId) {
-  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  if (!res.ok) throw new Error(`Download error ${res.status}`);
-  return res.arrayBuffer();
-}
-
-// Crear ZIP en memoria con los PDFs de la carpeta
-async function buildZip(token, folderId) {
-  // Listar PDFs directos y subcarpetas
-  const items = await driveList(token, folderId);
-  
-  // Coleccionar todos los PDFs (en raíz y subcarpetas un nivel)
-  const pdfs = []; // {name, data, folder}
-  
-  for (const item of items) {
-    if (item.mimeType === "application/vnd.google-apps.folder") {
-      // Subcarpeta (5A, 4A, etc.) — listar PDFs dentro
-      const subItems = await driveList(token, item.id, "application/pdf");
-      for (const pdf of subItems) {
-        pdfs.push({ name: pdf.name, folderId: item.id, fileId: pdf.id, subfolder: item.name });
-      }
-    } else if (item.mimeType === "application/pdf") {
-      pdfs.push({ name: item.name, fileId: item.id, subfolder: "" });
-    }
-  }
-
-  if (pdfs.length === 0) throw new Error("No se encontraron PDFs en la carpeta del mes");
-
-  // Construir ZIP manualmente (formato ZIP sin compresión)
-  const encoder = new TextEncoder();
-  const localHeaders = [];
-  const centralDir = [];
-  let offset = 0;
-
-  function u16(n) { const b = new Uint8Array(2); b[0]=n&0xff; b[1]=(n>>8)&0xff; return b; }
-  function u32(n) { const b = new Uint8Array(4); b[0]=n&0xff; b[1]=(n>>8)&0xff; b[2]=(n>>16)&0xff; b[3]=(n>>24)&0xff; return b; }
-
-  function crc32(buf) {
-    let crc = 0xFFFFFFFF;
-    const table = [];
-    for (let i=0;i<256;i++){let c=i;for(let j=0;j<8;j++)c=c&1?(0xEDB88320^(c>>>1)):(c>>>1);table[i]=c;}
-    for (let i=0;i<buf.length;i++) crc=table[(crc^buf[i])&0xff]^(crc>>>8);
-    return (crc^0xFFFFFFFF)>>>0;
-  }
-
-  const parts = [];
-
-  for (const pdf of pdfs) {
-    const data = new Uint8Array(await downloadFile(token, pdf.fileId));
-    const path = pdf.subfolder ? `${pdf.subfolder}/${pdf.name}` : pdf.name;
-    const nameBytes = encoder.encode(path);
-    const crc = crc32(data);
-    const size = data.length;
-
-    // Local file header
-    const lhSig = new Uint8Array([0x50,0x4b,0x03,0x04]);
-    const lh = concat([lhSig, u16(20), u16(0), u16(0), u16(0), u16(0), u32(crc), u32(size), u32(size), u16(nameBytes.length), u16(0), nameBytes, data]);
-    
-    // Central directory entry
-    const cdSig = new Uint8Array([0x50,0x4b,0x01,0x02]);
-    const cd = concat([cdSig, u16(20), u16(20), u16(0), u16(0), u16(0), u16(0), u32(crc), u32(size), u32(size), u16(nameBytes.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(offset), nameBytes]);
-
-    localHeaders.push(lh);
-    centralDir.push(cd);
-    offset += lh.length;
-  }
-
-  // End of central directory
-  const cdOffset = offset;
-  const cdSize = centralDir.reduce((s,c)=>s+c.length, 0);
-  const eocd = concat([
-    new Uint8Array([0x50,0x4b,0x05,0x06]),
-    u16(0), u16(0),
-    u16(pdfs.length), u16(pdfs.length),
-    u32(cdSize), u32(cdOffset),
-    u16(0)
-  ]);
-
-  return concat([...localHeaders, ...centralDir, eocd]);
-}
-
-function concat(arrays) {
-  const total = arrays.reduce((s,a)=>s+a.length,0);
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const a of arrays) { out.set(a, offset); offset += a.length; }
-  return out;
 }
 
 export default async function handler(req, res) {
@@ -147,16 +54,16 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
-  // ?periodo=Mayo+2026
   const periodo = req.query.periodo;
-  if (!periodo) return res.status(400).json({ error: "Falta parámetro periodo" });
+  if (!periodo) return res.status(400).json({ error: "Falta parametro periodo" });
 
-  const [mesNombre, anio] = periodo.split(" ");
+  const parts = periodo.split(" ");
+  const mesNombre = parts[0];
+  const anio = parts[1];
   const mesNum = MES_NUM[mesNombre];
-  if (!mesNum || !anio) return res.status(400).json({ error: "Período inválido: " + periodo });
+  if (!mesNum || !anio) return res.status(400).json({ error: "Periodo invalido: " + periodo });
 
-  const folderName = `${mesNum}-${anio}`; // "05-2026"
-
+  const folderName = `${mesNum}-${anio}`;
   const saJson = process.env.GOOGLE_SERVICE_ACCOUNT;
   if (!saJson) return res.status(500).json({ error: "GOOGLE_SERVICE_ACCOUNT no configurada" });
 
@@ -164,21 +71,40 @@ export default async function handler(req, res) {
     const serviceAccount = JSON.parse(saJson);
     const token = await getAccessToken(serviceAccount);
 
-    // Buscar la carpeta del mes dentro de Facturacion Mensual
-    const folders = await driveList(token, FACTURACION_FOLDER_ID, "application/vnd.google-apps.folder");
-    const monthFolder = folders.find(f => f.name === folderName);
+    // Buscar carpeta del mes dentro de Facturacion Mensual
+    const folders = await driveList(token, FACTURACION_FOLDER_ID);
+    const monthFolder = folders.find(f =>
+      f.mimeType === "application/vnd.google-apps.folder" && f.name === folderName
+    );
     if (!monthFolder) {
       return res.status(404).json({ error: `Carpeta ${folderName} no encontrada en Drive` });
     }
 
-    // Construir ZIP con los PDFs
-    const zipData = await buildZip(token, monthFolder.id);
+    // Buscar el ZIP dentro de la carpeta del mes
+    const files = await driveList(token, monthFolder.id);
+    const zipFile = files.find(f => f.name.toLowerCase().endsWith(".zip"));
+    if (!zipFile) {
+      return res.status(404).json({
+        error: `No se encontro archivo .zip en ${folderName}. Sube el ZIP con los PDFs del mes.`
+      });
+    }
 
+    // Descargar y servir el ZIP directo
+    const driveRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${zipFile.id}?alt=media`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!driveRes.ok) {
+      const txt = await driveRes.text();
+      return res.status(driveRes.status).json({ error: `Drive ${driveRes.status}: ${txt.slice(0,200)}` });
+    }
+
+    const buffer = await driveRes.arrayBuffer();
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${folderName}.zip"`);
     res.setHeader("Cache-Control", "no-store");
-    res.setHeader("Content-Length", zipData.length);
-    return res.status(200).send(Buffer.from(zipData));
+    res.setHeader("Content-Length", buffer.byteLength);
+    return res.status(200).send(Buffer.from(buffer));
 
   } catch (e) {
     return res.status(500).json({ error: e.message });
