@@ -47,43 +47,44 @@ async function driveList(token, folderId) {
   return data.files || [];
 }
 
-/* Extraer texto de PDF en Node usando buffer raw */
 function extractTextFromPDFBuffer(buffer) {
   const str = buffer.toString("latin1");
   const texts = [];
-
-  // Extraer operadores Tj (string simple) y TJ (array)
   const tjRegex = /\(([^)\\]*(?:\\.[^)\\]*)*)\)\s*Tj/g;
   const tjArrRegex = /\[([^\]]*)\]\s*TJ/g;
-
   let m;
   while ((m = tjRegex.exec(str)) !== null) {
-    const t = m[1]
-      .replace(/\\n/g, " ").replace(/\\r/g, " ")
-      .replace(/\\\(/g, "(").replace(/\\\)/g, ")")
-      .replace(/\\\\/g, "\\");
+    const t = m[1].replace(/\\n/g," ").replace(/\\r/g," ").replace(/\\\(/g,"(").replace(/\\\)/g,")").replace(/\\\\/g,"\\");
     if (t.trim()) texts.push(t);
   }
   while ((m = tjArrRegex.exec(str)) !== null) {
-    const inner = m[1].replace(/\(([^)]*)\)/g, (_, s) => s);
+    const inner = m[1].replace(/\(([^)]*)\)/g, (_,s) => s);
     if (inner.trim()) texts.push(inner);
   }
-
-  return texts.join(" ").replace(/\s+/g, " ").trim();
+  return texts.join(" ").replace(/\s+/g," ").trim();
 }
 
-/* Extraer UF del texto */
-function extractUF(text, tipo) {
+/* Normalizar RUT: "96.955.880-7" → "96955880-7" para comparación */
+function normalizeRUT(rut) {
+  return rut.replace(/\./g,"").replace(/\s/g,"").toLowerCase();
+}
+
+function extractFromText(text, tipo) {
+  /* RUT: patrón XX.XXX.XXX-X o XX.XXX.XXX-K */
+  const rutMatch = text.match(/(\d{1,2}\.\d{3}\.\d{3}-[\dkK])/);
+  const rut = rutMatch ? normalizeRUT(rutMatch[1]) : null;
+
+  /* UF según tipo */
+  let uf = null;
   if (tipo === "arriendo") {
-    // "UF 380,57 x 39.841,72" o "UF 64,83 x 40186,79"
     const m = text.match(/UF\s+([\d]+[,.]\d+)\s+x\s+[\d]/);
-    if (m) return parseFloat(m[1].replace(",", "."));
+    if (m) uf = parseFloat(m[1].replace(",","."));
   } else {
-    // "11,84 UF" en Cant/Unidad
     const m = text.match(/([\d]+[,.]\d+)\s*UF/i);
-    if (m) return parseFloat(m[1].replace(",", "."));
+    if (m) uf = parseFloat(m[1].replace(",","."));
   }
-  return null;
+
+  return { rut, uf: uf ? Math.round(uf*10000)/10000 : null };
 }
 
 export default async function handler(req, res) {
@@ -100,7 +101,6 @@ export default async function handler(req, res) {
   if (!mesNum) return res.status(400).json({ error: "Periodo invalido" });
 
   const zipName = `${anio}-${mesNum}.zip`;
-
   const saJson = process.env.GOOGLE_SERVICE_ACCOUNT;
   if (!saJson) return res.status(500).json({ error: "Sin credenciales" });
 
@@ -108,12 +108,10 @@ export default async function handler(req, res) {
     const serviceAccount = JSON.parse(saJson);
     const token = await getAccessToken(serviceAccount);
 
-    // Encontrar el ZIP
     const files = await driveList(token, FACTURACION_FOLDER_ID);
     const zipFile = files.find(f => f.name.toLowerCase() === zipName.toLowerCase());
     if (!zipFile) return res.status(404).json({ error: `${zipName} no encontrado` });
 
-    // Descargar ZIP
     const zipRes = await fetch(
       `https://www.googleapis.com/drive/v3/files/${zipFile.id}?alt=media`,
       { headers: { Authorization: `Bearer ${token}` } }
@@ -121,39 +119,29 @@ export default async function handler(req, res) {
     if (!zipRes.ok) throw new Error(`Drive error ${zipRes.status}`);
     const zipBuffer = Buffer.from(await zipRes.arrayBuffer());
 
-    // Descomprimir y extraer UF de cada PDF usando Node's built-in
     const { default: JSZip } = await import("jszip");
     const zip = await JSZip.loadAsync(zipBuffer);
 
-    const result = {}; // { "F-14540": { uf: 380.57, tipo: "arriendo", sitio: "5-A", nombre: "Ingersoll Rand" } }
+    const SITIO_MAP = {"5A":"5-A","4A":"4-A","A1":"A-1","A2":"A-2","B":"B","D2":"D-2"};
+    const result = {};
 
-    const pdfEntries = Object.entries(zip.files).filter(([name]) => name.toLowerCase().endsWith(".pdf"));
-
-    for (const [path, entry] of pdfEntries) {
+    for (const [path, entry] of Object.entries(zip.files)) {
+      if (!path.toLowerCase().endsWith(".pdf")) continue;
       const parts = path.split("/");
-      const carpeta = parts.length > 1 ? parts[parts.length - 2] : "";
-      const nombre = parts[parts.length - 1];
-
-      const SITIO_MAP = {"5A":"5-A","4A":"4-A","A1":"A-1","A2":"A-2","B":"B","D2":"D-2"};
+      const carpeta = parts.length > 1 ? parts[parts.length-2] : "";
+      const nombre = parts[parts.length-1];
       const sitio = SITIO_MAP[carpeta] || carpeta;
 
-      const nroMatch = nombre.match(/^(F(?:EE)?-\d+)\s*(.+)?\.pdf$/i);
+      const nroMatch = nombre.match(/^(F(?:EE)?-\d+)/i);
       if (!nroMatch) continue;
       const nroFact = nroMatch[1].toUpperCase();
-      const nombreCliente = (nroMatch[2] || "").trim();
       const tipo = nroFact.startsWith("FEE-") ? "serv_adm" : "arriendo";
 
       const pdfBuffer = Buffer.from(await entry.async("arraybuffer"));
       const text = extractTextFromPDFBuffer(pdfBuffer);
-      const uf = extractUF(text, tipo);
+      const { rut, uf } = extractFromText(text, tipo);
 
-      result[nroFact] = {
-        uf: uf ? Math.round(uf * 10000) / 10000 : null,
-        tipo,
-        sitio,
-        nombre: nombreCliente,
-        path
-      };
+      result[nroFact] = { rut, uf, tipo, sitio, path };
     }
 
     return res.status(200).json({ pdfs: result, count: Object.keys(result).length });
