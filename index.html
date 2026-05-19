@@ -322,32 +322,37 @@ async function procesarPlanillaFacturacion(file,periodo){
   const wb=XLSX.read(buf,{type:"array"});
   const ws=wb.Sheets["Flujo"];
   if(!ws)throw new Error("No se encontró la hoja 'Flujo' en la planilla de facturación");
-  const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+  /* raw:true para obtener seriales Excel en números; lo usamos para detectar la columna */
+  const dataRaw=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
   const mesNum=MES_NUM[periodo.split(" ")[0]];
   const anio=parseInt(periodo.split(" ")[1]);
   let colGS=-1,colGT=-1;
+
   function esTargetMes(val){
     if(val===null||val===undefined)return false;
-    if(typeof val==="number"&&val>40000&&val<50000){
-      const msPerDay=86400000;
-      const excelEpoch=new Date(Date.UTC(1899,11,30));
-      const dateMs=excelEpoch.getTime()+Math.round(val)*msPerDay;
-      const d=new Date(dateMs);
+    if(typeof val==="number"&&val>40000&&val<60000){
+      const d=new Date(new Date(Date.UTC(1899,11,30)).getTime()+Math.round(val)*86400000);
       return d.getUTCFullYear()===anio&&(d.getUTCMonth()+1)===mesNum;
     }
-    if(val instanceof Date)return val.getFullYear()===anio&&(val.getMonth()+1)===mesNum;
-    if(typeof val==="string"){try{const d=new Date(val);return d.getFullYear()===anio&&(d.getMonth()+1)===mesNum;}catch(e){}}
+    if(typeof val==="string"){try{const d=new Date(val);if(!isNaN(d))return d.getFullYear()===anio&&(d.getMonth()+1)===mesNum;}catch(e){}}
     return false;
   }
-  const fila3=data[3]||[];
-  for(let i=0;i<fila3.length;i++){if(esTargetMes(fila3[i])){colGS=i;colGT=i+1;break;}}
-  if(colGS===-1)throw new Error(`No se encontró columna para ${periodo} en la fila de fechas`);
+
+  /* Fechas en fila 3 (índice 2) */
+  const fila3=dataRaw[2]||[];
+  for(let i=64;i<fila3.length;i++){
+    if(esTargetMes(fila3[i])){colGS=i;colGT=i+1;break;}
+  }
+  if(colGS===-1)throw new Error(`No se encontró columna para ${periodo}. Verifica que la planilla tenga ese mes.`);
+
   const excl=["","VACANTE","Nombre Cliente","Areas Comunes Edificio","Areas comunes Edificio (Subterraneos)","Area Comun"];
   const clientes=[];
-  for(let i=5;i<data.length;i++){
-    const row=data[i];if(!row)continue;
-    const sitio=row[6];const cliente=row[9];
-    const ufGS=row[colGS];const ufGT=row[colGT];
+  for(let i=4;i<dataRaw.length;i++){
+    const row=dataRaw[i];if(!row)continue;
+    const sitio=row[7];
+    const cliente=row[11];
+    const ufGS=row[colGS];
+    const ufGT=row[colGT];
     if(!cliente||excl.includes(String(cliente).trim()))continue;
     const sName=String(cliente).trim();
     const sito=sitio?String(sitio).trim():"";
@@ -356,16 +361,6 @@ async function procesarPlanillaFacturacion(file,periodo){
     if(typeof ufGT==="number"&&ufGT>0&&ufGT<=500)clientes.push({sitio:sito,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling});
   }
   return clientes;
-}
-/* procesarPlanillaEnvio eliminado — email viene de col M de la planilla principal */
-async function extraerTextoPDF(arrayBuffer){
-  try{
-    pdfjsLib.GlobalWorkerOptions.workerSrc="";
-    const pdf=await pdfjsLib.getDocument({data:arrayBuffer}).promise;
-    let texto="";
-    for(let i=1;i<=pdf.numPages;i++){const page=await pdf.getPage(i);const content=await page.getTextContent();texto+=content.items.map(it=>it.str).join(" ")+"\n";}
-    return texto;
-  }catch(e){return"";}
 }
 async function procesarPDFs(zipFile,addLog){
   const buf=await readFileAsBuffer(zipFile);
@@ -583,7 +578,6 @@ function App(){
   /* Auto-procesar cuando planilla + ZIP están listos */
   useEffect(()=>{
     if(files.planilla&&files.zip&&!showProc&&data.length===0){
-      setView("table_loading");
       procesar();
     }
   },[files.planilla,files.zip]);
@@ -1054,8 +1048,9 @@ function App(){
           [{label:"Planilla facturación",ok:!!files.planilla},{label:"PDFs "+periodo,ok:!!files.zip}]
           .map((f,i)=>h("span",{key:i,style:{fontSize:11,padding:"3px 10px",borderRadius:20,background:f.ok?"var(--gbg)":"var(--surf2)",color:f.ok?"var(--green)":"var(--txd)",border:`1px solid ${f.ok?"var(--gdim)":"var(--bdr)"}`}},f.ok?"✓ ":"○ ",f.label))
         ),
-        h("div",{style:{marginTop:16,display:"flex",justifyContent:"center"}},
-          h("button",{onClick:procesar,disabled:!todosSubidos||!apiKey,className:"btn-primary",style:{opacity:todosSubidos?1:0.45,minWidth:220}},todosSubidos?"▶ Procesar archivos":"Sube los 3 archivos para continuar")
+        h("div",{style:{marginTop:16,display:"flex",justifyContent:"center",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},
+          !todosSubidos?h("span",null,h("span",{className:"spin",style:{marginRight:6}},"⟳"),"Cargando archivos desde Drive..."):
+          h("button",{onClick:procesar,className:"btn-primary",style:{minWidth:220}},"▶ Procesar archivos")
         )
       )
     ),
