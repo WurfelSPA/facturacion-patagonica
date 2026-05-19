@@ -82,6 +82,9 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 .nav-btn{background:transparent;border:1px solid var(--bdr);color:var(--txm);border-radius:8px;padding:5px 14px;font-size:11px;font-weight:500;display:flex;align-items:center;gap:5px}
 .nav-btn:hover{background:var(--surf2);color:var(--tx)}
 .nav-btn.active{background:var(--surf3);border-color:var(--acc);color:var(--accl)}
+.nav-btn-navy{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#d0e4f7;border-radius:8px;padding:5px 14px;font-size:11px;font-weight:500;display:flex;align-items:center;gap:5px;cursor:pointer;transition:all 0.15s}
+.nav-btn-navy:hover{background:rgba(255,255,255,0.16);color:#fff}
+.nav-btn-navy.active{background:rgba(255,255,255,0.18);border-color:rgba(255,255,255,0.4);color:#fff}
 .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
 @media(max-width:900px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(10,124,78,0.4)}50%{box-shadow:0 0 0 8px rgba(10,124,78,0)}}
@@ -93,8 +96,8 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 <script>
 const {useState,useRef,useCallback,useEffect,createElement:h}=React;
 const REMITENTE="amelendez@patagonica.cl";
-const CCO="";
-const TEST_DEST="amelendez@patagonica.cl";
+const CCO="mmunoz@patagonica.cl";
+const TEST_DEST="";
 const MODO_PRUEBA=TEST_DEST!=="";
 const VER="v4.8.0";
 const DRIVE_PLANILLA_ID="1rAGS-b1MoPpEhMgN2BR9Hvg4cTYdcQDu";
@@ -473,6 +476,42 @@ function formatRUT(rut){
   }
   return result+dv;
 }
+
+function buildResumenHtml(enviados,periodo){
+  const filas=enviados.map(r=>`
+    <tr style="border-bottom:1px solid #f0f0f0">
+      <td style="padding:8px 12px;font-size:12px;color:#555">${r.sitio}</td>
+      <td style="padding:8px 12px;font-size:12px;color:#111;font-weight:500">${r.cliente}</td>
+      <td style="padding:8px 12px;font-size:12px;color:#555">${r.concepto}</td>
+      <td style="padding:8px 12px;font-size:12px;font-family:monospace;color:#333">${r.factura||"—"}</td>
+      <td style="padding:8px 12px;font-size:12px;font-family:monospace;color:#111">${r.ufPlan>500?"$"+Math.round(r.ufPlan).toLocaleString("es-CL"):r.ufPlan.toFixed(2)+" UF"}</td>
+      <td style="padding:8px 12px;font-size:12px;color:${r.correo?"#1a5fa8":"#999"}">${r.correo||"— sin correo"}</td>
+    </tr>`).join("");
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#f4f4f4;font-family:Helvetica,Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:28px 0"><tr><td align="center">
+  <table width="680" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;border:1px solid #e0e0e0;overflow:hidden">
+    <tr><td style="background:#1e3a5f;padding:20px 28px">
+      <div style="font-size:17px;font-weight:700;color:#fff">Resumen de Facturación Enviada</div>
+      <div style="font-size:12px;color:#93b5d4;margin-top:4px">Período: ${periodo} · ${enviados.length} correo${enviados.length!==1?"s":""} enviado${enviados.length!==1?"s":""}</div>
+    </td></tr>
+    <tr><td style="padding:20px 28px">
+      <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e8e8;border-radius:6px;overflow:hidden">
+        <tr style="background:#f0f4f8">
+          <td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999;letter-spacing:.06em">SITIO</td>
+          <td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999;letter-spacing:.06em">CLIENTE</td>
+          <td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999;letter-spacing:.06em">CONCEPTO</td>
+          <td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999;letter-spacing:.06em">FACTURA</td>
+          <td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999;letter-spacing:.06em">MONTO</td>
+          <td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999;letter-spacing:.06em">DESTINATARIO</td>
+        </tr>
+        ${filas}
+      </table>
+    </td></tr>
+    <tr><td style="background:#f8f8f8;border-top:1px solid #e8e8e8;padding:14px 28px">
+      <p style="font-size:11px;color:#999;margin:0">Resumen generado automáticamente · Patagónica Inmobiliaria SpA · RUT 96.673.250-4</p>
+    </td></tr>
+  </table></td></tr></table></body></html>`;
+}
 function getEstado(r){if(!r.factura)return"missing";if(r.ufPlan>500)return r.factura?"ok":"missing";if(r.ufPdf===null||r.ufPdf===undefined)return"missing";if(Math.abs(r.ufPdf-r.ufPlan)>0.5)return"diff";return"ok";}
 
 /* ═══════════════════════════════════
@@ -791,7 +830,17 @@ function App(){
         try{await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(row.i,key);enviados++;await new Promise(r=>setTimeout(r,400));}
         catch(e){notify("Error en "+row.cliente+": "+e.message,"err");}
       }
-      notify("✓ "+enviados+"/"+pend.length+" correos enviados"+(MODO_PRUEBA?" (PRUEBA → "+TEST_DEST+")":""));
+      // Enviar resumen a administración
+      if(enviados>0){
+        try{
+          const resumenRows=pend.slice(0,enviados);
+          const resumenHtml=buildResumenHtml(resumenRows,periodo);
+          const resSubject="Resumen Facturación "+periodo+" — "+enviados+" correos enviados";
+          await sendGmail(token,"amelendez@patagonica.cl","","amelendez@patagonica.cl",resSubject,resumenHtml,null,null);
+          await sendGmail(token,"mmunoz@patagonica.cl","","amelendez@patagonica.cl",resSubject,resumenHtml,null,null);
+        }catch(e){console.warn("Error enviando resumen:",e.message);}
+      }
+      notify("✓ "+enviados+"/"+pend.length+" correos enviados");
     }catch(e){notify(e.message.includes("popup")?"Autorización cancelada":"Error: "+e.message,"warn");}
   };
 
@@ -1065,7 +1114,7 @@ function App(){
     MODO_PRUEBA&&h("div",{className:"test-banner"},"⚠",h("strong",null,"MODO PRUEBA"),"— correos van a",h("strong",{style:{marginLeft:4}},TEST_DEST),h("span",{style:{marginLeft:"auto",fontSize:10,color:"var(--txd)"}},'Producción: TEST_DEST="" en el código')),
 
     /* HEADER */
-    h("header",{style:{background:"var(--surf)",borderBottom:"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:50}},
+    h("header",{style:{background:view==="table"?"#1e3a5f":"var(--surf)",borderBottom:view==="table"?"1px solid #152d4a":"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:50}},
       h("div",{style:{display:"flex",alignItems:"center",gap:12}},
         h("div",{style:{width:30,height:30,background:"linear-gradient(135deg,var(--acc),var(--acc2))",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"#fff",fontWeight:700}},"⬡"),
         h("div",null,
@@ -1075,7 +1124,7 @@ function App(){
         (view==="table"||view==="upload")&&h("span",{style:{background:"var(--bbg)",border:"1px solid #b5d0f0",color:"var(--blue)",fontSize:10,fontWeight:600,padding:"2px 10px",borderRadius:20,marginLeft:4,fontFamily:"'DM Mono',monospace"}},periodo)
       ),
       h("div",{style:{display:"flex",gap:8,alignItems:"center"}},
-        h("button",{onClick:()=>setView("dashboard"),className:`nav-btn${view==="dashboard"?" active":""}`,style:{fontSize:11}},"📊 Dashboard"),
+        h("button",{onClick:()=>setView("dashboard"),className:view==="table"?`nav-btn-navy`:`nav-btn${view==="dashboard"?" active":""}`,style:{fontSize:11}},"📊 Dashboard"),
         h("button",{
           onClick:()=>{if(files.planilla&&files.zip){procesar();}else{setView("upload");}},
           className:`nav-btn${view!=="dashboard"?" active":""}`,
@@ -1094,7 +1143,7 @@ function App(){
           PERIODOS.map(p=>h("option",{key:p,value:p,style:{background:"#fff",color:"#1a1a1a"}},p))
         ),
         h("span",{style:{color:"var(--txd)",fontSize:12}},"·"),
-        view==="table"&&h("button",{onClick:()=>{setView("upload");setData([]);},className:"nav-btn",style:{fontSize:11}},"⊞ Nuevos archivos"),
+        view==="table"&&h("button",{onClick:()=>{setView("upload");setData([]);},className:"nav-btn-navy",style:{fontSize:11}},"⊞ Nuevos archivos"),
 
         view==="table"&&h("button",{onClick:sendAll,style:{background:"var(--gbg)",border:"1px solid var(--gdim)",color:"var(--green)",borderRadius:9,padding:"6px 16px",fontSize:12,fontWeight:700}},MODO_PRUEBA?"⚠ Enviar todos (PRUEBA)":"✉ Enviar todos")
       )
