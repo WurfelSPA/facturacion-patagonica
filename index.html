@@ -84,6 +84,7 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 .nav-btn.active{background:var(--surf3);border-color:var(--acc);color:var(--accl)}
 .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
 @media(max-width:900px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(10,124,78,0.4)}50%{box-shadow:0 0 0 8px rgba(10,124,78,0)}}
 </style>
 </head>
 <body>
@@ -95,7 +96,7 @@ const REMITENTE="amelendez@patagonica.cl";
 const CCO="";
 const TEST_DEST="amelendez@patagonica.cl";
 const MODO_PRUEBA=TEST_DEST!=="";
-const VER="v4.6.0";
+const VER="v4.7.0";
 const DRIVE_PLANILLA_ID="1rAGS-b1MoPpEhMgN2BR9Hvg4cTYdcQDu";
 const GOOGLE_SCOPES="https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.readonly";
 const TG_BOT=window.__TG_BOT__||"";
@@ -579,6 +580,14 @@ function App(){
       });
   },[periodo]);
 
+  /* Auto-procesar cuando planilla + ZIP están listos */
+  useEffect(()=>{
+    if(files.planilla&&files.zip&&!showProc&&data.length===0){
+      setView("table_loading");
+      procesar();
+    }
+  },[files.planilla,files.zip]);
+
   /* Cargar UF del mes actual al inicio */
   useEffect(()=>{
     const now=new Date();
@@ -984,7 +993,18 @@ function App(){
       ),
       h("div",{style:{display:"flex",gap:8,alignItems:"center"}},
         h("button",{onClick:()=>setView("dashboard"),className:`nav-btn${view==="dashboard"?" active":""}`,style:{fontSize:11}},"📊 Dashboard"),
-        h("button",{onClick:()=>setView("upload"),className:`nav-btn${view!=="dashboard"?" active":""}`,style:{fontSize:11}},"📋 Facturación"),
+        h("button",{
+          onClick:()=>{if(files.planilla&&files.zip){procesar();}else{setView("upload");}},
+          className:`nav-btn${view!=="dashboard"?" active":""}`,
+          style:{fontSize:11,position:"relative",
+            background:files.planilla&&files.zip?"linear-gradient(135deg,var(--green),#059669)":"",
+            color:files.planilla&&files.zip?"#fff":"",
+            border:files.planilla&&files.zip?"none":"",
+            animation:files.planilla&&files.zip?"pulse 1.5s ease-in-out 3":"none"
+          }
+        },
+          files.planilla&&files.zip?`▶ Procesar ${periodo.split(" ")[0].slice(0,3)} ${periodo.split(" ")[1]}`:"📋 Facturación"
+        ),
         /* Selector período siempre visible en header */
         h("select",{value:periodo,onChange:e=>{setPeriodo(e.target.value);setFiles(p=>({...p,zip:null}));},
           style:{fontSize:11,fontWeight:600,padding:"5px 10px",background:"linear-gradient(135deg,var(--acc),var(--acc2))",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}},
