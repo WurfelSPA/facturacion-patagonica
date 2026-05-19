@@ -408,10 +408,12 @@ async function procesarPDFs(zipFile,addLog){
       /* Detectar tipo por contenido primero, luego por prefijo como fallback */
       tipo=textoJ.includes("Serv. Adm.")||textoJ.includes("Serv.Adm.")
         ?"serv_adm"
+        :textoJ.includes("Arriendo")
+        ?"arriendo"
         :nroFact.startsWith("FEE-")?"serv_adm":"arriendo";
       if(texto.length>10){
         /* Arriendo: "UF 380,57 x 39.841,72" */
-        const mArr=textoJ.match(/UF\s+([\d]+[,.]\d+)\s+x\s+[\d]/);
+        const mArr=textoJ.match(/UF\s+([\d]+(?:[,.]\d+)?)\s+x\s+[\d]/);
         /* Serv.Adm: "11,84 UF" o "11,84 UF40.186" */
         const mSrv=textoJ.match(/([\d]+[,.]\d+)\s*UF/i);
         if(tipo==="arriendo"&&mArr) ufPdf=parseFloat(mArr[1].replace(",","."));
