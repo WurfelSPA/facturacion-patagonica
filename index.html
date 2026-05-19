@@ -95,7 +95,7 @@ const REMITENTE="amelendez@patagonica.cl";
 const CCO="";
 const TEST_DEST="amelendez@patagonica.cl";
 const MODO_PRUEBA=TEST_DEST!=="";
-const VER="v4.4.0";
+const VER="v4.6.0";
 const DRIVE_PLANILLA_ID="1rAGS-b1MoPpEhMgN2BR9Hvg4cTYdcQDu";
 const GOOGLE_SCOPES="https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.readonly";
 const TG_BOT=window.__TG_BOT__||"";
@@ -350,28 +350,13 @@ async function procesarPlanillaFacturacion(file,periodo){
     if(!cliente||excl.includes(String(cliente).trim()))continue;
     const sName=String(cliente).trim();
     const sito=sitio?String(sitio).trim():"";
-    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000});
-    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=500)clientes.push({sitio:sito,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000});
+    const emailBilling=row[12]?String(row[12]).trim():"";
+    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling});
+    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=500)clientes.push({sitio:sito,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling});
   }
   return clientes;
 }
-async function procesarPlanillaEnvio(file){
-  const buf=await readFileAsBuffer(file);
-  const wb=XLSX.read(buf,{type:"array"});
-  const emailMap={};
-  for(const sname of wb.SheetNames){
-    const ws=wb.Sheets[sname];
-    const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
-    for(const row of data){
-      const nombre=row[4];const mail=row[5];
-      if(nombre&&mail&&typeof nombre==="string"&&typeof mail==="string"){
-        const n=nombre.trim().toUpperCase();const m=mail.trim();
-        if(n&&m&&m.includes("@")&&n!=="NOMBRE")emailMap[n]=m;
-      }
-    }
-  }
-  return emailMap;
-}
+/* procesarPlanillaEnvio eliminado — email viene de col M de la planilla principal */
 async function extraerTextoPDF(arrayBuffer){
   try{
     pdfjsLib.GlobalWorkerOptions.workerSrc="";
@@ -520,7 +505,7 @@ function App(){
   const [gmailToken,setGmailToken]=useState(null);
   const [view,setView]=useState("dashboard");
   const [periodo,setPeriodo]=useState("Mayo 2026");
-  const [files,setFiles]=useState({planilla:null,envio:null,zip:null});
+  const [files,setFiles]=useState({planilla:null,zip:null});
   const [data,setData]=useState([]);
   const [pdfMap,setPdfMap]=useState({});
   const [filter,setFilter]=useState("all");
@@ -574,6 +559,26 @@ function App(){
   const notify=(msg,t="ok")=>{setNotif({msg,t});setTimeout(()=>setNotif(null),4000);};
   const addLog=(txt,t="")=>setProcLogs(p=>[...p,{txt,t}]);
 
+  /* Cargar ZIP desde Drive cuando cambia el período */
+  useEffect(()=>{
+    if(!periodo)return;
+    setFiles(p=>({...p,zip:null}));
+    fetch(`/api/zip?periodo=${encodeURIComponent(periodo)}`)
+      .then(r=>{
+        if(!r.ok)return r.json().then(e=>{throw new Error(e.error||"Error "+r.status);});
+        return r.blob();
+      })
+      .then(blob=>{
+        const f=new File([blob],periodo.replace(" ","-")+".zip",{type:"application/zip"});
+        setFiles(p=>({...p,zip:f}));
+        notify("✓ PDFs cargados desde Drive · "+periodo);
+      })
+      .catch(e=>{
+        console.error("ZIP error:",e);
+        notify("No se pudo cargar el ZIP: "+e.message,"err");
+      });
+  },[periodo]);
+
   /* Cargar UF del mes actual al inicio */
   useEffect(()=>{
     const now=new Date();
@@ -611,7 +616,7 @@ function App(){
   },[files.planilla]);
 
   const getToken=useCallback(async()=>{if(gmailToken)return gmailToken;const token=await getGoogleToken(clientId);setGmailToken(token);return token;},[gmailToken,clientId]);
-  const todosSubidos=files.planilla&&files.envio&&files.zip;
+  const todosSubidos=files.planilla&&files.zip;
 
   /* ── PROCESAR ── */
   const procesar=useCallback(async()=>{
@@ -621,9 +626,7 @@ function App(){
       addLog("▶ Leyendo planilla de facturación...","info");
       const clientes=await procesarPlanillaFacturacion(files.planilla,periodo);
       addLog(`✓ ${clientes.length} filas detectadas para ${periodo}`,"ok");setProcProgress(25);
-      addLog("▶ Leyendo correos desde planilla de envío...","info");
-      const emailMap=await procesarPlanillaEnvio(files.envio);
-      addLog(`✓ ${Object.keys(emailMap).length} correos mapeados`,"ok");setProcProgress(40);
+      addLog("✓ Correos leídos desde columna M de la planilla","ok");setProcProgress(40);
       addLog("▶ Procesando PDFs del ZIP...","info");
       const pdfs=await procesarPDFs(files.zip,addLog);setProcProgress(75);
       addLog("▶ Cruzando datos planilla vs PDFs...","info");
@@ -631,7 +634,7 @@ function App(){
       const MANUAL={"A-2|Banco Estado Express|202.6|arriendo":"FEE-39","A-2|Banco del Estado de Chile|256.7|arriendo":"FEE-39"};
       const filas=[];
       for(const c of clientes){
-        const correo=getEmail(c.cliente,emailMap);
+        const correo=c.email||"";
         const concepto=c.tipo==="arriendo"?"Arriendo":"Serv. Adm.";
         const colRef=c.tipo==="arriendo"?"GS":"GT";
         const mk=`${c.sitio}|${c.cliente}|${c.uf}|${c.tipo}`;
@@ -982,6 +985,11 @@ function App(){
       h("div",{style:{display:"flex",gap:8,alignItems:"center"}},
         h("button",{onClick:()=>setView("dashboard"),className:`nav-btn${view==="dashboard"?" active":""}`,style:{fontSize:11}},"📊 Dashboard"),
         h("button",{onClick:()=>setView("upload"),className:`nav-btn${view!=="dashboard"?" active":""}`,style:{fontSize:11}},"📋 Facturación"),
+        /* Selector período siempre visible en header */
+        h("select",{value:periodo,onChange:e=>{setPeriodo(e.target.value);setFiles(p=>({...p,zip:null}));},
+          style:{fontSize:11,fontWeight:600,padding:"5px 10px",background:"linear-gradient(135deg,var(--acc),var(--acc2))",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}},
+          PERIODOS.map(p=>h("option",{key:p,value:p},p))
+        ),
         h("span",{style:{color:"var(--txd)",fontSize:12}},"·"),
         view==="table"&&h("button",{onClick:()=>{setView("upload");setData([]);},className:"nav-btn",style:{fontSize:11}},"⊞ Nuevos archivos"),
 
@@ -998,10 +1006,10 @@ function App(){
         h("p",{style:{fontSize:12,color:"var(--txm)"}},"Selecciona el período y sube los 3 archivos desde tu carpeta de descargas.")
       ),
       h("div",{style:{width:"100%",maxWidth:500}},
-        h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr2)",borderRadius:12,padding:"16px 20px",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between"}},
-          h("div",null,h("div",{style:{fontSize:13,fontWeight:600,marginBottom:2}},"Período a facturar"),h("div",{style:{fontSize:11,color:"var(--txm)"}},"Las columnas GS/GT se detectan automáticamente")),
-          h("select",{value:periodo,onChange:e=>{setPeriodo(e.target.value);setFiles({planilla:null,envio:null,zip:null});setDashData(null);},style:{fontSize:13,fontWeight:600,padding:"7px 12px",background:"var(--acc)",color:"#fff",border:"none",borderRadius:8,cursor:"pointer"}},
-            PERIODOS.map(p=>h("option",{key:p,value:p},p)))
+        h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr2)",borderRadius:12,padding:"14px 20px",marginBottom:16,display:"flex",alignItems:"center",gap:10}},
+          h("div",{style:{fontSize:13,fontWeight:600,color:"var(--tx)"}},"Período seleccionado:"),
+          h("span",{style:{background:"linear-gradient(135deg,var(--acc),var(--acc2))",color:"#fff",borderRadius:8,padding:"5px 14px",fontSize:13,fontWeight:700}},periodo),
+          h("div",{style:{fontSize:11,color:"var(--txm)",marginLeft:4}},"Las columnas GS/GT se detectan automáticamente")
         ),
         h("div",{style:{display:"flex",flexDirection:"column",gap:10}},
           /* Planilla: si viene de Drive se muestra como done sin opción de cambiar; si no, se sube */
@@ -1011,11 +1019,19 @@ function App(){
               h("div",{style:{fontSize:11,color:"var(--txm)"}},"Cargada desde Google Drive · "+Math.round(files.planilla.size/1024)+" KB")
             ):
             h(FileUpload,{label:"Planilla_Facturación.xlsx",desc:"Hoja Flujo · columnas GS (Arriendo) y GT (Serv.Adm.)",accept:".xlsx,.xls",file:files.planilla,done:!!files.planilla,onFile:f=>setFiles(p=>({...p,planilla:f}))}),
-          h(FileUpload,{label:"Detalle_envío_facturas_Inpasa_y_Pisa.xlsx",desc:"Columna E (cliente) · F (correo)",accept:".xlsx,.xls",file:files.envio,done:!!files.envio,onFile:f=>setFiles(p=>({...p,envio:f}))}),
-          h(FileUpload,{label:"PDFs facturas (ZIP)",desc:"Carpeta comprimida con subcarpetas 5A · 4A · A2 · A1 · B · D2",accept:".zip",file:files.zip,done:!!files.zip,onFile:f=>setFiles(p=>({...p,zip:f}))})
+
+          files.zip?
+            h("div",{className:"drop-zone done",style:{cursor:"default"}},
+              h("div",{style:{color:"var(--green)",fontWeight:600,fontSize:13,marginBottom:3}},"✓ PDFs "+periodo),
+              h("div",{style:{fontSize:11,color:"var(--txm)"}},"Cargado desde Google Drive · "+Math.round(files.zip.size/1024)+" KB")
+            ):
+            h("div",{className:"drop-zone",style:{cursor:"default",opacity:0.6}},
+              h("div",{style:{fontSize:13,fontWeight:600,color:"var(--txm)",marginBottom:4}},h("span",{className:"spin",style:{marginRight:8}},"⟳"),"Cargando PDFs desde Drive..."),
+              h("div",{style:{fontSize:11,color:"var(--txd)"}},"Carpeta "+periodo.split(" ")[0].slice(0,3)+" "+periodo.split(" ")[1]+" en Drive")
+            )
         ),
         h("div",{style:{marginTop:14,display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}},
-          [{label:"Planilla facturación",ok:!!files.planilla},{label:"Planilla correos",ok:!!files.envio},{label:"ZIP de PDFs",ok:!!files.zip}]
+          [{label:"Planilla facturación",ok:!!files.planilla},{label:"PDFs "+periodo,ok:!!files.zip}]
           .map((f,i)=>h("span",{key:i,style:{fontSize:11,padding:"3px 10px",borderRadius:20,background:f.ok?"var(--gbg)":"var(--surf2)",color:f.ok?"var(--green)":"var(--txd)",border:`1px solid ${f.ok?"var(--gdim)":"var(--bdr)"}`}},f.ok?"✓ ":"○ ",f.label))
         ),
         h("div",{style:{marginTop:16,display:"flex",justifyContent:"center"}},
