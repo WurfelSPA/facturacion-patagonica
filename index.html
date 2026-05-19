@@ -408,7 +408,9 @@ async function procesarPDFs(zipFile,addLog){
 
     pdfs.push({sitio,nroFact,tipo,ufPdf,zipPath:path,pdfNombre:nombre});
   }
-  addLog(`✓ ${pdfs.length} facturas procesadas (Arriendo + Serv.Adm.)`,"ok");
+  const sinUF=pdfs.filter(p=>p.ufPdf===null).length;
+  addLog(`✓ ${pdfs.length} PDFs: ${pdfs.length-sinUF} con monto UF, ${sinUF} sin monto`,"ok");
+  if(pdfs.length>0){addLog(`  Sitios detectados: ${[...new Set(pdfs.map(p=>p.sitio))].join(", ")}`,"info");}
   return pdfs;
 }
 async function getPdfBase64FromZip(zipFile,zipPath){
@@ -679,7 +681,9 @@ function App(){
       const nuevoMapa={};
       for(const p of pdfs){if(p.nroFact&&p.zipPath)nuevoMapa[p.nroFact]={zipPath:p.zipPath,nombre:p.pdfNombre};}
       setPdfMap(nuevoMapa);
-      addLog(`✓ ${filas.filter(f=>f.factura).length}/${filas.length} facturas cruzadas`,"ok");setProcProgress(100);setProcDone(true);
+      const sinPdf=filas.filter(f=>!f.factura);
+      addLog(`✓ ${filas.filter(f=>f.factura).length}/${filas.length} facturas cruzadas`,"ok");
+      if(sinPdf.length>0){addLog(`  Sin PDF: ${sinPdf.slice(0,3).map(f=>f.sitio+"/"+f.cliente.slice(0,20)).join(" | ")}`,"info");}setProcProgress(100);setProcDone(true);
       /* Auto-cerrar y mostrar tabla si no hubo errores */
       setTimeout(()=>{setShowProc(false);setView("table");},1800);
       setData(filas);
