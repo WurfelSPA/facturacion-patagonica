@@ -200,7 +200,7 @@ async function sendTelegram(botToken,chatId,mensaje){
 }
 function buildEmailHtml(cliente,concepto,periodo,ufPlan,factura){
   const mes=periodo.toLowerCase();
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#f4f4f4;font-family:Helvetica,Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:28px 0"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;border:1px solid #e0e0e0;overflow:hidden"><tr><td style="background:#0f1117;padding:22px 32px"><div style="font-size:18px;font-weight:700;color:#fff">Patagónica Inmobiliaria SpA</div><div style="font-size:11px;color:#7b8299;margin-top:4px">Av. Américo Vespucio 2680, Conchalí, Santiago</div></td></tr><tr><td style="padding:28px 32px"><p style="font-size:14px;color:#333;margin:0 0 16px">Estimado(a) cliente,</p><p style="font-size:14px;color:#333;line-height:1.7;margin:0 0 20px">Junto con saludar, hacemos envío de la factura correspondiente al <strong>${concepto.toLowerCase()} del mes de ${mes}</strong>:</p><table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e8e8;border-radius:6px;margin:0 0 20px"><tr style="background:#f8f8f8"><td style="padding:10px 16px;font-size:11px;font-weight:600;color:#999;border-bottom:1px solid #e8e8e8">CONCEPTO</td><td style="padding:10px 16px;font-size:11px;font-weight:600;color:#999;border-bottom:1px solid #e8e8e8">DETALLE</td></tr><tr><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">N° Factura</td><td style="padding:11px 16px;font-size:13px;color:#111;font-weight:600;font-family:monospace;border-bottom:1px solid #f0f0f0">${factura}</td></tr><tr style="background:#fafafa"><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">Cliente</td><td style="padding:11px 16px;font-size:13px;color:#111;border-bottom:1px solid #f0f0f0">${cliente}</td></tr><tr><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">Período</td><td style="padding:11px 16px;font-size:13px;color:#111;border-bottom:1px solid #f0f0f0">${periodo}</td></tr><tr><td style="padding:14px 16px;font-size:13px;color:#555">Monto</td><td style="padding:14px 16px"><span style="font-size:20px;font-weight:700;color:#111">${ufPlan.toFixed(4)} UF</span></td></tr></table><p style="font-size:14px;color:#333;line-height:1.7;margin:0 0 20px">Adjunto encontrará el documento PDF para su registro y gestión de pago.</p><p style="font-size:13px;color:#666;margin:0">Ante cualquier consulta, no dude en contactarnos.</p></td></tr><tr><td style="background:#f8f8f8;border-top:1px solid #e8e8e8;padding:18px 32px"><p style="font-size:13px;font-weight:600;color:#111;margin:0 0 2px">Área de Administración</p><p style="font-size:12px;color:#666;margin:0">Patagónica Inmobiliaria SpA · RUT 96.673.250-4</p><p style="font-size:11px;color:#999;margin:6px 0 0">Correo generado automáticamente.</p></td></tr></table></td></tr></table></body></html>`;
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#f4f4f4;font-family:Helvetica,Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:28px 0"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;border:1px solid #e0e0e0;overflow:hidden"><tr><td style="background:#0f1117;padding:22px 32px"><div style="font-size:18px;font-weight:700;color:#fff">Patagónica Inmobiliaria SpA</div><div style="font-size:11px;color:#7b8299;margin-top:4px">Av. Américo Vespucio 2680, Conchalí, Santiago</div></td></tr><tr><td style="padding:28px 32px"><p style="font-size:14px;color:#333;margin:0 0 16px">Estimado(a) cliente,</p><p style="font-size:14px;color:#333;line-height:1.7;margin:0 0 20px">Junto con saludar, hacemos envío de la factura correspondiente al <strong>${concepto.toLowerCase()} del mes de ${mes}</strong>:</p><table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e8e8;border-radius:6px;margin:0 0 20px"><tr style="background:#f8f8f8"><td style="padding:10px 16px;font-size:11px;font-weight:600;color:#999;border-bottom:1px solid #e8e8e8">CONCEPTO</td><td style="padding:10px 16px;font-size:11px;font-weight:600;color:#999;border-bottom:1px solid #e8e8e8">DETALLE</td></tr><tr><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">N° Factura</td><td style="padding:11px 16px;font-size:13px;color:#111;font-weight:600;font-family:monospace;border-bottom:1px solid #f0f0f0">${factura}</td></tr><tr style="background:#fafafa"><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">Cliente</td><td style="padding:11px 16px;font-size:13px;color:#111;border-bottom:1px solid #f0f0f0">${cliente}</td></tr><tr><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">Período</td><td style="padding:11px 16px;font-size:13px;color:#111;border-bottom:1px solid #f0f0f0">${periodo}</td></tr><tr><td style="padding:14px 16px;font-size:13px;color:#555">Monto</td><td style="padding:14px 16px"><span style="font-size:20px;font-weight:700;color:#111">${ufPlan.toFixed(2)} UF</span></td></tr></table><p style="font-size:14px;color:#333;line-height:1.7;margin:0 0 20px">Adjunto encontrará el documento PDF para su registro y gestión de pago.</p><p style="font-size:13px;color:#666;margin:0">Ante cualquier consulta, no dude en contactarnos.</p></td></tr><tr><td style="background:#f8f8f8;border-top:1px solid #e8e8e8;padding:18px 32px"><p style="font-size:13px;font-weight:600;color:#111;margin:0 0 2px">Área de Administración</p><p style="font-size:12px;color:#666;margin:0">Patagónica Inmobiliaria SpA · RUT 96.673.250-4</p><p style="font-size:11px;color:#999;margin:6px 0 0">Correo generado automáticamente.</p></td></tr></table></td></tr></table></body></html>`;
 }
 const PERIODOS=["Enero 2026","Febrero 2026","Marzo 2026","Abril 2026","Mayo 2026","Junio 2026","Julio 2026","Agosto 2026","Septiembre 2026","Octubre 2026","Noviembre 2026","Diciembre 2026"];
 const SITIO_C={"5-A":"#7c3aed","4-A":"#0d9488","A-2":"#ea580c","A-1":"#2563eb","D-2":"#db2777","B":"#64748b","J":"#b45309","D-3":"#0891b2","24.0":"#6d28d9"};
@@ -359,7 +359,7 @@ async function procesarPlanillaFacturacion(file,periodo){
     const emailBilling=row[12]?String(row[12]).trim():"";
     const rutBilling=row[9]?String(row[9]).replace(/\./g,"").trim().toLowerCase():""; /* Col J: RUT normalizado */
     if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling});
-    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=500)clientes.push({sitio:sito,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling});
+    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling});
   }
   return clientes;
 }
@@ -458,7 +458,7 @@ const NOMBRE_KEY={
   "Claro Infraestructura 171 S.A.":"CLARO","Banco de Crédito e Inversiones":"BCI","Banco Itau":"BANCO ITAU",
 };
 function getEmail(cliente,emailMap){const key=NOMBRE_KEY[cliente];if(!key)return"";return emailMap[key]||emailMap[key.toUpperCase()]||"";}
-function getEstado(r){if(!r.factura||r.ufPdf===null||r.ufPdf===undefined)return"missing";if(Math.abs(r.ufPdf-r.ufPlan)>0.5)return"diff";return"ok";}
+function getEstado(r){if(!r.factura)return"missing";if(r.ufPlan>500)return r.factura?"ok":"missing";if(r.ufPdf===null||r.ufPdf===undefined)return"missing";if(Math.abs(r.ufPdf-r.ufPlan)>0.5)return"diff";return"ok";}
 
 /* ═══════════════════════════════════
    COMPONENTES UI
@@ -513,7 +513,7 @@ function EmailModal({row,periodo,onClose,onConfirm,sending}){
         ),
         h("div",{style:{color:"var(--tx)",lineHeight:2}},
           h("p",null,"Estimado(a) cliente,"),
-          h("p",{style:{marginTop:8}},`Junto con saludar, hacemos envío de la factura correspondiente al ${row.concepto.toLowerCase()} del mes de ${mes}, por un monto de `,h("strong",{style:{color:"var(--accl)"}},`${row.ufPlan.toFixed(4)} UF`),`, factura N° ${row.factura}.`),
+          h("p",{style:{marginTop:8}},`Junto con saludar, hacemos envío de la factura correspondiente al ${row.concepto.toLowerCase()} del mes de ${mes}, por un monto de `,h("strong",{style:{color:"var(--accl)"}},`${row.ufPlan.toFixed(2)} UF`),`, factura N° ${row.factura}.`),
           h("p",{style:{marginTop:8}},"Adjunto encontrará el documento PDF para su registro y gestión de pago."),
           h("p",{style:{marginTop:8,color:"var(--txm)"}},"Atentamente,",h("br"),h("em",null,"Área de Administración — Patagónica Inmobiliaria SpA"))
         )
@@ -685,6 +685,7 @@ function App(){
       }catch(e){addLog("⚠ Error extrayendo datos: "+e.message,"warn");}
       setProcProgress(75);
       addLog("▶ Cruzando datos planilla vs PDFs...","info");
+
       const pdfUsado=new Set();
       const MANUAL={"A-2|Banco Estado Express|202.6|arriendo":"FEE-39","A-2|Banco del Estado de Chile|256.7|arriendo":"FEE-39"};
       const filas=[];
@@ -782,7 +783,7 @@ function App(){
   /* Sin SetupPanel — siempre va al dashboard */
 
   const enriched=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
-  const stats={total:enriched.length,ok:enriched.filter(r=>r.estado==="ok").length,diff:enriched.filter(r=>r.estado!=="ok").length,sent:sentSet.size,conPdf:enriched.filter(r=>r.factura&&r.ufPdf!==null).length,sinPdf:enriched.filter(r=>!r.factura||r.ufPdf===null).length};
+  const stats={total:enriched.length,ok:enriched.filter(r=>r.estado==="ok").length,diff:enriched.filter(r=>r.estado!=="ok").length,sent:sentSet.size,conPdf:enriched.filter(r=>r.factura&&(r.ufPdf!==null||r.ufPlan>500)).length,sinPdf:enriched.filter(r=>!r.factura||(r.ufPdf===null&&r.ufPlan<=500)).length};
   const filtered=enriched.filter(r=>{
     const mf=filter==="all"||(filter==="ok"&&r.estado==="ok"&&!sentSet.has(r.i))||(filter==="diff"&&r.estado!=="ok")||(filter==="sent"&&sentSet.has(r.i));
     const mc=concFilter==="all"||(concFilter==="arr"&&r.concepto==="Arriendo")||(concFilter==="srv"&&r.concepto==="Serv. Adm.");
@@ -1170,8 +1171,8 @@ function App(){
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{className:esArr?"tag-arr":"tag-srv"},row.concepto)),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{className:esArr?"col-gs":"col-gt"},row.colRef)),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:"var(--txm)"}},row.factura||"—")),
-                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace"}},row.ufPlan.toFixed(4))),
-                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",color:diff?"var(--amber)":"var(--tx)"}},row.ufPdf!==null&&row.ufPdf!==undefined?row.ufPdf.toFixed(4):"—")),
+                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace"}},row.ufPlan>500?"$"+Math.round(row.ufPlan).toLocaleString("es-CL"):row.ufPlan.toFixed(2))),
+                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",color:diff?"var(--amber)":"var(--tx)"}},row.ufPdf!==null&&row.ufPdf!==undefined?row.ufPdf.toFixed(2):"—")),
                 h("td",{style:{padding:"8px 11px",background:bg}},
                   sent?h("span",{style:{color:"var(--green)",fontSize:11,fontWeight:600}},"✓ Enviado"):
                   sending?h("span",{style:{color:"var(--blue)",fontSize:11,display:"inline-flex",alignItems:"center",gap:4}},h("span",{className:"spin"},"⟳")," Enviando..."):
