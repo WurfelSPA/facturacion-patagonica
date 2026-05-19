@@ -95,7 +95,7 @@ const REMITENTE="amelendez@patagonica.cl";
 const CCO="";
 const TEST_DEST="amelendez@patagonica.cl";
 const MODO_PRUEBA=TEST_DEST!=="";
-const VER="v4.3.0";
+const VER="v4.4.0";
 const DRIVE_PLANILLA_ID="1rAGS-b1MoPpEhMgN2BR9Hvg4cTYdcQDu";
 const GOOGLE_SCOPES="https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.readonly";
 const TG_BOT=window.__TG_BOT__||"";
@@ -550,22 +550,26 @@ function App(){
   const [monthlyUF,setMonthlyUF]=useState({});
   const [driveLoading,setDriveLoading]=useState(false);
 
-  /* Cargar planilla desde Drive automáticamente cuando hay token */
+  /* Cargar planilla automáticamente desde /api/planilla (Service Account — sin OAuth) */
   useEffect(()=>{
-    if(!gmailToken||files.planilla)return;
+    if(files.planilla)return;
     setDriveLoading(true);
-    descargarPlanillaDrive(gmailToken)
-      .then(f=>{
+    fetch("/api/planilla")
+      .then(r=>{
+        if(!r.ok)return r.json().then(e=>{throw new Error(e.error||"Error "+r.status);});
+        return r.blob();
+      })
+      .then(blob=>{
+        const f=new File([blob],"Planilla Facturación.xlsx",{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
         setFiles(p=>({...p,planilla:f}));
         setDriveLoading(false);
-        notify("✓ Planilla cargada desde Drive");
       })
       .catch(e=>{
-        console.error("Drive error:",e);
+        console.error("Planilla error:",e);
         setDriveLoading(false);
-        notify("No se pudo cargar desde Drive: "+e.message,"err");
+        notify("No se pudo cargar la planilla: "+e.message,"err");
       });
-  },[gmailToken]);
+  },[]);
 
   const notify=(msg,t="ok")=>{setNotif({msg,t});setTimeout(()=>setNotif(null),4000);};
   const addLog=(txt,t="")=>setProcLogs(p=>[...p,{txt,t}]);
@@ -763,7 +767,7 @@ function App(){
         driveLoading&&h("span",{style:{display:"flex",alignItems:"center",gap:5,color:"var(--blue)"}},h("span",{className:"spin",style:{fontSize:13}},"⟳"),"Cargando planilla desde Drive..."),
         files.planilla&&!driveLoading&&h("span",{style:{background:"var(--gbg)",border:"1px solid var(--gdim)",borderRadius:6,padding:"3px 10px",color:"var(--green)",fontWeight:600,fontSize:11}},"✓ Planilla Facturación · Drive"),
         h("span",{style:{color:"var(--txd)",marginLeft:2}},"Montos en CLP · mindicador.cl"),
-        files.planilla&&h("button",{onClick:async()=>{if(!gmailToken)return;setFiles(p=>({...p,planilla:null}));setDashData(null);setDriveLoading(true);try{const f=await descargarPlanillaDrive(gmailToken);setFiles(p=>({...p,planilla:f}));notify("✓ Planilla actualizada desde Drive");}catch(e){notify("Error actualizando: "+e.message,"err");}setDriveLoading(false);},style:{marginLeft:"auto",fontSize:10,padding:"2px 10px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--txm)",cursor:"pointer"}},"↻ Actualizar")
+        files.planilla&&h("button",{onClick:()=>{setFiles(p=>({...p,planilla:null}));setDashData(null);},style:{marginLeft:"auto",fontSize:10,padding:"2px 10px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--txm)",cursor:"pointer"}},"↻ Actualizar")
       ),
 
       /* ── KPIs en CLP ── */
@@ -872,15 +876,7 @@ function App(){
         driveLoading?
           h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},
             h("span",{className:"spin",style:{fontSize:18}},"⟳"),
-            "Cargando Planilla Facturación desde Google Drive..."
-          ):
-          !gmailToken?
-          h("div",null,
-            h("div",{style:{fontSize:12,fontWeight:600,marginBottom:8,color:"var(--txm)"}},"📋 Autoriza Google para cargar la planilla automáticamente desde Drive"),
-            h("button",{
-              onClick:async()=>{try{const t=await getToken();setGmailToken(t);}catch(e){notify("Error de autorización: "+e.message,"err");}},
-              className:"btn-primary",style:{fontSize:12,padding:"8px 20px"}
-            },"Autorizar con Google →")
+            "Cargando planilla desde Drive..."
           ):
           h("div",null,
             h("div",{style:{fontSize:12,fontWeight:600,marginBottom:10,color:"var(--txm)"}},"📂 O sube la planilla manualmente"),
