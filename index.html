@@ -652,7 +652,26 @@ function App(){
       addLog(`✓ ${clientes.length} filas detectadas para ${periodo}`,"ok");setProcProgress(25);
       addLog("✓ Correos leídos desde columna M de la planilla","ok");setProcProgress(40);
       addLog("▶ Procesando PDFs del ZIP...","info");
-      const pdfs=await procesarPDFs(files.zip,addLog);setProcProgress(75);
+      const pdfs=await procesarPDFs(files.zip,addLog);setProcProgress(65);
+      /* Obtener montos UF del servidor (extracción server-side) */
+      addLog("▶ Extrayendo montos UF de PDFs...","info");
+      try{
+        const ufRes=await fetch(`/api/pdftext?periodo=${encodeURIComponent(periodo)}`);
+        if(ufRes.ok){
+          const ufData=await ufRes.json();
+          let conUF=0;
+          for(const p of pdfs){
+            if(ufData.pdfs&&ufData.pdfs[p.nroFact]){
+              p.ufPdf=ufData.pdfs[p.nroFact].uf;
+              if(p.ufPdf!==null)conUF++;
+            }
+          }
+          addLog(`✓ UF extraídas: ${conUF}/${pdfs.length} PDFs con monto`,"ok");
+        }else{
+          addLog("⚠ No se pudieron extraer UF del servidor, usando solo nombre","warn");
+        }
+      }catch(e){addLog("⚠ Error extrayendo UF: "+e.message,"warn");}
+      setProcProgress(75);
       addLog("▶ Cruzando datos planilla vs PDFs...","info");
       const pdfUsado=new Set();
       const MANUAL={"A-2|Banco Estado Express|202.6|arriendo":"FEE-39","A-2|Banco del Estado de Chile|256.7|arriendo":"FEE-39"};
