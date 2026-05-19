@@ -368,6 +368,7 @@ async function procesarPDFs(zipFile,addLog){
   const pdfs=[];
   const archivos=Object.keys(zip.files).filter(f=>f.toLowerCase().endsWith(".pdf"));
   addLog(`▶ ${archivos.length} PDFs encontrados en el ZIP`,"info");
+  if(archivos.length>0){addLog(`  Ejemplo: ${archivos.slice(0,3).join(" | ")}`,"info");}
 
   for(const path of archivos){
     const parts=path.split("/");
@@ -592,7 +593,9 @@ function App(){
   /* Auto-procesar cuando planilla + ZIP están listos */
   useEffect(()=>{
     if(files.planilla&&files.zip&&!showProc&&data.length===0){
-      procesar();
+      /* Pequeño delay para asegurar que el estado esté estabilizado */
+      const t=setTimeout(()=>procesar(),300);
+      return()=>clearTimeout(t);
     }
   },[files.planilla,files.zip]);
 
