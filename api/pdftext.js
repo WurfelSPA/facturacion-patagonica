@@ -1,5 +1,4 @@
 import JSZip from "jszip";
-import { promisify } from "util";
 
 export const config = { api: { bodyParser: false, responseLimit: '60mb' } };
 
@@ -50,39 +49,100 @@ async function driveList(token, folderId) {
   return data.files || [];
 }
 
-function extractTextFromPDF(buffer) {
-  const str = buffer.toString("latin1");
-  const texts = [];
-  const tjRegex = /\(([^)\\]*(?:\\.[^)\\]*)*)\)\s*Tj/g;
-  const tjArrRegex = /\[([^\]]*)\]\s*TJ/g;
+/* Parsear CMap correctamente: rangos primero, luego chars individuales */
+function parseCMap(cmapText) {
+  const mapping = {};
+  // bfrange
+  const rangeSection = cmapText.match(/beginbfrange([\s\S]*?)endbfrange/g) || [];
+  for (const section of rangeSection) {
+    const matches = section.matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g);
+    for (const [, s, e, d] of matches) {
+      const si = parseInt(s, 16), ei = parseInt(e, 16), di = parseInt(d, 16);
+      for (let i = 0; i <= ei - si; i++) mapping[si + i] = String.fromCodePoint(di + i);
+    }
+  }
+  // bfchar (sobreescribe rangos)
+  const charSection = cmapText.match(/beginbfchar([\s\S]*?)endbfchar/g) || [];
+  for (const section of charSection) {
+    const matches = section.matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g);
+    for (const [, src, dst] of matches) {
+      try {
+        const code = parseInt(src, 16);
+        const dstBytes = Buffer.from(dst, "hex");
+        mapping[code] = dstBytes.toString("utf16le").split("").reverse().join(""); // BE
+        // Proper UTF-16BE decode
+        mapping[code] = "";
+        for (let i = 0; i < dstBytes.length; i += 2) {
+          mapping[code] += String.fromCodePoint(dstBytes.readUInt16BE(i));
+        }
+      } catch {}
+    }
+  }
+  return mapping;
+}
+
+/* Extraer texto del PDF usando CMap para decodificar */
+function extractPDFText(pdfBuffer) {
+  const { createInflateSync } = require("zlib");
+  const inflate = createInflateSync ? createInflateSync() : null;
+
+  const str = pdfBuffer.toString("latin1");
+  const streamRegex = /stream\r?\n([\s\S]*?)endstream/g;
+  const streams = [];
   let m;
-  while ((m = tjRegex.exec(str)) !== null) {
-    const t = m[1].replace(/\\n/g," ").replace(/\\r/g," ").replace(/\\\(/g,"(").replace(/\\\)/g,")").replace(/\\\\/g,"\\");
-    if (t.trim()) texts.push(t);
+  while ((m = streamRegex.exec(str)) !== null) {
+    streams.push(Buffer.from(m[1], "latin1"));
   }
-  while ((m = tjArrRegex.exec(str)) !== null) {
-    const inner = m[1].replace(/\(([^)]*)\)/g, (_,s) => s);
-    if (inner.trim()) texts.push(inner);
+
+  // Construir CMap de todos los streams
+  const mapping = {};
+  for (const s of streams) {
+    try {
+      const decompressed = require("zlib").inflateSync(s).toString("latin1");
+      if (decompressed.includes("beginbfchar") || decompressed.includes("beginbfrange")) {
+        Object.assign(mapping, parseCMap(decompressed));
+      }
+    } catch {}
   }
-  return texts.join(" ").replace(/\s+/g," ").trim();
+
+  // Extraer texto del stream de contenido
+  let text = "";
+  for (const s of streams) {
+    try {
+      const decompressed = require("zlib").inflateSync(s).toString("latin1");
+      // Buscar operadores Tj con hex: <HHHH> Tj
+      const hexTj = decompressed.matchAll(/<([0-9a-fA-F]+)>\s*Tj/g);
+      for (const [, h] of hexTj) {
+        const code = parseInt(h, 16);
+        text += mapping[code] !== undefined ? mapping[code] : (code >= 32 && code < 127 ? String.fromCharCode(code) : " ");
+      }
+    } catch {}
+  }
+
+  return text.replace(/\s+/g, " ").trim();
 }
 
 function normalizeRUT(rut) {
-  return rut.replace(/\./g,"").replace(/\s/g,"").toLowerCase();
+  return rut.replace(/\./g, "").replace(/\s/g, "").toLowerCase();
 }
 
 function extractData(text, tipo) {
-  const rutMatch = text.match(/(\d{1,2}\.\d{3}\.\d{3}-[\dkK])/);
-  const rut = rutMatch ? normalizeRUT(rutMatch[1]) : null;
+  // Buscar RUT del cliente (el segundo RUT, después del RUT de Patagónica 96.673.250-4)
+  const ruts = [...text.matchAll(/\d{1,2}\.\d{3}\.\d{3}-[\dkK]/g)].map(m => m[0]);
+  const clientRut = ruts.find(r => r !== "96.673.250-4") || null;
+  const rut = clientRut ? normalizeRUT(clientRut) : null;
+
   let uf = null;
   if (tipo === "arriendo") {
-    const m = text.match(/UF\s+([\d]+[,.]\d+)\s+x\s+[\d]/);
-    if (m) uf = parseFloat(m[1].replace(",","."));
+    const m = text.match(/UF\s*([\d]+[,.][\d]+)\s*x\s*[\d]/);
+    if (m) uf = parseFloat(m[1].replace(",", "."));
   } else {
-    const m = text.match(/([\d]+[,.]\d+)\s*UF/i);
-    if (m) uf = parseFloat(m[1].replace(",","."));
+    // Serv.Adm: buscar "X,XX UF" en descripción
+    const m = text.match(/([\d]+[,.][\d]+)\s*UF/i);
+    if (m) uf = parseFloat(m[1].replace(",", "."));
   }
-  return { rut, uf: uf ? Math.round(uf*10000)/10000 : null };
+
+  return { rut, uf: uf ? Math.round(uf * 10000) / 10000 : null };
 }
 
 export default async function handler(req, res) {
@@ -120,27 +180,25 @@ export default async function handler(req, res) {
     const zip = await JSZip.loadAsync(zipBuffer);
     const result = {};
 
-    const pdfFiles = Object.entries(zip.files).filter(([name]) =>
-      !zip.files[name].dir && name.toLowerCase().endsWith(".pdf")
-    );
-
-    for (const [path, entry] of pdfFiles) {
+    for (const [path, entry] of Object.entries(zip.files)) {
+      if (entry.dir || !path.toLowerCase().endsWith(".pdf")) continue;
       const parts = path.split("/");
-      const carpeta = parts.length > 1 ? parts[parts.length-2] : "";
-      const nombre = parts[parts.length-1];
+      const carpeta = parts.length > 1 ? parts[parts.length - 2] : "";
+      const nombre = parts[parts.length - 1];
       const sitio = SITIO_MAP[carpeta] || carpeta;
       const nroMatch = nombre.match(/^(F(?:EE)?-\d+)/i);
       if (!nroMatch) continue;
       const nroFact = nroMatch[1].toUpperCase();
       const tipo = nroFact.startsWith("FEE-") ? "serv_adm" : "arriendo";
+
       const pdfBuffer = Buffer.from(await entry.async("arraybuffer"));
-      const text = extractTextFromPDF(pdfBuffer);
+      const text = extractPDFText(pdfBuffer);
       const { rut, uf } = extractData(text, tipo);
       result[nroFact] = { rut, uf, tipo, sitio };
     }
 
     return res.status(200).json({ pdfs: result, count: Object.keys(result).length });
   } catch (e) {
-    return res.status(500).json({ error: e.message, stack: e.stack?.slice(0,500) });
+    return res.status(500).json({ error: e.message, stack: e.stack?.slice(0, 500) });
   }
 }
