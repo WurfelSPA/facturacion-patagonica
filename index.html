@@ -1153,7 +1153,6 @@ function App(){
                 h("div",{style:{fontSize:10,color:isSelected?"var(--acc)":"var(--txd)",textAlign:"right"}},isSelected?"▲":"📋")
               ),
               isSelected&&h(HistPanel,{client:c,anio:histAnio,setAnio:setHistAnio,onClose:()=>setHistClient(null)})
-              )
             );
             })
         )
