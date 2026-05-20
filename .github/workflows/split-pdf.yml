@@ -6,7 +6,43 @@ on:
   workflow_dispatch:
 
 jobs:
+  split:name: Separar PDF Facturas
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
   split:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install pypdf google-auth google-auth-httplib2 google-api-python-client
+
+      - name: Ejecutar script
+        env:
+          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+        run: python scripts/split_pdf.py
+
+      - name: Subir ZIP como artefacto
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: facturas-zip
+          path: output/*.zip
+          retention-days: 7
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
