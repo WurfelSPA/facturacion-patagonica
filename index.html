@@ -958,7 +958,16 @@ function App(){
       const data=await res.json();
       if(!res.ok)throw new Error(data.error||"Error desconocido");
       setSplitResult(data);
-      notify("✓ "+data.zipName+" subido a Drive ("+data.totalFacturas+" facturas)","ok");
+      // Descargar ZIP directamente en el navegador
+      if(data.zipBase64){
+        const bytes=Uint8Array.from(atob(data.zipBase64),c=>c.charCodeAt(0));
+        const blob=new Blob([bytes],{type:"application/zip"});
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement("a");
+        a.href=url; a.download=data.zipName; a.click();
+        URL.revokeObjectURL(url);
+      }
+      notify("✓ "+data.zipName+" descargado ("+data.totalFacturas+" facturas)","ok");
     }catch(e){
       setSplitResult({error:e.message});
       notify("Error: "+e.message,"err");
