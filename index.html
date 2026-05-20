@@ -45,6 +45,11 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 .btn-primary{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;border:none;border-radius:10px;padding:11px 28px;font-size:13px;font-weight:700;letter-spacing:-0.2px;box-shadow:0 4px 20px rgba(91,76,219,0.2)}
 .btn-primary:hover{opacity:0.9;transform:translateY(-1px)}
 .btn-primary:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+.pwd-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:200}
+.pwd-modal{background:var(--surf);border-radius:14px;padding:28px 32px;width:320px;box-shadow:0 8px 40px rgba(0,0,0,0.18);border:1px solid var(--bdr)}
+.pwd-input{width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--bdr);background:var(--surf2);color:var(--tx);font-size:14px;font-family:inherit;outline:none;box-sizing:border-box}
+.pwd-input:focus{border-color:var(--acc)}
+.pwd-input.error{border-color:#e53935;animation:shake .3s}
 .btn-send{background:var(--gbg);border:1px solid var(--gdim);color:var(--green);padding:5px 11px;border-radius:7px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px}
 .btn-send:hover{background:#c8ede2}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(4px)}
@@ -100,6 +105,7 @@ const CCO="mmunoz@patagonica.cl";
 const TEST_DEST="";
 const MODO_PRUEBA=TEST_DEST!=="";
 const VER="v4.8.0";
+const SEND_PWD="Patfact*";
 const DRIVE_PLANILLA_ID="1rAGS-b1MoPpEhMgN2BR9Hvg4cTYdcQDu";
 const GOOGLE_SCOPES="https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.readonly";
 const TG_BOT=window.__TG_BOT__||"";
@@ -570,6 +576,10 @@ function App(){
   const [procProgress,setProcProgress]=useState(0);
   const [procDone,setProcDone]=useState(false);
   const [preview,setPreview]=useState(null);
+  const [unlocked,setUnlocked]=useState(false);
+  const [showPwdModal,setShowPwdModal]=useState(false);
+  const [pwdInput,setPwdInput]=useState("");
+  const [pwdError,setPwdError]=useState(false);
   const [notif,setNotif]=useState(null);
 
   /* ── DASHBOARD STATE ── */
@@ -778,6 +788,10 @@ function App(){
     setSendingIdx(null);
   };
 
+  const handleLogin=()=>{
+    if(pwdInput===SEND_PWD){setUnlocked(true);setShowPwdModal(false);setPwdInput("");setPwdError(false);}
+    else{setPwdError(true);setPwdInput("");}
+  };
   const sendAll=async()=>{
     const enriched=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
     const pend=enriched.filter(r=>r.estado==="ok"&&r.correo&&!sentSet.has(r.i));
@@ -1067,6 +1081,26 @@ function App(){
       (notif.t==="ok"?"✓ ":notif.t==="err"?"✗ ":"△ ")+notif.msg
     ),
     showProc&&h(ProcModal,{logs:procLogs,progress:procProgress,done:procDone,onClose:finishProc}),
+    showPwdModal&&h("div",{className:"pwd-modal-overlay",onClick:e=>{if(e.target===e.currentTarget){setShowPwdModal(false);setPwdInput("");setPwdError(false);}}},
+      h("div",{className:"pwd-modal"},
+        h("div",{style:{fontSize:15,fontWeight:700,color:"var(--tx)",marginBottom:6}},"🔒 Desbloquear envío"),
+        h("div",{style:{fontSize:12,color:"var(--txm)",marginBottom:16}},"Ingresa la clave para habilitar el envío de correos en esta sesión."),
+        h("input",{
+          className:"pwd-input"+(pwdError?" error":""),
+          type:"password",
+          placeholder:"Clave de envío...",
+          value:pwdInput,
+          autoFocus:true,
+          onChange:e=>{setPwdInput(e.target.value);setPwdError(false);},
+          onKeyDown:e=>e.key==="Enter"&&handleLogin(),
+        }),
+        pwdError&&h("div",{style:{fontSize:11,color:"#e53935",marginTop:6}},"Clave incorrecta. Inténtalo nuevamente."),
+        h("div",{style:{display:"flex",gap:8,marginTop:16,justifyContent:"flex-end"}},
+          h("button",{onClick:()=>{setShowPwdModal(false);setPwdInput("");setPwdError(false);},style:{padding:"7px 16px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--txm)",fontSize:12,cursor:"pointer"}},"Cancelar"),
+          h("button",{onClick:handleLogin,style:{padding:"7px 16px",borderRadius:8,border:"none",background:"var(--acc)",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}},"Desbloquear")
+        )
+      )
+    ),
     preview&&h(EmailModal,{row:preview.row,periodo,onClose:()=>setPreview(null),onConfirm:confirmSend,sending:sendingIdx===preview.idx}),
     MODO_PRUEBA&&h("div",{className:"test-banner"},"⚠",h("strong",null,"MODO PRUEBA"),"— correos van a",h("strong",{style:{marginLeft:4}},TEST_DEST),h("span",{style:{marginLeft:"auto",fontSize:10,color:"var(--txd)"}},'Producción: TEST_DEST="" en el código')),
 
@@ -1102,7 +1136,17 @@ function App(){
         h("span",{style:{color:"var(--txd)",fontSize:12}},"·"),
         view==="table"&&h("button",{onClick:()=>{setView("upload");setData([]);},className:"nav-btn-navy",style:{fontSize:11}},"⊞ Nuevos archivos"),
 
-        view==="table"&&h("button",{onClick:sendAll,style:{background:"var(--gbg)",border:"1px solid var(--gdim)",color:"var(--green)",borderRadius:9,padding:"6px 16px",fontSize:12,fontWeight:700}},MODO_PRUEBA?"⚠ Enviar todos (PRUEBA)":"✉ Enviar todos")
+        view==="table"&&h("div",{style:{display:"flex",gap:6,alignItems:"center"}},
+          h("button",{
+            onClick:unlocked?sendAll:()=>setShowPwdModal(true),
+            style:{background:unlocked?"var(--gbg)":"var(--surf2)",border:unlocked?"1px solid var(--gdim)":"1px solid var(--bdr)",color:unlocked?"var(--green)":"var(--txm)",borderRadius:9,padding:"6px 16px",fontSize:12,fontWeight:700,cursor:"pointer"}
+          },"✉ Enviar todos"),
+          h("button",{
+            onClick:unlocked?()=>setUnlocked(false):()=>setShowPwdModal(true),
+            title:unlocked?"Bloquear envío":"Desbloquear envío",
+            style:{background:unlocked?"#e8f5ee":"var(--surf2)",border:unlocked?"1px solid #b6ddd0":"1px solid var(--bdr)",color:unlocked?"#0a7c4e":"var(--txm)",borderRadius:9,padding:"6px 10px",fontSize:14,cursor:"pointer",lineHeight:1}
+          },unlocked?"🔓":"🔒")
+        )
       )
     ),
 
@@ -1194,7 +1238,12 @@ function App(){
                 h("td",{style:{padding:"8px 11px",background:bg}},
                   sent?h("span",{style:{color:"var(--green)",fontSize:11,fontWeight:600}},"✓ Enviado"):
                   sending?h("span",{style:{color:"var(--blue)",fontSize:11,display:"inline-flex",alignItems:"center",gap:4}},h("span",{className:"spin"},"⟳")," Enviando..."):
-                  row.estado==="ok"&&!noEmail?h("button",{className:"btn-send",onClick:()=>setPreview({row,idx:i})},"✉ Enviar"):
+                  row.estado==="ok"&&!noEmail?h("button",{
+                    className:"btn-send",
+                    onClick:unlocked?()=>setPreview({row,idx:i}):()=>setShowPwdModal(true),
+                    title:unlocked?"Enviar correo":"Clave requerida para enviar",
+                    style:{opacity:unlocked?1:0.55,cursor:unlocked?"pointer":"pointer"}
+                  },"✉ "+(unlocked?"Enviar":"🔒")):
                   h(Badge,{e:row.estado})
                 )
               );
@@ -1204,7 +1253,10 @@ function App(){
       ),
       h("footer",{style:{background:"#ddeaf8",borderTop:"1px solid #b8d0ee",padding:"9px 18px",display:"flex",alignItems:"center",justifyContent:"space-between"}},
         h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},`${filtered.length}/${stats.total} · ${stats.sent} enviados · ${periodo}`),
-        h("button",{onClick:sendAll,style:{background:"var(--gbg)",border:"1px solid var(--gdim)",color:"var(--green)",borderRadius:8,padding:"7px 16px",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:6}},MODO_PRUEBA?`⚠ Enviar todos (PRUEBA → ${TEST_DEST})`:`✉ Enviar todos (${Math.max(0,stats.ok-stats.sent)})`)
+        h("button",{
+            onClick:unlocked?sendAll:()=>setShowPwdModal(true),
+            style:{background:unlocked?"var(--gbg)":"var(--surf2)",border:unlocked?"1px solid var(--gdim)":"1px solid var(--bdr)",color:unlocked?"var(--green)":"var(--txm)",borderRadius:8,padding:"7px 16px",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:6,cursor:"pointer"}
+          },unlocked?`✉ Enviar todos (${Math.max(0,stats.ok-stats.sent)})`:`🔒 Enviar todos (${Math.max(0,stats.ok-stats.sent)})`)
       )
     )
   );
