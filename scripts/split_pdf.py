@@ -1,6 +1,5 @@
 """
-split_pdf.py — Separa PDF de facturas y guarda ZIP localmente.
-El workflow de GitHub Actions lo sube como artefacto descargable.
+split_pdf.py — Separa PDF de facturas usando pdfplumber para extracción de texto.
 """
 
 import os, io, re, json, zipfile, sys
@@ -8,6 +7,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 from pypdf import PdfReader, PdfWriter
+import pdfplumber
 
 SA_JSON   = os.environ["GOOGLE_SERVICE_ACCOUNT"]
 FOLDER_ID = os.environ["DRIVE_FOLDER_ID"]
@@ -66,9 +66,19 @@ def process(drive, fi):
     periodo = detect_periodo(fname)
     print(f"\nProcesando: {fname} → período {periodo}")
 
-    pdf = download(drive, fid)
-    reader = PdfReader(io.BytesIO(pdf))
-    print(f"  {len(reader.pages)} páginas")
+    pdf_bytes = download(drive, fid)
+    print(f"  {len(pdf_bytes):,} bytes descargados")
+
+    # Usar pdfplumber para extraer texto de cada página
+    plumber_pdf = pdfplumber.open(io.BytesIO(pdf_bytes))
+    reader      = PdfReader(io.BytesIO(pdf_bytes))
+    total       = len(reader.pages)
+    print(f"  {total} páginas")
+
+    # Debug primeras 2 páginas
+    for i in range(min(2, total)):
+        t = plumber_pdf.pages[i].extract_text() or ""
+        print(f"  DEBUG pág {i+1} (primeros 200 chars): {repr(t[:200])}")
 
     zip_buf   = io.BytesIO()
     sin_cod   = []
@@ -76,11 +86,11 @@ def process(drive, fi):
 
     with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for i, page in enumerate(reader.pages):
-            text = page.extract_text() or ""            
-if i < 3:  # Solo primeras 3 páginas
-    print(f"  DEBUG pág {i+1}: '{text[:200]}'")
-            cod  = detect_cod(text)
-            nro  = detect_nro(text)
+            # Extraer texto con pdfplumber
+            text = plumber_pdf.pages[i].extract_text() or ""
+
+            cod = detect_cod(text)
+            nro = detect_nro(text)
 
             if not cod:
                 sin_cod.append(i+1)
@@ -94,26 +104,24 @@ if i < 3:  # Solo primeras 3 páginas
             buf = io.BytesIO(); writer.write(buf)
             zf.writestr(f"{periodo}/{cod}/{fname_pdf}", buf.getvalue())
             breakdown[cod] = breakdown.get(cod,0)+1
-            print(f"  Pág {i+1}: {cod} → {fname_pdf}")
 
-        lines = [f"Período: {periodo}", f"Total: {len(reader.pages)} páginas",
+        lines = [f"Período: {periodo}", f"Total: {total} páginas",
                  f"Procesadas: {sum(breakdown.values())}", f"Sin COD: {len(sin_cod)}", ""]
         lines += [f"  {s}: {c}" for s,c in sorted(breakdown.items())]
-        if sin_cod: lines.append(f"\nSin COD: páginas {sin_cod}")
+        if sin_cod: lines.append(f"\nSin COD: {sin_cod}")
         zf.writestr(f"{periodo}/resumen.txt", "\n".join(lines))
+
+    plumber_pdf.close()
 
     print("\nResumen:")
     for s,c in sorted(breakdown.items()): print(f"  {s}: {c} facturas")
-    if sin_cod: print(f"  Sin COD: {sin_cod}")
+    if sin_cod: print(f"  Sin COD: {len(sin_cod)} páginas")
 
-    # Guardar ZIP en carpeta output/ para que Actions lo suba como artefacto
     os.makedirs("output", exist_ok=True)
     zip_name = f"{periodo}.zip"
     zip_path = f"output/{zip_name}"
     with open(zip_path, "wb") as f: f.write(zip_buf.getvalue())
-    print(f"ZIP guardado: {zip_path} ({os.path.getsize(zip_path):,} bytes)")
-
-    return {"periodo":periodo,"zip":zip_name,"total":sum(breakdown.values()),"sin_cod":len(sin_cod)}
+    print(f"ZIP: {zip_path} ({os.path.getsize(zip_path):,} bytes)")
 
 def main():
     drive = get_drive()
