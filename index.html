@@ -128,6 +128,30 @@ const PRESET_GID=window.__PAT_GID__||"";
 ═══════════════════════════════════ */
 const ufCache={};
 
+async function getUFDia5(year,month){
+  const key=`uf5-${year}-${String(month).padStart(2,"0")}`;
+  if(ufCache[key])return ufCache[key];
+  try{
+    const url=`https://mindicador.cl/api/uf/${String(year)}`;
+    const res=await fetch(url);
+    if(!res.ok)throw new Error("HTTP "+res.status);
+    const data=await res.json();
+    const serie=data.serie||[];
+    // Buscar exactamente el día 05 del mes
+    const dia5=serie.find(e=>{
+      const d=new Date(e.fecha);
+      return d.getUTCFullYear()===year&&(d.getUTCMonth()+1)===month&&d.getUTCDate()===5;
+    });
+    if(dia5){ufCache[key]=dia5.valor;return dia5.valor;}
+    // Fallback: día más cercano al 05 por debajo
+    const delMes=serie.filter(e=>{
+      const d=new Date(e.fecha);
+      return d.getUTCFullYear()===year&&(d.getUTCMonth()+1)===month&&d.getUTCDate()<=5;
+    }).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+    if(delMes.length>0){ufCache[key]=delMes[0].valor;return delMes[0].valor;}
+    return null;
+  }catch(e){console.warn("Error UF día 5",e.message);return null;}
+}
 async function getUFForMonth(year,month){
   const key=`${year}-${String(month).padStart(2,"0")}`;
   if(ufCache[key])return ufCache[key];
@@ -570,7 +594,16 @@ function formatRUT(rut){
   for(let i=0;i<cuerpo.length;i++){if(i>0&&(cuerpo.length-i)%3===0)result+=".";result+=cuerpo[i];}
   return result+dv;
 }
-function getEstado(r){if(!r.factura)return"missing";if(r.ufPlan>500)return r.factura?"ok":"missing";if(r.ufPdf===null||r.ufPdf===undefined)return"missing";if(Math.abs(r.ufPdf-r.ufPlan)>0.5)return"diff";return"ok";}
+function getEstado(r){
+  if(!r.factura)return"missing";
+  if(r.ufPlan>500)return r.factura?"ok":"missing";
+  if(r.ufPdf===null||r.ufPdf===undefined)return"missing";
+  // Comparar las 3 UF: PDF vs Planilla, y Planilla vs SII
+  const diffPdf=Math.abs(r.ufPdf-r.ufPlan)>0.5;
+  const diffSII=r.ufSII!=null&&Math.abs(r.ufPlan-r.ufSII)>0.5;
+  if(diffPdf||diffSII)return"diff";
+  return"ok";
+}
 
 /* ═══════════════════════════════════
    COMPONENTES UI
@@ -664,6 +697,7 @@ function App(){
   const [procDone,setProcDone]=useState(false);
   const [preview,setPreview]=useState(null);
   const [histClient,setHistClient]=useState(null);
+  const [ufSII,setUfSII]=useState(null);
   const [histAnio,setHistAnio]=useState(2026);
   const [unlocked,setUnlocked]=useState(false);
   const [showPwdModal,setShowPwdModal]=useState(false);
@@ -739,6 +773,15 @@ function App(){
       setUfLoading(false);
     }).catch(()=>setUfLoading(false));
   },[]);
+
+  /* Cargar UF SII (día 05 del mes) cuando cambia el período */
+  useEffect(()=>{
+    const parts=periodo.split(" ");
+    const MES_NUM={"Enero":1,"Febrero":2,"Marzo":3,"Abril":4,"Mayo":5,"Junio":6,"Julio":7,"Agosto":8,"Septiembre":9,"Octubre":10,"Noviembre":11,"Diciembre":12};
+    const mes=MES_NUM[parts[0]],anio=parseInt(parts[1]);
+    if(!mes||!anio)return;
+    getUFDia5(anio,mes).then(v=>setUfSII(v?Math.round(v*100)/100:null));
+  },[periodo]);
 
   /* Cargar UF históricas cuando dashData está disponible */
   useEffect(()=>{
@@ -839,7 +882,7 @@ function App(){
           }
           if(bestIdx>=0){pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;}
         }
-        filas.push({sitio:c.sitio,cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,ufPlan:c.uf,ufPdf,enviado:false});
+        filas.push({sitio:c.sitio,cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,ufSII,ufPlan:c.uf,ufPdf,enviado:false});
       }
       const nuevoMapa={};
       for(const p of pdfs){if(p.nroFact&&p.zipPath)nuevoMapa[p.nroFact]={zipPath:p.zipPath,nombre:p.pdfNombre};}
@@ -1233,6 +1276,7 @@ function App(){
           PERIODOS.map(p=>h("option",{key:p,value:p,style:{background:"#fff",color:"#1a1a1a"}},p))
         ),
         h("span",{style:{color:"var(--txd)",fontSize:12}},"·"),
+        ufSII&&view==="table"&&h("span",{style:{fontSize:11,color:"#1a5fa8",background:"#e8f2fb",border:"1px solid #b5d0f0",borderRadius:16,padding:"3px 10px",fontFamily:"'DM Mono',monospace",fontWeight:600}},`UF día 5: ${ufSII.toFixed(2)}`),
         view==="table"&&h("button",{onClick:()=>{setView("upload");setData([]);},className:"nav-btn-navy",style:{fontSize:11}},"⊞ Nuevos archivos"),
 
         view==="table"&&h("div",{style:{display:"flex",gap:6,alignItems:"center"}},
@@ -1312,17 +1356,19 @@ function App(){
       ),
       h("div",{style:{flex:1,overflowX:"auto"}},
         h("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:880}},
-          h("colgroup",null,h("col",{style:{width:58}}),h("col",{style:{width:"16%"}}),h("col",{style:{width:"18%"}}),h("col",{style:{width:88}}),h("col",{style:{width:48}}),h("col",{style:{width:92}}),h("col",{style:{width:86}}),h("col",{style:{width:86}}),h("col",{style:{width:102}})),
+          h("colgroup",null,h("col",{style:{width:58}}),h("col",{style:{width:"15%"}}),h("col",{style:{width:"17%"}}),h("col",{style:{width:88}}),h("col",{style:{width:48}}),h("col",{style:{width:88}}),h("col",{style:{width:76}}),h("col",{style:{width:76}}),h("col",{style:{width:76}}),h("col",{style:{width:102}})),
           h("thead",null,h("tr",{style:{background:"#ddeaf8"}},
-            ["Sitio","Cliente","Correo","Concepto","Col.","Factura","UF planilla","UF PDF","Estado/Acción"].map(hd=>
+            ["Sitio","Cliente","Correo","Concepto","Col.","Factura","UF SII","UF planilla","UF PDF","Estado/Acción"].map(hd=>
               h("th",{key:hd,style:{padding:"8px 11px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:"0.07em",borderBottom:"1px solid var(--bdr)"}},hd.toUpperCase())
             )
           )),
           h("tbody",null,filtered.length===0?
-            h("tr",null,h("td",{colSpan:9,style:{padding:"48px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados")):
+            h("tr",null,h("td",{colSpan:10,style:{padding:"48px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados")):
             filtered.map(row=>{
               const i=row.i,sent=sentSet.has(i),sending=sendingIdx===i,noEmail=!row.correo;
-              const diff=row.ufPdf!==null&&row.ufPdf!==undefined&&Math.abs(row.ufPdf-row.ufPlan)>0.5;
+              const diffPdf=row.ufPdf!==null&&row.ufPdf!==undefined&&Math.abs(row.ufPdf-row.ufPlan)>0.5;
+              const diffSII=row.ufSII!=null&&row.ufPlan<=500&&Math.abs(row.ufPlan-row.ufSII)>0.5;
+              const diff=diffPdf||diffSII;
               const esArr=row.concepto==="Arriendo";
               const bg=sent?"#e6f7ef":esArr?"#ffffff":"#fffdf5";
               return h("tr",{key:i,className:"row-tr"},
@@ -1332,8 +1378,9 @@ function App(){
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{className:esArr?"tag-arr":"tag-srv"},row.concepto)),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{className:esArr?"col-gs":"col-gt"},row.colRef)),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:"var(--txm)"}},row.factura||"—")),
+                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",color:"#1a5fa8",fontWeight:600}},row.ufSII!=null?row.ufSII.toFixed(2):"—")),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace"}},row.ufPlan>500?"$"+Math.round(row.ufPlan).toLocaleString("es-CL"):row.ufPlan.toFixed(2))),
-                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",color:diff?"var(--amber)":"var(--tx)"}},row.ufPdf!==null&&row.ufPdf!==undefined?row.ufPdf.toFixed(2):"—")),
+                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",color:diffPdf?"var(--amber)":"var(--tx)"}},row.ufPdf!==null&&row.ufPdf!==undefined?row.ufPdf.toFixed(2):"—")),
                 h("td",{style:{padding:"8px 11px",background:bg}},
                   sent?h("span",{style:{color:"var(--green)",fontSize:11,fontWeight:600}},"✓ Enviado"):
                   sending?h("span",{style:{color:"var(--blue)",fontSize:11,display:"inline-flex",alignItems:"center",gap:4}},h("span",{className:"spin"},"⟳")," Enviando..."):
