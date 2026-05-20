@@ -2,209 +2,265 @@ import JSZip from "jszip";
 
 export const config = { api: { bodyParser: true, responseLimit: '60mb' } };
 
-// ── Misma lógica JWT/OAuth que pdftext.js ────────────────────────────────────
+// ── JWT / OAuth ──────────────────────────────────────────────────────────────
 async function signJWT(payload, privateKey) {
   const header = { alg: "RS256", typ: "JWT" };
   const encode = obj => btoa(JSON.stringify(obj)).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
   const signingInput = `${encode(header)}.${encode(payload)}`;
-  const pemContents = privateKey.replace(/-----BEGIN PRIVATE KEY-----/,"").replace(/-----END PRIVATE KEY-----/,"").replace(/\s/g,"");
-  const binaryKey = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
+  const pem = privateKey.replace(/-----BEGIN PRIVATE KEY-----/,"").replace(/-----END PRIVATE KEY-----/,"").replace(/\s/g,"");
+  const binaryKey = Uint8Array.from(atob(pem), c => c.charCodeAt(0));
   const cryptoKey = await crypto.subtle.importKey("pkcs8", binaryKey.buffer, {name:"RSASSA-PKCS1-v1_5",hash:"SHA-256"}, false, ["sign"]);
-  const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", cryptoKey, new TextEncoder().encode(signingInput));
-  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
+  const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", cryptoKey, new TextEncoder().encode(signingInput));
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
   return `${signingInput}.${sigB64}`;
 }
 
-async function getAccessToken(serviceAccount) {
+async function getAccessToken(sa) {
   const now = Math.floor(Date.now() / 1000);
-  const payload = {
-    iss: serviceAccount.client_email,
-    scope: "https://www.googleapis.com/auth/drive",  // full drive (read + write)
-    aud: "https://oauth2.googleapis.com/token",
-    iat: now, exp: now + 3600,
-  };
-  const jwt = await signJWT(payload, serviceAccount.private_key);
+  const jwt = await signJWT({
+    iss: sa.client_email, scope: "https://www.googleapis.com/auth/drive",
+    aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600,
+  }, sa.private_key);
   const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
   });
   const data = await res.json();
-  if (!data.access_token) throw new Error("Token error: " + JSON.stringify(data));
+  if (!data.access_token) throw new Error("Token: " + JSON.stringify(data));
   return data.access_token;
 }
 
-// ── Drive: descargar archivo ──────────────────────────────────────────────────
 async function driveDownload(token, fileId) {
-  const res = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+    { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) throw new Error(`Drive download error ${res.status}`);
   return Buffer.from(await res.arrayBuffer());
 }
 
-// ── Drive: subir archivo (multipart) ─────────────────────────────────────────
-async function driveUpload(token, name, dataBuffer, mimeType, parentId) {
-  const meta = JSON.stringify({ name, mimeType, parents: parentId ? [parentId] : [] });
-  const boundary = "pat_boundary_split_pdf";
+async function driveUpload(token, name, data, mime, parentId) {
+  const meta = JSON.stringify({ name, mimeType: mime, ...(parentId ? { parents: [parentId] } : {}) });
+  const boundary = "pat_split_boundary";
   const body = Buffer.concat([
     Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`),
     Buffer.from(meta),
-    Buffer.from(`\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`),
-    dataBuffer,
+    Buffer.from(`\r\n--${boundary}\r\nContent-Type: ${mime}\r\n\r\n`),
+    data,
     Buffer.from(`\r\n--${boundary}--`),
   ]);
-  const res = await fetch(
-    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": `multipart/related; boundary=${boundary}`,
-        "Content-Length": body.length,
-      },
-      body,
-    }
-  );
-  const data = await res.json();
-  if (!data.id) throw new Error("Upload error: " + JSON.stringify(data));
-  return data.id;
+  const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/related; boundary=${boundary}` },
+    body,
+  });
+  const resp = await res.json();
+  if (!resp.id) throw new Error("Upload: " + JSON.stringify(resp));
+  return resp.id;
 }
 
-// ── Parsear CMap (mismo que pdftext.js) ──────────────────────────────────────
-function parseCMap(cmapText) {
+// ── PDF parser puro en JS ────────────────────────────────────────────────────
+// Separar un PDF multipágina en PDFs individuales de 1 página
+function splitPDFPages(buf) {
+  const src = buf.toString("binary");
+
+  // 1. Parsear xref para obtener offsets de todos los objetos
+  const objOffsets = {};
+  const objRe = /(\d+)\s+0\s+obj/g;
+  let m;
+  while ((m = objRe.exec(src)) !== null) {
+    objOffsets[parseInt(m[1])] = m.index;
+  }
+
+  // Helper: leer objeto por número
+  function getObj(num) {
+    const off = objOffsets[num];
+    if (off == null) return "";
+    const end = src.indexOf("endobj", off);
+    return end > off ? src.slice(off, end + 6) : src.slice(off, off + 4096);
+  }
+
+  // 2. Encontrar el objeto Pages (catálogo)
+  function findPages() {
+    for (const num of Object.keys(objOffsets)) {
+      const o = getObj(parseInt(num));
+      if (o.includes("/Type /Pages") || o.includes("/Type/Pages")) {
+        const kidsM = o.match(/\/Kids\s*\[([^\]]+)\]/);
+        if (kidsM) return kidsM[1].trim().split(/\s+R/).filter(s => s.trim())
+          .map(s => parseInt(s.trim().split(/\s+/)[0])).filter(n => !isNaN(n));
+      }
+    }
+    return [];
+  }
+
+  const pageNums = findPages();
+  if (pageNums.length === 0) return null;
+
+  // 3. Para cada página, construir un PDF mínimo válido
+  const pages = [];
+  for (const pageNum of pageNums) {
+    const pageObj = getObj(pageNum);
+
+    // Encontrar el stream de contenido referenciado por esta página
+    const contentsM = pageObj.match(/\/Contents\s+(\d+)\s+0\s+R/);
+    const contentsNum = contentsM ? parseInt(contentsM[1]) : null;
+    const contentsObj = contentsNum ? getObj(contentsNum) : null;
+
+    // Recopilar todos los objetos necesarios para esta página
+    // Buscar recursos: /Font, /XObject, etc.
+    const needed = new Set([pageNum]);
+    if (contentsNum) needed.add(contentsNum);
+
+    // Buscar referencias de recursos en el objeto página
+    const allRefs = [...pageObj.matchAll(/(\d+)\s+0\s+R/g)].map(r => parseInt(r[1]));
+    for (const ref of allRefs) needed.add(ref);
+
+    // Recopilar objetos de recursos en 2 niveles de profundidad
+    const toProcess = [...needed];
+    for (const ref of toProcess) {
+      const o = getObj(ref);
+      const refs2 = [...o.matchAll(/(\d+)\s+0\s+R/g)].map(r => parseInt(r[1]));
+      for (const r2 of refs2) {
+        if (!needed.has(r2) && objOffsets[r2] != null) needed.add(r2);
+      }
+    }
+
+    // Construir PDF mínimo
+    let newPdf = "%PDF-1.4\n";
+    const mapping = {}; // oldNum -> newNum
+    let counter = 1;
+
+    // Asignar nuevos números
+    const neededArr = [...needed];
+    for (const n of neededArr) mapping[n] = counter++;
+
+    // Objeto 1 es el catálogo, objeto 2 es Pages, objeto 3 es la página
+    const catalogNum = counter++;
+    const pagesNum = counter++;
+
+    const offsets = {};
+
+    // Escribir objetos de recursos (fonts, etc.)
+    const resourceObjs = neededArr.filter(n => n !== pageNum && n !== contentsNum);
+    for (const oldNum of resourceObjs) {
+      const newNum = mapping[oldNum];
+      offsets[newNum] = newPdf.length;
+      let o = getObj(oldNum);
+      // Remap references
+      o = o.replace(/(\d+)\s+0\s+R/g, (match, n) => {
+        const mapped = mapping[parseInt(n)];
+        return mapped ? `${mapped} 0 R` : match;
+      });
+      // Fix object number
+      o = o.replace(/^\d+\s+0\s+obj/, `${newNum} 0 obj`);
+      newPdf += o + "\n";
+    }
+
+    // Escribir stream de contenido
+    if (contentsNum && contentsObj) {
+      const newNum = mapping[contentsNum];
+      offsets[newNum] = newPdf.length;
+      let o = contentsObj;
+      o = o.replace(/^(\d+)\s+0\s+obj/, `${newNum} 0 obj`);
+      newPdf += o + "\n";
+    }
+
+    // Escribir objeto página (remap referencias)
+    const pageNewNum = mapping[pageNum];
+    offsets[pageNewNum] = newPdf.length;
+    let pageObjNew = pageObj;
+    pageObjNew = pageObjNew.replace(/(\d+)\s+0\s+R/g, (match, n) => {
+      if (parseInt(n) === pageNum) return `${pageNewNum} 0 R`;
+      const mapped = mapping[parseInt(n)];
+      return mapped ? `${mapped} 0 R` : match;
+    });
+    // Reemplazar referencia a Parent con el nuevo Pages
+    pageObjNew = pageObjNew.replace(/\/Parent\s+\d+\s+0\s+R/, `/Parent ${pagesNum} 0 R`);
+    pageObjNew = pageObjNew.replace(/^\d+\s+0\s+obj/, `${pageNewNum} 0 obj`);
+    newPdf += pageObjNew + "\n";
+
+    // Escribir Pages object
+    offsets[pagesNum] = newPdf.length;
+    newPdf += `${pagesNum} 0 obj\n<< /Type /Pages /Kids [${pageNewNum} 0 R] /Count 1 >>\nendobj\n`;
+
+    // Escribir Catalog
+    offsets[catalogNum] = newPdf.length;
+    newPdf += `${catalogNum} 0 obj\n<< /Type /Catalog /Pages ${pagesNum} 0 R >>\nendobj\n`;
+
+    // Escribir xref
+    const xrefOffset = newPdf.length;
+    const totalObjs = counter;
+    newPdf += `xref\n0 ${totalObjs}\n0000000000 65535 f \n`;
+    for (let i = 1; i < totalObjs; i++) {
+      const off = offsets[i];
+      newPdf += off != null ? `${String(off).padStart(10, "0")} 00000 n \n` : `0000000000 65535 f \n`;
+    }
+    newPdf += `trailer\n<< /Size ${totalObjs} /Root ${catalogNum} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+
+    pages.push(Buffer.from(newPdf, "binary"));
+  }
+
+  return pages;
+}
+
+// ── Parsear CMap y extraer texto (igual que pdftext.js) ──────────────────────
+function parseCMap(t) {
   const mapping = {};
-  const rangeSection = cmapText.match(/beginbfrange([\s\S]*?)endbfrange/g) || [];
-  for (const section of rangeSection) {
-    const matches = section.matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g);
-    for (const [, s, e, d] of matches) {
-      const si = parseInt(s,16), ei = parseInt(e,16), di = parseInt(d,16);
-      for (let i = 0; i <= ei-si; i++) mapping[si+i] = String.fromCodePoint(di+i);
+  for (const sec of (t.match(/beginbfrange([\s\S]*?)endbfrange/g) || [])) {
+    for (const [, s, e, d] of sec.matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g)) {
+      const si=parseInt(s,16),ei=parseInt(e,16),di=parseInt(d,16);
+      for(let i=0;i<=ei-si;i++) mapping[si+i]=String.fromCodePoint(di+i);
     }
   }
-  const charSection = cmapText.match(/beginbfchar([\s\S]*?)endbfchar/g) || [];
-  for (const section of charSection) {
-    const matches = section.matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g);
-    for (const [, src, dst] of matches) {
+  for (const sec of (t.match(/beginbfchar([\s\S]*?)endbfchar/g) || [])) {
+    for (const [, src, dst] of sec.matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g)) {
       try {
-        const code = parseInt(src, 16);
-        const dstBytes = Buffer.from(dst, "hex");
-        mapping[code] = "";
-        for (let i = 0; i < dstBytes.length; i += 2)
-          mapping[code] += String.fromCodePoint(dstBytes.readUInt16BE(i));
+        const code=parseInt(src,16), bytes=Buffer.from(dst,"hex");
+        mapping[code]="";
+        for(let i=0;i<bytes.length;i+=2) mapping[code]+=String.fromCodePoint(bytes.readUInt16BE(i));
       } catch {}
     }
   }
   return mapping;
 }
 
-// ── Extraer texto de una página PDF (buffer de 1 página) ─────────────────────
-function extractPageText(pdfBuffer) {
-  const str = pdfBuffer.toString("latin1");
-  const streamRegex = /stream\r?\n([\s\S]*?)endstream/g;
+function extractText(pdfBuf) {
+  const str = pdfBuf.toString("latin1");
   const streams = [];
+  const re = /stream\r?\n([\s\S]*?)endstream/g;
   let m;
-  while ((m = streamRegex.exec(str)) !== null)
-    streams.push(Buffer.from(m[1], "latin1"));
-
+  while ((m = re.exec(str)) !== null) streams.push(Buffer.from(m[1], "latin1"));
   const mapping = {};
   for (const s of streams) {
-    try {
-      const d = require("zlib").inflateSync(s).toString("latin1");
-      if (d.includes("beginbfchar") || d.includes("beginbfrange"))
-        Object.assign(mapping, parseCMap(d));
+    try { const d=require("zlib").inflateSync(s).toString("latin1");
+      if(d.includes("beginbfchar")||d.includes("beginbfrange")) Object.assign(mapping,parseCMap(d));
     } catch {}
   }
-
   let text = "";
   for (const s of streams) {
-    try {
-      const d = require("zlib").inflateSync(s).toString("latin1");
-      for (const [, h] of d.matchAll(/<([0-9a-fA-F]+)>\s*Tj/g)) {
-        const code = parseInt(h, 16);
-        text += mapping[code] !== undefined ? mapping[code]
-              : (code >= 32 && code < 127 ? String.fromCharCode(code) : " ");
+    try { const d=require("zlib").inflateSync(s).toString("latin1");
+      for(const[,h] of d.matchAll(/<([0-9a-fA-F]+)>\s*Tj/g)){
+        const code=parseInt(h,16);
+        text+=mapping[code]!==undefined?mapping[code]:(code>=32&&code<127?String.fromCharCode(code):" ");
       }
     } catch {}
   }
-  return text.replace(/\s+/g, " ").trim();
+  return text.replace(/\s+/g," ").trim();
 }
 
-// ── Detectar COD en texto ────────────────────────────────────────────────────
-const COD_MAP = {
-  "5-A":"5A","5A":"5A",
-  "4-A":"4A","4A":"4A",
-  "A-1":"A1","A1":"A1",
-  "A-2":"A2","A2":"A2",
-  "B":"B",
-  "D-2":"D2","D2":"D2",
-  "D-3":"D3","D3":"D3",
-};
+// ── Detectar COD ─────────────────────────────────────────────────────────────
+const COD_MAP = {"5-A":"5A","5A":"5A","4-A":"4A","4A":"4A","A-1":"A1","A1":"A1",
+  "A-2":"A2","A2":"A2","B":"B","D-2":"D2","D2":"D2","D-3":"D3","D3":"D3"};
 
 function detectCod(text) {
   const m = text.match(/COD:\s*([A-D0-9][-A-D0-9]*)/);
   if (!m) return null;
-  const raw = m[1].trim().replace(/-$/,"").toUpperCase();
-  return COD_MAP[raw] || null;
+  return COD_MAP[m[1].trim().replace(/-$/,"").toUpperCase()] || null;
 }
-
 function detectNro(text) {
   const m = text.match(/N[º°]\s*(\d+)/);
   return m ? m[1] : null;
 }
 
-// ── Extraer páginas individuales de un PDF como Buffers ──────────────────────
-function splitPDFPages(pdfBuffer) {
-  // Parsear el PDF manualmente para extraer páginas individuales
-  // Usamos una estrategia simple: buscar objetos de página y reconstruir PDFs mínimos
-  // Para Vercel sin pypdf, usamos la estructura del PDF directamente
-  const str = pdfBuffer.toString("latin1");
-  
-  // Encontrar referencias a páginas en el árbol
-  // Buscar "Page" objects en el xref
-  const pageBuffers = [];
-  
-  // Estrategia: dividir en páginas usando qué objetos pertenecen a cada página
-  // Más simple: usar el stream completo y separar por patrones de página
-  // Para facturas de 1 página cada una, buscamos los objetos del PDF
-  
-  // Encontrar el array Kids en Pages
-  const kidsMatch = str.match(/\/Kids\s*\[([^\]]+)\]/);
-  if (!kidsMatch) return null;
-  
-  const kidRefs = [...kidsMatch[1].matchAll(/(\d+)\s+\d+\s+R/g)].map(m => parseInt(m[1]));
-  
-  // Para cada página, encontrar su objeto y reconstruir un PDF mínimo
-  // Usar offset del xref para localizar objetos
-  const xrefMatch = str.match(/xref\s*\n\s*0\s+(\d+)\s*\n([\s\S]*?)trailer/);
-  
-  if (!xrefMatch) {
-    // PDF con xref cross-reference streams (PDF 1.5+) - no podemos parsear fácilmente
-    return null;
-  }
-  
-  return null; // Señal para usar método alternativo
-}
-
-// ── Separar PDF usando pdfseparate o método buffer ────────────────────────────
-function splitByteRanges(pdfBuffer, totalPages) {
-  // Método robusto: crear un PDF de 1 página usando referencias al original
-  // Buscar startxref para encontrar objetos
-  const str = pdfBuffer.toString("binary");
-  
-  // Encontrar todos los "obj" en el PDF
-  const objPattern = /(\d+)\s+0\s+obj/g;
-  const objects = {};
-  let match;
-  while ((match = objPattern.exec(str)) !== null) {
-    objects[parseInt(match[1])] = match.index;
-  }
-  
-  return objects;
-}
-
-// ── Handler principal ─────────────────────────────────────────────────────────
+// ── Handler ───────────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -223,171 +279,65 @@ export default async function handler(req, res) {
 
     // 1. Descargar PDF
     console.log(`Descargando PDF ${pdfFileId}...`);
-    const pdfBuffer = await driveDownload(token, pdfFileId);
-    console.log(`PDF descargado: ${pdfBuffer.length} bytes`);
+    const pdfBuf = await driveDownload(token, pdfFileId);
+    console.log(`PDF: ${pdfBuf.length} bytes`);
 
-    // 2. Separar en páginas usando JSZip no es para PDF...
-    // Usamos el método de extracción de texto por streams del PDF
-    // y separamos cada página individualmente reconstruyendo PDFs mínimos
+    // 2. Extraer texto de todo el PDF para detectar CODs
+    // Usamos el extractor CMap sobre el PDF completo
+    const fullText = extractText(pdfBuf);
 
-    // Encontrar todas las páginas: buscar "endobj" delimitando objetos
-    const pdfStr = pdfBuffer.toString("latin1");
-    
-    // Extraer texto de cada página usando el extractor CMap
-    // Para separar páginas físicamente, buscamos los stream de contenido
-    const streamRegex = /stream\r?\n([\s\S]*?)endstream/g;
-    const allStreams = [];
-    let sm;
-    while ((sm = streamRegex.exec(pdfStr)) !== null) {
-      allStreams.push({ pos: sm.index, raw: Buffer.from(sm[1], "latin1") });
+    // Separar páginas usando el parser puro
+    const pageBufs = splitPDFPages(pdfBuf);
+    if (!pageBufs || pageBufs.length === 0) {
+      throw new Error("No se pudieron separar las páginas del PDF");
     }
+    console.log(`Páginas separadas: ${pageBufs.length}`);
 
-    // Identificar streams de contenido (no CMap)
-    const contentStreams = [];
-    for (const s of allStreams) {
-      try {
-        const d = require("zlib").inflateSync(s.raw).toString("latin1");
-        // Es stream de contenido si tiene operadores PDF como Tj, BT, ET
-        if (d.includes(" Tj") && (d.includes("BT") || d.includes("/F"))) {
-          contentStreams.push({ ...s, text: d });
-        }
-      } catch {}
-    }
-
-    console.log(`Streams de contenido encontrados: ${contentStreams.length}`);
-
-    // Construir CMap global una vez
-    const globalMapping = {};
-    for (const s of allStreams) {
-      try {
-        const d = require("zlib").inflateSync(s.raw).toString("latin1");
-        if (d.includes("beginbfchar") || d.includes("beginbfrange"))
-          Object.assign(globalMapping, parseCMap(d));
-      } catch {}
-    }
-
-    // Decodificar texto de cada stream de contenido
-    const pageTexts = contentStreams.map(s => {
-      let text = "";
-      for (const [, h] of s.text.matchAll(/<([0-9a-fA-F]+)>\s*Tj/g)) {
-        const code = parseInt(h, 16);
-        text += globalMapping[code] !== undefined ? globalMapping[code]
-              : (code >= 32 && code < 127 ? String.fromCharCode(code) : " ");
-      }
-      return text.replace(/\s+/g, " ").trim();
-    });
-
-    // Agrupar streams por página (cada factura = 1 página = 1 stream de contenido)
-    const pages = pageTexts.map((text, i) => ({
-      index: i,
-      text,
-      cod: detectCod(text),
-      nro: detectNro(text),
-    }));
-
-    console.log(`Páginas detectadas: ${pages.length}`);
-    pages.forEach((p, i) => console.log(`  Pág ${i+1}: cod=${p.cod} nro=${p.nro}`));
-
-    // 3. Separar el PDF físicamente página por página
-    // Usamos qpdf via child_process si está disponible, sino PDF manual
-    const { execSync, spawnSync } = require("child_process");
-    const fs = require("fs");
-    const path = require("path");
-    const os = require("os");
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pat-split-"));
-    
-    // Escribir PDF original
-    const origPath = path.join(tmpDir, "original.pdf");
-    fs.writeFileSync(origPath, pdfBuffer);
-
-    // Separar con qpdf página por página
-    let splitOk = false;
-    try {
-      execSync(`qpdf --version`, { stdio: "ignore" });
-      splitOk = true;
-      console.log("qpdf disponible, separando páginas...");
-      for (let i = 0; i < pages.length; i++) {
-        const outPath = path.join(tmpDir, `page_${i+1}.pdf`);
-        execSync(`qpdf ${origPath} --pages . ${i+1} -- ${outPath}`);
-        pages[i].pdfPath = outPath;
-      }
-    } catch (e) {
-      console.log("qpdf no disponible:", e.message);
-    }
-
-    if (!splitOk) {
-      // Fallback: usar pdfseparate (poppler)
-      try {
-        execSync(`pdfseparate ${origPath} ${path.join(tmpDir, "page_%d.pdf")}`);
-        for (let i = 0; i < pages.length; i++) {
-          const p = path.join(tmpDir, `page_${i+1}.pdf`);
-          if (fs.existsSync(p)) { pages[i].pdfPath = p; splitOk = true; }
-        }
-        console.log("pdfseparate OK");
-      } catch (e) {
-        console.log("pdfseparate no disponible:", e.message);
-      }
-    }
-
-    // Construir ZIP
+    // 3. Para cada página extraer texto y detectar COD
     const zip = new JSZip();
     const sinCod = [];
-    let totalFacturas = 0;
+    const breakdown = {};
 
-    for (let i = 0; i < pages.length; i++) {
-      const page = pages[i];
-      if (!page.cod) { sinCod.push(i+1); continue; }
-      
-      const fname = page.nro ? `F-${page.nro}.pdf` : `F-p${i+1}.pdf`;
-      const zipPath = `${periodo}/${page.cod}/${fname}`;
-      
-      let pdfData;
-      if (page.pdfPath && fs.existsSync(page.pdfPath)) {
-        pdfData = fs.readFileSync(page.pdfPath);
-      } else {
-        // Fallback: incluir el PDF completo como placeholder
-        pdfData = pdfBuffer;
-        console.warn(`⚠ Sin PDF individual para página ${i+1}, usando completo`);
+    for (let i = 0; i < pageBufs.length; i++) {
+      const text = extractText(pageBufs[i]);
+      const cod = detectCod(text);
+      const nro = detectNro(text);
+
+      if (!cod) {
+        sinCod.push(i + 1);
+        console.log(`Pág ${i+1}: sin COD`);
+        continue;
       }
-      
-      zip.file(zipPath, pdfData);
-      totalFacturas++;
+
+      const fname = nro ? `F-${nro}.pdf` : `F-p${i+1}.pdf`;
+      zip.file(`${periodo}/${cod}/${fname}`, pageBufs[i]);
+      breakdown[cod] = (breakdown[cod] || 0) + 1;
+      console.log(`Pág ${i+1}: ${cod} → ${fname}`);
     }
 
     if (sinCod.length > 0) {
-      zip.file(`${periodo}/sin_cod.txt`, `Páginas sin COD detectado: ${sinCod.join(", ")}\n`);
+      zip.file(`${periodo}/sin_cod.txt`, `Páginas sin COD: ${sinCod.join(", ")}\n`);
     }
 
-    // Limpiar tmp
-    try { execSync(`rm -rf ${tmpDir}`); } catch {}
+    // 4. Generar ZIP
+    const zipBuf = Buffer.from(await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }));
+    console.log(`ZIP: ${zipBuf.length} bytes`);
 
-    const zipBuffer = Buffer.from(await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }));
-    console.log(`ZIP generado: ${zipBuffer.length} bytes, ${totalFacturas} facturas`);
-
-    // 4. Subir ZIP a Drive
+    // 5. Subir a Drive
     const zipName = `${periodo}.zip`;
-    const uploadedId = await driveUpload(token, zipName, zipBuffer, "application/zip", destFolderId || null);
-    console.log(`ZIP subido a Drive: ${uploadedId}`);
-
-    // Limpiar tmp si quedó algo
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    const fileId = await driveUpload(token, zipName, zipBuf, "application/zip", destFolderId || null);
+    console.log(`ZIP subido: ${fileId}`);
 
     return res.status(200).json({
-      ok: true,
-      zipName,
-      fileId: uploadedId,
-      driveUrl: `https://drive.google.com/file/d/${uploadedId}/view`,
-      totalFacturas,
+      ok: true, zipName, fileId,
+      driveUrl: `https://drive.google.com/file/d/${fileId}/view`,
+      totalFacturas: Object.values(breakdown).reduce((a,b)=>a+b,0),
       sinCod,
-      breakdown: Object.entries(
-        pages.filter(p => p.cod).reduce((acc, p) => {
-          acc[p.cod] = (acc[p.cod] || 0) + 1; return acc;
-        }, {})
-      ).sort(([a],[b]) => a.localeCompare(b)),
+      breakdown: Object.entries(breakdown).sort(([a],[b])=>a.localeCompare(b)),
     });
 
   } catch (e) {
-    console.error("split-pdf error:", e);
-    return res.status(500).json({ error: e.message, stack: e.stack?.slice(0, 500) });
+    console.error("split-pdf:", e);
+    return res.status(500).json({ error: e.message, stack: e.stack?.slice(0,300) });
   }
 }
