@@ -76,7 +76,9 @@ def process(drive, fi):
 
     with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for i, page in enumerate(reader.pages):
-            text = page.extract_text() or ""
+            text = page.extract_text() or ""            
+if i < 3:  # Solo primeras 3 páginas
+    print(f"  DEBUG pág {i+1}: '{text[:200]}'")
             cod  = detect_cod(text)
             nro  = detect_nro(text)
 
