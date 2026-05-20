@@ -116,6 +116,7 @@ const MODO_PRUEBA=TEST_DEST!=="";
 const VER="v4.8.0";
 const SEND_PWD="patagonica2026";
 const DRIVE_PLANILLA_ID="1rAGS-b1MoPpEhMgN2BR9Hvg4cTYdcQDu";
+const DRIVE_FACTURACION_FOLDER_ID="1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u"; /* Carpeta Facturacion Mensual */
 const GOOGLE_SCOPES="https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.readonly";
 const TG_BOT=window.__TG_BOT__||"";
 const TG_CHAT=window.__TG_CHAT__||"";
@@ -711,6 +712,10 @@ function App(){
   const [procDone,setProcDone]=useState(false);
   const [preview,setPreview]=useState(null);
   const [histClient,setHistClient]=useState(null);
+  const [splitModal,setSplitModal]=useState(false);
+  const [splitPdfId,setSplitPdfId]=useState("1Pl7s4FNyjVQOMcEBtgCcvCGD4FlzRg2W");
+  const [splitLoading,setSplitLoading]=useState(false);
+  const [splitResult,setSplitResult]=useState(null);
   const [ufSII,setUfSII]=useState(null);
   const [histAnio,setHistAnio]=useState(2026);
   const [unlocked,setUnlocked]=useState(false);
@@ -934,6 +939,32 @@ function App(){
     setSendingIdx(null);
   };
 
+  const splitPDF=async()=>{
+    if(!splitPdfId.trim()){notify("Ingresa el ID del PDF","err");return;}
+    setSplitLoading(true);setSplitResult(null);
+    const MES_NUM={"Enero":"01","Febrero":"02","Marzo":"03","Abril":"04","Mayo":"05","Junio":"06","Julio":"07","Agosto":"08","Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12"};
+    const [mesNombre,anio]=periodo.split(" ");
+    const mesNum=MES_NUM[mesNombre];
+    const periodoCode=`${anio}-${mesNum}`;
+    try{
+      const res=await fetch("/api/split-pdf",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          pdfFileId:splitPdfId.trim(),
+          periodo:periodoCode,
+          destFolderId:DRIVE_FACTURACION_FOLDER_ID,
+        }),
+      });
+      const data=await res.json();
+      if(!res.ok)throw new Error(data.error||"Error desconocido");
+      setSplitResult(data);
+      notify("✓ ZIP creado y subido a Drive","ok");
+    }catch(e){
+      setSplitResult({error:e.message});
+      notify("Error: "+e.message,"err");
+    }finally{setSplitLoading(false);}
+  };
   const handleLogin=()=>{
     if(pwdInput===SEND_PWD){setUnlocked(true);setShowPwdModal(false);setPwdInput("");setPwdError(false);}
     else{setPwdError(true);setPwdInput("");}
@@ -1240,7 +1271,49 @@ function App(){
       (notif.t==="ok"?"✓ ":notif.t==="err"?"✗ ":"△ ")+notif.msg
     ),
     showProc&&h(ProcModal,{logs:procLogs,progress:procProgress,done:procDone,onClose:finishProc}),
-    showPwdModal&&h("div",{className:"pwd-modal-overlay",onClick:e=>{if(e.target===e.currentTarget){setShowPwdModal(false);setPwdInput("");setPwdError(false);}}},
+    splitModal&&h("div",{className:"pwd-modal-overlay",onClick:e=>{if(e.target===e.currentTarget&&!splitLoading){setSplitModal(false);setSplitResult(null);}}},
+      h("div",{className:"pwd-modal",style:{width:420}},
+        h("div",{style:{fontSize:15,fontWeight:700,color:"var(--tx)",marginBottom:4}},"📂 Separar PDF de Facturas"),
+        h("div",{style:{fontSize:12,color:"var(--txm)",marginBottom:14}},
+          `Separa el PDF general en facturas individuales, crea subcarpetas por sitio y sube ${periodo.split(" ")[1]}-${{"Enero":"01","Febrero":"02","Marzo":"03","Abril":"04","Mayo":"05","Junio":"06","Julio":"07","Agosto":"08","Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12"}[periodo.split(" ")[0]]}.zip a Google Drive.`
+        ),
+        h("div",{style:{fontSize:11,fontWeight:600,color:"var(--txm)",marginBottom:4}},"ID del PDF en Google Drive:"),
+        h("input",{
+          className:"pwd-input",
+          type:"text",
+          placeholder:"ID del archivo PDF...",
+          value:splitPdfId,
+          onChange:e=>setSplitPdfId(e.target.value),
+          disabled:splitLoading,
+          style:{fontFamily:"'DM Mono',monospace",fontSize:12},
+        }),
+        h("div",{style:{fontSize:10,color:"var(--txd)",marginTop:4,marginBottom:14}},
+          "Lo encuentras en la URL de Drive: drive.google.com/file/d/",
+          h("strong",null,"ESTE_ES_EL_ID"),"/view"
+        ),
+        splitResult&&!splitResult.error&&h("div",{style:{background:"var(--gbg)",border:"1px solid var(--gdim)",borderRadius:8,padding:"10px 14px",marginBottom:12}},
+          h("div",{style:{fontWeight:700,color:"var(--green)",fontSize:12,marginBottom:6}},"✓ ZIP creado exitosamente"),
+          h("div",{style:{fontSize:11,color:"var(--txm)",marginBottom:4}},`Archivo: ${splitResult.zipName} · ${splitResult.totalFacturas} facturas`),
+          splitResult.breakdown&&h("div",{style:{fontSize:11,color:"var(--txm)",marginBottom:4}},
+            splitResult.breakdown.map(([sitio,cnt])=>`${sitio}: ${cnt}`).join(" · ")
+          ),
+          splitResult.sinCod?.length>0&&h("div",{style:{fontSize:10,color:"var(--amber)"}},`⚠ Sin COD: páginas ${splitResult.sinCod.join(", ")}`),
+          h("a",{href:splitResult.driveUrl,target:"_blank",style:{fontSize:11,color:"var(--accl)",display:"block",marginTop:4}},"🔗 Ver en Google Drive →")
+        ),
+        splitResult?.error&&h("div",{style:{background:"var(--rbg)",border:"1px solid var(--rdim)",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:11,color:"var(--red)"}},
+          "✗ Error: "+splitResult.error
+        ),
+        h("div",{style:{display:"flex",gap:8,justifyContent:"flex-end"}},
+          h("button",{onClick:()=>{setSplitModal(false);setSplitResult(null);},disabled:splitLoading,style:{padding:"7px 16px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--txm)",fontSize:12,cursor:"pointer"}},"Cerrar"),
+          !splitResult?.ok&&h("button",{
+            onClick:splitPDF,
+            disabled:splitLoading,
+            style:{padding:"7px 16px",borderRadius:8,border:"none",background:splitLoading?"var(--surf3)":"var(--acc)",color:splitLoading?"var(--txm)":"#fff",fontSize:12,fontWeight:700,cursor:splitLoading?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:6}
+          },splitLoading?h("span",null,h("span",{className:"spin"},"⟳")," Procesando..."):h("span",null,"📂 Separar y subir ZIP"))
+        )
+      )
+    ),
+    showPwdModal&&h("div",{className:"pwd-modal-overlay"},onClick:e=>{if(e.target===e.currentTarget){setShowPwdModal(false);setPwdInput("");setPwdError(false);}}},
       h("div",{className:"pwd-modal"},
         h("div",{style:{fontSize:15,fontWeight:700,color:"var(--tx)",marginBottom:6}},"🔒 Desbloquear envío"),
         h("div",{style:{fontSize:12,color:"var(--txm)",marginBottom:16}},"Ingresa la clave para habilitar el envío de correos en esta sesión."),
@@ -1295,6 +1368,7 @@ function App(){
         h("span",{style:{color:"var(--txd)",fontSize:12}},"·"),
         
         view==="table"&&h("button",{onClick:()=>{setView("upload");setData([]);},className:"nav-btn-navy",style:{fontSize:11}},"⊞ Nuevos archivos"),
+        view==="table"&&h("button",{onClick:()=>setSplitModal(true),className:"nav-btn-navy",style:{fontSize:11}},"📂 Separar PDF"),
 
         view==="table"&&h("div",{style:{display:"flex",gap:6,alignItems:"center"}},
           h("button",{
