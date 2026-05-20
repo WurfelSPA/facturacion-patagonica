@@ -945,7 +945,7 @@ function App(){
     setSplitLoading(true);setSplitResult(null);
     const [mesNombre,anio]=periodo.split(" ");
     const mesNum=MES_STR[mesNombre];
-    const periodoCode=`${anio}-${mesNum}`;
+    const periodoCode=`${anio}-${mesNum} prueba`;
     try{
       const res=await fetch("/api/split-pdf",{
         method:"POST",
