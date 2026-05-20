@@ -1,5 +1,6 @@
 """
-split_pdf.py — Separa PDF de facturas usando pdfplumber para extracción de texto.
+split_pdf.py — Separa PDF usando OCR (pdf2image + pytesseract).
+Funciona con cualquier PDF independiente del encoding.
 """
 
 import os, io, re, json, zipfile, sys
@@ -7,7 +8,8 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 from pypdf import PdfReader, PdfWriter
-import pdfplumber
+from pdf2image import convert_from_bytes
+import pytesseract
 
 SA_JSON   = os.environ["GOOGLE_SERVICE_ACCOUNT"]
 FOLDER_ID = os.environ["DRIVE_FOLDER_ID"]
@@ -43,12 +45,14 @@ def download(drive, fid):
     buf.seek(0); return buf.read()
 
 def detect_cod(text):
-    m = re.search(r"COD:\s*([A-D0-9][-A-D0-9]*)", text)
+    # Buscar "COD: 4-A", "COD: B", "COD:4-A", etc.
+    m = re.search(r"COD[:\s]*([A-D0-9][-A-D0-9]*)", text, re.IGNORECASE)
     if not m: return None
-    return COD_MAP.get(m.group(1).strip().rstrip("-").upper())
+    raw = m.group(1).strip().rstrip("-").upper()
+    return COD_MAP.get(raw)
 
 def detect_nro(text):
-    m = re.search(r"N[º°]\s*(\d+)", text)
+    m = re.search(r"N[º°oi]\s*(\d{4,6})", text)
     return m.group(1) if m else None
 
 def detect_periodo(name):
@@ -61,65 +65,67 @@ def detect_periodo(name):
     n = datetime.now()
     return f"{n.year}-{n.month:02d}"
 
+def extract_text_ocr(img):
+    """Extraer texto de imagen con Tesseract."""
+    return pytesseract.image_to_string(img, lang="spa", config="--psm 6")
+
 def process(drive, fi):
     fid, fname = fi["id"], fi["name"]
     periodo = detect_periodo(fname)
     print(f"\nProcesando: {fname} → período {periodo}")
 
     pdf_bytes = download(drive, fid)
-    print(f"  {len(pdf_bytes):,} bytes descargados")
+    print(f"  {len(pdf_bytes):,} bytes")
 
-    # Usar pdfplumber para extraer texto de cada página
-    plumber_pdf = pdfplumber.open(io.BytesIO(pdf_bytes))
-    reader      = PdfReader(io.BytesIO(pdf_bytes))
-    total       = len(reader.pages)
-    print(f"  {total} páginas")
+    # Convertir todas las páginas a imágenes (200 DPI — balance velocidad/calidad)
+    print("  Convirtiendo páginas a imágenes...")
+    images = convert_from_bytes(pdf_bytes, dpi=200)
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    total  = len(images)
+    print(f"  {total} páginas convertidas")
 
     # Debug primeras 2 páginas
     for i in range(min(2, total)):
-        t = plumber_pdf.pages[i].extract_text() or ""
-        print(f"  DEBUG pág {i+1} (primeros 200 chars): {repr(t[:200])}")
+        t = extract_text_ocr(images[i])
+        print(f"  DEBUG pág {i+1}: {repr(t[:300])}")
 
     zip_buf   = io.BytesIO()
     sin_cod   = []
     breakdown = {}
 
     with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for i, page in enumerate(reader.pages):
-            # Extraer texto con pdfplumber
-            text = plumber_pdf.pages[i].extract_text() or ""
-
-            cod = detect_cod(text)
-            nro = detect_nro(text)
+        for i, img in enumerate(images):
+            text = extract_text_ocr(img)
+            cod  = detect_cod(text)
+            nro  = detect_nro(text)
 
             if not cod:
+                print(f"  Pág {i+1}: sin COD → '{text[:100]}'")
                 sin_cod.append(i+1)
-                writer = PdfWriter(); writer.add_page(page)
+                writer = PdfWriter(); writer.add_page(reader.pages[i])
                 buf = io.BytesIO(); writer.write(buf)
                 zf.writestr(f"{periodo}/sin_cod/p{i+1}.pdf", buf.getvalue())
                 continue
 
             fname_pdf = f"F-{nro}.pdf" if nro else f"F-p{i+1}.pdf"
-            writer = PdfWriter(); writer.add_page(page)
+            writer = PdfWriter(); writer.add_page(reader.pages[i])
             buf = io.BytesIO(); writer.write(buf)
             zf.writestr(f"{periodo}/{cod}/{fname_pdf}", buf.getvalue())
             breakdown[cod] = breakdown.get(cod,0)+1
+            print(f"  Pág {i+1}: {cod} → {fname_pdf}")
 
-        lines = [f"Período: {periodo}", f"Total: {total} páginas",
+        lines = [f"Período: {periodo}", f"Total: {total}",
                  f"Procesadas: {sum(breakdown.values())}", f"Sin COD: {len(sin_cod)}", ""]
         lines += [f"  {s}: {c}" for s,c in sorted(breakdown.items())]
         if sin_cod: lines.append(f"\nSin COD: {sin_cod}")
         zf.writestr(f"{periodo}/resumen.txt", "\n".join(lines))
-
-    plumber_pdf.close()
 
     print("\nResumen:")
     for s,c in sorted(breakdown.items()): print(f"  {s}: {c} facturas")
     if sin_cod: print(f"  Sin COD: {len(sin_cod)} páginas")
 
     os.makedirs("output", exist_ok=True)
-    zip_name = f"{periodo}.zip"
-    zip_path = f"output/{zip_name}"
+    zip_path = f"output/{periodo}.zip"
     with open(zip_path, "wb") as f: f.write(zip_buf.getvalue())
     print(f"ZIP: {zip_path} ({os.path.getsize(zip_path):,} bytes)")
 
@@ -137,6 +143,7 @@ def main():
         try: process(drive, fi)
         except Exception as e:
             print(f"✗ Error: {e}"); errors.append(str(e))
+            import traceback; traceback.print_exc()
 
     if errors: sys.exit(1)
 
