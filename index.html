@@ -522,6 +522,17 @@ function HistPanel({client,anio,setAnio,onClose}){
   const anios=[...new Set(client.hist.map(r=>r.anio))].sort((a,b)=>b-a);
   const filas=client.hist.filter(r=>r.anio===anio);
   const fmt=v=>v!=null?v.toFixed(2):"S/Inf";
+  const [ufDia5Map,setUfDia5Map]=React.useState({});
+  React.useEffect(()=>{
+    // Cargar UF día 5 para cada mes del año visible
+    const meses=[...new Set(filas.map(r=>r.mes+1))];
+    Promise.all(meses.map(async mes=>{
+      const v=await getUFDia5(anio,mes);
+      return[anio+"-"+String(mes).padStart(2,"0"),v?Math.round(v*100)/100:null];
+    })).then(pairs=>{
+      setUfDia5Map(Object.fromEntries(pairs));
+    });
+  },[anio,client]);
   const fmtDif=v=>{
     if(v==null)return h("span",{className:"hist-null"},"S/Inf");
     if(Math.abs(v)<0.01)return h("span",{style:{color:"var(--txm)"}},v.toFixed(2));
@@ -554,6 +565,7 @@ function HistPanel({client,anio,setAnio,onClose}){
         h("thead",null,
           h("tr",null,
             h("th",null,"Mes"),
+            h("th",{style:{textAlign:"right",color:"#1a5fa8"}},"UF día 5"),
             h("th",{style:{textAlign:"right"}},"UF Planilla"),
             h("th",{style:{textAlign:"right"}},"Facturado UF"),
             h("th",{style:{textAlign:"right"}},"Diferencia"),
@@ -564,6 +576,7 @@ function HistPanel({client,anio,setAnio,onClose}){
             ? h("tr",null,h("td",{colSpan:4,style:{textAlign:"center",color:"var(--txm)",padding:"20px"}},"Sin datos para "+anio))
             : filas.map(r=>h("tr",{key:r.key},
                 h("td",{style:{color:"var(--tx)",fontWeight:500,fontFamily:"inherit"}},MESES_FULL[r.mes]),
+                h("td",{style:{textAlign:"right",color:"#1a5fa8",fontWeight:500}},ufDia5Map[r.key]!=null?ufDia5Map[r.key].toFixed(2):"—"),
                 h("td",{style:{textAlign:"right",color:r.uf!=null?"var(--tx)":"#bbb"}},fmt(r.uf)),
                 h("td",{style:{textAlign:"right",color:r.fact!=null?"var(--tx)":"#bbb"}},fmt(r.fact)),
                 h("td",{style:{textAlign:"right"}},fmtDif(r.dif))
@@ -1276,7 +1289,7 @@ function App(){
           PERIODOS.map(p=>h("option",{key:p,value:p,style:{background:"#fff",color:"#1a1a1a"}},p))
         ),
         h("span",{style:{color:"var(--txd)",fontSize:12}},"·"),
-        ufSII&&view==="table"&&h("span",{style:{fontSize:11,color:"#1a5fa8",background:"#e8f2fb",border:"1px solid #b5d0f0",borderRadius:16,padding:"3px 10px",fontFamily:"'DM Mono',monospace",fontWeight:600}},`UF día 5: ${ufSII.toFixed(2)}`),
+        
         view==="table"&&h("button",{onClick:()=>{setView("upload");setData([]);},className:"nav-btn-navy",style:{fontSize:11}},"⊞ Nuevos archivos"),
 
         view==="table"&&h("div",{style:{display:"flex",gap:6,alignItems:"center"}},
