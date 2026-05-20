@@ -324,14 +324,13 @@ export default async function handler(req, res) {
     const zipBuf = Buffer.from(await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }));
     console.log(`ZIP: ${zipBuf.length} bytes`);
 
-    // 5. Subir a Drive
+    // 5. Devolver ZIP como base64 para descarga directa en el navegador
     const zipName = `${periodo}.zip`;
-    const fileId = await driveUpload(token, zipName, zipBuf, "application/zip", destFolderId || null);
-    console.log(`ZIP subido: ${fileId}`);
+    console.log(`Enviando ZIP: ${zipBuf.length} bytes`);
 
     return res.status(200).json({
-      ok: true, zipName, fileId,
-      driveUrl: `https://drive.google.com/file/d/${fileId}/view`,
+      ok: true, zipName,
+      zipBase64: zipBuf.toString("base64"),
       totalFacturas: Object.values(breakdown).reduce((a,b)=>a+b,0),
       sinCod,
       breakdown: Object.entries(breakdown).sort(([a],[b])=>a.localeCompare(b)),
