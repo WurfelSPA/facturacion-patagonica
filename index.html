@@ -82,9 +82,6 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 .nav-btn{background:transparent;border:1px solid var(--bdr);color:var(--txm);border-radius:8px;padding:5px 14px;font-size:11px;font-weight:500;display:flex;align-items:center;gap:5px}
 .nav-btn:hover{background:var(--surf2);color:var(--tx)}
 .nav-btn.active{background:var(--surf3);border-color:var(--acc);color:var(--accl)}
-.nav-btn-navy{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#d0e4f7;border-radius:8px;padding:5px 14px;font-size:11px;font-weight:500;display:flex;align-items:center;gap:5px;cursor:pointer;transition:all 0.15s}
-.nav-btn-navy:hover{background:rgba(255,255,255,0.16);color:#fff}
-.nav-btn-navy.active{background:rgba(255,255,255,0.18);border-color:rgba(255,255,255,0.4);color:#fff}
 .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
 @media(max-width:900px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(10,124,78,0.4)}50%{box-shadow:0 0 0 8px rgba(10,124,78,0)}}
@@ -96,8 +93,8 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 <script>
 const {useState,useRef,useCallback,useEffect,createElement:h}=React;
 const REMITENTE="amelendez@patagonica.cl";
-const CCO="mmunoz@patagonica.cl";
-const TEST_DEST="";
+const CCO="";
+const TEST_DEST="amelendez@patagonica.cl";
 const MODO_PRUEBA=TEST_DEST!=="";
 const VER="v4.8.0";
 const DRIVE_PLANILLA_ID="1rAGS-b1MoPpEhMgN2BR9Hvg4cTYdcQDu";
@@ -203,7 +200,7 @@ async function sendTelegram(botToken,chatId,mensaje){
 }
 function buildEmailHtml(cliente,concepto,periodo,ufPlan,factura){
   const mes=periodo.toLowerCase();
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#f4f4f4;font-family:Helvetica,Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:28px 0"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;border:1px solid #e0e0e0;overflow:hidden"><tr><td style="background:#0f1117;padding:22px 32px"><div style="font-size:18px;font-weight:700;color:#fff">Patagónica Inmobiliaria SpA</div><div style="font-size:11px;color:#7b8299;margin-top:4px">Av. Américo Vespucio 2680, Conchalí, Santiago</div></td></tr><tr><td style="padding:28px 32px"><p style="font-size:14px;color:#333;margin:0 0 16px">Estimado(a) cliente,</p><p style="font-size:14px;color:#333;line-height:1.7;margin:0 0 20px">Junto con saludar, hacemos envío de la factura correspondiente al <strong>${concepto.toLowerCase()} del mes de ${mes}</strong>:</p><table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e8e8;border-radius:6px;margin:0 0 20px"><tr style="background:#f8f8f8"><td style="padding:10px 16px;font-size:11px;font-weight:600;color:#999;border-bottom:1px solid #e8e8e8">CONCEPTO</td><td style="padding:10px 16px;font-size:11px;font-weight:600;color:#999;border-bottom:1px solid #e8e8e8">DETALLE</td></tr><tr><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">N° Factura</td><td style="padding:11px 16px;font-size:13px;color:#111;font-weight:600;font-family:monospace;border-bottom:1px solid #f0f0f0">${factura}</td></tr><tr style="background:#fafafa"><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">Cliente</td><td style="padding:11px 16px;font-size:13px;color:#111;border-bottom:1px solid #f0f0f0">${cliente}</td></tr><tr><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">Período</td><td style="padding:11px 16px;font-size:13px;color:#111;border-bottom:1px solid #f0f0f0">${periodo}</td></tr><tr><td style="padding:14px 16px;font-size:13px;color:#555">Monto</td><td style="padding:14px 16px"><span style="font-size:20px;font-weight:700;color:#111">${ufPlan.toFixed(2)} UF</span></td></tr></table><p style="font-size:14px;color:#333;line-height:1.7;margin:0 0 20px">Adjunto encontrará el documento PDF para su registro y gestión de pago.</p><p style="font-size:13px;color:#666;margin:0">Ante cualquier consulta, no dude en contactarnos.</p></td></tr><tr><td style="background:#f8f8f8;border-top:1px solid #e8e8e8;padding:18px 32px"><p style="font-size:13px;font-weight:600;color:#111;margin:0 0 2px">Área de Administración</p><p style="font-size:12px;color:#666;margin:0">Patagónica Inmobiliaria SpA · RUT 96.673.250-4</p><p style="font-size:11px;color:#999;margin:6px 0 0">Correo generado automáticamente.</p></td></tr></table></td></tr></table></body></html>`;
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#f4f4f4;font-family:Helvetica,Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:28px 0"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;border:1px solid #e0e0e0;overflow:hidden"><tr><td style="background:#0f1117;padding:22px 32px"><div style="font-size:18px;font-weight:700;color:#fff">Patagónica Inmobiliaria SpA</div><div style="font-size:11px;color:#7b8299;margin-top:4px">Av. Américo Vespucio 2680, Conchalí, Santiago</div></td></tr><tr><td style="padding:28px 32px"><p style="font-size:14px;color:#333;margin:0 0 16px">Estimado(a) cliente,</p><p style="font-size:14px;color:#333;line-height:1.7;margin:0 0 20px">Junto con saludar, hacemos envío de la factura correspondiente al <strong>${concepto.toLowerCase()} del mes de ${mes}</strong>:</p><table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e8e8;border-radius:6px;margin:0 0 20px"><tr style="background:#f8f8f8"><td style="padding:10px 16px;font-size:11px;font-weight:600;color:#999;border-bottom:1px solid #e8e8e8">CONCEPTO</td><td style="padding:10px 16px;font-size:11px;font-weight:600;color:#999;border-bottom:1px solid #e8e8e8">DETALLE</td></tr><tr><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">N° Factura</td><td style="padding:11px 16px;font-size:13px;color:#111;font-weight:600;font-family:monospace;border-bottom:1px solid #f0f0f0">${factura}</td></tr><tr style="background:#fafafa"><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">Cliente</td><td style="padding:11px 16px;font-size:13px;color:#111;border-bottom:1px solid #f0f0f0">${cliente}</td></tr><tr><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">Período</td><td style="padding:11px 16px;font-size:13px;color:#111;border-bottom:1px solid #f0f0f0">${periodo}</td></tr><tr><td style="padding:14px 16px;font-size:13px;color:#555">Monto</td><td style="padding:14px 16px"><span style="font-size:20px;font-weight:700;color:#111">${ufPlan.toFixed(4)} UF</span></td></tr></table><p style="font-size:14px;color:#333;line-height:1.7;margin:0 0 20px">Adjunto encontrará el documento PDF para su registro y gestión de pago.</p><p style="font-size:13px;color:#666;margin:0">Ante cualquier consulta, no dude en contactarnos.</p></td></tr><tr><td style="background:#f8f8f8;border-top:1px solid #e8e8e8;padding:18px 32px"><p style="font-size:13px;font-weight:600;color:#111;margin:0 0 2px">Área de Administración</p><p style="font-size:12px;color:#666;margin:0">Patagónica Inmobiliaria SpA · RUT 96.673.250-4</p><p style="font-size:11px;color:#999;margin:6px 0 0">Correo generado automáticamente.</p></td></tr></table></td></tr></table></body></html>`;
 }
 const PERIODOS=["Enero 2026","Febrero 2026","Marzo 2026","Abril 2026","Mayo 2026","Junio 2026","Julio 2026","Agosto 2026","Septiembre 2026","Octubre 2026","Noviembre 2026","Diciembre 2026"];
 const SITIO_C={"5-A":"#7c3aed","4-A":"#0d9488","A-2":"#ea580c","A-1":"#2563eb","D-2":"#db2777","B":"#64748b","J":"#b45309","D-3":"#0891b2","24.0":"#6d28d9"};
@@ -281,9 +278,10 @@ async function parsePlanillaParaDashboard(file){
       termContrato:serialToDate(row[14]),   /* Col O: Fecha Término Contrato */
       renovacion:row[16]!=null?String(row[16]).trim():"",  /* Col Q: Antelación renovación */
       aviso:row[17]!=null?String(row[17]).trim():"",        /* Col R: Aviso */
-      fechaReajuste:serialToDate(row[18]),  /* Col S: Fecha Reajuste */
+      fechaReajuste:serialToDate(row[52]),  /* Col BA: Fecha Reajuste */
       pctReaj:row[53]!=null?String(row[53]):"",            /* Col BB: % Reajuste */
-      cadaAnios:row[19]!=null?String(row[19]).trim():"",   /* Col T: Cada cuántos años */
+      cadaAnios:row[54]!=null?String(row[54]).trim():"",   /* Col BC: Cada cuántos años */
+      m2:row[26]!=null&&row[26]!=""?Number(row[26]):null,  /* Col AA: Metros cuadrados */
       ufArr:Math.round(ufArr*100)/100,
       ufSrv:Math.round(ufSrv*100)/100,
       ufTotal:Math.round((ufArr+ufSrv)*100)/100,
@@ -362,7 +360,7 @@ async function procesarPlanillaFacturacion(file,periodo){
     const emailBilling=row[12]?String(row[12]).trim():"";
     const rutBilling=row[9]?String(row[9]).replace(/\./g,"").trim().toLowerCase():""; /* Col J: RUT normalizado */
     if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling});
-    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling});
+    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=500)clientes.push({sitio:sito,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling});
   }
   return clientes;
 }
@@ -398,26 +396,18 @@ async function procesarPDFs(zipFile,addLog){
     if(!nroMatch)continue;
     const nroFact=nroMatch[1].toUpperCase();
     const nombreEnArchivo=(nroMatch[2]||"").trim().toLowerCase();
-    /* FIX: detectar tipo por contenido del PDF, no por prefijo del nombre.
-       F-14633 empieza con "F-" pero su descripción dice "Serv. Adm." → debe ser serv_adm. */
+    const tipo=nroFact.startsWith("FEE-")?"serv_adm":"arriendo";
 
     /* Extraer UF del texto del PDF */
     let ufPdf=null;
-    let tipo="arriendo";
     try{
       const pdfBuf=await zip.files[path].async("arraybuffer");
       const texto=await extraerTextoPDF(pdfBuf);
-      const textoJ=texto.replace(/\s+/g," ");
-      /* Detectar tipo por contenido primero, luego por prefijo como fallback */
-      tipo=textoJ.includes("Serv. Adm.")||textoJ.includes("Serv.Adm.")
-        ?"serv_adm"
-        :textoJ.includes("Arriendo")
-        ?"arriendo"
-        :nroFact.startsWith("FEE-")?"serv_adm":"arriendo";
       if(texto.length>10){
+        const textoJ=texto.replace(/\s+/g," ");
         /* Arriendo: "UF 380,57 x 39.841,72" */
-        const mArr=textoJ.match(/UF\s+([\d]+(?:[,.]\d+)?)\s+x\s+[\d]/);
-        /* Serv.Adm: "11,84 UF" o "11,84 UF40.186" */
+        const mArr=textoJ.match(/UF\s+([\d]+[,.]\d+)\s+x\s+[\d]/);
+        /* Serv.Adm: "11,84 UF" */
         const mSrv=textoJ.match(/([\d]+[,.]\d+)\s*UF/i);
         if(tipo==="arriendo"&&mArr) ufPdf=parseFloat(mArr[1].replace(",","."));
         else if(tipo==="serv_adm"&&mSrv) ufPdf=parseFloat(mSrv[1].replace(",","."));
@@ -461,58 +451,7 @@ const NOMBRE_KEY={
   "Claro Infraestructura 171 S.A.":"CLARO","Banco de Crédito e Inversiones":"BCI","Banco Itau":"BANCO ITAU",
 };
 function getEmail(cliente,emailMap){const key=NOMBRE_KEY[cliente];if(!key)return"";return emailMap[key]||emailMap[key.toUpperCase()]||"";}
-function formatRUT(rut){
-  if(!rut)return"";
-  const clean=rut.replace(/\./g,"").toUpperCase();
-  const dash=clean.indexOf("-");
-  if(dash<0)return rut;
-  const cuerpo=clean.slice(0,dash);
-  const dv=clean.slice(dash);
-  // Agregar puntos cada 3 dígitos desde la derecha
-  let result="";
-  for(let i=0;i<cuerpo.length;i++){
-    if(i>0&&(cuerpo.length-i)%3===0)result+=".";
-    result+=cuerpo[i];
-  }
-  return result+dv;
-}
-
-function buildResumenHtml(enviados,periodo){
-  const filas=enviados.map(r=>`
-    <tr style="border-bottom:1px solid #f0f0f0">
-      <td style="padding:8px 12px;font-size:12px;color:#555">${r.sitio}</td>
-      <td style="padding:8px 12px;font-size:12px;color:#111;font-weight:500">${r.cliente}</td>
-      <td style="padding:8px 12px;font-size:12px;color:#555">${r.concepto}</td>
-      <td style="padding:8px 12px;font-size:12px;font-family:monospace;color:#333">${r.factura||"—"}</td>
-      <td style="padding:8px 12px;font-size:12px;font-family:monospace;color:#111">${r.ufPlan>500?"$"+Math.round(r.ufPlan).toLocaleString("es-CL"):r.ufPlan.toFixed(2)+" UF"}</td>
-      <td style="padding:8px 12px;font-size:12px;color:${r.correo?"#1a5fa8":"#999"}">${r.correo||"— sin correo"}</td>
-    </tr>`).join("");
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#f4f4f4;font-family:Helvetica,Arial,sans-serif">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:28px 0"><tr><td align="center">
-  <table width="680" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;border:1px solid #e0e0e0;overflow:hidden">
-    <tr><td style="background:#1e3a5f;padding:20px 28px">
-      <div style="font-size:17px;font-weight:700;color:#fff">Resumen de Facturación Enviada</div>
-      <div style="font-size:12px;color:#93b5d4;margin-top:4px">Período: ${periodo} · ${enviados.length} correo${enviados.length!==1?"s":""} enviado${enviados.length!==1?"s":""}</div>
-    </td></tr>
-    <tr><td style="padding:20px 28px">
-      <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e8e8;border-radius:6px;overflow:hidden">
-        <tr style="background:#f0f4f8">
-          <td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999;letter-spacing:.06em">SITIO</td>
-          <td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999;letter-spacing:.06em">CLIENTE</td>
-          <td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999;letter-spacing:.06em">CONCEPTO</td>
-          <td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999;letter-spacing:.06em">FACTURA</td>
-          <td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999;letter-spacing:.06em">MONTO</td>
-          <td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999;letter-spacing:.06em">DESTINATARIO</td>
-        </tr>
-        ${filas}
-      </table>
-    </td></tr>
-    <tr><td style="background:#f8f8f8;border-top:1px solid #e8e8e8;padding:14px 28px">
-      <p style="font-size:11px;color:#999;margin:0">Resumen generado automáticamente · Patagónica Inmobiliaria SpA · RUT 96.673.250-4</p>
-    </td></tr>
-  </table></td></tr></table></body></html>`;
-}
-function getEstado(r){if(!r.factura)return"missing";if(r.ufPlan>500)return r.factura?"ok":"missing";if(r.ufPdf===null||r.ufPdf===undefined)return"missing";if(Math.abs(r.ufPdf-r.ufPlan)>0.5)return"diff";return"ok";}
+function getEstado(r){if(!r.factura||r.ufPdf===null||r.ufPdf===undefined)return"missing";if(Math.abs(r.ufPdf-r.ufPlan)>0.5)return"diff";return"ok";}
 
 /* ═══════════════════════════════════
    COMPONENTES UI
@@ -567,7 +506,7 @@ function EmailModal({row,periodo,onClose,onConfirm,sending}){
         ),
         h("div",{style:{color:"var(--tx)",lineHeight:2}},
           h("p",null,"Estimado(a) cliente,"),
-          h("p",{style:{marginTop:8}},`Junto con saludar, hacemos envío de la factura correspondiente al ${row.concepto.toLowerCase()} del mes de ${mes}, por un monto de `,h("strong",{style:{color:"var(--accl)"}},`${row.ufPlan.toFixed(2)} UF`),`, factura N° ${row.factura}.`),
+          h("p",{style:{marginTop:8}},`Junto con saludar, hacemos envío de la factura correspondiente al ${row.concepto.toLowerCase()} del mes de ${mes}, por un monto de `,h("strong",{style:{color:"var(--accl)"}},`${row.ufPlan.toFixed(4)} UF`),`, factura N° ${row.factura}.`),
           h("p",{style:{marginTop:8}},"Adjunto encontrará el documento PDF para su registro y gestión de pago."),
           h("p",{style:{marginTop:8,color:"var(--txm)"}},"Atentamente,",h("br"),h("em",null,"Área de Administración — Patagónica Inmobiliaria SpA"))
         )
@@ -739,7 +678,6 @@ function App(){
       }catch(e){addLog("⚠ Error extrayendo datos: "+e.message,"warn");}
       setProcProgress(75);
       addLog("▶ Cruzando datos planilla vs PDFs...","info");
-
       const pdfUsado=new Set();
       const MANUAL={"A-2|Banco Estado Express|202.6|arriendo":"FEE-39","A-2|Banco del Estado de Chile|256.7|arriendo":"FEE-39"};
       const filas=[];
@@ -776,7 +714,7 @@ function App(){
           }
           if(bestIdx>=0){pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;}
         }
-        filas.push({sitio:c.sitio,cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,ufPlan:c.uf,ufPdf,enviado:false});
+        filas.push({sitio:c.sitio,cliente:c.cliente,correo,concepto,colRef,factura,ufPlan:c.uf,ufPdf,enviado:false});
       }
       const nuevoMapa={};
       for(const p of pdfs){if(p.nroFact&&p.zipPath)nuevoMapa[p.nroFact]={zipPath:p.zipPath,nombre:p.pdfNombre};}
@@ -830,28 +768,18 @@ function App(){
         try{await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(row.i,key);enviados++;await new Promise(r=>setTimeout(r,400));}
         catch(e){notify("Error en "+row.cliente+": "+e.message,"err");}
       }
-      // Enviar resumen a administración
-      if(enviados>0){
-        try{
-          const resumenRows=pend.slice(0,enviados);
-          const resumenHtml=buildResumenHtml(resumenRows,periodo);
-          const resSubject="Resumen Facturación "+periodo+" — "+enviados+" correos enviados";
-          await sendGmail(token,"amelendez@patagonica.cl","","amelendez@patagonica.cl",resSubject,resumenHtml,null,null);
-          await sendGmail(token,"mmunoz@patagonica.cl","","amelendez@patagonica.cl",resSubject,resumenHtml,null,null);
-        }catch(e){console.warn("Error enviando resumen:",e.message);}
-      }
-      notify("✓ "+enviados+"/"+pend.length+" correos enviados");
+      notify("✓ "+enviados+"/"+pend.length+" correos enviados"+(MODO_PRUEBA?" (PRUEBA → "+TEST_DEST+")":""));
     }catch(e){notify(e.message.includes("popup")?"Autorización cancelada":"Error: "+e.message,"warn");}
   };
 
   /* Sin SetupPanel — siempre va al dashboard */
 
   const enriched=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
-  const stats={total:enriched.length,ok:enriched.filter(r=>r.estado==="ok").length,diff:enriched.filter(r=>r.estado!=="ok").length,sent:sentSet.size,conPdf:enriched.filter(r=>r.factura&&(r.ufPdf!==null||r.ufPlan>500)).length,sinPdf:enriched.filter(r=>!r.factura||(r.ufPdf===null&&r.ufPlan<=500)).length};
+  const stats={total:enriched.length,ok:enriched.filter(r=>r.estado==="ok").length,diff:enriched.filter(r=>r.estado!=="ok").length,sent:sentSet.size,conPdf:enriched.filter(r=>r.factura&&r.ufPdf!==null).length,sinPdf:enriched.filter(r=>!r.factura||r.ufPdf===null).length};
   const filtered=enriched.filter(r=>{
     const mf=filter==="all"||(filter==="ok"&&r.estado==="ok"&&!sentSet.has(r.i))||(filter==="diff"&&r.estado!=="ok")||(filter==="sent"&&sentSet.has(r.i));
     const mc=concFilter==="all"||(concFilter==="arr"&&r.concepto==="Arriendo")||(concFilter==="srv"&&r.concepto==="Serv. Adm.");
-    const ms=!search||r.cliente.toLowerCase().includes(search.toLowerCase())||r.sitio.includes(search.toUpperCase())||(r.rut&&r.rut.replace(/\./g,"").includes(search.replace(/\./g,"")));
+    const ms=!search||r.cliente.toLowerCase().includes(search.toLowerCase())||r.sitio.includes(search.toUpperCase());
     return mf&&mc&&ms;
   });
 
@@ -1057,7 +985,7 @@ function App(){
           h("input",{value:dashSearch,onChange:e=>setDashSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:180,marginLeft:"auto"}})
         ),
         h("div",{className:"dash-client-hdr"},
-          ["Sitio","Cliente / RUT","Arriendo CLP","Serv.Adm. CLP","Total CLP","IVA","Término","Antelac.","Aviso","F.Reajuste","% Reaj."].map(col=>h("div",{key:col},col))
+          ["Sitio","Cliente / RUT","Arriendo CLP","Serv.Adm. CLP","Total CLP","IVA","Término","Antelac.","Aviso","F.Reajuste","% Reaj.","Cada","m²"].map(col=>h("div",{key:col},col))
         ),
         h("div",{key:"rows-"+curSitio+"-"+tblClients.length,style:{maxHeight:420,overflowY:"auto",overflowX:"auto"}},
           tblClients.length===0?
@@ -1082,7 +1010,9 @@ function App(){
                 h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.renovacion||"—"),
                 h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.aviso||"—"),
                 h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:c.fechaReajuste?"var(--tx)":"var(--txd)"}},c.fechaReajuste||"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.pctReaj||"—")
+                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.pctReaj||"—"),
+                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.cadaAnios?c.cadaAnios+" años":"—"),
+                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},c.m2!=null?c.m2.toLocaleString("es-CL"):"—")
               );
             })
         )
@@ -1114,17 +1044,17 @@ function App(){
     MODO_PRUEBA&&h("div",{className:"test-banner"},"⚠",h("strong",null,"MODO PRUEBA"),"— correos van a",h("strong",{style:{marginLeft:4}},TEST_DEST),h("span",{style:{marginLeft:"auto",fontSize:10,color:"var(--txd)"}},'Producción: TEST_DEST="" en el código')),
 
     /* HEADER */
-    h("header",{style:{background:view==="table"?"#1e3a5f":"var(--surf)",borderBottom:view==="table"?"1px solid #152d4a":"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:50}},
+    h("header",{style:{background:"var(--surf)",borderBottom:"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:50}},
       h("div",{style:{display:"flex",alignItems:"center",gap:12}},
         h("div",{style:{width:30,height:30,background:"linear-gradient(135deg,var(--acc),var(--acc2))",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"#fff",fontWeight:700}},"⬡"),
         h("div",null,
-          h("div",{style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px",color:view==="table"?"#fff":"var(--tx)"}},"Patagónica Inmobiliaria"),
-          h("div",{style:{fontSize:9,color:view==="table"?"#93b5d4":"var(--txm)",fontFamily:"'DM Mono',monospace"}},REMITENTE+" · "+VER)
+          h("div",{style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px"}},"Patagónica Inmobiliaria"),
+          h("div",{style:{fontSize:9,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},REMITENTE+" · "+VER)
         ),
-        (view==="table"||view==="upload")&&h("span",{style:{background:view==="table"?"rgba(255,255,255,0.12)":"var(--bbg)",border:view==="table"?"1px solid rgba(255,255,255,0.25)":"1px solid #b5d0f0",color:view==="table"?"#d0e8ff":"var(--blue)",fontSize:10,fontWeight:600,padding:"2px 10px",borderRadius:20,marginLeft:4,fontFamily:"'DM Mono',monospace"}},periodo)
+        (view==="table"||view==="upload")&&h("span",{style:{background:"var(--bbg)",border:"1px solid #b5d0f0",color:"var(--blue)",fontSize:10,fontWeight:600,padding:"2px 10px",borderRadius:20,marginLeft:4,fontFamily:"'DM Mono',monospace"}},periodo)
       ),
       h("div",{style:{display:"flex",gap:8,alignItems:"center"}},
-        h("button",{onClick:()=>setView("dashboard"),className:view==="table"?`nav-btn-navy`:`nav-btn${view==="dashboard"?" active":""}`,style:{fontSize:11}},"📊 Dashboard"),
+        h("button",{onClick:()=>setView("dashboard"),className:`nav-btn${view==="dashboard"?" active":""}`,style:{fontSize:11}},"📊 Dashboard"),
         h("button",{
           onClick:()=>{if(files.planilla&&files.zip){procesar();}else{setView("upload");}},
           className:`nav-btn${view!=="dashboard"?" active":""}`,
@@ -1143,7 +1073,7 @@ function App(){
           PERIODOS.map(p=>h("option",{key:p,value:p,style:{background:"#fff",color:"#1a1a1a"}},p))
         ),
         h("span",{style:{color:"var(--txd)",fontSize:12}},"·"),
-        view==="table"&&h("button",{onClick:()=>{setView("upload");setData([]);},className:"nav-btn-navy",style:{fontSize:11}},"⊞ Nuevos archivos"),
+        view==="table"&&h("button",{onClick:()=>{setView("upload");setData([]);},className:"nav-btn",style:{fontSize:11}},"⊞ Nuevos archivos"),
 
         view==="table"&&h("button",{onClick:sendAll,style:{background:"var(--gbg)",border:"1px solid var(--gdim)",color:"var(--green)",borderRadius:9,padding:"6px 16px",fontSize:12,fontWeight:700}},MODO_PRUEBA?"⚠ Enviar todos (PRUEBA)":"✉ Enviar todos")
       )
@@ -1193,8 +1123,8 @@ function App(){
       )
     ),
 
-    view==="table"&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflowX:"hidden",background:"#eef4fd"},className:"fade-up"},
-      h("div",{style:{display:"grid",gridTemplateColumns:"repeat(5,1fr)",borderBottom:"1px solid #b8d0ee",background:"#ddeaf8"}},
+    view==="table"&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflowX:"hidden"},className:"fade-up"},
+      h("div",{style:{display:"grid",gridTemplateColumns:"repeat(5,1fr)",borderBottom:"1px solid var(--bdr)"}},
         [{label:"Total",val:stats.total,col:"var(--tx)",sub:""},{label:"Con PDF",val:stats.conPdf,col:"var(--green)",sub:"facturas cruzadas"},{label:"Sin PDF",val:stats.sinPdf,col:"var(--red)",sub:"revisar"},{label:"Coinciden",val:stats.ok,col:"var(--accl)",sub:"listos para enviar"},{label:"Enviados",val:stats.sent,col:"var(--amber)",sub:MODO_PRUEBA?"→ "+TEST_DEST:"esta sesión"}]
         .map((m,i)=>h("div",{key:i,style:{background:"var(--surf)",padding:"13px 16px",borderRight:i<4?"1px solid var(--bdr)":"none"}},
           h("div",{style:{fontSize:10,fontWeight:600,color:"var(--txm)",marginBottom:4,letterSpacing:"0.06em"}},m.label.toUpperCase()),
@@ -1202,18 +1132,18 @@ function App(){
           m.sub&&h("div",{style:{fontSize:10,color:"var(--txd)",marginTop:3}},m.sub)
         ))
       ),
-      h("div",{style:{background:"#ddeaf8",borderBottom:"1px solid #b8d0ee",padding:"8px 18px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
+      h("div",{style:{background:"var(--surf)",borderBottom:"1px solid var(--bdr)",padding:"8px 18px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
         [{k:"all",l:`Todos (${stats.total})`},{k:"ok",l:`Coinciden (${stats.ok})`},{k:"diff",l:`Revisar (${stats.total-stats.ok})`},{k:"sent",l:`Enviados (${stats.sent})`}]
         .map(f=>h("button",{key:f.k,className:`pill${filter===f.k?" active":""}`,onClick:()=>setFilter(f.k)},f.l)),
         h("span",{style:{color:"var(--txd)",fontSize:11,marginLeft:3}},"·"),
         [{k:"all",l:"Ambos"},{k:"arr",l:"Arriendo"},{k:"srv",l:"Serv.Adm."}]
         .map(f=>h("button",{key:f.k,className:`pill${concFilter===f.k?" active":""}`,onClick:()=>setConcFilter(f.k),style:{fontSize:10}},f.l)),
-        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{marginLeft:"auto",width:190,fontFamily:"'DM Sans',sans-serif"}})
+        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar...",style:{marginLeft:"auto",width:160,fontFamily:"'DM Sans',sans-serif"}})
       ),
       h("div",{style:{flex:1,overflowX:"auto"}},
         h("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:880}},
           h("colgroup",null,h("col",{style:{width:58}}),h("col",{style:{width:"16%"}}),h("col",{style:{width:"18%"}}),h("col",{style:{width:88}}),h("col",{style:{width:48}}),h("col",{style:{width:92}}),h("col",{style:{width:86}}),h("col",{style:{width:86}}),h("col",{style:{width:102}})),
-          h("thead",null,h("tr",{style:{background:"#ddeaf8"}},
+          h("thead",null,h("tr",{style:{background:"var(--surf)"}},
             ["Sitio","Cliente","Correo","Concepto","Col.","Factura","UF planilla","UF PDF","Estado/Acción"].map(hd=>
               h("th",{key:hd,style:{padding:"8px 11px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:"0.07em",borderBottom:"1px solid var(--bdr)"}},hd.toUpperCase())
             )
@@ -1224,19 +1154,16 @@ function App(){
               const i=row.i,sent=sentSet.has(i),sending=sendingIdx===i,noEmail=!row.correo;
               const diff=row.ufPdf!==null&&row.ufPdf!==undefined&&Math.abs(row.ufPdf-row.ufPlan)>0.5;
               const esArr=row.concepto==="Arriendo";
-              const bg=sent?"#e6f7ef":esArr?"#ffffff":"#fffdf5";
+              const bg=sent?"#f0faf5":esArr?"#f0f4fc":"#fdf8f0";
               return h("tr",{key:i,className:"row-tr"},
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{display:"inline-block",padding:"2px 7px",borderRadius:5,fontSize:10,fontWeight:700,background:`${SITIO_C[row.sitio]||"#888"}18`,color:SITIO_C[row.sitio]||"#888",border:`1px solid ${SITIO_C[row.sitio]||"#888"}40`}},row.sitio)),
-                h("td",{style:{padding:"8px 11px",background:bg}},
-                  h("span",{style:{fontSize:12,fontWeight:600}},row.cliente),
-                  row.rut&&h("div",{style:{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--txd)",marginTop:2}},formatRUT(row.rut))
-                ),
+                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontWeight:600}},row.cliente)),
                 h("td",{style:{padding:"8px 11px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",background:bg}},h("span",{style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:row.correo?"var(--accl)":"var(--txd)"}},row.correo||"— sin correo")),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{className:esArr?"tag-arr":"tag-srv"},row.concepto)),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{className:esArr?"col-gs":"col-gt"},row.colRef)),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:"var(--txm)"}},row.factura||"—")),
-                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace"}},row.ufPlan>500?"$"+Math.round(row.ufPlan).toLocaleString("es-CL"):row.ufPlan.toFixed(2))),
-                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",color:diff?"var(--amber)":"var(--tx)"}},row.ufPdf!==null&&row.ufPdf!==undefined?row.ufPdf.toFixed(2):"—")),
+                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace"}},row.ufPlan.toFixed(4))),
+                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",color:diff?"var(--amber)":"var(--tx)"}},row.ufPdf!==null&&row.ufPdf!==undefined?row.ufPdf.toFixed(4):"—")),
                 h("td",{style:{padding:"8px 11px",background:bg}},
                   sent?h("span",{style:{color:"var(--green)",fontSize:11,fontWeight:600}},"✓ Enviado"):
                   sending?h("span",{style:{color:"var(--blue)",fontSize:11,display:"inline-flex",alignItems:"center",gap:4}},h("span",{className:"spin"},"⟳")," Enviando..."):
@@ -1248,7 +1175,7 @@ function App(){
           )
         )
       ),
-      h("footer",{style:{background:"#ddeaf8",borderTop:"1px solid #b8d0ee",padding:"9px 18px",display:"flex",alignItems:"center",justifyContent:"space-between"}},
+      h("footer",{style:{background:"var(--surf)",borderTop:"1px solid var(--bdr)",padding:"9px 18px",display:"flex",alignItems:"center",justifyContent:"space-between"}},
         h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},`${filtered.length}/${stats.total} · ${stats.sent} enviados · ${periodo}`),
         h("button",{onClick:sendAll,style:{background:"var(--gbg)",border:"1px solid var(--gdim)",color:"var(--green)",borderRadius:8,padding:"7px 16px",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:6}},MODO_PRUEBA?`⚠ Enviar todos (PRUEBA → ${TEST_DEST})`:`✉ Enviar todos (${Math.max(0,stats.ok-stats.sent)})`)
       )
