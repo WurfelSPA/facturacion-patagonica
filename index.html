@@ -117,6 +117,7 @@ const VER="v4.8.0";
 const SEND_PWD="patagonica2026";
 const DRIVE_PLANILLA_ID="1rAGS-b1MoPpEhMgN2BR9Hvg4cTYdcQDu";
 const DRIVE_FACTURACION_FOLDER_ID="1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u"; /* Carpeta Facturacion Mensual */
+const DRIVE_PDF_FACTURAS_ID="1Pl7s4FNyjVQOMcEBtgCcvCGD4FlzRg2W"; /* PDF Facturas del mes — actualizar cada mes */
 const GOOGLE_SCOPES="https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.readonly";
 const TG_BOT=window.__TG_BOT__||"";
 const TG_CHAT=window.__TG_CHAT__||"";
@@ -712,8 +713,6 @@ function App(){
   const [procDone,setProcDone]=useState(false);
   const [preview,setPreview]=useState(null);
   const [histClient,setHistClient]=useState(null);
-  const [splitModal,setSplitModal]=useState(false);
-  const [splitPdfId,setSplitPdfId]=useState("1Pl7s4FNyjVQOMcEBtgCcvCGD4FlzRg2W");
   const [splitLoading,setSplitLoading]=useState(false);
   const [splitResult,setSplitResult]=useState(null);
   const [ufSII,setUfSII]=useState(null);
@@ -941,7 +940,7 @@ function App(){
 
   const MES_STR={"Enero":"01","Febrero":"02","Marzo":"03","Abril":"04","Mayo":"05","Junio":"06","Julio":"07","Agosto":"08","Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12"};
   const splitPDF=async()=>{
-    if(!splitPdfId.trim()){notify("Ingresa el ID del PDF","err");return;}
+    
     setSplitLoading(true);setSplitResult(null);
     const [mesNombre,anio]=periodo.split(" ");
     const mesNum=MES_STR[mesNombre];
@@ -951,7 +950,7 @@ function App(){
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
-          pdfFileId:splitPdfId.trim(),
+          pdfFileId:DRIVE_PDF_FACTURAS_ID,
           periodo:periodoCode,
           destFolderId:DRIVE_FACTURACION_FOLDER_ID,
         }),
@@ -959,7 +958,7 @@ function App(){
       const data=await res.json();
       if(!res.ok)throw new Error(data.error||"Error desconocido");
       setSplitResult(data);
-      notify("✓ ZIP creado y subido a Drive","ok");
+      notify("✓ "+data.zipName+" subido a Drive ("+data.totalFacturas+" facturas)","ok");
     }catch(e){
       setSplitResult({error:e.message});
       notify("Error: "+e.message,"err");
@@ -1271,7 +1270,7 @@ function App(){
       (notif.t==="ok"?"✓ ":notif.t==="err"?"✗ ":"△ ")+notif.msg
     ),
     showProc&&h(ProcModal,{logs:procLogs,progress:procProgress,done:procDone,onClose:finishProc}),
-    splitModal&&h("div",{className:"pwd-modal-overlay",onClick:e=>{if(e.target===e.currentTarget&&!splitLoading){setSplitModal(false);setSplitResult(null);}}},
+    false&&h("div",{className:"pwd-modal-overlay"},
       h("div",{className:"pwd-modal",style:{width:420}},
         h("div",{style:{fontSize:15,fontWeight:700,color:"var(--tx)",marginBottom:4}},"📂 Separar PDF de Facturas"),
         h("div",{style:{fontSize:12,color:"var(--txm)",marginBottom:14}},
@@ -1368,7 +1367,12 @@ function App(){
         h("span",{style:{color:"var(--txd)",fontSize:12}},"·"),
         
         view==="table"&&h("button",{onClick:()=>{setView("upload");setData([]);},className:"nav-btn-navy",style:{fontSize:11}},"⊞ Nuevos archivos"),
-        view==="table"&&h("button",{onClick:()=>setSplitModal(true),className:"nav-btn-navy",style:{fontSize:11}},"📂 Separar PDF"),
+        view==="table"&&h("button",{
+          onClick:splitPDF,
+          disabled:splitLoading,
+          className:"nav-btn-navy",
+          style:{fontSize:11,opacity:splitLoading?0.6:1}
+        },splitLoading?h("span",null,h("span",{className:"spin"},"⟳")," Procesando..."):"📂 Separar PDF"),
 
         view==="table"&&h("div",{style:{display:"flex",gap:6,alignItems:"center"}},
           h("button",{
