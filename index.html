@@ -45,6 +45,15 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 .btn-primary{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;border:none;border-radius:10px;padding:11px 28px;font-size:13px;font-weight:700;letter-spacing:-0.2px;box-shadow:0 4px 20px rgba(91,76,219,0.2)}
 .btn-primary:hover{opacity:0.9;transform:translateY(-1px)}
 .btn-primary:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+.hist-panel{background:var(--surf);border:1px solid var(--bdr);border-radius:12px;margin:0 18px 18px;overflow:hidden}
+.hist-tbl{width:100%;border-collapse:collapse;font-size:11px}
+.hist-tbl th{padding:6px 10px;background:#f0f4f8;color:#6b8fb5;font-weight:700;text-transform:uppercase;font-size:9px;letter-spacing:.05em;border-bottom:1px solid var(--bdr);white-space:nowrap}
+.hist-tbl td{padding:7px 10px;border-bottom:1px solid #f0f0f0;font-family:"DM Mono",monospace;font-size:11px;white-space:nowrap}
+.hist-tbl tr:last-child td{border-bottom:none}
+.hist-tbl tr:nth-child(even) td{background:#fafcff}
+.hist-dif-pos{color:#0a7c4e;font-weight:600}
+.hist-dif-neg{color:#c0392b;font-weight:600}
+.hist-null{color:#bbb}
 .pwd-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:200}
 .pwd-modal{background:var(--surf);border-radius:14px;padding:28px 32px;width:320px;box-shadow:0 8px 40px rgba(0,0,0,0.18);border:1px solid var(--bdr)}
 .pwd-input{width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--bdr);background:var(--surf2);color:var(--tx);font-size:14px;font-family:inherit;outline:none;box-sizing:border-box}
@@ -79,7 +88,7 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 .month-val{font-size:9px;color:var(--txm);font-family:'DM Mono',monospace;text-align:center}
 .month-col:hover .month-seg-arr{background:#185fa5}
 .month-col:hover .month-val{color:var(--tx)}
-.dash-client-hdr{display:grid;grid-template-columns:58px minmax(140px,1fr) 100px 100px 100px 60px 95px 80px 65px 80px 60px 60px 55px;border-bottom:2px solid var(--bdr);background:var(--surf)}
+.dash-client-hdr{display:grid;grid-template-columns:58px minmax(140px,1fr) 100px 100px 100px 60px 95px 80px 65px 80px 60px 60px 55px 28px;border-bottom:2px solid var(--bdr);background:var(--surf)}
 .dash-client-hdr>div{padding:7px 8px;font-size:9px;font-weight:700;color:var(--txd);letter-spacing:.06em;text-transform:uppercase}
 .dash-client-row{display:grid;grid-template-columns:58px minmax(140px,1fr) 100px 100px 100px 60px 95px 80px 65px 80px 60px 60px 55px;border-bottom:1px solid var(--bdr);transition:background .1s;cursor:default}
 .dash-client-row:hover>div{background:var(--surf2)}
@@ -105,7 +114,7 @@ const CCO="mmunoz@patagonica.cl";
 const TEST_DEST="";
 const MODO_PRUEBA=TEST_DEST!=="";
 const VER="v4.8.0";
-const SEND_PWD="Patfact*";
+const SEND_PWD="patagonica2026";
 const DRIVE_PLANILLA_ID="1rAGS-b1MoPpEhMgN2BR9Hvg4cTYdcQDu";
 const GOOGLE_SCOPES="https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.readonly";
 const TG_BOT=window.__TG_BOT__||"";
@@ -291,6 +300,26 @@ async function parsePlanillaParaDashboard(file){
       pctReaj:row[53]!=null?String(row[53]):"",            /* Col BB: % Reajuste */
       cadaAnios:row[54]!=null?String(row[54]).trim():"",   /* Col BC: Cada cuántos años */
       m2:row[26]!=null&&row[26]!==""?Number(row[26]):null,  /* Col AA: Metros cuadrados */
+      hist:(()=>{
+        /* BN=65, cada mes ocupa 4 cols: UF planilla, Facturado, Diferencia, Comentarios */
+        /* Desde Abr-2023 hasta el presente */
+        const MESES=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+        const result=[];
+        let col=65,mes=3,anio=2023;
+        while(!(anio===2027||(anio===2026&&mes>11))){
+          const uf=row[col],fact=row[col+1],dif=row[col+2];
+          result.push({
+            key:`${anio}-${String(mes+1).padStart(2,"0")}`,
+            label:`${MESES[mes]}`,
+            anio,mes,
+            uf:typeof uf==="number"?Math.round(uf*100)/100:null,
+            fact:typeof fact==="number"?Math.round(fact*100)/100:null,
+            dif:typeof dif==="number"?Math.round(dif*100)/100:null,
+          });
+          col+=4; mes++; if(mes>11){mes=0;anio++;}
+        }
+        return result;
+      })(),
       ufArr:Math.round(ufArr*100)/100,
       ufSrv:Math.round(ufSrv*100)/100,
       ufTotal:Math.round((ufArr+ufSrv)*100)/100,
@@ -462,6 +491,64 @@ const NOMBRE_KEY={
 };
 function getEmail(cliente,emailMap){const key=NOMBRE_KEY[cliente];if(!key)return"";return emailMap[key]||emailMap[key.toUpperCase()]||"";}
 
+
+function HistPanel({client,anio,setAnio,onClose}){
+  if(!client)return null;
+  const MESES_FULL=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  const anios=[...new Set(client.hist.map(r=>r.anio))].sort((a,b)=>b-a);
+  const filas=client.hist.filter(r=>r.anio===anio);
+  const fmt=v=>v!=null?v.toFixed(2):"S/Inf";
+  const fmtDif=v=>{
+    if(v==null)return h("span",{className:"hist-null"},"S/Inf");
+    if(Math.abs(v)<0.01)return h("span",{style:{color:"var(--txm)"}},v.toFixed(2));
+    return h("span",{className:v>0?"hist-dif-pos":"hist-dif-neg"},(v>0?"+":"")+v.toFixed(2));
+  };
+  return h("div",{className:"hist-panel"},
+    h("div",{style:{padding:"12px 16px",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",background:"#f8fbff"}},
+      h("div",{style:{flex:1}},
+        h("span",{style:{fontSize:13,fontWeight:700,color:"var(--tx)"}},"📋 Historial — "+client.nombre),
+        h("span",{style:{fontSize:11,color:"var(--txm)",marginLeft:8,fontFamily:"'DM Mono',monospace"}},formatRUT(client.rut)),
+        h("span",{style:{fontSize:11,color:"var(--txm)",marginLeft:8}},"Sitio: "+client.sitio)
+      ),
+      h("div",{style:{display:"flex",gap:6,alignItems:"center"}},
+        h("span",{style:{fontSize:11,color:"var(--txm)"}},"Año:"),
+        anios.map(a=>h("button",{
+          key:a,
+          onClick:()=>setAnio(a),
+          style:{padding:"3px 12px",borderRadius:6,border:"1px solid "+(a===anio?"var(--acc)":"var(--bdr)"),
+            background:a===anio?"var(--acc)":"var(--surf2)",color:a===anio?"#fff":"var(--txm)",
+            fontSize:11,fontWeight:a===anio?700:400,cursor:"pointer"}
+        },a))
+      ),
+      h("button",{
+        onClick:onClose,
+        style:{padding:"3px 10px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--txm)",fontSize:11,cursor:"pointer"}
+      },"✕ Cerrar")
+    ),
+    h("div",{style:{overflowX:"auto"}},
+      h("table",{className:"hist-tbl"},
+        h("thead",null,
+          h("tr",null,
+            h("th",null,"Mes"),
+            h("th",{style:{textAlign:"right"}},"UF Planilla"),
+            h("th",{style:{textAlign:"right"}},"Facturado UF"),
+            h("th",{style:{textAlign:"right"}},"Diferencia"),
+          )
+        ),
+        h("tbody",null,
+          filas.length===0
+            ? h("tr",null,h("td",{colSpan:4,style:{textAlign:"center",color:"var(--txm)",padding:"20px"}},"Sin datos para "+anio))
+            : filas.map(r=>h("tr",{key:r.key},
+                h("td",{style:{color:"var(--tx)",fontWeight:500,fontFamily:"inherit"}},MESES_FULL[r.mes]),
+                h("td",{style:{textAlign:"right",color:r.uf!=null?"var(--tx)":"#bbb"}},fmt(r.uf)),
+                h("td",{style:{textAlign:"right",color:r.fact!=null?"var(--tx)":"#bbb"}},fmt(r.fact)),
+                h("td",{style:{textAlign:"right"}},fmtDif(r.dif))
+              ))
+        )
+      )
+    )
+  );
+}
 function buildResumenHtml(enviados,periodo){
   const filas=enviados.map(r=>`<tr style="border-bottom:1px solid #f0f0f0">
     <td style="padding:8px 12px;font-size:12px;color:#555">${r.sitio}</td>
@@ -576,6 +663,8 @@ function App(){
   const [procProgress,setProcProgress]=useState(0);
   const [procDone,setProcDone]=useState(false);
   const [preview,setPreview]=useState(null);
+  const [histClient,setHistClient]=useState(null);
+  const [histAnio,setHistAnio]=useState(2026);
   const [unlocked,setUnlocked]=useState(false);
   const [showPwdModal,setShowPwdModal]=useState(false);
   const [pwdInput,setPwdInput]=useState("");
@@ -1026,7 +1115,7 @@ function App(){
           h("input",{value:dashSearch,onChange:e=>setDashSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:180,marginLeft:"auto"}})
         ),
         h("div",{className:"dash-client-hdr"},
-          ["Sitio","Cliente / RUT","Arriendo CLP","Serv.Adm. CLP","Total CLP","IVA","Término","Antelac.","Aviso","F.Reajuste","% Reaj.","Cada","m²"].map(col=>h("div",{key:col},col))
+          ["Sitio","Cliente / RUT","Arriendo CLP","Serv.Adm. CLP","Total CLP","IVA","Término","Antelac.","Aviso","F.Reajuste","% Reaj.","Cada","m²",""].map(col=>h("div",{key:col},col))
         ),
         h("div",{key:"rows-"+curSitio+"-"+tblClients.length,style:{maxHeight:420,overflowY:"auto",overflowX:"auto"}},
           tblClients.length===0?
@@ -1036,7 +1125,14 @@ function App(){
               const clpArr=c.ufArr>0?Math.round(c.ufArr*tblUf):null;
               const clpSrv=c.ufSrv>0?Math.round(c.ufSrv*tblUf):null;
               const clpTotal=c.ufTotal>0?Math.round(c.ufTotal*tblUf):null;
-              return h("div",{key:c.rut+c.nombre+c.sitio,className:"dash-client-row"},
+              const isSelected=histClient&&histClient.rut===c.rut&&histClient.sitio===c.sitio;
+              return h("div",{key:c.rut+c.nombre+c.sitio+"_wrap",style:{borderBottom:"1px solid var(--bdr)",background:isSelected?"#f0f6ff":"transparent"}},
+              h("div",{
+                className:"dash-client-row",
+                style:{cursor:"pointer",borderBottom:"none",background:isSelected?"#e8f2ff":"transparent"},
+                onClick:()=>{setHistClient(isSelected?null:c);setHistAnio(2026);},
+                title:isSelected?"Cerrar historial":"Ver historial del cliente"
+              },
                 h("div",null,h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${color}18`,color,border:`1px solid ${color}40`}},c.sitio||"—")),
                 h("div",{style:{flexDirection:"column",alignItems:"flex-start",gap:2}},
                   h("div",{style:{fontWeight:600,fontSize:11,lineHeight:1.3}},c.nombre),
@@ -1053,8 +1149,12 @@ function App(){
                 h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:c.fechaReajuste?"var(--tx)":"var(--txd)"}},c.fechaReajuste||"—"),
                 h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.pctReaj||"—"),
                 h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.cadaAnios?c.cadaAnios+" años":"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},c.m2!=null?c.m2.toLocaleString("es-CL"):"—")
-              );
+                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},c.m2!=null?c.m2.toLocaleString("es-CL"):"—"),
+                h("div",{style:{fontSize:10,color:isSelected?"var(--acc)":"var(--txd)",textAlign:"right"}},isSelected?"▲":"📋")
+              ),
+              isSelected&&h(HistPanel,{client:c,anio:histAnio,setAnio:setHistAnio,onClose:()=>setHistClient(null)})
+              )
+            );
             })
         )
       ),
