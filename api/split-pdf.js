@@ -267,7 +267,8 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { pdfFileId, periodo, destFolderId } = req.body || {};
+  const { pdfFileId, periodo } = req.body || {};
+  const destFolderId = "1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u"; /* Carpeta Facturacion Mensual — siempre */
   if (!pdfFileId || !periodo) return res.status(400).json({ error: "Falta pdfFileId o periodo" });
 
   const saJson = process.env.GOOGLE_SERVICE_ACCOUNT;
