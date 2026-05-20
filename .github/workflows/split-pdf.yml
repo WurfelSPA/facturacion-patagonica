@@ -8,19 +8,29 @@ on:
 jobs:
   split:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Instalar dependencias
-        run: pip install pypdf pdfplumber google-auth google-auth-httplib2 google-api-python-client
+
+      - name: Instalar dependencias del sistema
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq poppler-utils tesseract-ocr tesseract-ocr-spa
+
+      - name: Instalar dependencias Python
+        run: pip install pypdf pdf2image pytesseract google-auth google-auth-httplib2 google-api-python-client
+
       - name: Ejecutar script
         env:
           GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
         run: python scripts/split_pdf.py
+
       - name: Subir ZIP
         uses: actions/upload-artifact@v4
         if: always()
