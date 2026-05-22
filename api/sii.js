@@ -1,6 +1,6 @@
 // /api/sii.js
-// Autenticación SII via certificado .pfx + descarga RCV ventas
-// Usa node-forge para parsear PFX sin depender del binario openssl
+// Autenticación SII via certificado digital (.pfx) + descarga RCV ventas
+// Implementación correcta de XMLDSig según spec SII Chile
 
 import crypto from "crypto";
 import forge from "node-forge";
@@ -27,73 +27,62 @@ export default async function handler(req, res) {
     const certBuf = Buffer.from(certB64, "base64");
 
     if (action === "test") {
-      return res.json({ ok: true, empresa, rut: cfg.rut, certBytes: certBuf.length, mensaje: "Certificado cargado OK" });
+      return res.json({ ok: true, empresa, rut: cfg.rut, certBytes: certBuf.length });
     }
 
-    // ── 1. Extraer clave privada y certificado del PFX con forge ──
-    const { privateKeyPem, certificatePem, certDerB64 } = extractFromPfx(certBuf, certPass);
+    // Extraer clave privada y certificado del PFX
+    const { privateKey, certificate, certDerB64 } = extractFromPfx(certBuf, certPass);
 
     if (action === "cert") {
-      const cert = forge.pki.certificateFromPem(certificatePem);
-      return res.json({
-        ok: true,
-        subject: cert.subject.getField("CN")?.value || "N/A",
-        issuer:  cert.issuer.getField("CN")?.value  || "N/A",
-        validTo: cert.validity.notAfter,
-        keyType: "RSA",
-      });
+      const subject = certificate.subject.getField("CN")?.value || "N/A";
+      const issuer  = certificate.issuer.getField("CN")?.value  || "N/A";
+      return res.json({ ok: true, subject, issuer, validTo: certificate.validity.notAfter });
     }
 
-    // ── 2. Obtener semilla del SII ──
+    // Obtener semilla
     const semilla = await getSemilla();
 
-    // ── 3. Firmar semilla ──
-    const xmlFirmado = firmarSemilla(semilla, privateKeyPem, certDerB64);
+    // Construir y firmar XML con node-forge (firma XMLDSig correcta)
+    const xmlFirmado = firmarSemilla(semilla, privateKey, certificate, certDerB64);
 
-    // ── 4. Obtener token ──
+    // Obtener token
     const token = await getToken(xmlFirmado);
 
     if (action === "token") {
       return res.json({ ok: true, empresa, rut: cfg.rut, token: token.slice(0,15)+"...", mensaje: "Autenticación SII exitosa ✓" });
     }
 
-    // ── 5. Descargar RCV ventas tipo 33 ──
+    // Descargar RCV
     const [anio, mesNum] = mes.split("-");
     const registros = await getRCV(token, cfg.rut, anio, mesNum.padStart(2,"0"));
-
     return res.json({ ok: true, empresa, rut: cfg.rut, mes, total: registros.length, registros });
 
   } catch (e) {
-    return res.status(500).json({ error: e.message, stack: e.stack?.slice(0, 400) });
+    return res.status(500).json({ error: e.message, stack: e.stack?.slice(0, 500) });
   }
 }
 
-/* ── Parsear PFX con node-forge ── */
+/* ── Extraer desde PFX con node-forge ── */
 function extractFromPfx(pfxBuf, password) {
-  const p12Der  = forge.util.createBuffer(pfxBuf.toString("binary"));
-  const p12Asn1 = forge.asn1.fromDer(p12Der);
+  const p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(pfxBuf.toString("binary")));
   const p12     = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
 
-  // Extraer clave privada
   const keyBags  = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
-  const keyBag   = keyBags[forge.pki.oids.pkcs8ShroudedKeyBag]?.[0];
-  if (!keyBag) throw new Error("No se encontró clave privada en el PFX");
-  const privateKeyPem = forge.pki.privateKeyToPem(keyBag.key);
+  const privateKey = keyBags[forge.pki.oids.pkcs8ShroudedKeyBag]?.[0]?.key;
+  if (!privateKey) throw new Error("No se encontró clave privada en el PFX");
 
-  // Extraer certificado
-  const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
-  const certBag  = certBags[forge.pki.oids.certBag]?.[0];
-  if (!certBag) throw new Error("No se encontró certificado en el PFX");
-  const certificatePem = forge.pki.certificateToPem(certBag.cert);
+  const certBags   = p12.getBags({ bagType: forge.pki.oids.certBag });
+  const certificate = certBags[forge.pki.oids.certBag]?.[0]?.cert;
+  if (!certificate) throw new Error("No se encontró certificado en el PFX");
 
-  // Certificado en DER base64 (para el XML de firma)
-  const certDer    = forge.asn1.toDer(forge.pki.certificateToAsn1(certBag.cert));
+  // Certificado en DER base64
+  const certDer    = forge.asn1.toDer(forge.pki.certificateToAsn1(certificate));
   const certDerB64 = Buffer.from(certDer.getBytes(), "binary").toString("base64");
 
-  return { privateKeyPem, certificatePem, certDerB64 };
+  return { privateKey, certificate, certDerB64 };
 }
 
-/* ── Obtener semilla del SII ── */
+/* ── Obtener semilla SII ── */
 async function getSemilla() {
   const r = await fetch("https://palena.sii.cl/DTEWS/CrSeed.jws", {
     method: "POST",
@@ -104,48 +93,44 @@ async function getSemilla() {
 </soapenv:Envelope>`,
   });
   const text = await r.text();
-  // La semilla puede venir directa o dentro de XML escapado en getSeedReturn
-  let m = text.match(/<SEMILLA>(\d+)<\/SEMILLA>/);
-  if (!m) m = text.match(/SEMILLA&gt;(\d+)&lt;\/SEMILLA/);
-  if (!m) {
-    // Intentar decodificar el XML escapado dentro de getSeedReturn
-    const inner = text.match(/getSeedReturn[^>]*>([\s\S]+?)<\/getSeedReturn/);
-    if (inner) {
-      const decoded = inner[1].replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&");
-      m = decoded.match(/<SEMILLA>(\d+)<\/SEMILLA>/);
-    }
-  }
-  if (!m) throw new Error("No se pudo obtener semilla SII: " + text.slice(0, 400));
+
+  // Decodificar XML escapado dentro de getSeedReturn
+  let xml = text;
+  const inner = text.match(/getSeedReturn[^>]*>([\s\S]+?)<\/getSeedReturn/);
+  if (inner) xml = inner[1].replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&");
+
+  const m = xml.match(/<SEMILLA>(\d+)<\/SEMILLA>/);
+  if (!m) throw new Error("No se pudo obtener semilla SII: " + text.slice(0, 300));
   return m[1];
 }
 
-/* ── Firmar XML de semilla ── */
-function firmarSemilla(semilla, privateKeyPem, certDerB64) {
-  const xmlBody    = `<item><Semilla>${semilla}</Semilla></item>`;
-  const xmlContent = `<getToken>${xmlBody}</getToken>`;
+/* ── Firmar semilla con XMLDSig usando node-forge ── */
+function firmarSemilla(semilla, privateKey, certificate, certDerB64) {
+  // Contenido a firmar
+  const xmlContent = `<getToken><item><Semilla>${semilla}</Semilla></item></getToken>`;
 
-  // DigestValue SHA1
-  const digest = crypto.createHash("sha1").update(xmlContent, "utf8").digest("base64");
+  // 1. DigestValue: SHA1 del contenido XML (sin declaración XML)
+  const md = forge.md.sha1.create();
+  md.update(xmlContent, "utf8");
+  const digestB64 = forge.util.encode64(md.digest().bytes());
 
-  const signedInfo = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#"><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/><Reference URI=""><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/><DigestValue>${digest}</DigestValue></Reference></SignedInfo>`;
+  // 2. Construir SignedInfo (debe ser exactamente así para canonicalización)
+  const signedInfo = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#"><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/><Reference URI=""><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/><DigestValue>${digestB64}</DigestValue></Reference></SignedInfo>`;
 
-  // Firma RSA-SHA1
-  const signer = crypto.createSign("RSA-SHA1");
-  signer.update(signedInfo, "utf8");
-  const sigValue = signer.sign(privateKeyPem, "base64");
+  // 3. Firmar SignedInfo con RSA-SHA1 usando node-forge
+  const mdSig = forge.md.sha1.create();
+  mdSig.update(signedInfo, "utf8");
+  const signatureBytes = privateKey.sign(mdSig);
+  const signatureB64   = forge.util.encode64(signatureBytes);
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <getToken>
-  ${xmlBody}
-  <Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
-    ${signedInfo}
-    <SignatureValue>${sigValue}</SignatureValue>
-    <KeyInfo>
-      <X509Data>
-        <X509Certificate>${certDerB64}</X509Certificate>
-      </X509Data>
-    </KeyInfo>
-  </Signature>
+<item><Semilla>${semilla}</Semilla></item>
+<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+<SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/><Reference URI=""><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/><DigestValue>${digestB64}</DigestValue></Reference></SignedInfo>
+<SignatureValue>${signatureB64}</SignatureValue>
+<KeyInfo><X509Data><X509Certificate>${certDerB64}</X509Certificate></X509Data></KeyInfo>
+</Signature>
 </getToken>`;
 }
 
@@ -164,18 +149,21 @@ async function getToken(xmlFirmado) {
 </soapenv:Envelope>`,
   });
   const text = await r.text();
-  // Decodificar XML escapado dentro de getTokenReturn
-  let parsed = text;
+
+  // Decodificar XML escapado
+  let xml = text;
   const inner = text.match(/getTokenReturn[^>]*>([\s\S]+?)<\/getTokenReturn/);
-  if (inner) {
-    parsed = inner[1].replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&");
+  if (inner) xml = inner[1].replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&");
+
+  // Verificar estado
+  const estado = xml.match(/<ESTADO>([^<]+)<\/ESTADO>/)?.[1];
+  if (estado && estado !== "00") {
+    const desc = xml.match(/<DESCRIPCION>([^<]+)<\/DESCRIPCION>/)?.[1] || "Sin descripción";
+    throw new Error(`Token SII error ${estado}: ${desc}`);
   }
-  const m = parsed.match(/<TOKEN>([^<]+)<\/TOKEN>/);
-  if (!m) {
-    const err = parsed.match(/<DESCRIPCION>([^<]+)<\/DESCRIPCION>/);
-    const estado = parsed.match(/<ESTADO>([^<]+)<\/ESTADO>/);
-    throw new Error("Token SII fallido: " + (err?.[1] || estado?.[1] || parsed.slice(0, 400)));
-  }
+
+  const m = xml.match(/<TOKEN>([^<]+)<\/TOKEN>/);
+  if (!m) throw new Error("Token SII fallido: " + xml.slice(0, 400));
   return m[1];
 }
 
@@ -210,6 +198,11 @@ async function getRCV(token, rut, anio, mes) {
   return lines.slice(1).map(line => {
     const c = line.split(";");
     const g = (i, fb) => (c[i >= 0 ? i : fb] || "").trim();
-    return { folio:g(iF,5), tipo:g(iT,1), rut:g(iR,3), razon:g(iRz,4), fecha:g(iFch,6), neto:parseInt(g(iN,11))||0, total:parseInt(g(iTot,13))||0 };
+    return {
+      folio: g(iF,5), tipo: g(iT,1), rut: g(iR,3),
+      razon: g(iRz,4), fecha: g(iFch,6),
+      neto:  parseInt(g(iN,11))  || 0,
+      total: parseInt(g(iTot,13)) || 0,
+    };
   }).filter(r => r.folio);
 }
