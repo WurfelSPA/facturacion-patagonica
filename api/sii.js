@@ -127,7 +127,7 @@ function firmarSemilla(semilla, privateKeyPem, certificatePem) {
 
   sig.addReference({
     xpath: "/*",
-    transforms: [],
+    transforms: ["http://www.w3.org/2000/09/xmldsig#enveloped-signature"],
     digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
   });
 
