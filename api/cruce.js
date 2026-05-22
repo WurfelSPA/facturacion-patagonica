@@ -59,8 +59,10 @@ export default async function handler(req, res) {
 
 /* ── Cruce por folio ── */
 function cruzar(odoo, sii) {
-  const odooMap = Object.fromEntries(odoo.map(f => [String(f.folio), f]));
-  const siiMap  = Object.fromEntries(sii.map(f => [String(f.folio), f]));
+  // Normalizar folios: quitar ceros iniciales y espacios para comparar
+  const normFolio = f => String(f).replace(/^0+/, "").trim();
+  const odooMap = Object.fromEntries(odoo.map(f => [normFolio(f.folio), f]));
+  const siiMap  = Object.fromEntries(sii.map(f => [normFolio(f.folio), f]));
 
   const coinciden  = [];
   const diff_monto = [];
