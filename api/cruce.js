@@ -18,6 +18,21 @@ export default async function handler(req, res) {
   const cfg = RUT_MAP[empresa];
   if (!cfg) return res.status(400).json({ error: "Empresa desconocida" });
 
+  // Ver compañías disponibles en Odoo
+  if (req.query.action === "companies") {
+    const ODOO_URL = process.env.ODOO_DKO_URL;
+    const db   = process.env[cfg.odooDb];
+    const user = process.env[cfg.odooUser];
+    const pass = process.env[cfg.odooPass];
+    const loginRes = await fetch(`${ODOO_URL}/web/session/authenticate`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ jsonrpc:"2.0", method:"call", id:1, params:{ db, login:user, password:pass } }),
+    });
+    const cookie = loginRes.headers.get("set-cookie") || "";
+    const companies = await odooCall(ODOO_URL, cookie, "res.company", "search_read", [[]], ["id","name","vat"]);
+    return res.json({ ok:true, companies });
+  }
+
   try {
     // Ejecutar en paralelo: Odoo + SII
     const [odooResult, siiResult] = await Promise.allSettled([
@@ -134,10 +149,11 @@ async function getOdooFacturas(cfg, mes) {
   const fechaDesde = `${anio}-${mesNum}-01`;
   const fechaHasta = `${anio}-${mesNum}-31`;
 
-  // Buscar compañía
+  // Buscar compañía por RUT (más confiable que por nombre)
+  const rutSinDv = cfg.rut.replace("-","").slice(0,-1); // ej: "77538786"
   const companies = await odooCall(ODOO_URL, cookie, "res.company", "search_read",
-    [[["name", "ilike", cfg.odooDb.includes("MULTI") ? "sanchez" : "dko"]]], ["id","name"]);
-  
+    [[["vat", "like", rutSinDv]]], ["id","name","vat"]);
+
   const domain = [
     ["move_type", "=", "out_invoice"],
     ["state", "=", "posted"],
@@ -146,10 +162,7 @@ async function getOdooFacturas(cfg, mes) {
     ["l10n_latam_document_type_id.code", "=", "33"],
   ];
   if (companies.length > 0) {
-    const comp = cfg.odooDb.includes("MULTI")
-      ? companies.find(c => !c.name.toLowerCase().includes("dko")) || companies[0]
-      : companies[0];
-    domain.push(["company_id", "=", comp.id]);
+    domain.push(["company_id", "=", companies[0].id]);
   }
 
   const facturas = await odooCall(ODOO_URL, cookie, "account.move", "search_read", [domain], [
