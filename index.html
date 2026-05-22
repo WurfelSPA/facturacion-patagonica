@@ -575,7 +575,8 @@ function VentasView({periodo}){
 
   const emp = empresas.find(e => e.id===activeEmp);
   const r   = emp?.result;
-  const allLoaded = empresas.every(e => e.result!==null || e.error!==null);
+  // allLoaded = true cuando todas las empresas terminaron (resultado o error)
+  const allLoaded = empresas.every(e => !e.loading);
 
   const totalCoinciden = empresas.reduce((s,e) => s+(e.result?.coinciden||0), 0);
   const totalFacturas  = empresas.reduce((s,e) => s+(e.result?.odoo_count||0), 0);
