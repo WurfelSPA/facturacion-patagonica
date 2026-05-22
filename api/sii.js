@@ -233,25 +233,32 @@ async function getRCV(token, rut, anio, mes) {
   if (!r.ok) throw new Error(`RCV HTTP ${r.status}: ${(await r.text()).slice(0,300)}`);
   const data = await r.json();
 
-  // La respuesta tiene estructura { data: { detalleVentas: [...] } } o similar
-  const registros = data?.data?.detalleVentas
-    || data?.data?.listaVentas
-    || data?.data?.registros
-    || data?.registros
-    || [];
+  // data es un array de strings CSV: primer elemento = header, resto = filas
+  const csvLines = Array.isArray(data?.data) ? data.data : [];
+  if (!csvLines.length) return [];
 
-  // Si viene en otro formato, retornar el data crudo para debug
-  if (!Array.isArray(registros)) {
-    return [{ debug: true, keys: Object.keys(data?.data || data || {}), raw: JSON.stringify(data).slice(0,500) }];
-  }
+  const header = csvLines[0].split(";");
+  const col = name => header.findIndex(h => h.toLowerCase().includes(name.toLowerCase()));
 
-  return registros.map(r => ({
-    folio:  String(r.folio || r.nroDoc || r.numero || ""),
-    tipo:   String(r.tipoDoc || r.tipoDte || "33"),
-    rut:    String(r.rutDoc || r.rutReceptor || r.rut || ""),
-    razon:  String(r.razonSocial || r.nombre || ""),
-    fecha:  String(r.fechaDoc || r.fecha || ""),
-    neto:   parseInt(r.montoNeto || r.neto || 0) || 0,
-    total:  parseInt(r.montoTotal || r.monto || r.total || 0) || 0,
-  })).filter(r => r.folio);
+  const iNro   = col("nro");
+  const iRut   = col("rut cliente");
+  const iRazon = col("razon social");
+  const iFolio = col("folio");
+  const iFecha = col("fecha docto");
+  const iNeto  = col("monto neto");
+  const iTotal = col("monto total");
+
+  return csvLines.slice(1).map(line => {
+    const c = line.split(";");
+    const g = (i, fb) => (c[i >= 0 ? i : fb] || "").trim();
+    return {
+      folio: g(iFolio, 4),
+      tipo:  "33",
+      rut:   g(iRut, 2),
+      razon: g(iRazon, 3),
+      fecha: g(iFecha, 5).split(" ")[0], // solo fecha sin hora
+      neto:  parseInt(g(iNeto, 10))  || 0,
+      total: parseInt(g(iTotal, 12)) || 0,
+    };
+  }).filter(r => r.folio);
 }
