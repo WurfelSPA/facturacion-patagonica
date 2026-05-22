@@ -1,8 +1,9 @@
 // /api/sii.js
-// Autenticación SII via certificado digital (.pfx) + descarga RCV ventas
-// Usa Node.js crypto nativo (sin binario openssl)
+// Autenticación SII via certificado .pfx + descarga RCV ventas
+// Usa node-forge para parsear PFX sin depender del binario openssl
 
 import crypto from "crypto";
+import forge from "node-forge";
 
 const RUT_MAP = {
   dko:   { rut: "77454587-5",  razon: "Sánchez Hermanos" },
@@ -29,24 +30,31 @@ export default async function handler(req, res) {
       return res.json({ ok: true, empresa, rut: cfg.rut, certBytes: certBuf.length, mensaje: "Certificado cargado OK" });
     }
 
-    // ── 1. Extraer clave privada y certificado del PFX usando Node crypto ──
-    const { privateKey, certificate } = extractFromPfx(certBuf, certPass);
+    // ── 1. Extraer clave privada y certificado del PFX con forge ──
+    const { privateKeyPem, certificatePem, certDerB64 } = extractFromPfx(certBuf, certPass);
 
     if (action === "cert") {
-      return res.json({ ok: true, keyType: privateKey.asymmetricKeyType, certSubject: certificate.subject });
+      const cert = forge.pki.certificateFromPem(certificatePem);
+      return res.json({
+        ok: true,
+        subject: cert.subject.getField("CN")?.value || "N/A",
+        issuer:  cert.issuer.getField("CN")?.value  || "N/A",
+        validTo: cert.validity.notAfter,
+        keyType: "RSA",
+      });
     }
 
     // ── 2. Obtener semilla del SII ──
     const semilla = await getSemilla();
 
     // ── 3. Firmar semilla ──
-    const xmlFirmado = firmarSemilla(semilla, privateKey, certificate);
+    const xmlFirmado = firmarSemilla(semilla, privateKeyPem, certDerB64);
 
     // ── 4. Obtener token ──
     const token = await getToken(xmlFirmado);
 
     if (action === "token") {
-      return res.json({ ok: true, empresa, rut: cfg.rut, token: token.slice(0,15)+"...", mensaje: "Autenticación SII exitosa" });
+      return res.json({ ok: true, empresa, rut: cfg.rut, token: token.slice(0,15)+"...", mensaje: "Autenticación SII exitosa ✓" });
     }
 
     // ── 5. Descargar RCV ventas tipo 33 ──
@@ -60,22 +68,29 @@ export default async function handler(req, res) {
   }
 }
 
-/* ── Extraer clave privada y cert del PFX usando Node.js nativo ── */
+/* ── Parsear PFX con node-forge ── */
 function extractFromPfx(pfxBuf, password) {
-  // Node.js 15+ soporta X509Certificate y createPrivateKey con PFX
-  const privateKey = crypto.createPrivateKey({
-    key: pfxBuf,
-    format: "der",
-    type: "pkcs12",
-    passphrase: password,
-  });
+  const p12Der  = forge.util.createBuffer(pfxBuf.toString("binary"));
+  const p12Asn1 = forge.asn1.fromDer(p12Der);
+  const p12     = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
 
-  const cert = new crypto.X509Certificate(
-    crypto.createPublicKey({ key: pfxBuf, format: "der", type: "pkcs12", passphrase: password })
-      .export({ type: "pkcs1", format: "der" })
-  );
+  // Extraer clave privada
+  const keyBags  = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
+  const keyBag   = keyBags[forge.pki.oids.pkcs8ShroudedKeyBag]?.[0];
+  if (!keyBag) throw new Error("No se encontró clave privada en el PFX");
+  const privateKeyPem = forge.pki.privateKeyToPem(keyBag.key);
 
-  return { privateKey, certificate: cert };
+  // Extraer certificado
+  const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
+  const certBag  = certBags[forge.pki.oids.certBag]?.[0];
+  if (!certBag) throw new Error("No se encontró certificado en el PFX");
+  const certificatePem = forge.pki.certificateToPem(certBag.cert);
+
+  // Certificado en DER base64 (para el XML de firma)
+  const certDer    = forge.asn1.toDer(forge.pki.certificateToAsn1(certBag.cert));
+  const certDerB64 = Buffer.from(certDer.getBytes(), "binary").toString("base64");
+
+  return { privateKeyPem, certificatePem, certDerB64 };
 }
 
 /* ── Obtener semilla del SII ── */
@@ -94,34 +109,20 @@ async function getSemilla() {
   return m[1];
 }
 
-/* ── Firmar XML de semilla con clave privada ── */
-function firmarSemilla(semilla, privateKey, certObj) {
-  const xmlBody = `<item><Semilla>${semilla}</Semilla></item>`;
-  const xmlCompleto = `<getToken>${xmlBody}</getToken>`;
+/* ── Firmar XML de semilla ── */
+function firmarSemilla(semilla, privateKeyPem, certDerB64) {
+  const xmlBody    = `<item><Semilla>${semilla}</Semilla></item>`;
+  const xmlContent = `<getToken>${xmlBody}</getToken>`;
 
-  // DigestValue SHA1 del contenido
-  const digest = crypto.createHash("sha1").update(xmlCompleto, "utf8").digest("base64");
+  // DigestValue SHA1
+  const digest = crypto.createHash("sha1").update(xmlContent, "utf8").digest("base64");
 
-  const signedInfo = [
-    `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">`,
-    `<CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>`,
-    `<SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>`,
-    `<Reference URI="">`,
-    `<DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>`,
-    `<DigestValue>${digest}</DigestValue>`,
-    `</Reference>`,
-    `</SignedInfo>`,
-  ].join("");
+  const signedInfo = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#"><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/><Reference URI=""><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/><DigestValue>${digest}</DigestValue></Reference></SignedInfo>`;
 
-  // Firmar SignedInfo
-  const sign = crypto.createSign("RSA-SHA1");
-  sign.update(signedInfo, "utf8");
-  const sigValue = sign.sign(privateKey, "base64");
-
-  // Exportar certificado en DER → base64
-  const certDer = certObj.raw
-    ? certObj.raw.toString("base64")
-    : Buffer.from(certObj.export({ type: "spki", format: "der" })).toString("base64");
+  // Firma RSA-SHA1
+  const signer = crypto.createSign("RSA-SHA1");
+  signer.update(signedInfo, "utf8");
+  const sigValue = signer.sign(privateKeyPem, "base64");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <getToken>
@@ -131,7 +132,7 @@ function firmarSemilla(semilla, privateKey, certObj) {
     <SignatureValue>${sigValue}</SignatureValue>
     <KeyInfo>
       <X509Data>
-        <X509Certificate>${certDer}</X509Certificate>
+        <X509Certificate>${certDerB64}</X509Certificate>
       </X509Data>
     </KeyInfo>
   </Signature>
@@ -181,32 +182,17 @@ async function getRCV(token, rut, anio, mes) {
 
   if (!r.ok) throw new Error(`RCV HTTP ${r.status}: ${(await r.text()).slice(0, 200)}`);
   const text = await r.text();
-
   const lines = text.split(/\r?\n/).filter(l => l.trim());
   if (!lines.length) return [];
 
   const header = lines[0].split(";").map(h => h.trim());
   const col = name => header.findIndex(h => h.toLowerCase().includes(name.toLowerCase()));
-
-  const iF   = col("folio");
-  const iT   = col("tipo");
-  const iR   = col("rut");
-  const iRz  = col("razon");
-  const iFch = col("fecha");
-  const iN   = col("neto");
-  const iTot = col("total");
+  const iF=col("folio"), iT=col("tipo"), iR=col("rut"), iRz=col("razon");
+  const iFch=col("fecha"), iN=col("neto"), iTot=col("total");
 
   return lines.slice(1).map(line => {
     const c = line.split(";");
-    const get = (i, fb) => (c[i >= 0 ? i : fb] || "").trim();
-    return {
-      folio: get(iF, 5),
-      tipo:  get(iT, 1),
-      rut:   get(iR, 3),
-      razon: get(iRz, 4),
-      fecha: get(iFch, 6),
-      neto:  parseInt(get(iN, 11))  || 0,
-      total: parseInt(get(iTot, 13)) || 0,
-    };
+    const g = (i, fb) => (c[i >= 0 ? i : fb] || "").trim();
+    return { folio:g(iF,5), tipo:g(iT,1), rut:g(iR,3), razon:g(iRz,4), fecha:g(iFch,6), neto:parseInt(g(iN,11))||0, total:parseInt(g(iTot,13))||0 };
   }).filter(r => r.folio);
 }
