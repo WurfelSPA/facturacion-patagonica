@@ -35,7 +35,8 @@ export default async function handler(req, res) {
 
     const [anio, mesNum] = (mes || "2026-05").split("-").map(Number);
     const fechaDesde = `${anio}-${String(mesNum).padStart(2,"0")}-01`;
-    const fechaHasta = `${anio}-${String(mesNum).padStart(2,"0")}-31`;
+    const ultimoDia = new Date(anio, parseInt(mesNum), 0).getDate();
+    const fechaHasta = `${anio}-${String(mesNum).padStart(2,"0")}-${ultimoDia}`;
 
     const domain = [
       ["move_type", "=", "out_invoice"],
