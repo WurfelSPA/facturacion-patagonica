@@ -1266,6 +1266,13 @@ function App(){
           h("span",{style:{fontSize:18}},"📋"),
           "Ir al Módulo de Facturación Mensual",
           h("span",{style:{opacity:.7}},"→")
+        ),
+        h("button",{
+          onClick:splitPDF,
+          disabled:splitLoading,
+          style:{background:splitLoading?"var(--surf2)":"var(--surf)",border:"1px solid var(--bdr)",color:splitLoading?"var(--txm)":"var(--tx)",borderRadius:12,padding:"14px 32px",fontSize:14,fontWeight:600,display:"flex",alignItems:"center",gap:10,cursor:splitLoading?"not-allowed":"pointer",opacity:splitLoading?0.6:1}
+        },
+          splitLoading?h("span",null,h("span",{className:"spin"},"⟳")," Procesando..."):h("span",null,h("span",{style:{fontSize:18}},"📂")," Separar PDF de Facturas")
         )
       )
     );
@@ -1352,7 +1359,7 @@ function App(){
           h("div",{style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px",color:view==="table"?"#fff":"var(--tx)"}},"Patagónica Inmobiliaria"),
           h("div",{style:{fontSize:9,color:view==="table"?"#93b5d4":"var(--txm)",fontFamily:"'DM Mono',monospace"}},REMITENTE+" · "+VER)
         ),
-        (view==="table"||view==="upload")&&h("span",{style:{background:view==="table"?"rgba(255,255,255,0.12)":"var(--bbg)",border:view==="table"?"1px solid rgba(255,255,255,0.25)":"1px solid #b5d0f0",color:view==="table"?"#d0e8ff":"var(--blue)",fontSize:10,fontWeight:600,padding:"2px 10px",borderRadius:20,marginLeft:4,fontFamily:"'DM Mono',monospace"}},periodo)
+        
       ),
       h("div",{style:{display:"flex",gap:8,alignItems:"center"}},
         h("button",{onClick:()=>setView("dashboard"),className:view==="table"?`nav-btn-navy`:`nav-btn${view==="dashboard"?" active":""}`,style:{fontSize:11}},"📊 Dashboard"),
@@ -1375,13 +1382,8 @@ function App(){
         ),
         h("span",{style:{color:"var(--txd)",fontSize:12}},"·"),
         
-        view==="table"&&h("button",{onClick:()=>{setView("upload");setData([]);},className:"nav-btn-navy",style:{fontSize:11}},"⊞ Nuevos archivos"),
-        view==="table"&&h("button",{
-          onClick:splitPDF,
-          disabled:splitLoading,
-          className:"nav-btn-navy",
-          style:{fontSize:11,opacity:splitLoading?0.6:1}
-        },splitLoading?h("span",null,h("span",{className:"spin"},"⟳")," Procesando..."):"📂 Separar PDF"),
+        
+        
 
         view==="table"&&h("div",{style:{display:"flex",gap:6,alignItems:"center"}},
           h("button",{
