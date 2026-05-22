@@ -134,10 +134,12 @@ function firmarSemilla(semilla, privateKey, certDerB64) {
 }
 
 async function getToken(xmlFirmado) {
+  // Log para debug — remover después
+  const soapBody = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Body><getToken><pszXml><![CDATA[${xmlFirmado}]]></pszXml></getToken></soapenv:Body></soapenv:Envelope>`;
   const r = await fetch("https://palena.sii.cl/DTEWS/GetTokenFromSeed.jws", {
     method: "POST",
     headers: { "Content-Type": "text/xml; charset=utf-8", "SOAPAction": "" },
-    body: `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Body><getToken><pszXml><![CDATA[${xmlFirmado}]]></pszXml></getToken></soapenv:Body></soapenv:Envelope>`,
+    body: soapBody,
   });
   const text = await r.text();
   let xml = text;
@@ -147,7 +149,7 @@ async function getToken(xmlFirmado) {
   const estado = xml.match(/<ESTADO>([^<]+)<\/ESTADO>/)?.[1];
   if (estado && estado !== "00") {
     const desc = xml.match(/<DESCRIPCION>([^<]+)<\/DESCRIPCION>/)?.[1] || "Sin descripción";
-    throw new Error(`Token SII error ${estado}: ${desc} | GLOSA: ${xml.match(/<GLOSA>([^<]+)<\/GLOSA>/)?.[1]||""} | XML: ${xml.slice(0,500)}`);
+    throw new Error(`Token SII error ${estado} | GLOSA: ${xml.match(/<GLOSA>([^<]+)<\/GLOSA>/)?.[1]||""} | CERT_EN_XML: ${xmlFirmado.includes("X509Certificate")?"SI":"NO"} | XML_CERT_SLICE: ${xmlFirmado.slice(xmlFirmado.indexOf("X509Certificate")-5, xmlFirmado.indexOf("X509Certificate")+50)}`);
   }
   const m = xml.match(/<TOKEN>([^<]+)<\/TOKEN>/);
   if (!m) throw new Error("Token no encontrado: " + xml.slice(0,300));
