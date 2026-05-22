@@ -42,6 +42,14 @@ export default async function handler(req, res) {
     const semilla = await getSemilla();
     const xmlFirmado = firmarSemilla(semilla, privateKey, certDerB64);
 
+    if (action === "soap") {
+      // Mostrar el SOAP exacto que se enviaría
+      const xmlF = firmarSemilla(semilla, privateKey, certDerB64);
+      const xmlEsc = xmlF.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");
+      const soap = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Body><getToken><pszXml>${xmlEsc}</pszXml></getToken></soapenv:Body></soapenv:Envelope>`;
+      res.setHeader("Content-Type","text/plain");
+      return res.send(soap);
+    }
     if (action === "debug") {
       // Mostrar también el SOAP envelope completo
       const xmlEscapado2 = xmlFirmado
