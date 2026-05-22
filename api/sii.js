@@ -42,6 +42,11 @@ export default async function handler(req, res) {
     // Obtener semilla
     const semilla = await getSemilla();
 
+    if (action === "debug") {
+      const xmlFirmado = firmarSemilla(semilla, privateKey, certificate, certDerB64);
+      return res.json({ ok: true, semilla, xmlFirmado });
+    }
+
     // Construir y firmar XML con node-forge (firma XMLDSig correcta)
     const xmlFirmado = firmarSemilla(semilla, privateKey, certificate, certDerB64);
 
