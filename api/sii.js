@@ -128,7 +128,8 @@ function firmarSemilla(semilla, privateKey, certDerB64) {
   const digestB64 = forge.util.encode64(mdDoc.digest().bytes());
 
   // SignedInfo — exactamente lo que se firma
-  const signedInfoXml = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">`
+  // xmlns solo en Signature, NO en SignedInfo (evitar namespace duplicado)
+  const signedInfoXml = `<SignedInfo>`
     + `<CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>`
     + `<SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>`
     + `<Reference URI="">`
