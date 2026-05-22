@@ -146,7 +146,7 @@ async function getToken(xmlFirmado) {
   const estado = xml.match(/<ESTADO>([^<]+)<\/ESTADO>/)?.[1];
   if (estado && estado !== "00") {
     const desc = xml.match(/<DESCRIPCION>([^<]+)<\/DESCRIPCION>/)?.[1] || "Sin descripción";
-    throw new Error(`Token SII error ${estado}: ${desc} | XML: ${xml.slice(0,200)}`);
+    throw new Error(`Token SII error ${estado}: ${desc} | GLOSA: ${xml.match(/<GLOSA>([^<]+)<\/GLOSA>/)?.[1]||""} | XML: ${xml.slice(0,500)}`);
   }
   const m = xml.match(/<TOKEN>([^<]+)<\/TOKEN>/);
   if (!m) throw new Error("Token no encontrado: " + xml.slice(0,300));
