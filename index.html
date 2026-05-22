@@ -1369,21 +1369,10 @@ function App(){
           files.planilla&&files.zip?`▶ Procesar ${periodo.split(" ")[0].slice(0,3)} ${periodo.split(" ")[1]}`:"📋 Facturación"
         ),
         /* Selector período siempre visible en header */
-        h("button",{
-          onClick:splitPDF,
-          disabled:splitLoading,
-          className:view==="table"?"nav-btn-navy":"nav-btn",
-          style:{fontSize:11,opacity:splitLoading?0.6:1}
-        },splitLoading?h("span",null,h("span",{className:"spin"},"⟳")," Procesando..."):"📂 Separar PDF"),
         h("select",{value:periodo,onChange:e=>{setPeriodo(e.target.value);setFiles(p=>({...p,zip:null}));},
           style:{fontSize:11,fontWeight:600,padding:"5px 10px",background:"linear-gradient(135deg,var(--acc),var(--acc2))",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}},
           PERIODOS.map(p=>h("option",{key:p,value:p,style:{background:"#fff",color:"#1a1a1a"}},p))
         ),
-        h("span",{style:{color:"var(--txd)",fontSize:12}},"·"),
-        
-        
-        
-
         view==="table"&&h("div",{style:{display:"flex",gap:6,alignItems:"center"}},
           h("button",{
             onClick:unlocked?sendAll:()=>setShowPwdModal(true),
@@ -1394,7 +1383,18 @@ function App(){
             title:unlocked?"Bloquear envío":"Desbloquear envío",
             style:{background:unlocked?"#e8f5ee":"var(--surf2)",border:unlocked?"1px solid #b6ddd0":"1px solid var(--bdr)",color:unlocked?"#0a7c4e":"var(--txm)",borderRadius:9,padding:"6px 10px",fontSize:14,cursor:"pointer",lineHeight:1}
           },unlocked?"🔓":"🔒")
-        )
+        ),
+        h("button",{
+          onClick:splitPDF,
+          disabled:splitLoading,
+          className:view==="table"?"nav-btn-navy":"nav-btn",
+          style:{fontSize:11,opacity:splitLoading?0.6:1}
+        },splitLoading?h("span",null,h("span",{className:"spin"},"⟳")," Procesando..."):"📂 Separar PDF"),
+        h("button",{
+          onClick:()=>setView("ventas"),
+          className:view==="table"?`nav-btn-navy${view==="ventas"?" active":""}`:`nav-btn${view==="ventas"?" active":""}`,
+          style:{fontSize:11}
+        },"📈 Detalles Ventas")
       )
     ),
 
