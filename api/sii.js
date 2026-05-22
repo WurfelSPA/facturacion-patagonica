@@ -1,11 +1,13 @@
 // /api/sii.js
 // Autenticación SII via certificado digital (.pfx) + descarga RCV ventas
+// Usa xml-crypto para firma XMLDSig correcta
 
 import forge from "node-forge";
+import { SignedXml } from "xml-crypto";
 
 const RUT_MAP = {
-  dko:   { rut: "77454587-5",  certEnv: "SII_CERT_DKO",   passEnv: "SII_CERT_PASS_DKO" },
-  multi: { rut: "77538786-6",  certEnv: "SII_CERT_MULTI",  passEnv: "SII_CERT_PASS_MULTI" },
+  dko:   { rut: "77454587-5", certEnv: "SII_CERT_DKO",   passEnv: "SII_CERT_PASS_DKO" },
+  multi: { rut: "77538786-6", certEnv: "SII_CERT_MULTI",  passEnv: "SII_CERT_PASS_MULTI" },
 };
 
 export default async function handler(req, res) {
@@ -28,45 +30,30 @@ export default async function handler(req, res) {
       return res.json({ ok: true, empresa, certBytes: certBuf.length });
     }
 
-    const { privateKey, certificate, certDerB64 } = extractFromPfx(certBuf, certPass);
+    const { privateKeyPem, certificatePem } = extractFromPfx(certBuf, certPass);
 
     if (action === "cert") {
+      const cert = forge.pki.certificateFromPem(certificatePem);
       return res.json({
         ok: true,
-        subject: certificate.subject.getField("CN")?.value,
-        issuer: certificate.issuer.getField("CN")?.value,
-        validTo: certificate.validity.notAfter,
+        subject: cert.subject.getField("CN")?.value,
+        issuer:  cert.issuer.getField("CN")?.value,
+        validTo: cert.validity.notAfter,
       });
     }
 
     const semilla = await getSemilla();
-    const xmlFirmado = firmarSemilla(semilla, privateKey, certDerB64);
+    const xmlFirmado = firmarSemilla(semilla, privateKeyPem, certificatePem);
+
+    if (action === "debug") {
+      return res.json({ ok: true, semilla, xmlFirmado });
+    }
 
     if (action === "soap") {
-      // Mostrar el SOAP exacto que se enviaría
-      const xmlF = firmarSemilla(semilla, privateKey, certDerB64);
-      const xmlEsc = xmlF.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");
+      const xmlEsc = xmlFirmado.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
       const soap = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Body><getToken><pszXml>${xmlEsc}</pszXml></getToken></soapenv:Body></soapenv:Envelope>`;
       res.setHeader("Content-Type","text/plain");
       return res.send(soap);
-    }
-    if (action === "debug") {
-      // Mostrar también el SOAP envelope completo
-      const xmlEscapado2 = xmlFirmado
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&apos;");
-      const soapDebug = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Body><getToken><pszXml>${xmlEscapado2}</pszXml></getToken></soapenv:Body></soapenv:Envelope>`;
-      return res.json({ ok: true, semilla, 
-        xmlLen: xmlFirmado.length,
-        certB64Start: xmlFirmado.slice(xmlFirmado.indexOf("X509Certificate>")+16, xmlFirmado.indexOf("X509Certificate>")+80),
-        certB64End: xmlFirmado.slice(xmlFirmado.lastIndexOf("</")-50, xmlFirmado.lastIndexOf("</")),
-        soapLen: soapDebug.length,
-        soapStart: soapDebug.slice(0,300),
-        soapEnd: soapDebug.slice(-300),
-      });
     }
 
     const token = await getToken(xmlFirmado);
@@ -84,25 +71,26 @@ export default async function handler(req, res) {
   }
 }
 
+/* ── Extraer PEM desde PFX ── */
 function extractFromPfx(pfxBuf, password) {
   const p12Asn1  = forge.asn1.fromDer(forge.util.createBuffer(pfxBuf.toString("binary")));
   const p12      = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
 
   const keyBags  = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
-  const privateKey = keyBags[forge.pki.oids.pkcs8ShroudedKeyBag]?.[0]?.key;
-  if (!privateKey) throw new Error("No se encontró clave privada en el PFX");
+  const privateKeyForge = keyBags[forge.pki.oids.pkcs8ShroudedKeyBag]?.[0]?.key;
+  if (!privateKeyForge) throw new Error("No se encontró clave privada en el PFX");
 
   const certBags   = p12.getBags({ bagType: forge.pki.oids.certBag });
   const certificate = certBags[forge.pki.oids.certBag]?.[0]?.cert;
   if (!certificate) throw new Error("No se encontró certificado en el PFX");
 
-  const certDer    = forge.asn1.toDer(forge.pki.certificateToAsn1(certificate));
-  // Certificado sin saltos de línea ni espacios — el SII es muy estricto con esto
-  const certDerB64 = Buffer.from(certDer.getBytes(), "binary").toString("base64").replace(/[\r\n\s]/g, "");
+  const privateKeyPem  = forge.pki.privateKeyToPem(privateKeyForge);
+  const certificatePem = forge.pki.certificateToPem(certificate);
 
-  return { privateKey, certificate, certDerB64 };
+  return { privateKeyPem, certificatePem };
 }
 
+/* ── Obtener semilla ── */
 async function getSemilla() {
   const r = await fetch("https://palena.sii.cl/DTEWS/CrSeed.jws", {
     method: "POST",
@@ -118,70 +106,64 @@ async function getSemilla() {
   return m[1];
 }
 
-function firmarSemilla(semilla, privateKey, certDerB64) {
-  // Documento a firmar
-  const docToSign = `<getToken><item><Semilla>${semilla}</Semilla></item></getToken>`;
+/* ── Firmar semilla con xml-crypto ── */
+function firmarSemilla(semilla, privateKeyPem, certificatePem) {
+  // Documento XML base (sin declaración XML)
+  const xmlDoc = `<getToken><item><Semilla>${semilla}</Semilla></item></getToken>`;
 
-  // DigestValue SHA1 del documento
-  const mdDoc = forge.md.sha1.create();
-  mdDoc.update(docToSign, "utf8");
-  const digestB64 = forge.util.encode64(mdDoc.digest().bytes());
+  // Limpiar PEM del certificado para X509Certificate (sin cabeceras ni saltos)
+  const certClean = certificatePem
+    .replace("-----BEGIN CERTIFICATE-----", "")
+    .replace("-----END CERTIFICATE-----", "")
+    .replace(/\r?\n/g, "")
+    .trim();
 
-  // SignedInfo — exactamente lo que se firma
-  // xmlns solo en Signature, NO en SignedInfo (evitar namespace duplicado)
-  const signedInfoXml = `<SignedInfo>`
-    + `<CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>`
-    + `<SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>`
-    + `<Reference URI="">`
-    + `<DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>`
-    + `<DigestValue>${digestB64}</DigestValue>`
-    + `</Reference>`
-    + `</SignedInfo>`;
+  const sig = new SignedXml({
+    privateKey: privateKeyPem,
+    publicCert: certificatePem,
+    signatureAlgorithm: "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
+    canonicalizationAlgorithm: "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+  });
 
-  // Firma RSA-SHA1 sobre SignedInfo
-  const mdSig = forge.md.sha1.create();
-  mdSig.update(signedInfoXml, "utf8");
-  const sigB64 = forge.util.encode64(privateKey.sign(mdSig));
+  sig.addReference({
+    xpath: "/*",
+    transforms: [],
+    digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
+  });
 
-  return `<?xml version="1.0" encoding="UTF-8"?>`
-    + `<getToken>`
-    + `<item><Semilla>${semilla}</Semilla></item>`
-    + `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">`
-    + signedInfoXml
-    + `<SignatureValue>${sigB64}</SignatureValue>`
-    + `<KeyInfo>`
-    + `<X509Data><X509Certificate>${certDerB64}</X509Certificate></X509Data>`
-    + `</KeyInfo>`
-    + `</Signature>`
-    + `</getToken>`;
+  sig.computeSignature(xmlDoc, {
+    location: { reference: "/getToken", action: "append" },
+    existingPrefixes: { ds: "http://www.w3.org/2000/09/xmldsig#" },
+  });
+
+  // Reemplazar KeyInfo generado por xml-crypto con nuestro X509Certificate
+  let signed = sig.getSignedXml();
+
+  // xml-crypto genera KeyInfo con KeyValue — reemplazarlo por X509Data
+  signed = signed.replace(
+    /<KeyInfo>[\s\S]*?<\/KeyInfo>/,
+    `<KeyInfo><X509Data><X509Certificate>${certClean}</X509Certificate></X509Data></KeyInfo>`
+  );
+
+  return `<?xml version="1.0" encoding="UTF-8"?>${signed}`;
 }
 
+/* ── Obtener token ── */
 async function getToken(xmlFirmado) {
-  // Enviar el XML firmado directamente como XML dentro del SOAP (sin CDATA ni escape)
-  // El SII parsea el XML del parámetro pszXml directamente
-  const xmlEscapado = xmlFirmado
+  const xmlEsc = xmlFirmado
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
+    .replace(/"/g, "&quot;");
 
-  const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>`
-    + `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">`
-    + `<soapenv:Body>`
-    + `<getToken>`
-    + `<pszXml>${xmlEscapado}</pszXml>`
-    + `</getToken>`
-    + `</soapenv:Body>`
-    + `</soapenv:Envelope>`;
+  const soap = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Body><getToken><pszXml>${xmlEsc}</pszXml></getToken></soapenv:Body></soapenv:Envelope>`;
 
   const r = await fetch("https://palena.sii.cl/DTEWS/GetTokenFromSeed.jws", {
     method: "POST",
     headers: { "Content-Type": "text/xml; charset=utf-8", "SOAPAction": "" },
-    body: soapEnvelope,
+    body: soap,
   });
   const text = await r.text();
-
   let xml = text;
   const inner = text.match(/getTokenReturn[^>]*>([\s\S]+?)<\/getTokenReturn/);
   if (inner) xml = inner[1].replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&");
@@ -196,6 +178,7 @@ async function getToken(xmlFirmado) {
   return m[1];
 }
 
+/* ── Descargar RCV ventas tipo 33 ── */
 async function getRCV(token, rut, anio, mes) {
   const [rutNum, dv] = rut.split("-");
   const params = new URLSearchParams({ rutEmisor:rutNum, dvEmisor:dv, periodo:`${anio}${mes}`, tipoDoc:"33", tipo:"VENTA" });
