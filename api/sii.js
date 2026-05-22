@@ -74,7 +74,8 @@ function extractFromPfx(pfxBuf, password) {
   if (!certificate) throw new Error("No se encontró certificado en el PFX");
 
   const certDer    = forge.asn1.toDer(forge.pki.certificateToAsn1(certificate));
-  const certDerB64 = Buffer.from(certDer.getBytes(), "binary").toString("base64");
+  // Sin saltos de línea — el SII requiere base64 en una sola línea
+  const certDerB64 = Buffer.from(certDer.getBytes(), "binary").toString("base64").replace(/\n/g,"").replace(/\r/g,"");
 
   return { privateKey, certificate, certDerB64 };
 }
