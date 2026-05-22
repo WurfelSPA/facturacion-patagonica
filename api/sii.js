@@ -164,10 +164,17 @@ async function getToken(xmlFirmado) {
 </soapenv:Envelope>`,
   });
   const text = await r.text();
-  const m = text.match(/<TOKEN>([^<]+)<\/TOKEN>/);
+  // Decodificar XML escapado dentro de getTokenReturn
+  let parsed = text;
+  const inner = text.match(/getTokenReturn[^>]*>([\s\S]+?)<\/getTokenReturn/);
+  if (inner) {
+    parsed = inner[1].replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&");
+  }
+  const m = parsed.match(/<TOKEN>([^<]+)<\/TOKEN>/);
   if (!m) {
-    const err = text.match(/<DESCRIPCION>([^<]+)<\/DESCRIPCION>/);
-    throw new Error("Token SII fallido: " + (err?.[1] || text.slice(0, 300)));
+    const err = parsed.match(/<DESCRIPCION>([^<]+)<\/DESCRIPCION>/);
+    const estado = parsed.match(/<ESTADO>([^<]+)<\/ESTADO>/);
+    throw new Error("Token SII fallido: " + (err?.[1] || estado?.[1] || parsed.slice(0, 400)));
   }
   return m[1];
 }
