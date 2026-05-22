@@ -147,7 +147,9 @@ async function getOdooFacturas(cfg, mes) {
 
   const [anio, mesNum] = mes.split("-");
   const fechaDesde = `${anio}-${mesNum}-01`;
-  const fechaHasta = `${anio}-${mesNum}-31`;
+  // Calcular último día real del mes
+  const ultimoDia = new Date(parseInt(anio), parseInt(mesNum), 0).getDate();
+  const fechaHasta = `${anio}-${mesNum}-${ultimoDia}`;
 
   // Buscar compañía por RUT (más confiable que por nombre)
   const rutSinDv = cfg.rut.replace("-","").slice(0,-1); // ej: "77538786"
