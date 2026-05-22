@@ -65,7 +65,7 @@ export default async function handler(req, res) {
       const url2 = "https://www4.sii.cl/consdcvinternetui/services/data/facadeService/getDetalleVentaExport";
       const body2 = JSON.stringify({
         metaData: { conversationId: token, transactionId: "0", namespace: "cl.sii.sdi.lob.diii.consdcv.data.api.interfaces.FacadeService/getDetalleVentaExport", page: null },
-        data: { rutEmisor: rutNum2, dvEmisor: dv2, ptributario: periodo2, operacion: "VENTA", estadoContab: "REGISTRO", codTipoDoc: "33", accionRecaptcha: "RCV_DETC", tokenRecaptcha: "c3" }
+        data: { rutEmisor: rutNum2, dvEmisor: dv2, ptributario: periodo2, operacion: "VENTA", estadoContab: "REGISTRO", codTipoDoc: "33", accionRecaptcha: "RCV_DDETV", tokenRecaptcha: "c3" }
       });
       const r2 = await fetch(url2, { method:"POST", headers:{"Cookie":`TOKEN=${token}`,"Content-Type":"application/json; charset=utf-8","User-Agent":"Mozilla/5.0"}, body: body2 });
       const status2 = r2.status;
@@ -213,7 +213,7 @@ async function getRCV(token, rut, anio, mes) {
       operacion: "VENTA",
       estadoContab: "REGISTRO",
       codTipoDoc: "33",
-      accionRecaptcha: "RCV_DETC",
+      accionRecaptcha: "RCV_DDETV",
       tokenRecaptcha: "c3",
     }
   });
