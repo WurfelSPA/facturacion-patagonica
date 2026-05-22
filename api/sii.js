@@ -178,23 +178,65 @@ async function getToken(xmlFirmado) {
   return m[1];
 }
 
-/* ── Descargar RCV ventas tipo 33 ── */
+/* ── Descargar RCV ventas tipo 33 via API JSON SII ── */
 async function getRCV(token, rut, anio, mes) {
   const [rutNum, dv] = rut.split("-");
-  const params = new URLSearchParams({ rutEmisor:rutNum, dvEmisor:dv, periodo:`${anio}${mes}`, tipoDoc:"33", tipo:"VENTA" });
-  const r = await fetch(`https://palena.sii.cl/cgi_dte/UPL/DTEUpload?${params}`, {
-    headers: { "Cookie":`TOKEN=${token}`, "User-Agent":"Mozilla/5.0" },
+  const periodo = `${anio}${mes}`;
+  const url = "https://www4.sii.cl/consdcvinternetui/services/data/facadeService/getDetalleVentaExport";
+
+  const body = JSON.stringify({
+    metaData: {
+      conversationId: token,
+      transactionId: "0",
+      namespace: "cl.sii.sdi.lob.diii.consdcv.data.api.interfaces.FacadeService/getDetalleVentaExport",
+      page: null,
+    },
+    data: {
+      rutEmisor: rutNum,
+      dvEmisor: dv,
+      ptributario: periodo,
+      operacion: "VENTA",
+      estadoContab: "REGISTRO",
+      codTipoDoc: "33",
+      accionRecaptcha: "RCV_DETC",
+      tokenRecaptcha: "c3",
+    }
   });
-  if (!r.ok) throw new Error(`RCV HTTP ${r.status}: ${(await r.text()).slice(0,200)}`);
-  const text = await r.text();
-  const lines = text.split(/\r?\n/).filter(l=>l.trim());
-  if (!lines.length) return [];
-  const header = lines[0].split(";").map(h=>h.trim());
-  const col = name => header.findIndex(h=>h.toLowerCase().includes(name.toLowerCase()));
-  const iF=col("folio"),iT=col("tipo"),iR=col("rut"),iRz=col("razon"),iFch=col("fecha"),iN=col("neto"),iTot=col("total");
-  return lines.slice(1).map(line=>{
-    const c=line.split(";");
-    const g=(i,fb)=>(c[i>=0?i:fb]||"").trim();
-    return { folio:g(iF,5),tipo:g(iT,1),rut:g(iR,3),razon:g(iRz,4),fecha:g(iFch,6),neto:parseInt(g(iN,11))||0,total:parseInt(g(iTot,13))||0 };
-  }).filter(r=>r.folio);
+
+  const r = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Cookie": `TOKEN=${token}`,
+      "Content-Type": "application/json; charset=utf-8",
+      "User-Agent": "Mozilla/5.0",
+      "Referer": "https://www4.sii.cl/consdcvinternetui/",
+      "Origin": "https://www4.sii.cl",
+    },
+    body,
+  });
+
+  if (!r.ok) throw new Error(`RCV HTTP ${r.status}: ${(await r.text()).slice(0,300)}`);
+  const data = await r.json();
+
+  // La respuesta tiene estructura { data: { detalleVentas: [...] } } o similar
+  const registros = data?.data?.detalleVentas
+    || data?.data?.listaVentas
+    || data?.data?.registros
+    || data?.registros
+    || [];
+
+  // Si viene en otro formato, retornar el data crudo para debug
+  if (!Array.isArray(registros)) {
+    return [{ debug: true, keys: Object.keys(data?.data || data || {}), raw: JSON.stringify(data).slice(0,500) }];
+  }
+
+  return registros.map(r => ({
+    folio:  String(r.folio || r.nroDoc || r.numero || ""),
+    tipo:   String(r.tipoDoc || r.tipoDte || "33"),
+    rut:    String(r.rutDoc || r.rutReceptor || r.rut || ""),
+    razon:  String(r.razonSocial || r.nombre || ""),
+    fecha:  String(r.fechaDoc || r.fecha || ""),
+    neto:   parseInt(r.montoNeto || r.neto || 0) || 0,
+    total:  parseInt(r.montoTotal || r.monto || r.total || 0) || 0,
+  })).filter(r => r.folio);
 }
