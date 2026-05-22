@@ -135,7 +135,13 @@ function firmarSemilla(semilla, privateKey, certDerB64) {
 
 async function getToken(xmlFirmado) {
   // Log para debug — remover después
-  const soapBody = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Body><getToken><pszXml><![CDATA[${xmlFirmado}]]></pszXml></getToken></soapenv:Body></soapenv:Envelope>`;
+  // Escapar XML para enviarlo sin CDATA
+  const xmlEscapado = xmlFirmado
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+  const soapBody = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Body><getToken><pszXml>${xmlEscapado}</pszXml></getToken></soapenv:Body></soapenv:Envelope>`;
   const r = await fetch("https://palena.sii.cl/DTEWS/GetTokenFromSeed.jws", {
     method: "POST",
     headers: { "Content-Type": "text/xml; charset=utf-8", "SOAPAction": "" },
