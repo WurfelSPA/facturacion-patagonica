@@ -1081,9 +1081,10 @@ function App(){
   const notify=(msg,t="ok")=>{setNotif({msg,t});setTimeout(()=>setNotif(null),4000);};
   const addLog=(txt,t="")=>setProcLogs(p=>[...p,{txt,t}]);
 
-  /* Cargar ZIP desde Drive cuando cambia el período */
+  /* Cargar ZIP desde Drive — solo cuando está en vista de facturación */
   useEffect(()=>{
     if(!periodo)return;
+    if(view!=="table"&&view!=="upload")return; // No cargar en otras vistas
     setFiles(p=>({...p,zip:null}));
     fetch(`/api/zip?periodo=${encodeURIComponent(periodo)}`)
       .then(r=>{
