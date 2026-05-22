@@ -111,8 +111,17 @@ async function getSemilla() {
 
 /* ── Firmar semilla con XMLDSig usando node-forge ── */
 function firmarSemilla(semilla, privateKey, certificate, certDerB64) {
-  // Contenido a firmar
+  // Contenido a firmar (sin declaración XML para el digest)
   const xmlContent = `<getToken><item><Semilla>${semilla}</Semilla></item></getToken>`;
+
+  // Extraer módulo y exponente RSA del certificado para RSAKeyValue
+  const pubKey = certificate.publicKey;
+  const nBytes = pubKey.n.toByteArray();
+  const eBytes = pubKey.e.toByteArray();
+  // Remover byte 0x00 de padding si existe
+  const nClean = nBytes[0] === 0 ? nBytes.slice(1) : nBytes;
+  const modulusB64  = Buffer.from(nClean.map(b => b < 0 ? b + 256 : b)).toString("base64");
+  const exponentB64 = Buffer.from(eBytes.map(b => b < 0 ? b + 256 : b)).toString("base64");
 
   // 1. DigestValue: SHA1 del contenido XML (sin declaración XML)
   const md = forge.md.sha1.create();
@@ -128,15 +137,8 @@ function firmarSemilla(semilla, privateKey, certificate, certDerB64) {
   const signatureBytes = privateKey.sign(mdSig);
   const signatureB64   = forge.util.encode64(signatureBytes);
 
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<getToken>
-<item><Semilla>${semilla}</Semilla></item>
-<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
-<SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/><Reference URI=""><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/><DigestValue>${digestB64}</DigestValue></Reference></SignedInfo>
-<SignatureValue>${signatureB64}</SignatureValue>
-<KeyInfo><X509Data><X509Certificate>${certDerB64}</X509Certificate></X509Data></KeyInfo>
-</Signature>
-</getToken>`;
+  // Estructura exacta según manual SII OI2007_AUTAUTOM_MDE_1.9
+  return `<?xml version="1.0" encoding="UTF-8"?><getToken><item><Semilla>${semilla}</Semilla></item><Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/><DigestValue>${digestB64}</DigestValue></Reference></SignedInfo><SignatureValue>${signatureB64}</SignatureValue><KeyInfo><KeyValue><RSAKeyValue><Modulus>${modulusB64}</Modulus><Exponent>${exponentB64}</Exponent></RSAKeyValue></KeyValue><X509Data><X509Certificate>${certDerB64}</X509Certificate></X509Data></KeyInfo></Signature></getToken>`;
 }
 
 /* ── Obtener token SII ── */
