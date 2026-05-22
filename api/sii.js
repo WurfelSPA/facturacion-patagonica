@@ -43,7 +43,22 @@ export default async function handler(req, res) {
     const xmlFirmado = firmarSemilla(semilla, privateKey, certDerB64);
 
     if (action === "debug") {
-      return res.json({ ok: true, semilla, xmlFirmado });
+      // Mostrar también el SOAP envelope completo
+      const xmlEscapado2 = xmlFirmado
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&apos;");
+      const soapDebug = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Body><getToken><pszXml>${xmlEscapado2}</pszXml></getToken></soapenv:Body></soapenv:Envelope>`;
+      return res.json({ ok: true, semilla, 
+        xmlLen: xmlFirmado.length,
+        certB64Start: xmlFirmado.slice(xmlFirmado.indexOf("X509Certificate>")+16, xmlFirmado.indexOf("X509Certificate>")+80),
+        certB64End: xmlFirmado.slice(xmlFirmado.lastIndexOf("</")-50, xmlFirmado.lastIndexOf("</")),
+        soapLen: soapDebug.length,
+        soapStart: soapDebug.slice(0,300),
+        soapEnd: soapDebug.slice(-300),
+      });
     }
 
     const token = await getToken(xmlFirmado);
