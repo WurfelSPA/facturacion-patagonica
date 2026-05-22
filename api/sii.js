@@ -104,8 +104,18 @@ async function getSemilla() {
 </soapenv:Envelope>`,
   });
   const text = await r.text();
-  const m = text.match(/<SEMILLA>(\d+)<\/SEMILLA>/);
-  if (!m) throw new Error("No se pudo obtener semilla SII: " + text.slice(0, 300));
+  // La semilla puede venir directa o dentro de XML escapado en getSeedReturn
+  let m = text.match(/<SEMILLA>(\d+)<\/SEMILLA>/);
+  if (!m) m = text.match(/SEMILLA&gt;(\d+)&lt;\/SEMILLA/);
+  if (!m) {
+    // Intentar decodificar el XML escapado dentro de getSeedReturn
+    const inner = text.match(/getSeedReturn[^>]*>([\s\S]+?)<\/getSeedReturn/);
+    if (inner) {
+      const decoded = inner[1].replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&");
+      m = decoded.match(/<SEMILLA>(\d+)<\/SEMILLA>/);
+    }
+  }
+  if (!m) throw new Error("No se pudo obtener semilla SII: " + text.slice(0, 400));
   return m[1];
 }
 
