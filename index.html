@@ -113,13 +113,11 @@ const REMITENTE="amelendez@patagonica.cl";
 const CCO="mmunoz@patagonica.cl";
 const TEST_DEST="";
 const MODO_PRUEBA=TEST_DEST!=="";
-const VER="v4.9.0";
+const VER="v4.9.1";
 const SEND_PWD="patagonica2026";
 const DRIVE_PLANILLA_ID="1rAGS-b1MoPpEhMgN2BR9Hvg4cTYdcQDu";
 const DRIVE_FACTURACION_FOLDER_ID="1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u"; /* Carpeta Facturacion Mensual */
 const DRIVE_PDF_FACTURAS_ID="1Pl7s4FNyjVQOMcEBtgCcvCGD4FlzRg2W"; /* PDF Facturas del mes — actualizar cada mes */
-const DRIVE_VENTAS_DKO_ID="1biNH7ZfjVnZPlGwqxl9COBmfH7aE4usW";   /* Detalle Ventas — Dko Home */
-const DRIVE_VENTAS_MULTI_ID="1moqCdNHRohfUR0uNbaORQ_WcBYw85nxc"; /* Detalle Ventas — Multivendor */
 const GOOGLE_SCOPES="https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.readonly";
 const TG_BOT=window.__TG_BOT__||"";
 const TG_CHAT=window.__TG_CHAT__||"";
@@ -523,296 +521,172 @@ function getEmail(cliente,emailMap){const key=NOMBRE_KEY[cliente];if(!key)return
 
 
 /* ═══════════════════════════════════
-   DETALLE VENTAS
-   Lee Odoo (.xlsx) y RCV SII (.csv)
-   desde carpetas de Drive
+   DETALLE VENTAS — Lee desde /api/odoo
 ═══════════════════════════════════ */
-
-/* Parsear export Odoo */
-function parseOdooXlsx(arrayBuffer){
-  const wb = XLSX.read(new Uint8Array(arrayBuffer), {type:"array"});
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
-  if(!rows.length) return [];
-  const header = rows[0];
-  const idx = {};
-  header.forEach((h,i) => { if(h) idx[h] = i; });
-  const data = [];
-  for(let r = 1; r < rows.length; r++){
-    const row = rows[r];
-    const num = row[idx["Número"]||0];
-    if(!num || typeof num !== "string") continue;
-    const tipo = row[idx["Tipo de Documento"]||12];
-    const rut  = row[idx["RUT Nº"]||11];
-    if(tipo == null && rut == null) continue;
-    const folio = row[idx["Número de Documento"]||15];
-    let folioStr = null;
-    try { folioStr = folio != null ? String(parseInt(folio)) : null; } catch(e){}
-    data.push({
-      numero: num.trim(),
-      folio: folioStr,
-      tipo,
-      rut,
-      neto: row[idx["Importe libre de impuestos firmado"]||5],
-      total: row[idx["Total firmado"]||6],
-      estado_sii: row[idx["Estado del DTE en SII"]||13],
-      estado_acep: row[idx["Estado de aceptación del DTE"]||14],
-    });
-  }
-  return data;
-}
-
-/* Parsear RCV SII (.csv, latin-1 convertido a texto) */
-function parseRcvCsv(text){
-  const lines = text.split(/\r?\n/).filter(l => l.trim());
-  if(!lines.length) return [];
-  const header = lines[0].split(";");
-  const iCol = name => header.indexOf(name);
-  const iF = iCol("Folio"), iT = iCol("Tipo Doc"), iTotal = iCol("Monto total"), iNeto = iCol("Monto Neto");
-  const data = [];
-  for(let i = 1; i < lines.length; i++){
-    const cols = lines[i].split(";");
-    const folio = (cols[iF]||"").trim();
-    const tipo  = (cols[iT]||"").trim();
-    const totalStr = (cols[iTotal]||"0").trim();
-    const netoStr  = (cols[iNeto]||"0").trim();
-    if(!folio) continue;
-    data.push({
-      folio,
-      tipo_cod: tipo,
-      total: parseInt(totalStr)||0,
-      neto:  parseInt(netoStr)||0,
-    });
-  }
-  return data;
-}
-
-/* Cruce Odoo vs SII por folio, solo tipo 33 */
-function cruzarOdooSII(odoo, rcv){
-  const odoo33 = {};
-  for(const r of odoo){
-    if(r.tipo && r.tipo.includes("33") && r.folio) odoo33[r.folio] = r;
-  }
-  const rcv33 = {};
-  for(const r of rcv){
-    if(r.tipo_cod === "33") rcv33[r.folio] = r;
-  }
-  const coinciden = [], diff_monto = [], solo_odoo = [], solo_rcv = [];
-  const todos = new Set([...Object.keys(odoo33), ...Object.keys(rcv33)]);
-  for(const folio of todos){
-    const enO = folio in odoo33, enR = folio in rcv33;
-    if(enO && enR){
-      const to = parseInt(odoo33[folio].total)||0, tr = rcv33[folio].total;
-      if(to === tr) coinciden.push({folio, total: to, estado_sii: odoo33[folio].estado_sii});
-      else diff_monto.push({folio, total_odoo: to, total_rcv: tr, diff: to - tr});
-    } else if(enO){
-      solo_odoo.push({folio, total: parseInt(odoo33[folio].total)||0, estado_sii: odoo33[folio].estado_sii});
-    } else {
-      solo_rcv.push({folio, total: rcv33[folio].total});
-    }
-  }
-  return {
-    odoo_count: Object.keys(odoo33).length,
-    rcv_count:  Object.keys(rcv33).length,
-    coinciden:  coinciden.length,
-    diff_monto, solo_odoo, solo_rcv,
-    total_odoo: Object.values(odoo33).reduce((s,r)=>s+(parseInt(r.total)||0),0),
-    total_rcv:  Object.values(rcv33).reduce((s,r)=>s+r.total,0),
-  };
-}
-
-/* Descargar archivos de una carpeta Drive via /api/ventas-drive */
-async function listDriveFolder(folderId, token){
-  const url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType,modifiedTime)&orderBy=modifiedTime+desc`;
-  const res = await fetch(url, {headers:{Authorization:"Bearer "+token}});
-  if(!res.ok) throw new Error("Drive list error "+res.status);
-  const data = await res.json();
-  return data.files||[];
-}
-
-async function downloadDriveFile(fileId, token){
-  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {headers:{Authorization:"Bearer "+token}});
-  if(!res.ok) throw new Error("Drive download error "+res.status);
-  return res;
-}
-
-/* Detectar si el archivo es Odoo (.xlsx) o RCV (.csv) */
-function clasificarArchivo(name){
-  const n = name.toLowerCase();
-  if(n.endsWith(".xlsx") || n.endsWith(".xls")) return "odoo";
-  if(n.endsWith(".csv")) return "rcv";
-  return null;
-}
-
-function VentasView({periodo, gmailToken, getToken}){
+function VentasView({periodo}){
   const [empresas, setEmpresas] = React.useState([
-    {id:"dko",   nombre:"Sánchez Hermanos",     rut:"77.454.587-5", folderId:DRIVE_VENTAS_DKO_ID,   result:null, loading:false, error:null, archivos:[]},
-    {id:"multi", nombre:"Distribuidora Sánchez 4G", rut:"77.538.786-6", folderId:DRIVE_VENTAS_MULTI_ID, result:null, loading:false, error:null, archivos:[]},
+    {id:"dko",   nombre:"Sánchez Hermanos",        rut:"77.454.587-5", result:null, loading:false, error:null},
+    {id:"multi", nombre:"Distribuidora Sánchez 4G", rut:"77.538.786-6", result:null, loading:false, error:null},
   ]);
   const [activeEmp, setActiveEmp] = React.useState("dko");
-  const [globalLoading, setGlobalLoading] = React.useState(false);
 
   const fmtCLP = v => "$"+Math.round(v).toLocaleString("es-CL");
 
-  /* Cargar y cruzar una empresa */
+  /* Parsear mes del período seleccionado */
+  const getMes = () => {
+    const MN={"Enero":"01","Febrero":"02","Marzo":"03","Abril":"04","Mayo":"05","Junio":"06","Julio":"07","Agosto":"08","Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12"};
+    const [nom,anio] = periodo.split(" ");
+    return `${anio}-${MN[nom]||"05"}`;
+  };
+
   const cargarEmpresa = React.useCallback(async (empId) => {
     setEmpresas(prev => prev.map(e => e.id===empId ? {...e, loading:true, error:null} : e));
     try {
-      const token = await getToken();
-      const emp = empresas.find(e=>e.id===empId);
-      const files = await listDriveFolder(emp.folderId, token);
+      const mes = getMes();
+      const res = await fetch(`/api/odoo?empresa=${empId}&mes=${mes}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error "+res.status);
 
-      const odooFile = files.find(f => clasificarArchivo(f.name)==="odoo");
-      const rcvFile  = files.find(f => clasificarArchivo(f.name)==="rcv");
-
-      if(!odooFile) throw new Error("No se encontró archivo Odoo (.xlsx) en la carpeta");
-      if(!rcvFile)  throw new Error("No se encontró archivo RCV (.csv) en la carpeta");
-
-      /* Descargar Odoo */
-      const odooRes = await downloadDriveFile(odooFile.id, token);
-      const odooBuf = await odooRes.arrayBuffer();
-      const odooData = parseOdooXlsx(odooBuf);
-
-      /* Descargar RCV — leer como latin-1 */
-      const rcvRes  = await downloadDriveFile(rcvFile.id, token);
-      const rcvBuf  = await rcvRes.arrayBuffer();
-      const rcvText = new TextDecoder("iso-8859-1").decode(rcvBuf);
-      const rcvData = parseRcvCsv(rcvText);
-
-      const result = cruzarOdooSII(odooData, rcvData);
+      // Cruzar: solo tipo 33 vs RCV (usamos datos Odoo como fuente única por ahora)
+      // Cuando tengamos SII directo, cruzamos aquí
+      const facts33 = data.facturas.filter(f => f.tipo_doc.includes("33"));
+      const pendientes = facts33.filter(f => f.estado_sii === "not_sent" || f.estado_sii === "ask_for_status" || f.estado_sii === "rejected");
+      const aceptadas  = facts33.filter(f => f.estado_sii === "accepted");
+      const rechazadas = facts33.filter(f => f.estado_sii === "rejected");
+      const sinEnviar  = facts33.filter(f => f.estado_sii === "not_sent");
+      const enEspera   = facts33.filter(f => f.estado_sii === "ask_for_status");
 
       setEmpresas(prev => prev.map(e => e.id===empId ? {
-        ...e, loading:false, error:null, result,
-        archivos:[
-          {tipo:"odoo", nombre:odooFile.name, mod:odooFile.modifiedTime},
-          {tipo:"rcv",  nombre:rcvFile.name,  mod:rcvFile.modifiedTime},
-        ]
+        ...e, loading:false, error:null,
+        result: {
+          total: data.total,
+          facts33: facts33.length,
+          aceptadas: aceptadas.length,
+          pendientes: pendientes.length,
+          rechazadas: rechazadas.length,
+          sinEnviar: sinEnviar.length,
+          enEspera: enEspera.length,
+          total_neto: facts33.reduce((s,f)=>s+f.neto,0),
+          total_bruto: facts33.reduce((s,f)=>s+f.total,0),
+          lista_pendientes: pendientes.slice(0,50),
+          lista_rechazadas: rechazadas.slice(0,50),
+        }
       } : e));
-    } catch(err){
+    } catch(err) {
       setEmpresas(prev => prev.map(e => e.id===empId ? {...e, loading:false, error:err.message} : e));
     }
-  }, [empresas, getToken]);
+  }, [periodo]);
 
-  /* Cargar ambas al montar */
   React.useEffect(()=>{
-    setGlobalLoading(true);
-    Promise.allSettled([cargarEmpresa("dko"), cargarEmpresa("multi")])
-      .finally(()=>setGlobalLoading(false));
-  }, []);
+    cargarEmpresa("dko");
+    cargarEmpresa("multi");
+  }, [periodo]);
 
   const emp = empresas.find(e=>e.id===activeEmp);
-  const totalCoinciden = empresas.reduce((s,e)=>s+(e.result?.coinciden||0),0);
-  const totalFacturas  = empresas.reduce((s,e)=>s+(e.result?.odoo_count||0),0);
-  const totalNeto      = empresas.reduce((s,e)=>s+(e.result?.total_odoo||0),0);
-  const alertas        = empresas.reduce((s,e)=>s+(e.result?.solo_odoo.length||0)+(e.result?.diff_monto.length||0),0);
-  const allLoaded      = empresas.every(e=>e.result!==null||e.error!==null);
+  const allLoaded = empresas.every(e=>e.result!==null||e.error!==null);
+  const totalAlertas = empresas.reduce((s,e)=>s+(e.result?.pendientes||0),0);
+  const totalFacts = empresas.reduce((s,e)=>s+(e.result?.facts33||0),0);
+  const totalNeto = empresas.reduce((s,e)=>s+(e.result?.total_neto||0),0);
+  const totalAcep = empresas.reduce((s,e)=>s+(e.result?.aceptadas||0),0);
 
-  const pct = emp?.result ? Math.round(emp.result.coinciden/emp.result.odoo_count*100) : 0;
+  const estadoLabel = {
+    "accepted":        {l:"Aceptada",       col:"var(--green)",  bg:"var(--gbg)",  bdr:"var(--gdim)"},
+    "not_sent":        {l:"Sin enviar",      col:"var(--red)",    bg:"var(--rbg)",  bdr:"var(--rdim)"},
+    "ask_for_status":  {l:"Consultando SII", col:"var(--amber)",  bg:"var(--abg)",  bdr:"var(--adim)"},
+    "rejected":        {l:"Rechazada",       col:"var(--red)",    bg:"var(--rbg)",  bdr:"var(--rdim)"},
+    "cancelled":       {l:"Anulada",         col:"var(--txd)",    bg:"var(--surf2)","bdr":"var(--bdr)"},
+  };
 
   return h("main",{style:{flex:1,overflowY:"auto",padding:"20px 24px",display:"flex",flexDirection:"column",gap:18},className:"fade-up"},
 
-    /* Título */
     h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}},
       h("div",null,
         h("div",{style:{fontSize:16,fontWeight:700,letterSpacing:"-0.4px"}},"📈 Detalles Ventas — "+periodo),
-        h("div",{style:{fontSize:11,color:"var(--txm)",marginTop:3}},"Cruce automático Odoo vs SII · Facturas Electrónicas tipo 33 · Desde Google Drive")
+        h("div",{style:{fontSize:11,color:"var(--txm)",marginTop:3}},"Estado DTE en SII · Facturas Electrónicas tipo 33 · Fuente: Odoo directo")
       ),
-      h("button",{
-        onClick:()=>{setEmpresas(p=>p.map(e=>({...e,result:null,error:null,loading:false})));Promise.allSettled([cargarEmpresa("dko"),cargarEmpresa("multi")]);},
-        style:{fontSize:11,padding:"5px 14px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--txm)",cursor:"pointer",display:"flex",alignItems:"center",gap:5}
-      },globalLoading?h("span",{className:"spin"},"⟳"):"↻"," Actualizar")
+      h("div",{style:{display:"flex",gap:8,alignItems:"center"}},
+        h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:6,padding:"4px 10px"}},"Próximamente: cruce automático vs SII"),
+        h("button",{
+          onClick:()=>{setEmpresas(p=>p.map(e=>({...e,result:null,error:null})));cargarEmpresa("dko");cargarEmpresa("multi");},
+          style:{fontSize:11,padding:"5px 14px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--txm)",cursor:"pointer",display:"flex",alignItems:"center",gap:5}
+        },"↻ Actualizar")
+      )
     ),
 
-    /* KPIs globales */
+    /* KPIs */
     h("div",{style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}},
       [
-        {lbl:"Total Facturas",  val:allLoaded?totalFacturas:"—",  sub:"ambas empresas",           col:"var(--accl)"},
-        {lbl:"Coinciden Exacto",val:allLoaded?totalCoinciden:"—", sub:"Odoo = SII",               col:"var(--green)"},
-        {lbl:"Alertas",         val:allLoaded?alertas:"—",        sub:alertas===0?"Sin diferencias":"requieren revisión", col:alertas>0?"var(--red)":"var(--green)"},
-        {lbl:"Total Neto",      val:allLoaded?fmtCLP(totalNeto):"—", sub:"suma ambas empresas",   col:"var(--blue)", mono:true},
+        {lbl:"Facturas tipo 33", val:allLoaded?totalFacts:"—",    sub:"ambas empresas",         col:"var(--accl)"},
+        {lbl:"Aceptadas SII",    val:allLoaded?totalAcep:"—",     sub:"sin observaciones",       col:"var(--green)"},
+        {lbl:"Con alertas",      val:allLoaded?totalAlertas:"—",  sub:totalAlertas===0?"✓ Todo OK":"pendientes/rechazadas", col:totalAlertas>0?"var(--red)":"var(--green)"},
+        {lbl:"Total Neto",       val:allLoaded?fmtCLP(totalNeto):"—", sub:"suma ambas empresas", col:"var(--blue)", mono:true},
       ].map((k,i)=>h("div",{key:i,className:"dash-card",style:{borderLeft:"3px solid "+k.col}},
         h("div",{className:"dash-card-lbl"},k.lbl),
         h("div",{style:{fontSize:k.mono?15:28,fontWeight:700,fontFamily:"'DM Mono',monospace",color:k.col,lineHeight:1,marginTop:2,letterSpacing:"-1px"}},
-          !allLoaded ? h("span",{className:"spin",style:{fontSize:16}},"⟳") : k.val
+          !allLoaded?h("span",{className:"spin",style:{fontSize:16}},"⟳"):k.val
         ),
         h("div",{className:"dash-card-sub"},k.sub)
       ))
     ),
 
-    /* Selector empresas */
+    /* Selector empresa */
     h("div",{style:{display:"flex",gap:10,flexWrap:"wrap"}},
       empresas.map(e=>{
-        const isActive = activeEmp===e.id;
-        const hasAlert = (e.result?.solo_odoo.length||0)+(e.result?.diff_monto.length||0) > 0;
-        return h("button",{key:e.id, onClick:()=>setActiveEmp(e.id),
+        const isActive=activeEmp===e.id;
+        const hasAlert=(e.result?.pendientes||0)>0;
+        return h("button",{key:e.id,onClick:()=>setActiveEmp(e.id),
           style:{padding:"12px 20px",borderRadius:10,border:"2px solid "+(isActive?"var(--acc)":"var(--bdr)"),
             background:isActive?"linear-gradient(135deg,var(--acc),var(--acc2))":"var(--surf)",
             color:isActive?"#fff":"var(--tx)",cursor:"pointer",transition:"all .15s",
             display:"flex",flexDirection:"column",alignItems:"flex-start",gap:4,minWidth:220,textAlign:"left"}},
           h("div",{style:{fontWeight:700,fontSize:13,display:"flex",alignItems:"center",gap:6}},
             e.nombre,
-            e.loading && h("span",{className:"spin",style:{fontSize:12}},"⟳"),
-            hasAlert && h("span",{style:{background:"#e53935",color:"#fff",borderRadius:10,fontSize:9,padding:"1px 7px",fontWeight:700}},"!"+(e.result.solo_odoo.length+e.result.diff_monto.length))
+            e.loading&&h("span",{className:"spin",style:{fontSize:12}},"⟳"),
+            hasAlert&&h("span",{style:{background:"#e53935",color:"#fff",borderRadius:10,fontSize:9,padding:"1px 7px",fontWeight:700}},
+              "!"+e.result.pendientes
+            )
           ),
           h("div",{style:{fontSize:10,fontFamily:"'DM Mono',monospace",opacity:isActive?0.85:0.5}},e.rut),
           h("div",{style:{fontSize:10,opacity:isActive?0.85:0.5}},
-            e.result ? e.result.coinciden+"/"+e.result.odoo_count+" coinciden · "+fmtCLP(e.result.total_odoo) :
-            e.error  ? "⚠ Error al cargar" : "Cargando..."
+            e.result?`${e.result.aceptadas}/${e.result.facts33} aceptadas · ${fmtCLP(e.result.total_neto)}`:
+            e.error?"⚠ Error":"Cargando..."
           )
         );
       })
     ),
 
     /* Panel empresa activa */
-    emp && h("div",{style:{display:"grid",gridTemplateColumns:"220px 1fr",gap:14,alignItems:"start"}},
+    emp&&h("div",{style:{display:"grid",gridTemplateColumns:"220px 1fr",gap:14,alignItems:"start"}},
 
       /* Resumen lateral */
-      h("div",{className:"dash-card",style:{borderTop:"3px solid var(--acc)",display:"flex",flexDirection:"column",gap:0}},
+      h("div",{className:"dash-card",style:{borderTop:"3px solid var(--acc)"}},
         h("div",{style:{fontWeight:700,fontSize:12,marginBottom:10}},emp.nombre),
         h("div",{style:{fontSize:10,color:"var(--txd)",marginBottom:1}},"RUT"),
-        h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,marginBottom:10}},emp.rut),
+        h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,marginBottom:12}},emp.rut),
 
-        emp.loading && h("div",{style:{display:"flex",alignItems:"center",gap:8,color:"var(--txm)",fontSize:12,padding:"10px 0"}},
-          h("span",{className:"spin"},"⟳"),"Descargando desde Drive..."
-        ),
-
-        emp.error && h("div",{style:{background:"var(--rbg)",border:"1px solid var(--rdim)",borderRadius:8,padding:"10px",fontSize:11,color:"var(--red)",marginBottom:10}},
+        emp.loading&&h("div",{style:{display:"flex",alignItems:"center",gap:8,color:"var(--txm)",fontSize:12}},"⟳ Consultando Odoo..."),
+        emp.error&&h("div",{style:{background:"var(--rbg)",border:"1px solid var(--rdim)",borderRadius:8,padding:"10px",fontSize:11,color:"var(--red)",marginBottom:8}},
           "✗ "+emp.error,
-          h("button",{onClick:()=>cargarEmpresa(emp.id),style:{display:"block",marginTop:6,fontSize:11,padding:"4px 10px",borderRadius:6,border:"1px solid var(--rdim)",background:"var(--surf)",color:"var(--red)",cursor:"pointer"}},"↻ Reintentar")
+          h("button",{onClick:()=>cargarEmpresa(emp.id),style:{display:"block",marginTop:6,fontSize:11,padding:"3px 10px",borderRadius:6,border:"1px solid var(--rdim)",background:"var(--surf)",color:"var(--red)",cursor:"pointer"}},"↻ Reintentar")
         ),
 
-        emp.result && h("div",null,
-          h("div",{style:{fontSize:10,color:"var(--txd)",marginBottom:4}},"Coincidencia: "+pct+"%"),
-          h("div",{style:{height:6,background:"var(--surf3)",borderRadius:3,marginBottom:12,overflow:"hidden"}},
-            h("div",{style:{height:"100%",width:pct+"%",background:pct===100?"var(--green)":pct>95?"var(--amber)":"var(--red)",borderRadius:3,transition:"width .6s ease"}})
-          ),
+        emp.result&&h("div",null,
           [
-            {lbl:"Odoo",           val:emp.result.odoo_count, col:"var(--blue)"},
-            {lbl:"SII (RCV)",      val:emp.result.rcv_count,  col:"var(--blue)"},
-            {lbl:"✓ Coinciden",    val:emp.result.coinciden,  col:"var(--green)"},
-            {lbl:"≠ Dif. monto",   val:emp.result.diff_monto.length, col:emp.result.diff_monto.length>0?"var(--red)":"var(--txd)"},
-            {lbl:"Solo en Odoo",   val:emp.result.solo_odoo.length,  col:emp.result.solo_odoo.length>0?"var(--amber)":"var(--txd)"},
-            {lbl:"Solo en SII",    val:emp.result.solo_rcv.length,   col:emp.result.solo_rcv.length>0?"var(--amber)":"var(--txd)"},
+            {lbl:"Total documentos", val:emp.result.total,      col:"var(--txm)"},
+            {lbl:"Facturas tipo 33", val:emp.result.facts33,    col:"var(--blue)"},
+            {lbl:"✓ Aceptadas",      val:emp.result.aceptadas,  col:"var(--green)"},
+            {lbl:"⏳ Consultando",   val:emp.result.enEspera,   col:"var(--amber)"},
+            {lbl:"⚠ Sin enviar",     val:emp.result.sinEnviar,  col:emp.result.sinEnviar>0?"var(--red)":"var(--txd)"},
+            {lbl:"✗ Rechazadas",     val:emp.result.rechazadas, col:emp.result.rechazadas>0?"var(--red)":"var(--txd)"},
           ].map((s,i)=>h("div",{key:i,style:{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid var(--bdr)"}},
             h("span",{style:{fontSize:11,color:"var(--txm)"}},s.lbl),
             h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:s.col}},s.val)
           )),
           h("div",{style:{marginTop:12,paddingTop:10,borderTop:"1px solid var(--bdr)"}},
-            h("div",{style:{fontSize:10,color:"var(--txd)",marginBottom:2}},"Total Odoo"),
-            h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:"var(--blue)"}},fmtCLP(emp.result.total_odoo)),
-            h("div",{style:{fontSize:10,color:"var(--txd)",marginTop:6,marginBottom:2}},"Total SII"),
-            h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:"var(--blue)"}},fmtCLP(emp.result.total_rcv)),
-            emp.result.total_odoo!==emp.result.total_rcv && h("div",{style:{marginTop:6,background:"var(--abg)",border:"1px solid var(--adim)",borderRadius:6,padding:"5px 8px",fontSize:10,color:"var(--amber)",fontWeight:600}},
-              "Δ "+fmtCLP(Math.abs(emp.result.total_odoo-emp.result.total_rcv))
-            )
-          ),
-
-          /* Archivos cargados */
-          emp.archivos.length>0 && h("div",{style:{marginTop:12,paddingTop:10,borderTop:"1px solid var(--bdr)"}},
-            h("div",{style:{fontSize:10,color:"var(--txd)",marginBottom:6}},"Archivos en Drive:"),
-            emp.archivos.map((a,i)=>h("div",{key:i,style:{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--txm)",padding:"2px 0",display:"flex",gap:4}},
-              h("span",{style:{color:a.tipo==="odoo"?"var(--blue)":"var(--green)"}},"▸"),a.nombre
-            ))
+            h("div",{style:{fontSize:10,color:"var(--txd)",marginBottom:2}},"Neto facturado"),
+            h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:"var(--blue)"}},fmtCLP(emp.result.total_neto)),
+            h("div",{style:{fontSize:10,color:"var(--txd)",marginTop:6,marginBottom:2}},"Total con IVA"),
+            h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:"var(--blue)"}},fmtCLP(emp.result.total_bruto))
           )
         )
       ),
@@ -820,93 +694,100 @@ function VentasView({periodo, gmailToken, getToken}){
       /* Panel derecho */
       h("div",{style:{display:"flex",flexDirection:"column",gap:12}},
 
-        /* Loading skeleton */
-        emp.loading && h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,padding:"40px",textAlign:"center",color:"var(--txm)",fontSize:13,display:"flex",flexDirection:"column",alignItems:"center",gap:12}},
+        emp.loading&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,padding:"40px",textAlign:"center",color:"var(--txm)",fontSize:13,display:"flex",flexDirection:"column",alignItems:"center",gap:12}},
           h("span",{className:"spin",style:{fontSize:24}},"⟳"),
-          h("span",null,"Descargando archivos desde Google Drive..."),
-          h("span",{style:{fontSize:11,color:"var(--txd)"}},"Odoo .xlsx + RCV SII .csv")
+          "Consultando Odoo..."
         ),
 
-        /* Error */
-        emp.error && !emp.loading && h("div",{style:{background:"var(--rbg)",border:"1px solid var(--rdim)",borderRadius:12,padding:"24px",display:"flex",alignItems:"center",gap:16}},
+        emp.error&&!emp.loading&&h("div",{style:{background:"var(--rbg)",border:"1px solid var(--rdim)",borderRadius:12,padding:"24px",display:"flex",alignItems:"center",gap:16}},
           h("div",{style:{fontSize:32}},"⚠️"),
           h("div",null,
-            h("div",{style:{fontWeight:700,fontSize:14,color:"var(--red)",marginBottom:6}},"Error al cargar archivos"),
+            h("div",{style:{fontWeight:700,fontSize:14,color:"var(--red)",marginBottom:6}},"Error al consultar Odoo"),
             h("div",{style:{fontSize:12,color:"var(--txm)",marginBottom:10}},emp.error),
             h("button",{onClick:()=>cargarEmpresa(emp.id),style:{fontSize:12,padding:"6px 16px",borderRadius:8,border:"none",background:"var(--red)",color:"#fff",fontWeight:700,cursor:"pointer"}},"↻ Reintentar")
           )
         ),
 
-        /* Resultados */
-        emp.result && !emp.loading && (
-          (emp.result.solo_odoo.length===0 && emp.result.solo_rcv.length===0 && emp.result.diff_monto.length===0) ?
+        emp.result&&!emp.loading&&(
+          emp.result.pendientes===0?
           h("div",{style:{background:"var(--gbg)",border:"1px solid var(--gdim)",borderRadius:12,padding:"28px",display:"flex",alignItems:"center",gap:18}},
-            h("div",{style:{fontSize:40,lineHeight:1}},"✅"),
+            h("div",{style:{fontSize:40}},"✅"),
             h("div",null,
-              h("div",{style:{fontWeight:700,fontSize:15,color:"var(--green)",marginBottom:6}},emp.result.coinciden+"/"+emp.result.coinciden+" facturas coinciden exactamente"),
-              h("div",{style:{fontSize:12,color:"var(--txm)",lineHeight:1.6}},"Odoo y SII tienen los mismos folios y montos para "+emp.nombre+"."),
-              h("div",{style:{fontSize:11,color:"var(--txd)",marginTop:8,fontFamily:"'DM Mono',monospace"}},
-                "Total: "+fmtCLP(emp.result.total_odoo)+" · "+emp.result.coinciden+" facturas tipo 33"
-              )
+              h("div",{style:{fontWeight:700,fontSize:15,color:"var(--green)",marginBottom:6}},emp.result.aceptadas+"/"+emp.result.facts33+" facturas aceptadas por el SII"),
+              h("div",{style:{fontSize:12,color:"var(--txm)",lineHeight:1.6}},"Todas las facturas de "+emp.nombre+" han sido aceptadas sin observaciones."),
+              h("div",{style:{fontSize:11,color:"var(--txd)",marginTop:8,fontFamily:"'DM Mono',monospace"}},"Neto: "+fmtCLP(emp.result.total_neto)+" · "+emp.result.facts33+" facturas tipo 33")
             )
           ):
           h("div",{style:{display:"flex",flexDirection:"column",gap:10}},
 
-            /* Solo en Odoo */
-            emp.result.solo_odoo.length>0 && h("div",{style:{background:"var(--abg)",border:"1px solid var(--adim)",borderRadius:12,overflow:"hidden"}},
-              h("div",{style:{padding:"12px 16px",borderBottom:"1px solid var(--adim)",display:"flex",alignItems:"center",gap:8}},
-                h("span",{style:{fontSize:16}},"⚠️"),
+            /* Sin enviar */
+            emp.result.sinEnviar>0&&h("div",{style:{background:"var(--rbg)",border:"1px solid var(--rdim)",borderRadius:12,overflow:"hidden"}},
+              h("div",{style:{padding:"12px 16px",borderBottom:"1px solid var(--rdim)",display:"flex",alignItems:"center",gap:8}},
+                h("span",{style:{fontSize:16}},"🔴"),
                 h("div",{style:{flex:1}},
-                  h("div",{style:{fontWeight:700,fontSize:12,color:"var(--amber)"}},"Solo en Odoo — no encontrada en SII"),
-                  h("div",{style:{fontSize:11,color:"var(--txm)"}},"Factura emitida pero aún no aparece en el RCV del SII")
+                  h("div",{style:{fontWeight:700,fontSize:12,color:"var(--red)"}},"Sin enviar al SII"),
+                  h("div",{style:{fontSize:11,color:"var(--txm)"}},"Facturas emitidas en Odoo que aún no fueron enviadas al SII")
                 ),
-                h("span",{style:{background:"var(--amber)",color:"#fff",borderRadius:10,fontSize:10,fontWeight:700,padding:"2px 8px"}},emp.result.solo_odoo.length)
+                h("span",{style:{background:"var(--red)",color:"#fff",borderRadius:10,fontSize:10,fontWeight:700,padding:"2px 8px"}},emp.result.sinEnviar)
               ),
               h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
                 h("thead",null,h("tr",{style:{background:"rgba(255,255,255,0.5)"}},
-                  ["Folio","Total","Estado SII","Acción"].map(c=>h("th",{key:c,style:{padding:"7px 14px",fontSize:9,fontWeight:700,color:"var(--amber)",textAlign:"left",letterSpacing:".06em"}},c.toUpperCase()))
+                  ["Folio","Cliente","Fecha","Total","Estado SII"].map(c=>h("th",{key:c,style:{padding:"7px 14px",fontSize:9,fontWeight:700,color:"var(--red)",textAlign:"left",letterSpacing:".06em"}},c.toUpperCase()))
                 )),
                 h("tbody",null,
-                  emp.result.solo_odoo.map((r,i)=>h("tr",{key:i,style:{borderTop:"1px solid var(--adim)"}},
-                    h("td",{style:{padding:"9px 14px",fontFamily:"'DM Mono',monospace",fontWeight:700}},r.folio),
-                    h("td",{style:{padding:"9px 14px",fontFamily:"'DM Mono',monospace"}},fmtCLP(r.total)),
-                    h("td",{style:{padding:"9px 14px",color:"var(--red)",fontWeight:600}},r.estado_sii||"Pendiente de envío al SII"),
-                    h("td",{style:{padding:"9px 14px",color:"var(--txm)"}},"Verificar en portal SII")
+                  emp.result.lista_pendientes.filter(f=>f.estado_sii==="not_sent").map((f,i)=>h("tr",{key:i,style:{borderTop:"1px solid var(--rdim)"}},
+                    h("td",{style:{padding:"8px 14px",fontFamily:"'DM Mono',monospace",fontWeight:700}},f.folio),
+                    h("td",{style:{padding:"8px 14px",fontSize:11,maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},f.cliente),
+                    h("td",{style:{padding:"8px 14px",fontFamily:"'DM Mono',monospace",fontSize:11}},f.fecha),
+                    h("td",{style:{padding:"8px 14px",fontFamily:"'DM Mono',monospace",fontSize:11}},"$"+f.total.toLocaleString("es-CL")),
+                    h("td",{style:{padding:"8px 14px",color:"var(--red)",fontWeight:600,fontSize:10}},"Sin enviar")
                   ))
                 )
               )
             ),
 
-            /* Diferencias de monto */
-            emp.result.diff_monto.length>0 && h("div",{style:{background:"var(--rbg)",border:"1px solid var(--rdim)",borderRadius:12,overflow:"hidden"}},
+            /* Consultando SII */
+            emp.result.enEspera>0&&h("div",{style:{background:"var(--abg)",border:"1px solid var(--adim)",borderRadius:12,overflow:"hidden"}},
+              h("div",{style:{padding:"12px 16px",borderBottom:"1px solid var(--adim)",display:"flex",alignItems:"center",gap:8}},
+                h("span",{style:{fontSize:16}},"⏳"),
+                h("div",{style:{flex:1}},
+                  h("div",{style:{fontWeight:700,fontSize:12,color:"var(--amber)"}},"Consultando estado en SII"),
+                  h("div",{style:{fontSize:11,color:"var(--txm)"}},"Enviadas pero pendientes de respuesta del SII")
+                ),
+                h("span",{style:{background:"var(--amber)",color:"#fff",borderRadius:10,fontSize:10,fontWeight:700,padding:"2px 8px"}},emp.result.enEspera)
+              ),
+              h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
+                h("thead",null,h("tr",{style:{background:"rgba(255,255,255,0.5)"}},
+                  ["Folio","Cliente","Fecha","Total"].map(c=>h("th",{key:c,style:{padding:"7px 14px",fontSize:9,fontWeight:700,color:"var(--amber)",textAlign:"left",letterSpacing:".06em"}},c.toUpperCase()))
+                )),
+                h("tbody",null,
+                  emp.result.lista_pendientes.filter(f=>f.estado_sii==="ask_for_status").slice(0,20).map((f,i)=>h("tr",{key:i,style:{borderTop:"1px solid var(--adim)"}},
+                    h("td",{style:{padding:"8px 14px",fontFamily:"'DM Mono',monospace",fontWeight:700}},f.folio),
+                    h("td",{style:{padding:"8px 14px",fontSize:11,maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},f.cliente),
+                    h("td",{style:{padding:"8px 14px",fontFamily:"'DM Mono',monospace",fontSize:11}},f.fecha),
+                    h("td",{style:{padding:"8px 14px",fontFamily:"'DM Mono',monospace",fontSize:11}},"$"+f.total.toLocaleString("es-CL"))
+                  ))
+                )
+              )
+            ),
+
+            /* Rechazadas */
+            emp.result.rechazadas>0&&h("div",{style:{background:"var(--rbg)",border:"1px solid var(--rdim)",borderRadius:12,overflow:"hidden"}},
               h("div",{style:{padding:"12px 16px",borderBottom:"1px solid var(--rdim)",display:"flex",alignItems:"center",gap:8}},
                 h("span",{style:{fontSize:16}},"❌"),
-                h("div",null,
-                  h("div",{style:{fontWeight:700,fontSize:12,color:"var(--red)"}},"Diferencias de monto"),
-                  h("div",{style:{fontSize:11,color:"var(--txm)"}},"Mismo folio, montos distintos entre Odoo y SII")
-                )
+                h("div",{style:{flex:1}},
+                  h("div",{style:{fontWeight:700,fontSize:12,color:"var(--red)"}},"Rechazadas por el SII"),
+                  h("div",{style:{fontSize:11,color:"var(--txm)"}},"Requieren corrección urgente")
+                ),
+                h("span",{style:{background:"var(--red)",color:"#fff",borderRadius:10,fontSize:10,fontWeight:700,padding:"2px 8px"}},emp.result.rechazadas)
               ),
-              h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
-                h("thead",null,h("tr",{style:{background:"rgba(255,255,255,0.5)"}},
-                  ["Folio","Odoo","SII","Diferencia"].map(c=>h("th",{key:c,style:{padding:"7px 14px",fontSize:9,fontWeight:700,color:"var(--red)",textAlign:"left",letterSpacing:".06em"}},c.toUpperCase()))
-                )),
-                h("tbody",null,
-                  emp.result.diff_monto.map((r,i)=>h("tr",{key:i,style:{borderTop:"1px solid var(--rdim)"}},
-                    h("td",{style:{padding:"9px 14px",fontFamily:"'DM Mono',monospace",fontWeight:700}},r.folio),
-                    h("td",{style:{padding:"9px 14px",fontFamily:"'DM Mono',monospace"}},fmtCLP(r.total_odoo)),
-                    h("td",{style:{padding:"9px 14px",fontFamily:"'DM Mono',monospace"}},fmtCLP(r.total_rcv)),
-                    h("td",{style:{padding:"9px 14px",fontFamily:"'DM Mono',monospace",fontWeight:700,color:"var(--red)"}},
-                      (r.diff>0?"+":"")+fmtCLP(r.diff)
-                    )
-                  ))
-                )
+              h("tbody",null,
+                emp.result.lista_rechazadas.map((f,i)=>h("tr",{key:i,style:{borderTop:"1px solid var(--rdim)"}},
+                  h("td",{style:{padding:"8px 14px",fontFamily:"'DM Mono',monospace",fontWeight:700}},f.folio),
+                  h("td",{style:{padding:"8px 14px",fontSize:11}},f.cliente),
+                  h("td",{style:{padding:"8px 14px",fontFamily:"'DM Mono',monospace",fontSize:11}},"$"+f.total.toLocaleString("es-CL"))
+                ))
               )
-            ),
-
-            /* Solo en SII */
-            emp.result.solo_rcv.length>0 && h("div",{style:{background:"var(--rbg)",border:"1px solid var(--rdim)",borderRadius:12,padding:"14px 16px"}},
-              h("div",{style:{fontWeight:700,fontSize:12,color:"var(--red)",marginBottom:8}},"❌ Solo en SII — no encontradas en Odoo ("+emp.result.solo_rcv.length+")"),
-              emp.result.solo_rcv.map((r,i)=>h("div",{key:i,style:{fontFamily:"'DM Mono',monospace",fontSize:11,padding:"3px 0",color:"var(--txm)"}},"Folio "+r.folio+" · "+fmtCLP(r.total)))
             )
           )
         )
@@ -1780,15 +1661,15 @@ function App(){
             style:{background:unlocked?"#e8f5ee":"var(--surf2)",border:unlocked?"1px solid #b6ddd0":"1px solid var(--bdr)",color:unlocked?"#0a7c4e":"var(--txm)",borderRadius:9,padding:"6px 10px",fontSize:14,cursor:"pointer",lineHeight:1}
           },unlocked?"🔓":"🔒")
         ),
-        h("button",{
+        view!=="table"&&h("button",{
           onClick:splitPDF,
           disabled:splitLoading,
-          className:view==="table"?"nav-btn-navy":"nav-btn",
+          className:"nav-btn",
           style:{fontSize:11,opacity:splitLoading?0.6:1}
         },splitLoading?h("span",null,h("span",{className:"spin"},"⟳")," Procesando..."):"📂 Separar PDF"),
-        h("button",{
-          onClick:()=>setView("ventas"),
-          className:view==="table"?`nav-btn-navy${view==="ventas"?" active":""}`:`nav-btn${view==="ventas"?" active":""}`,
+        view!=="table"&&h("button",{
+          onClick:()=>setView(view==="ventas"?"dashboard":"ventas"),
+          className:`nav-btn${view==="ventas"?" active":""}`,
           style:{fontSize:11}
         },"📈 Detalles Ventas")
       )
@@ -1906,7 +1787,7 @@ function App(){
           },unlocked?`✉ Enviar todos (${Math.max(0,stats.ok-stats.sent)})`:`🔒 Enviar todos (${Math.max(0,stats.ok-stats.sent)})`)
       )
     )
-    ,view==="ventas"&&h(VentasView,{periodo,gmailToken,getToken})
+    ,view==="ventas"&&h(VentasView,{periodo})
   );
 }
 ReactDOM.createRoot(document.getElementById("root")).render(h(App));
