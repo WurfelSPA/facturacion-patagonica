@@ -58,6 +58,21 @@ export default async function handler(req, res) {
 
     const token = await getToken(xmlFirmado);
 
+    if (action === "debug_rcv") {
+      const [anio2, mesNum2] = mes.split("-");
+      const [rutNum2, dv2] = cfg.rut.split("-");
+      const periodo2 = `${anio2}${mesNum2.padStart(2,"0")}`;
+      const url2 = "https://www4.sii.cl/consdcvinternetui/services/data/facadeService/getDetalleVentaExport";
+      const body2 = JSON.stringify({
+        metaData: { conversationId: token, transactionId: "0", namespace: "cl.sii.sdi.lob.diii.consdcv.data.api.interfaces.FacadeService/getDetalleVentaExport", page: null },
+        data: { rutEmisor: rutNum2, dvEmisor: dv2, ptributario: periodo2, operacion: "VENTA", estadoContab: "REGISTRO", codTipoDoc: "33", accionRecaptcha: "RCV_DETC", tokenRecaptcha: "c3" }
+      });
+      const r2 = await fetch(url2, { method:"POST", headers:{"Cookie":`TOKEN=${token}`,"Content-Type":"application/json; charset=utf-8","User-Agent":"Mozilla/5.0"}, body: body2 });
+      const status2 = r2.status;
+      const raw2 = await r2.text();
+      return res.json({ ok: true, status: status2, raw: raw2.slice(0,2000) });
+    }
+
     if (action === "token") {
       return res.json({ ok: true, empresa, token: token.slice(0,15)+"...", mensaje: "✓ Autenticación SII exitosa" });
     }
