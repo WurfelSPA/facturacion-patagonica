@@ -343,13 +343,13 @@ export default async function handler(req, res) {
       if (nro && cliente) fname = `F-${nro} ${cliente}.pdf`;
       else if (nro)       fname = `F-${nro}.pdf`;
       else                fname = `F-p${i+1}.pdf`;
-      zip.file(`${periodo}/${cod}/${fname}`, pageBufs[i]);
+      zip.file(`${cod}/${fname}`, pageBufs[i]);
       breakdown[cod] = (breakdown[cod] || 0) + 1;
       console.log(`Pág ${i+1}: ${cod} → ${fname}`);
     }
 
     if (sinCod.length > 0) {
-      zip.file(`${periodo}/sin_cod.txt`, `Páginas sin COD: ${sinCod.join(", ")}\n`);
+      zip.file(`sin_cod.txt`, `Páginas sin COD: ${sinCod.join(", ")}\n`);
     }
 
     /* Resumen legible para verificación */
@@ -357,7 +357,7 @@ export default async function handler(req, res) {
     for (const [cod, cnt] of Object.entries(breakdown).sort(([a],[b])=>a.localeCompare(b))) {
       resumenLines.push(`  ${cod}: ${cnt} facturas`);
     }
-    zip.file(`${periodo}/resumen.txt`, resumenLines.join("\n") + "\n");
+    zip.file(`resumen.txt`, resumenLines.join("\n") + "\n");
 
     // 4. Generar ZIP
     const zipBuf = Buffer.from(await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }));
