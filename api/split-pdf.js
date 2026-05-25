@@ -246,6 +246,31 @@ function extractText(pdfBuf) {
   return text.replace(/\s+/g," ").trim();
 }
 
+// ── Dividir texto completo en bloques por página ────────────────────────────
+// El PDF completo produce texto concatenado; cada factura empieza con "Nº XXXXX"
+// Usamos ese patrón como delimitador de página
+function splitByPages(fullText) {
+  const splits = [];
+  // Ancla: "FACTURA (EXENTA) ELECTRONICA" seguido de Nº y número de factura
+  const pageStartRegex = /FACTURA(?:\s+EXENTA)?\s+ELECTRONICA\s*N[\xBA\xB0\u00BA\u00B0]\s*\d{2,6}/g;
+  let m;
+  while ((m = pageStartRegex.exec(fullText)) !== null) {
+    splits.push(m.index);
+  }
+  if (splits.length === 0) {
+    console.warn("splitByPages: no se encontraron anclas, devolviendo texto completo");
+    return [fullText];
+  }
+  const pageTexts = [];
+  for (let i = 0; i < splits.length; i++) {
+    const start = splits[i];
+    const end = i + 1 < splits.length ? splits[i + 1] : fullText.length;
+    pageTexts.push(fullText.slice(start, end));
+  }
+  console.log(`splitByPages: ${pageTexts.length} páginas detectadas`);
+  return pageTexts;
+}
+
 // ── Detectar COD ─────────────────────────────────────────────────────────────
 const COD_MAP = {"5-A":"5A","5A":"5A","4-A":"4A","4A":"4A","A-1":"A1","A1":"A1",
   "A-2":"A2","A2":"A2","B":"B","D-2":"D2","D2":"D2","D-3":"D3","D3":"D3"};
@@ -262,12 +287,12 @@ function detectNro(text) {
   return m ? m[1] : null;
 }
 function detectCliente(text) {
-  /* Busca "Señor(es) NOMBRE RUT" — toma el nombre entre Señor(es) y RUT */
-  const m = text.match(/Se[ñn]or(?:es)?\.?\s+(.+?)\s+RUT/i);
+  /* En texto CMap los campos están pegados: "Señor(es)NOMBRE CLIENTERUT59.170..." */
+  const m = text.match(/Señor\(es\)\s*(.+?)\s*RUT\s*[\d]/)
+    || text.match(/Senor\(es\)\s*(.+?)\s*RUT\s*[\d]/);
   if (!m) return null;
-  /* Limpiar y truncar a 30 chars para el nombre de archivo */
   return m[1].trim()
-    .replace(/[/\\:*?"<>|]/g, "")   /* chars inválidos en nombres de archivo */
+    .replace(/[/\\:*?"<>|]/g, "")
     .replace(/\s+/g, " ")
     .slice(0, 30)
     .trim();
@@ -296,9 +321,15 @@ export default async function handler(req, res) {
     const pdfBuf = await driveDownload(token, pdfFileId);
     console.log(`PDF: ${pdfBuf.length} bytes`);
 
-    // 2. Extraer texto de todo el PDF para detectar CODs
-    // Usamos el extractor CMap sobre el PDF completo
+    // 2. Extraer metadata de TODAS las páginas desde el PDF completo
+    //    (los CMaps funcionan correctamente sobre el PDF completo)
+    //    Dividir por form feed \f que separa páginas en el texto plano
     const fullText = extractText(pdfBuf);
+    
+    // Separar en páginas: cada página del PDF produce un bloque de texto
+    // Usamos los marcadores Nº XXXXX para delimitar páginas
+    const pageTexts = splitByPages(fullText);
+    console.log(`Texto extraído: ${fullText.length} chars, páginas detectadas: ${pageTexts.length}`);
 
     // Separar páginas usando el parser puro
     const pageBufs = splitPDFPages(pdfBuf);
@@ -307,18 +338,18 @@ export default async function handler(req, res) {
     }
     console.log(`Páginas separadas: ${pageBufs.length}`);
 
-    // 3. Para cada página extraer texto y detectar COD
+    // 3. Usar el texto del PDF completo para nombrar cada página
     const zip = new JSZip();
     const sinCod = [];
     const breakdown = {};
 
     for (let i = 0; i < pageBufs.length; i++) {
-      const text = extractText(pageBufs[i]);
+      // Usar texto extraído del PDF completo para esta posición de página
+      const text = pageTexts[i] || "";
       const cod = detectCod(text);
       const nro = detectNro(text);
 
       if (!cod) {
-        /* Último recurso: buscar en el texto completo del PDF por posición de página */
         sinCod.push(i + 1);
         console.log(`Pág ${i+1}: sin COD — texto: "${text.slice(0,80)}"`);
         continue;
