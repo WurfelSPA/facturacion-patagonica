@@ -1121,9 +1121,13 @@ function App(){
   },[periodo]);
 
   useEffect(()=>{
-    if(view!=="table"&&view!=="upload")return;
-    cargarZipDrive();
-  },[periodo,view]);
+    if(view!=="upload")return;
+    setZipStatus("idle");
+    setFiles(p=>({...p,zip:null}));
+    // small delay so state clears before fetching
+    const t=setTimeout(()=>cargarZipDrive(),50);
+    return ()=>clearTimeout(t);
+  },[periodo]);
 
   /* Separar PDF maestro y subir ZIP a Drive */
   /* Auto-generar ZIP cuando no existe en Drive */
@@ -1846,7 +1850,7 @@ function App(){
       ),
 
       /* ── COLUMNA DERECHA: estado del proceso ── */
-      h("div",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:"32px 48px"}},
+      h("div",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-start",gap:16,padding:"32px 48px",overflowY:"auto"}},
         h("div",{style:{width:"100%",maxWidth:420}},
 
           h("h2",{style:{fontSize:18,fontWeight:700,marginBottom:20,color:"var(--tx)"}},periodo),
