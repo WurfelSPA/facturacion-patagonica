@@ -1097,91 +1097,70 @@ function App(){
   /* Cargar ZIP desde Drive cuando cambia período y estamos en vista facturación */
   const [zipStatus,setZipStatus]=useState("idle");
   const [zipError,setZipError]=useState(null);
+  const zipPeriodoRef=React.useRef(""); /* período del ZIP actualmente cargado */
 
-  /* Un solo useEffect: busca el ZIP cada vez que cambia el período.
-     Cancel flag evita que un fetch anterior pise al actual. */
-  useEffect(()=>{
-    if(view!=="upload"||!periodo)return;
-    let cancelled=false;
+  /* Buscar ZIP cuando se selecciona un período */
+  const buscarZip=React.useCallback((p)=>{
+    if(!p)return;
+    zipPeriodoRef.current=p;
     setZipStatus("loading");
     setZipError(null);
-    setFiles(p=>({...p,zip:null}));
-    fetch("/api/zip?periodo="+encodeURIComponent(periodo))
+    setFiles(prev=>({...prev,zip:null}));
+    fetch("/api/zip?periodo="+encodeURIComponent(p))
       .then(r=>{
         if(r.status===404)return r.json().then(()=>{throw Object.assign(new Error("no_zip"),{notFound:true});});
         if(!r.ok)return r.json().then(e=>{throw new Error(e.error||"Error "+r.status);});
         return r.blob();
       })
       .then(blob=>{
-        if(cancelled)return;
-        const f=new File([blob],periodo.replace(" ","-")+".zip",{type:"application/zip"});
-        setFiles(p=>({...p,zip:f}));
+        /* Ignorar si el usuario ya cambió de período */
+        if(zipPeriodoRef.current!==p)return;
+        const f=new File([blob],p.replace(" ","-")+".zip",{type:"application/zip"});
+        setFiles(prev=>({...prev,zip:f}));
         setZipStatus("ready");
       })
       .catch(e=>{
-        if(cancelled)return;
+        if(zipPeriodoRef.current!==p)return;
         if(e.notFound){setZipStatus("missing");}
         else{setZipStatus("error");setZipError(e.message);}
       });
-    return ()=>{cancelled=true;};
-  },[periodo,view]);
+  },[]);
 
-  /* Reintentar manualmente */
-  const cargarZipDrive=React.useCallback(()=>{
-    if(!periodo)return;
-    setZipStatus("loading");setZipError(null);setFiles(p=>({...p,zip:null}));
-    fetch("/api/zip?periodo="+encodeURIComponent(periodo))
-      .then(r=>{
-        if(r.status===404)return r.json().then(()=>{throw Object.assign(new Error("no_zip"),{notFound:true});});
-        if(!r.ok)return r.json().then(e=>{throw new Error(e.error||"Error "+r.status);});
-        return r.blob();
-      })
-      .then(blob=>{
-        const f=new File([blob],periodo.replace(" ","-")+".zip",{type:"application/zip"});
-        setFiles(p=>({...p,zip:f}));setZipStatus("ready");
-      })
-      .catch(e=>{
-        if(e.notFound){setZipStatus("missing");}
-        else{setZipStatus("error");setZipError(e.message);}
-      });
-  },[periodo]);
-  /* Auto-generar ZIP cuando no existe en Drive */
-  useEffect(()=>{
-    if(zipStatus==="missing"&&periodo) generarZip();
-  },[zipStatus]);
+  const cargarZipDrive=React.useCallback(()=>buscarZip(periodo),[periodo,buscarZip]);
 
-  /* Ref para lista de meses — no auto-procesar, usuario decide */
-  const autoProcesado=React.useRef(false);
-  useEffect(()=>{ autoProcesado.current=false; },[periodo]);
-
-  const generarZip=useCallback(async()=>{
+  /* Auto-generar ZIP cuando no existe */
+  const generarZip=React.useCallback(async()=>{
     if(!periodo)return;
     setZipStatus("splitting");setZipError(null);
     const [mesNombre,anio]=periodo.split(" ");
-    const mesNum=MES_STR[mesNombre];
-    const periodoCode=`${anio}-${mesNum}`;
+    const periodoCode=anio+"-"+MES_STR[mesNombre];
     try{
       const res=await fetch("/api/split-pdf",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({pdfFileId:DRIVE_PDF_FACTURAS_ID,periodo:periodoCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID}),
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({pdfFileId:DRIVE_PDF_FACTURAS_ID,periodo:periodoCode}),
       });
       const data=await res.json();
       if(!res.ok)throw new Error(data.error||"Error desconocido");
-      /* ZIP generado — ahora cargarlo como File */
       if(data.zipBase64){
         const bytes=Uint8Array.from(atob(data.zipBase64),c=>c.charCodeAt(0));
-        const blob=new Blob([bytes],{type:"application/zip"});
-        const f=new File([blob],periodoCode+".zip",{type:"application/zip"});
-        setFiles(p=>({...p,zip:f}));
+        const f=new File([new Blob([bytes],{type:"application/zip"})],periodoCode+".zip",{type:"application/zip"});
+        setFiles(prev=>({...prev,zip:f}));
         setZipStatus("ready");
-        notify("✓ PDFs generados y listos · "+data.totalFacturas+" facturas","ok");
+        notify("✓ PDFs generados · "+data.totalFacturas+" facturas","ok");
       }
     }catch(e){
       setZipStatus("error");setZipError(e.message);
       notify("Error al separar PDF: "+e.message,"err");
     }
   },[periodo]);
+
+  useEffect(()=>{
+    if(zipStatus==="missing"&&periodo)generarZip();
+  },[zipStatus]);
+
+  /* Ref para lista de meses */
+  const autoProcesado=React.useRef(false);
+  useEffect(()=>{ autoProcesado.current=false; },[periodo]);
 
   /* NO auto-procesar — el usuario decide cuándo ir a Facturación */
 
@@ -1847,7 +1826,7 @@ function App(){
           const [mesN,anioN]=p.split(" ");
           return h("button",{
             key:p,
-            onClick:()=>{ if(p!==periodo){ setPeriodo(p);setFiles(f=>({...f,zip:null}));setZipStatus("idle");setData([]);autoProcesado.current=false; } },
+            onClick:()=>{ if(p!==periodo){ setPeriodo(p);setZipStatus("idle");setData([]);autoProcesado.current=false;buscarZip(p); } },
             style:{
               display:"flex",alignItems:"center",gap:10,width:"100%",
               padding:"10px 18px",border:"none",textAlign:"left",cursor:"pointer",
