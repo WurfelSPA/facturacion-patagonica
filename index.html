@@ -484,17 +484,21 @@ async function procesarPDFs(zipFile,addLog){
       const textoJ=texto.replace(/\s+/g," ");
       const tipo=textoJ.includes("Serv. Adm.")||textoJ.includes("Serv.Adm.")?"serv_adm":textoJ.includes("Arriendo")?"arriendo":nroFact.startsWith("FEE-")?"serv_adm":"arriendo";
 
-    /* Extraer UF del texto del PDF */
+    /* Extraer UF del texto del PDF — 3 patrones + fallback flat */
     let ufPdf=null;
     try{
       if(texto.length>10){
-        const textoJ=texto.replace(/\s+/g," ");
-        /* Arriendo: "UF 380,57 x 39.841,72" */
-        const mArr=textoJ.match(/UF\s+([\d]+(?:[,.]\d+)?)\s+x\s+[\d]/);
-        /* Serv.Adm: "11,84 UF" */
-        const mSrv=textoJ.match(/([\d]+[,.]\d+)\s*UF/i);
-        if(tipo==="arriendo"&&mArr) ufPdf=parseFloat(mArr[1].replace(",","."));
-        else if(tipo==="serv_adm"&&mSrv) ufPdf=parseFloat(mSrv[1].replace(",","."));
+        /* P1: col Cant/Unidad con layout  →  "10,24 UF   40.186,79" */
+        let m=texto.match(/([\d]+(?:[,.][\d]+)?)\s+UF\s+4[09][,.\d]/);
+        if(m) ufPdf=parseFloat(m[1].replace(",","."));
+        /* P2: UF en descripción con layout  →  "UF 85,37 x 40186" */
+        if(!ufPdf){m=texto.match(/UF\s+([\d]+(?:[,.][\d]+)?)\s+x\s+4[09]/);if(m) ufPdf=parseFloat(m[1].replace(",","."));}
+        /* P3: layout partido — colapsar todo y buscar número antes de "x 4X" */
+        if(!ufPdf){
+          const flat=texto.replace(/\s+/g," ");
+          m=flat.match(/UF\s+([\d]+(?:[,.][\d]+)?)\s+x\s+/);if(m) ufPdf=parseFloat(m[1].replace(",","."));
+          if(!ufPdf){m=flat.match(/([\d]+[,.][\d]+)\s+x\s+4[09]/);if(m) ufPdf=parseFloat(m[1].replace(",","."));}
+        }
         if(ufPdf) ufPdf=Math.round(ufPdf*10000)/10000;
       }
     }catch(e){}
