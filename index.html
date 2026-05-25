@@ -1131,6 +1131,19 @@ function App(){
     if(zipStatus==="missing") generarZip();
   },[zipStatus]);
 
+  /* Auto-procesar cuando ZIP listo — sin intervención del usuario */
+  const autoProcesado=React.useRef(false);
+  useEffect(()=>{
+    /* Reset flag cuando cambia el período */
+    autoProcesado.current=false;
+  },[periodo]);
+  useEffect(()=>{
+    if(zipStatus==="ready"&&files.zip&&!autoProcesado.current){
+      autoProcesado.current=true;
+      procesar();
+    }
+  },[zipStatus,files.zip]);
+
   const generarZip=useCallback(async()=>{
     setZipStatus("splitting");setZipError(null);
     const [mesNombre,anio]=periodo.split(" ");
