@@ -225,10 +225,19 @@ function formatCLPCompact(pesos){
 
 /* ── Google OAuth (Gmail + Drive) ── */
 function loadGisScript(){return new Promise(res=>{if(window.google?.accounts){res();return;}const s=document.createElement("script");s.src="https://accounts.google.com/gsi/client";s.onload=res;document.head.appendChild(s);});}
+let _gToken=null,_gTokenExp=0;
 async function getGoogleToken(clientId){
   await loadGisScript();
+  if(_gToken&&Date.now()<_gTokenExp-60000)return _gToken;
   return new Promise((res,rej)=>{
-    const client=google.accounts.oauth2.initTokenClient({client_id:clientId,scope:GOOGLE_SCOPES,callback:(resp)=>{if(resp.error)rej(new Error(resp.error));else res(resp.access_token);}});
+    const client=google.accounts.oauth2.initTokenClient({
+      client_id:clientId,scope:GOOGLE_SCOPES,
+      hint:"amelendez@patagonica.cl",
+      callback:(resp)=>{
+        if(resp.error)rej(new Error(resp.error));
+        else{_gToken=resp.access_token;_gTokenExp=Date.now()+(resp.expires_in||3600)*1000;res(_gToken);}
+      }
+    });
     client.requestAccessToken({prompt:""});
   });
 }
@@ -1010,12 +1019,10 @@ function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlo
     {id:"dashboard", icon:"📊", label:"Dashboard"},
     {id:"ventas",    icon:"📈", label:"Detalles Ventas"},
     {id:"factura",   icon:"📋", label:"Facturación"},
-    {id:"split",     icon:"📂", label:"Separar PDF"},
   ];
   const isActive = id => id==="factura" ? (view==="table"||view==="upload") : view===id;
   const handleNav = id => {
     if(id==="factura"){ setView("upload"); }
-    else if(id==="split"){ splitPDF(); }
     else setView(id);
   };
   return h("aside",{className:"sidebar"},
@@ -1852,7 +1859,7 @@ function App(){
     h("header",{style:{background:view==="table"?"#1e3a5f":"var(--surf)",borderBottom:view==="table"?"1px solid #152d4a":"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:49,gap:10}},
       h("div",{style:{display:"flex",alignItems:"center",gap:10}},
         h("div",{style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px",color:view==="table"?"#fff":"var(--tx)"}},
-          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="table"?"📋 Facturación":view==="upload"?"📋 Facturación":"📂 Separar PDF"
+          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":"📋 Facturación"
         ),
         view==="table"&&h("span",{style:{fontSize:9,fontFamily:"'DM Mono',monospace",color:"#93b5d4",marginLeft:4}},periodo)
       ),
