@@ -1032,6 +1032,8 @@ function App(){
   const [view,setView]=useState("dashboard");
   const [periodo,setPeriodo]=useState("");
   const [files,setFiles]=useState({planilla:null,zip:null});
+  const [planillaStatus,setPlanillaStatus]=useState("idle"); /* idle | checking | ok | nodata | error */
+  const [planillaError,setPlanillaError]=useState(null);
   const [data,setData]=useState([]);
   const [pdfMap,setPdfMap]=useState({});
   const [filter,setFilter]=useState("all");
@@ -1070,6 +1072,24 @@ function App(){
   const [monthlyUF,setMonthlyUF]=useState({});
   const [driveLoading,setDriveLoading]=useState(false);
 
+  /* Validar que la planilla tenga datos para el período seleccionado */
+  useEffect(()=>{
+    if(!files.planilla||!periodo){setPlanillaStatus("idle");return;}
+    setPlanillaStatus("checking");
+    setPlanillaError(null);
+    procesarPlanillaFacturacion(files.planilla,periodo)
+      .then(()=>setPlanillaStatus("ok"))
+      .catch(e=>{
+        if(e.message&&e.message.includes("No se encontró columna")){
+          setPlanillaStatus("nodata");
+          setPlanillaError("Sin datos para "+periodo);
+        } else {
+          setPlanillaStatus("error");
+          setPlanillaError(e.message);
+        }
+      });
+  },[files.planilla,periodo]);
+
   /* Cargar planilla automáticamente desde /api/planilla (Service Account — sin OAuth) */
   useEffect(()=>{
     if(files.planilla)return;
@@ -1097,6 +1117,8 @@ function App(){
   /* Cargar ZIP desde Drive cuando cambia período y estamos en vista facturación */
   const [zipStatus,setZipStatus]=useState("idle");
   const [zipError,setZipError]=useState(null);
+  const [pdfMaestroId,setPdfMaestroId]=useState(null); /* ID del PDF maestro en Drive si existe */
+  const [canGenerate,setCanGenerate]=useState(false);  /* si se puede generar el ZIP */
   const zipPeriodoRef=React.useRef(""); /* período del ZIP actualmente cargado */
 
   /* Buscar ZIP cuando se selecciona un período */
@@ -1105,15 +1127,22 @@ function App(){
     zipPeriodoRef.current=p;
     setZipStatus("loading");
     setZipError(null);
+    setPdfMaestroId(null);
+    setCanGenerate(false);
     setFiles(prev=>({...prev,zip:null}));
     fetch("/api/zip?periodo="+encodeURIComponent(p))
-      .then(r=>{
-        if(r.status===404)return r.json().then(()=>{throw Object.assign(new Error("no_zip"),{notFound:true});});
-        if(!r.ok)return r.json().then(e=>{throw new Error(e.error||"Error "+r.status);});
-        return r.blob();
-      })
-      .then(blob=>{
-        /* Ignorar si el usuario ya cambió de período */
+      .then(async r=>{
+        if(zipPeriodoRef.current!==p)return;
+        if(r.status===404){
+          const data=await r.json();
+          /* El servidor informa si hay PDF maestro disponible */
+          setPdfMaestroId(data.pdfMaestroId||null);
+          setCanGenerate(!!data.canGenerate);
+          setZipStatus("missing");
+          return;
+        }
+        if(!r.ok){const e=await r.json();throw new Error(e.error||"Error "+r.status);}
+        const blob=await r.blob();
         if(zipPeriodoRef.current!==p)return;
         const f=new File([blob],p.replace(" ","-")+".zip",{type:"application/zip"});
         setFiles(prev=>({...prev,zip:f}));
@@ -1121,23 +1150,22 @@ function App(){
       })
       .catch(e=>{
         if(zipPeriodoRef.current!==p)return;
-        if(e.notFound){setZipStatus("missing");}
-        else{setZipStatus("error");setZipError(e.message);}
+        setZipStatus("error");setZipError(e.message);
       });
   },[]);
 
   const cargarZipDrive=React.useCallback(()=>buscarZip(periodo),[periodo,buscarZip]);
 
-  /* Auto-generar ZIP cuando no existe */
+  /* Generar ZIP desde PDF maestro del mes */
   const generarZip=React.useCallback(async()=>{
-    if(!periodo)return;
+    if(!periodo||!pdfMaestroId)return;
     setZipStatus("splitting");setZipError(null);
     const [mesNombre,anio]=periodo.split(" ");
     const periodoCode=anio+"-"+MES_STR[mesNombre];
     try{
       const res=await fetch("/api/split-pdf",{
         method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({pdfFileId:DRIVE_PDF_FACTURAS_ID,periodo:periodoCode}),
+        body:JSON.stringify({pdfFileId:pdfMaestroId,periodo:periodoCode}),
       });
       const data=await res.json();
       if(!res.ok)throw new Error(data.error||"Error desconocido");
@@ -1859,21 +1887,35 @@ function App(){
           h("h2",{style:{fontSize:18,fontWeight:700,marginBottom:20,color:"var(--tx)"}},periodo),
 
           /* ── ROW 1: Planilla ── */
-          h("div",{style:{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",background:"var(--surf)",border:"1px solid var(--bdr2)",borderRadius:10,marginBottom:10}},
+          h("div",{style:{
+            display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderRadius:10,marginBottom:10,
+            background:planillaStatus==="nodata"?"var(--abg)":planillaStatus==="error"?"var(--rbg)":"var(--surf)",
+            border:"1px solid "+(planillaStatus==="nodata"?"var(--adim)":planillaStatus==="error"?"var(--rdim)":"var(--bdr2)")
+          }},
             h("div",{style:{
               width:28,height:28,borderRadius:"50%",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",
-              background:files.planilla?"var(--gbg)":"var(--surf2)",
-              border:"1px solid "+(files.planilla?"var(--gdim)":"var(--bdr)")
+              background:planillaStatus==="ok"?"var(--gbg)":planillaStatus==="nodata"?"var(--abg)":planillaStatus==="error"?"var(--rbg)":"var(--surf2)",
+              border:"1px solid "+(planillaStatus==="ok"?"var(--gdim)":planillaStatus==="nodata"?"var(--adim)":planillaStatus==="error"?"var(--rdim)":"var(--bdr)")
             }},
-              files.planilla
-                ?h("span",{style:{color:"var(--green)",fontSize:14}},"✓")
-                :h("span",{className:"spin",style:{fontSize:12,color:"var(--txd)"}},"⟳")
+              planillaStatus==="ok"?h("span",{style:{color:"var(--green)",fontSize:14}},"✓")
+              :planillaStatus==="nodata"?h("span",{style:{color:"var(--amber)",fontSize:14}},"⚠")
+              :planillaStatus==="error"?h("span",{style:{color:"var(--red)",fontSize:14}},"✗")
+              :h("span",{className:"spin",style:{fontSize:12,color:"var(--txd)"}},"⟳")
             ),
             h("div",null,
-              h("div",{style:{fontSize:13,fontWeight:600,color:files.planilla?"var(--tx)":"var(--txm)"}},
-                "Planilla Facturación.xlsx"),
+              h("div",{style:{fontSize:13,fontWeight:600,
+                color:planillaStatus==="ok"?"var(--tx)":planillaStatus==="nodata"?"var(--amber)":planillaStatus==="error"?"var(--red)":"var(--txm)"}},
+                planillaStatus==="nodata"?"Sin datos para "+periodo
+                :planillaStatus==="error"?"Error en planilla"
+                :"Planilla Facturación.xlsx"
+              ),
               h("div",{style:{fontSize:11,color:"var(--txd)"}},
-                files.planilla?"Google Drive · "+Math.round(files.planilla.size/1024)+" KB":"Buscando en Drive...")
+                planillaStatus==="ok"?"Google Drive · "+Math.round(files.planilla.size/1024)+" KB"
+                :planillaStatus==="nodata"?"La planilla no tiene información para este período"
+                :planillaStatus==="error"?(planillaError||"Error desconocido")
+                :planillaStatus==="checking"?"Verificando período..."
+                :"Buscando en Drive..."
+              )
             )
           ),
 
@@ -1906,13 +1948,13 @@ function App(){
               ),
               h("div",{style:{fontSize:11,color:"var(--txd)",marginTop:2}},
                 zipStatus==="ready"?"Listos · "+Math.round((files.zip&&files.zip.size||0)/1024)+" KB"
-                :zipStatus==="missing"?"El ZIP no está en Drive — puedes generarlo desde el PDF maestro"
+                :zipStatus==="missing"&&canGenerate?"El PDF maestro está disponible — puedes generar el ZIP":zipStatus==="missing"?"No hay ZIP ni PDF maestro para este mes en Drive"
                 :zipStatus==="splitting"?"Separando PDF maestro, espera un momento..."
                 :zipStatus==="error"?(zipError||"Error desconocido")
                 :""
               ),
-              /* Botón generar — solo cuando missing */
-              zipStatus==="missing"&&h("button",{
+              /* Botón generar — solo si hay PDF maestro disponible */
+              zipStatus==="missing"&&canGenerate&&h("button",{
                 onClick:generarZip,
                 style:{marginTop:8,fontSize:11,padding:"5px 14px",borderRadius:8,
                   border:"1px solid var(--adim)",background:"var(--amber)",color:"#fff",cursor:"pointer",fontWeight:600}
@@ -1937,14 +1979,17 @@ function App(){
           ),
 
           /* ── Botón Procesar ── */
-          files.planilla&&zipStatus==="ready"
+          planillaStatus==="ok"&&zipStatus==="ready"
             ?h("button",{onClick:procesar,className:"btn-primary",style:{minWidth:220,fontSize:14}},"▶ Procesar "+periodo)
             :h("div",{style:{fontSize:12,color:"var(--txd)",fontStyle:"italic"}},
               !files.planilla?"Cargando planilla..."
+              :planillaStatus==="checking"?"Verificando datos del período..."
+              :planillaStatus==="nodata"?"La planilla no tiene datos para "+periodo+" — no se puede procesar"
+              :planillaStatus==="error"?"Error en la planilla"
               :zipStatus==="loading"?"Buscando PDFs en Drive..."
               :zipStatus==="missing"?"Genera los PDFs del mes para continuar"
               :zipStatus==="splitting"?"Generando PDFs..."
-              :zipStatus==="error"?"Corrige el error para continuar"
+              :zipStatus==="error"?"Corrige el error de PDFs para continuar"
               :""
             )
         )
