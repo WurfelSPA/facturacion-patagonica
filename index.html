@@ -1976,8 +1976,13 @@ function App(){
           ),
 
           /* ── Botón Procesar ── */
-          planillaStatus==="ok"&&zipStatus==="ready"
-            ?h("button",{onClick:procesar,className:"btn-primary",style:{minWidth:220,fontSize:14}},"▶ Procesar "+periodo)
+          (planillaStatus==="ok"||planillaStatus==="nodata")&&zipStatus==="ready"
+            ?h("div",{style:{display:"flex",flexDirection:"column",gap:8,alignItems:"flex-start"}},
+              planillaStatus==="nodata"&&h("div",{style:{display:"flex",alignItems:"center",gap:6,padding:"6px 12px",borderRadius:8,background:"var(--abg)",border:"1px solid var(--adim)",fontSize:11,color:"var(--amber)"}},
+                h("span",null,"⚠"),h("span",null,"Sin datos de planilla para "+periodo+" — se mostrarán solo los PDFs")
+              ),
+              h("button",{onClick:procesar,className:"btn-primary",style:{minWidth:220,fontSize:14}},"▶ Procesar "+periodo)
+            )
             :h("div",{style:{fontSize:12,color:"var(--txd)",fontStyle:"italic"}},
               !files.planilla?"Cargando planilla..."
               :planillaStatus==="checking"?"Verificando datos del período..."
@@ -1986,7 +1991,6 @@ function App(){
               :zipStatus==="missing"&&canGenerate?"Genera los PDFs del mes para continuar"
               :zipStatus==="missing"?"No hay PDF maestro disponible para este mes"
               :zipStatus==="error"?"Corrige el error de PDFs para continuar"
-              :planillaStatus==="nodata"?"PDFs listos — la planilla no tiene datos para "+periodo
               :planillaStatus==="error"?"Error en la planilla"
               :""
             )
