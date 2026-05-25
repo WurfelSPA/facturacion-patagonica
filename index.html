@@ -1823,113 +1823,114 @@ function App(){
     /* VIEWS */
     view==="dashboard"&&renderDashboard(dashSitio,dashMes,dashSearch),
 
-    (view===\"upload\")&&h(\"main\",{style:{flex:1,display:\"flex\",flexDirection:\"row\",overflow:\"hidden\"},className:\"fade-up\"},
+    view==="upload"&&h("main",{style:{flex:1,display:"flex",flexDirection:"row",overflow:"hidden"},className:"fade-up"},
 
       /* ── COLUMNA IZQUIERDA: lista de meses ── */
-      h(\"div\",{style:{
-        width:180,minWidth:180,background:\"var(--surf)\",borderRight:\"1px solid var(--bdr2)\",
-        display:\"flex\",flexDirection:\"column\",overflowY:\"auto\",padding:\"16px 0\"
+      h("div",{style:{
+        width:180,minWidth:180,background:"var(--surf)",borderRight:"1px solid var(--bdr2)",
+        display:"flex",flexDirection:"column",overflowY:"auto",padding:"16px 0"
       }},
-        h(\"div\",{style:{fontSize:10,fontWeight:700,color:\"var(--txd)\",letterSpacing:\"0.1em\",padding:\"0 18px 10px\"}},\"PERÍODO\"),
+        h("div",{style:{fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:"0.1em",padding:"0 18px 10px"}},"PERÍODO"),
         PERIODOS.map(p=>{
           const isActive=p===periodo;
-          const [mesN,anioN]=p.split(\" \");
-          return h(\"button\",{
+          const [mesN,anioN]=p.split(" ");
+          return h("button",{
             key:p,
-            onClick:()=>{ if(p!==periodo){ setPeriodo(p);setFiles(f=>({...f,zip:null}));setZipStatus(\"idle\");setData([]);autoProcesado.current=false; } },
+            onClick:()=>{ if(p!==periodo){ setPeriodo(p);setFiles(f=>({...f,zip:null}));setZipStatus("idle");setData([]);autoProcesado.current=false; } },
             style:{
-              display:\"flex\",alignItems:\"center\",gap:10,width:\"100%\",
-              padding:\"10px 18px\",border:\"none\",textAlign:\"left\",cursor:\"pointer\",
-              background:isActive?\"var(--acc)\":\"transparent\",
-              color:isActive?\"#fff\":\"var(--tx)\",
-              borderLeft:isActive?\"3px solid var(--acc2)\":\"3px solid transparent\",
-              transition:\"all .12s\"
+              display:"flex",alignItems:"center",gap:10,width:"100%",
+              padding:"10px 18px",border:"none",textAlign:"left",cursor:"pointer",
+              background:isActive?"var(--acc)":"transparent",
+              color:isActive?"#fff":"var(--tx)",
+              borderLeft:isActive?"3px solid var(--acc2)":"3px solid transparent",
+              transition:"all .12s"
             }
           },
-            h(\"div\",null,
-              h(\"div\",{style:{fontSize:13,fontWeight:isActive?700:500}},mesN),
-              h(\"div\",{style:{fontSize:10,color:isActive?\"rgba(255,255,255,0.7)\":\"var(--txd)\"}},anioN)
+            h("div",null,
+              h("div",{style:{fontSize:13,fontWeight:isActive?700:500}},mesN),
+              h("div",{style:{fontSize:10,color:isActive?"rgba(255,255,255,0.7)":"var(--txd)"}},anioN)
             )
           );
         })
       ),
 
       /* ── COLUMNA DERECHA: estado del proceso ── */
-      h(\"div\",{style:{flex:1,display:\"flex\",flexDirection:\"column\",alignItems:\"center\",justifyContent:\"center\",gap:16,padding:\"32px 48px\"}},
-        h(\"div\",{style:{width:\"100%\",maxWidth:420}},
+      h("div",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:"32px 48px"}},
+        h("div",{style:{width:"100%",maxWidth:420}},
 
-          h(\"h2\",{style:{fontSize:18,fontWeight:700,marginBottom:20,color:\"var(--tx)\"}},periodo),
+          h("h2",{style:{fontSize:18,fontWeight:700,marginBottom:20,color:"var(--tx)"}},periodo),
 
-          /* Estado planilla */
-          h(\"div\",{style:{
-            display:\"flex\",alignItems:\"center\",gap:12,padding:\"12px 16px\",
-            background:\"var(--surf)\",border:\"1px solid var(--bdr2)\",borderRadius:10,marginBottom:10
-          }},
-            h(\"div\",{style:{
-              width:28,height:28,borderRadius:\"50%\",display:\"flex\",alignItems:\"center\",justifyContent:\"center\",flexShrink:0,
-              background:files.planilla?\"var(--gbg)\":\"var(--surf2)\",
-              border:\"1px solid \"+(files.planilla?\"var(--gdim)\":\"var(--bdr)\")
-            }}, files.planilla?h(\"span\",{style:{color:\"var(--green)\",fontSize:14}},\"✓\"):h(\"span\",{className:\"spin\",style:{color:\"var(--txd)\",fontSize:12}},\"⟳\")),
-            h(\"div\",null,
-              h(\"div\",{style:{fontSize:13,fontWeight:600,color:files.planilla?\"var(--green)\":\"var(--txm)\"}},files.planilla?\"Planilla Facturación.xlsx\":\"Cargando planilla...\"),
-              h(\"div\",{style:{fontSize:11,color:\"var(--txd)\"}},files.planilla?\"Google Drive · \"+Math.round(files.planilla.size/1024)+\" KB\":\"Buscando en Drive...\")
-            )
-          ),
-
-          /* Estado PDFs */
-          h(\"div\",{style:{
-            display:\"flex\",alignItems:\"center\",gap:12,padding:\"12px 16px\",
-            background:\"var(--surf)\",border:\"1px solid var(--bdr2)\",borderRadius:10,marginBottom:24
-          }},
-            h(\"div\",{style:{
-              width:28,height:28,borderRadius:\"50%\",display:\"flex\",alignItems:\"center\",justifyContent:\"center\",flexShrink:0,
-              background:zipStatus===\"ready\"?\"var(--gbg)\":zipStatus===\"error\"?\"var(--rbg)\":\"var(--surf2)\",
-              border:\"1px solid \"+(zipStatus===\"ready\"?\"var(--gdim)\":zipStatus===\"error\"?\"var(--rdim)\":\"var(--bdr)\")
+          /* Planilla */
+          h("div",{style:{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",background:"var(--surf)",border:"1px solid var(--bdr2)",borderRadius:10,marginBottom:10}},
+            h("div",{style:{
+              width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
+              background:files.planilla?"var(--gbg)":"var(--surf2)",
+              border:"1px solid "+(files.planilla?"var(--gdim)":"var(--bdr)")
             }},
-              zipStatus===\"ready\"?h(\"span\",{style:{color:\"var(--green)\",fontSize:14}},\"✓\"):
-              zipStatus===\"error\"?h(\"span\",{style:{color:\"var(--red)\",fontSize:14}},\"✗\"):
-              h(\"span\",{className:\"spin\",style:{color:\"var(--txd)\",fontSize:12}},\"⟳\")
+              files.planilla
+                ?h("span",{style:{color:"var(--green)",fontSize:14}},"✓")
+                :h("span",{className:"spin",style:{color:"var(--txd)",fontSize:12}},"⟳")
             ),
-            h(\"div\",null,
-              h(\"div\",{style:{fontSize:13,fontWeight:600,color:
-                zipStatus===\"ready\"?\"var(--green)\":
-                zipStatus===\"error\"?\"var(--red)\":\"var(--txm)\"
-              }},
-                zipStatus===\"ready\"?\"PDFs \"+periodo:
-                zipStatus===\"loading\"?\"Buscando PDFs en Drive...\":""+
-                zipStatus===\"missing\"||zipStatus===\"splitting\"?\"Generando PDFs del mes...\":""+
-                zipStatus===\"error\"?\"Error al cargar PDFs\":
-                \"Esperando...\"
+            h("div",null,
+              h("div",{style:{fontSize:13,fontWeight:600,color:files.planilla?"var(--green)":"var(--txm)"}},
+                files.planilla?"Planilla Facturación.xlsx":"Cargando planilla..."
               ),
-              h(\"div\",{style:{fontSize:11,color:\"var(--txd)\"}},
-                zipStatus===\"ready\"?\"Listos · \"+Math.round((files.zip?.size||0)/1024)+\" KB\":
-                zipStatus===\"splitting\"?\"Separando PDF maestro — puede tardar 1-2 min\":
-                zipStatus===\"error\"?(zipError||\"Error desconocido\"):
-                \"\"
+              h("div",{style:{fontSize:11,color:"var(--txd)"}},
+                files.planilla?"Google Drive · "+Math.round(files.planilla.size/1024)+" KB":"Buscando en Drive..."
               )
             )
           ),
 
-          /* Barra de progreso visual */
-          h(\"div\",{style:{width:\"100%\",height:4,background:\"var(--surf2)\",borderRadius:2,marginBottom:24,overflow:\"hidden\"}},
-            h(\"div\",{style:{
-              height:\"100%\",borderRadius:2,transition:\"width .4s ease\",
-              background:\"linear-gradient(90deg,var(--acc),var(--acc2))\",
-              width:
-                files.planilla&&zipStatus===\"ready\"?\"100%\":
-                files.planilla&&(zipStatus===\"splitting\"||zipStatus===\"missing\")?\"60%\":
-                files.planilla?\"30%\":\"10%\"
+          /* PDFs */
+          h("div",{style:{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",background:"var(--surf)",border:"1px solid var(--bdr2)",borderRadius:10,marginBottom:24}},
+            h("div",{style:{
+              width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
+              background:zipStatus==="ready"?"var(--gbg)":zipStatus==="error"?"var(--rbg)":"var(--surf2)",
+              border:"1px solid "+(zipStatus==="ready"?"var(--gdim)":zipStatus==="error"?"var(--rdim)":"var(--bdr)")
+            }},
+              zipStatus==="ready"
+                ?h("span",{style:{color:"var(--green)",fontSize:14}},"✓")
+                :zipStatus==="error"
+                ?h("span",{style:{color:"var(--red)",fontSize:14}},"✗")
+                :h("span",{className:"spin",style:{color:"var(--txd)",fontSize:12}},"⟳")
+            ),
+            h("div",null,
+              h("div",{style:{fontSize:13,fontWeight:600,color:zipStatus==="ready"?"var(--green)":zipStatus==="error"?"var(--red)":"var(--txm)"}},
+                zipStatus==="ready"?"PDFs "+periodo
+                :zipStatus==="loading"?"Buscando PDFs en Drive..."
+                :(zipStatus==="missing"||zipStatus==="splitting")?"Generando PDFs del mes..."
+                :zipStatus==="error"?"Error al cargar PDFs"
+                :"Esperando..."
+              ),
+              h("div",{style:{fontSize:11,color:"var(--txd)"}},
+                zipStatus==="ready"?"Listos · "+Math.round((files.zip&&files.zip.size||0)/1024)+" KB"
+                :zipStatus==="splitting"?"Separando PDF maestro — puede tardar 1-2 min"
+                :zipStatus==="error"?(zipError||"Error desconocido")
+                :""
+              )
+            )
+          ),
+
+          /* Barra de progreso */
+          h("div",{style:{width:"100%",height:4,background:"var(--surf2)",borderRadius:2,marginBottom:16,overflow:"hidden"}},
+            h("div",{style:{
+              height:"100%",borderRadius:2,transition:"width .5s ease",
+              background:"linear-gradient(90deg,var(--acc),var(--acc2))",
+              width:files.planilla&&zipStatus==="ready"?"100%"
+                :files.planilla&&(zipStatus==="splitting"||zipStatus==="missing")?"60%"
+                :files.planilla?"30%":"10%"
             }})
           ),
 
-          /* Mensaje de estado */
-          h(\"div\",{style:{textAlign:\"center\",fontSize:12,color:\"var(--txm)\",minHeight:18}},
-            files.planilla&&zipStatus===\"ready\"?\"Listo — iniciando proceso...\":""+
-            zipStatus===\"error\"?h(\"button\",{onClick:cargarZipDrive,style:{fontSize:11,padding:\"5px 14px\",borderRadius:8,border:\"1px solid var(--rdim)\",background:\"transparent\",color:\"var(--red)\",cursor:\"pointer\"}},\"↺ Reintentar\"):
-            !files.planilla?\"Cargando datos desde Drive...\":""+
-            zipStatus===\"loading\"?\"Buscando PDFs en Drive...\":""+
-            zipStatus===\"splitting\"||zipStatus===\"missing\"?\"Generando PDFs del mes...\":""+
-            \"\"
+          /* Mensaje */
+          h("div",{style:{textAlign:"center",fontSize:12,color:"var(--txm)",minHeight:18}},
+            zipStatus==="error"
+              ?h("button",{onClick:cargarZipDrive,style:{fontSize:11,padding:"5px 14px",borderRadius:8,border:"1px solid var(--rdim)",background:"transparent",color:"var(--red)",cursor:"pointer"}},"↺ Reintentar")
+              :files.planilla&&zipStatus==="ready"?"Listo — iniciando proceso..."
+              :!files.planilla?"Cargando datos desde Drive..."
+              :zipStatus==="loading"?"Buscando PDFs en Drive..."
+              :(zipStatus==="splitting"||zipStatus==="missing")?"Generando PDFs del mes..."
+              :""
           )
         )
       )
