@@ -1169,13 +1169,9 @@ function App(){
       });
       const data=await res.json();
       if(!res.ok)throw new Error(data.error||"Error desconocido");
-      if(data.zipBase64){
-        const bytes=Uint8Array.from(atob(data.zipBase64),c=>c.charCodeAt(0));
-        const f=new File([new Blob([bytes],{type:"application/zip"})],periodoCode+".zip",{type:"application/zip"});
-        setFiles(prev=>({...prev,zip:f}));
-        setZipStatus("ready");
-        notify("✓ PDFs generados · "+data.totalFacturas+" facturas","ok");
-      }
+      /* ZIP ya fue subido a Drive por el servidor — ahora lo descargamos */
+      notify("✓ "+data.totalFacturas+" facturas generadas y subidas a Drive","ok");
+      buscarZip(periodo);  /* recarga el ZIP desde Drive */
     }catch(e){
       setZipStatus("error");setZipError(e.message);
       notify("Error al separar PDF: "+e.message,"err");
@@ -1984,12 +1980,13 @@ function App(){
             :h("div",{style:{fontSize:12,color:"var(--txd)",fontStyle:"italic"}},
               !files.planilla?"Cargando planilla..."
               :planillaStatus==="checking"?"Verificando datos del período..."
-              :planillaStatus==="nodata"?"La planilla no tiene datos para "+periodo+" — no se puede procesar"
-              :planillaStatus==="error"?"Error en la planilla"
               :zipStatus==="loading"?"Buscando PDFs en Drive..."
-              :zipStatus==="missing"?"Genera los PDFs del mes para continuar"
-              :zipStatus==="splitting"?"Generando PDFs..."
+              :zipStatus==="splitting"?"Generando y subiendo PDFs a Drive..."
+              :zipStatus==="missing"&&canGenerate?"Genera los PDFs del mes para continuar"
+              :zipStatus==="missing"?"No hay PDF maestro disponible para este mes"
               :zipStatus==="error"?"Corrige el error de PDFs para continuar"
+              :planillaStatus==="nodata"?"PDFs listos — la planilla no tiene datos para "+periodo
+              :planillaStatus==="error"?"Error en la planilla"
               :""
             )
         )
