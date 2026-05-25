@@ -132,14 +132,32 @@ function extractData(text, tipo) {
   const clientRut = ruts.find(r => r !== "96.673.250-4") || null;
   const rut = clientRut ? normalizeRUT(clientRut) : null;
 
+  // Extraer UF — 3 patrones detectados en facturas Patagónica:
+  //   P1: col Cant/Unidad  →  "10,24 UF   40.186,79"  (serv_adm y arriendo simple)
+  //   P2: en descripción   →  "UF 85,37 x 40186,79"   (arriendo mayoría)
+  //   P3: layout partido   →  línea cortada por PDF, fallback colapsando whitespace
   let uf = null;
-  if (tipo === "arriendo") {
-    const m = text.match(/UF\s*([\d]+(?:[,.][\d]+)?)\s*x\s*[\d]/);
+  let m;
+
+  // P1: "XX,XX UF   40.186"
+  m = text.match(/([\d]+(?:[,.][\d]+)?)\s+UF\s+4[09][,.\d]/);
+  if (m) uf = parseFloat(m[1].replace(",", "."));
+
+  // P2: "UF XX,XX x 40186"
+  if (!uf) {
+    m = text.match(/UF\s+([\d]+(?:[,.][\d]+)?)\s+x\s+4[09]/);
     if (m) uf = parseFloat(m[1].replace(",", "."));
-  } else {
-    // Serv.Adm: buscar "X,XX UF" en descripción
-    const m = text.match(/([\d]+[,.][\d]+)\s*UF/i);
+  }
+
+  // P3: layout partido — colapsar whitespace y reintentar
+  if (!uf) {
+    const flat = text.replace(/\s+/g, " ");
+    m = flat.match(/UF\s+([\d]+(?:[,.][\d]+)?)\s+x\s+/);
     if (m) uf = parseFloat(m[1].replace(",", "."));
+    if (!uf) {
+      m = flat.match(/([\d]+[,.][\d]+)\s+x\s+4[09]/);
+      if (m) uf = parseFloat(m[1].replace(",", "."));
+    }
   }
 
   return { rut, uf: uf ? Math.round(uf * 10000) / 10000 : null };
