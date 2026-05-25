@@ -993,7 +993,7 @@ function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlo
   ];
   const isActive = id => id==="factura" ? (view==="table"||view==="upload") : view===id;
   const handleNav = id => {
-    if(id==="factura"){ if(files.planilla&&files.zip) procesar(); else setView("upload"); }
+    if(id==="factura"){ setView("upload"); }
     else if(id==="split"){ splitPDF(); }
     else setView(id);
   };
@@ -1094,25 +1094,64 @@ function App(){
   const notify=(msg,t="ok")=>{setNotif({msg,t});setTimeout(()=>setNotif(null),4000);};
   const addLog=(txt,t="")=>setProcLogs(p=>[...p,{txt,t}]);
 
-  /* Cargar ZIP desde Drive — solo cuando está en vista de facturación */
-  useEffect(()=>{
+  /* Cargar ZIP desde Drive cuando cambia período y estamos en vista facturación */
+  const [zipStatus,setZipStatus]=useState("idle"); /* idle | loading | ready | missing | splitting | error */
+  const [zipError,setZipError]=useState(null);
+
+  const cargarZipDrive=useCallback(()=>{
     if(!periodo)return;
-    if(view!=="table"&&view!=="upload")return; // No cargar en otras vistas
+    setZipStatus("loading");setZipError(null);
     setFiles(p=>({...p,zip:null}));
     fetch(`/api/zip?periodo=${encodeURIComponent(periodo)}`)
       .then(r=>{
+        if(r.status===404)return r.json().then(()=>{ throw Object.assign(new Error("no_zip"),{notFound:true}); });
         if(!r.ok)return r.json().then(e=>{throw new Error(e.error||"Error "+r.status);});
         return r.blob();
       })
       .then(blob=>{
         const f=new File([blob],periodo.replace(" ","-")+".zip",{type:"application/zip"});
         setFiles(p=>({...p,zip:f}));
+        setZipStatus("ready");
         notify("✓ PDFs cargados desde Drive · "+periodo);
       })
       .catch(e=>{
-        console.error("ZIP error:",e);
-        notify("No se pudo cargar el ZIP: "+e.message,"err");
+        if(e.notFound){ setZipStatus("missing"); }
+        else{ setZipStatus("error"); setZipError(e.message); }
       });
+  },[periodo]);
+
+  useEffect(()=>{
+    if(view!=="table"&&view!=="upload")return;
+    cargarZipDrive();
+  },[periodo,view]);
+
+  /* Separar PDF maestro y subir ZIP a Drive */
+  const generarZip=useCallback(async()=>{
+    setZipStatus("splitting");setZipError(null);
+    const [mesNombre,anio]=periodo.split(" ");
+    const mesNum=MES_STR[mesNombre];
+    const periodoCode=`${anio}-${mesNum}`;
+    try{
+      const res=await fetch("/api/split-pdf",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({pdfFileId:DRIVE_PDF_FACTURAS_ID,periodo:periodoCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID}),
+      });
+      const data=await res.json();
+      if(!res.ok)throw new Error(data.error||"Error desconocido");
+      /* ZIP generado — ahora cargarlo como File */
+      if(data.zipBase64){
+        const bytes=Uint8Array.from(atob(data.zipBase64),c=>c.charCodeAt(0));
+        const blob=new Blob([bytes],{type:"application/zip"});
+        const f=new File([blob],periodoCode+".zip",{type:"application/zip"});
+        setFiles(p=>({...p,zip:f}));
+        setZipStatus("ready");
+        notify("✓ PDFs generados y listos · "+data.totalFacturas+" facturas","ok");
+      }
+    }catch(e){
+      setZipStatus("error");setZipError(e.message);
+      notify("Error al separar PDF: "+e.message,"err");
+    }
   },[periodo]);
 
   /* NO auto-procesar — el usuario decide cuándo ir a Facturación */
@@ -1724,7 +1763,7 @@ function App(){
         view==="table"&&h("span",{style:{fontSize:9,fontFamily:"'DM Mono',monospace",color:"#93b5d4",marginLeft:4}},periodo)
       ),
       h("div",{style:{display:"flex",gap:8,alignItems:"center"}},
-        (view==="table"||view==="upload")&&h("select",{value:periodo,onChange:e=>{setPeriodo(e.target.value);setFiles(p=>({...p,zip:null}));},style:{fontSize:11,fontWeight:600,padding:"5px 10px",background:"rgba(255,255,255,0.12)",color:"#fff",border:"1px solid rgba(255,255,255,0.2)",borderRadius:8,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}},PERIODOS.map(p=>h("option",{key:p,value:p,style:{background:"#1e3a5f",color:"#fff"}},p))),
+        (view==="table"||view==="upload")&&h("select",{value:periodo,onChange:e=>{setPeriodo(e.target.value);setFiles(p=>({...p,zip:null}));setZipStatus("idle");setData([]);},style:{fontSize:11,fontWeight:600,padding:"5px 10px",background:"rgba(255,255,255,0.12)",color:"#fff",border:"1px solid rgba(255,255,255,0.2)",borderRadius:8,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}},PERIODOS.map(p=>h("option",{key:p,value:p,style:{background:"#1e3a5f",color:"#fff"}},p))),
         view==="table"&&files.planilla&&files.zip&&h("button",{onClick:procesar,style:{background:"linear-gradient(135deg,var(--green),#059669)",color:"#fff",border:"none",borderRadius:8,padding:"6px 14px",fontSize:11,fontWeight:700,cursor:"pointer"}},`▶ Procesar ${periodo.split(" ")[0].slice(0,3)} ${periodo.split(" ")[1]}`),
         view==="table"&&h("button",{onClick:unlocked?sendAll:()=>setShowPwdModal(true),style:{background:unlocked?"var(--gbg)":"rgba(255,255,255,0.1)",border:unlocked?"1px solid var(--gdim)":"1px solid rgba(255,255,255,0.2)",color:unlocked?"var(--green)":"#d0e4f7",borderRadius:9,padding:"6px 14px",fontSize:11,fontWeight:700,cursor:"pointer"}},"✉ Enviar todos"),
         view==="table"&&h("button",{onClick:unlocked?()=>setUnlocked(false):()=>setShowPwdModal(true),style:{background:unlocked?"rgba(10,124,78,0.2)":"rgba(255,255,255,0.08)",border:unlocked?"1px solid rgba(10,124,78,0.4)":"1px solid rgba(255,255,255,0.15)",color:unlocked?"#4ade80":"#93b5d4",borderRadius:9,padding:"6px 10px",fontSize:14,cursor:"pointer",lineHeight:1}},unlocked?"🔓":"🔒"),
@@ -1735,47 +1774,90 @@ function App(){
     /* VIEWS */
     view==="dashboard"&&renderDashboard(dashSitio,dashMes,dashSearch),
 
-    view==="upload"&&!files.zip&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:24,padding:32},className:"fade-up"},
+    (view==="upload"||view==="table"&&!files.zip)&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:24,padding:32},className:"fade-up"},
       h("div",{style:{textAlign:"center"}},
         h("h1",{style:{fontSize:20,fontWeight:700,letterSpacing:"-0.4px",marginBottom:6}},"Facturación mensual"),
-        h("p",{style:{fontSize:12,color:"var(--txm)"}},"Selecciona el período y sube los 3 archivos desde tu carpeta de descargas.")
+        h("p",{style:{fontSize:12,color:"var(--txm)"}},"Selecciona el período de facturación.")
       ),
-      h("div",{style:{width:"100%",maxWidth:500}},
-        h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr2)",borderRadius:12,padding:"14px 20px",marginBottom:16,display:"flex",alignItems:"center",gap:10}},
-          h("div",{style:{fontSize:13,fontWeight:600,color:"var(--tx)"}},"Período seleccionado:"),
-          h("span",{style:{background:"linear-gradient(135deg,var(--acc),var(--acc2))",color:"#fff",borderRadius:8,padding:"5px 14px",fontSize:13,fontWeight:700}},periodo),
-          h("div",{style:{fontSize:11,color:"var(--txm)",marginLeft:4}},"Las columnas GS/GT se detectan automáticamente")
+      h("div",{style:{width:"100%",maxWidth:480}},
+
+        /* ── SELECTOR DE PERÍODO ── */
+        h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr2)",borderRadius:12,padding:"14px 20px",marginBottom:16}},
+          h("div",{style:{fontSize:11,fontWeight:600,color:"var(--txm)",marginBottom:10,letterSpacing:"0.06em"}},"PERÍODO"),
+          h("div",{style:{display:"flex",flexWrap:"wrap",gap:8}},
+            PERIODOS.map(p=>h("button",{
+              key:p,
+              onClick:()=>{ if(p!==periodo){ setPeriodo(p); setFiles(f=>({...f,zip:null})); setZipStatus("idle"); setData([]); } },
+              style:{
+                padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",border:"1px solid",
+                background:p===periodo?"linear-gradient(135deg,var(--acc),var(--acc2))":"var(--surf2)",
+                color:p===periodo?"#fff":"var(--txm)",
+                borderColor:p===periodo?"var(--acc)":"var(--bdr)",
+                transition:"all .15s"
+              }
+            },p))
+          )
         ),
-        h("div",{style:{display:"flex",flexDirection:"column",gap:10}},
-          /* Planilla: si viene de Drive se muestra como done sin opción de cambiar; si no, se sube */
-          files.planilla&&gmailToken?
+
+        /* ── ESTADO PLANILLA ── */
+        h("div",{style:{marginBottom:10}},
+          files.planilla?
             h("div",{className:"drop-zone done",style:{cursor:"default"}},
               h("div",{style:{color:"var(--green)",fontWeight:600,fontSize:13,marginBottom:3}},"✓ Planilla Facturación.xlsx"),
               h("div",{style:{fontSize:11,color:"var(--txm)"}},"Cargada desde Google Drive · "+Math.round(files.planilla.size/1024)+" KB")
             ):
-            h(FileUpload,{label:"Planilla_Facturación.xlsx",desc:"Hoja Flujo · columnas GS (Arriendo) y GT (Serv.Adm.)",accept:".xlsx,.xls",file:files.planilla,done:!!files.planilla,onFile:f=>setFiles(p=>({...p,planilla:f}))}),
+            h(FileUpload,{label:"Planilla_Facturación.xlsx",desc:"Hoja Flujo · columnas GS y GT",accept:".xlsx,.xls",file:files.planilla,done:false,onFile:f=>setFiles(p=>({...p,planilla:f}))})
+        ),
 
-          files.zip?
+        /* ── ESTADO PDFs ── */
+        h("div",{style:{marginBottom:16}},
+          zipStatus==="ready"?
             h("div",{className:"drop-zone done",style:{cursor:"default"}},
               h("div",{style:{color:"var(--green)",fontWeight:600,fontSize:13,marginBottom:3}},"✓ PDFs "+periodo),
-              h("div",{style:{fontSize:11,color:"var(--txm)"}},"Cargado desde Google Drive · "+Math.round(files.zip.size/1024)+" KB")
+              h("div",{style:{fontSize:11,color:"var(--txm)"}},"Listos · "+Math.round((files.zip?.size||0)/1024)+" KB")
             ):
-            h("div",{className:"drop-zone",style:{cursor:"default",opacity:0.6}},
-              h("div",{style:{fontSize:13,fontWeight:600,color:"var(--txm)",marginBottom:4}},h("span",{className:"spin",style:{marginRight:8}},"⟳"),"Cargando PDFs desde Drive..."),
-              h("div",{style:{fontSize:11,color:"var(--txd)"}},"Carpeta "+periodo.split(" ")[0].slice(0,3)+" "+periodo.split(" ")[1]+" en Drive")
+          zipStatus==="loading"?
+            h("div",{className:"drop-zone",style:{cursor:"default",opacity:0.7}},
+              h("div",{style:{fontSize:13,fontWeight:600,color:"var(--txm)",marginBottom:4}},h("span",{className:"spin",style:{marginRight:8}},"⟳"),"Buscando PDFs en Drive..."),
+              h("div",{style:{fontSize:11,color:"var(--txd)"}},"Carpeta "+periodo+" en Drive")
+            ):
+          zipStatus==="splitting"?
+            h("div",{className:"drop-zone",style:{cursor:"default",background:"var(--abg)",borderColor:"var(--adim)",opacity:1}},
+              h("div",{style:{fontSize:13,fontWeight:600,color:"var(--amber)",marginBottom:4}},h("span",{className:"spin",style:{marginRight:8}},"⟳"),"Separando PDF del mes..."),
+              h("div",{style:{fontSize:11,color:"var(--txd)"}},"Esto puede tardar 1-2 minutos")
+            ):
+          zipStatus==="missing"?
+            h("div",{className:"drop-zone",style:{cursor:"default",background:"var(--abg)",borderColor:"var(--adim)"}},
+              h("div",{style:{fontSize:13,fontWeight:600,color:"var(--amber)",marginBottom:8}},"⚠ No existe el ZIP para "+periodo),
+              h("div",{style:{fontSize:11,color:"var(--txm)",marginBottom:12}},"Se separará el PDF maestro y se creará la carpeta en Drive automáticamente."),
+              h("button",{onClick:generarZip,className:"btn-primary",style:{fontSize:12,padding:"7px 18px"}},"⚙ Generar PDFs del mes")
+            ):
+          zipStatus==="error"?
+            h("div",{className:"drop-zone",style:{cursor:"default",background:"var(--rbg)",borderColor:"var(--rdim)"}},
+              h("div",{style:{fontSize:13,fontWeight:600,color:"var(--red)",marginBottom:6}},"✗ Error cargando PDFs"),
+              h("div",{style:{fontSize:11,color:"var(--txm)",marginBottom:10}},zipError||"Error desconocido"),
+              h("button",{onClick:cargarZipDrive,style:{fontSize:11,padding:"5px 14px",borderRadius:8,border:"1px solid var(--rdim)",background:"transparent",color:"var(--red)",cursor:"pointer"}},"↺ Reintentar")
+            ):
+            h("div",{className:"drop-zone",style:{cursor:"default",opacity:0.5}},
+              h("div",{style:{fontSize:12,color:"var(--txm)"}},"Selecciona un período para cargar los PDFs")
             )
         ),
-        h("div",{style:{marginTop:14,display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}},
-          [{label:"Planilla facturación",ok:!!files.planilla},{label:"PDFs "+periodo,ok:!!files.zip}]
-          .map((f,i)=>h("span",{key:i,style:{fontSize:11,padding:"3px 10px",borderRadius:20,background:f.ok?"var(--gbg)":"var(--surf2)",color:f.ok?"var(--green)":"var(--txd)",border:`1px solid ${f.ok?"var(--gdim)":"var(--bdr)"}`}},f.ok?"✓ ":"○ ",f.label))
-        ),
-        h("div",{style:{marginTop:16,display:"flex",justifyContent:"center",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},
-          !todosSubidos?h("span",null,h("span",{className:"spin",style:{marginRight:6}},"⟳"),"Cargando archivos desde Drive..."):
-          h("button",{onClick:procesar,className:"btn-primary",style:{minWidth:220}},"▶ Procesar archivos")
+
+        /* ── BOTÓN PROCESAR ── */
+        h("div",{style:{display:"flex",justifyContent:"center"}},
+          files.planilla&&zipStatus==="ready"?
+            h("button",{onClick:procesar,className:"btn-primary",style:{minWidth:240,fontSize:14}},"▶ Procesar "+periodo):
+            h("span",{style:{fontSize:12,color:"var(--txd)"}},
+              !files.planilla?"Cargando planilla...":""+
+              zipStatus==="loading"?"Buscando PDFs en Drive...":
+              zipStatus==="missing"?"Genera los PDFs del mes para continuar":
+              zipStatus==="splitting"?"Generando PDFs...":""+
+              zipStatus==="error"?"Corrige el error para continuar":
+              "Esperando período..."
+            )
         )
       )
     ),
-
     view==="table"&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflowX:"hidden",background:"#eef4fd"},className:"fade-up"},
       h("div",{style:{display:"grid",gridTemplateColumns:"repeat(5,1fr)",borderBottom:"1px solid #b8d0ee",background:"#ddeaf8"}},
         [{label:"Total",val:stats.total,col:"var(--tx)",sub:""},{label:"Con PDF",val:stats.conPdf,col:"var(--green)",sub:"facturas cruzadas"},{label:"Sin PDF",val:stats.sinPdf,col:"var(--red)",sub:"revisar"},{label:"Coinciden",val:stats.ok,col:"var(--accl)",sub:"listos para enviar"},{label:"Enviados",val:stats.sent,col:"var(--amber)",sub:MODO_PRUEBA?"→ "+TEST_DEST:"esta sesión"}]
