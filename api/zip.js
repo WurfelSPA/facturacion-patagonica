@@ -8,6 +8,12 @@ const MES_NUM = {
   "Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12"
 };
 
+const MES_NOM = {
+  "01":"Enero","02":"Febrero","03":"Marzo","04":"Abril",
+  "05":"Mayo","06":"Junio","07":"Julio","08":"Agosto",
+  "09":"Septiembre","10":"Octubre","11":"Noviembre","12":"Diciembre"
+};
+
 async function signJWT(payload, privateKey) {
   const header = { alg: "RS256", typ: "JWT" };
   const encode = obj => btoa(JSON.stringify(obj)).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
@@ -63,7 +69,6 @@ export default async function handler(req, res) {
   const mesNum = MES_NUM[mesNombre];
   if (!mesNum || !anio) return res.status(400).json({ error: "Periodo invalido: " + periodo });
 
-  const folderName = `${mesNum}-${anio}`;
   const saJson = process.env.GOOGLE_SERVICE_ACCOUNT;
   if (!saJson) return res.status(500).json({ error: "GOOGLE_SERVICE_ACCOUNT no configurada" });
 
@@ -71,32 +76,57 @@ export default async function handler(req, res) {
     const serviceAccount = JSON.parse(saJson);
     const token = await getAccessToken(serviceAccount);
 
-    // Buscar el ZIP directamente en Facturacion Mensual con formato "YYYY-MM.zip"
-    const zipName = `${anio}-${mesNum}.zip`; // ej: "2026-05.zip"
     const files = await driveList(token, FACTURACION_FOLDER_ID);
+
+    // 1. Buscar ZIP: "2026-05.zip"
+    const zipName = `${anio}-${mesNum}.zip`;
     const zipFile = files.find(f => f.name.toLowerCase() === zipName.toLowerCase());
-    if (!zipFile) {
+
+    if (zipFile) {
+      // ZIP encontrado — descargarlo y servirlo
+      const driveRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${zipFile.id}?alt=media`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!driveRes.ok) {
+        const txt = await driveRes.text();
+        return res.status(driveRes.status).json({ error: `Drive ${driveRes.status}: ${txt.slice(0,200)}` });
+      }
+      const buffer = await driveRes.arrayBuffer();
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("Content-Length", buffer.byteLength);
+      return res.status(200).send(Buffer.from(buffer));
+    }
+
+    // 2. ZIP no existe — buscar PDF maestro del mes
+    // Nombres posibles: "Facturación Pisa Mayo.pdf", "Facturacion Pisa Mayo.pdf",
+    //                   "Facturación PISA Mayo.pdf", variantes con/sin acento
+    const mesNom = mesNombre; // "Mayo", "Junio", etc.
+    const pdfMaestro = files.find(f => {
+      const n = f.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+      const mes = mesNom.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+      return n.endsWith(".pdf") && n.includes("pisa") && n.includes(mes);
+    });
+
+    if (pdfMaestro) {
+      // PDF maestro encontrado — informar al frontend para que pueda generar el ZIP
       return res.status(404).json({
-        error: `No se encontro ${zipName} en Drive. Sube el ZIP con el nombre ${zipName}.`
+        error: "no_zip",
+        pdfMaestroId: pdfMaestro.id,
+        pdfMaestroNombre: pdfMaestro.name,
+        canGenerate: true,
+        mensaje: `No existe ${zipName} pero hay un PDF maestro disponible para generar.`
       });
     }
 
-    // Descargar y servir el ZIP directo
-    const driveRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${zipFile.id}?alt=media`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    if (!driveRes.ok) {
-      const txt = await driveRes.text();
-      return res.status(driveRes.status).json({ error: `Drive ${driveRes.status}: ${txt.slice(0,200)}` });
-    }
-
-    const buffer = await driveRes.arrayBuffer();
-    res.setHeader("Content-Type", "application/zip");
-    res.setHeader("Content-Disposition", `attachment; filename="${folderName}.zip"`);
-    res.setHeader("Cache-Control", "no-store");
-    res.setHeader("Content-Length", buffer.byteLength);
-    return res.status(200).send(Buffer.from(buffer));
+    // 3. Nada disponible para este mes
+    return res.status(404).json({
+      error: "no_zip",
+      canGenerate: false,
+      mensaje: `No existe ${zipName} ni PDF maestro para ${mesNombre} ${anio} en Drive.`
+    });
 
   } catch (e) {
     return res.status(500).json({ error: e.message });
