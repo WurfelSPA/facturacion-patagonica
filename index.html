@@ -1095,39 +1095,56 @@ function App(){
   const addLog=(txt,t="")=>setProcLogs(p=>[...p,{txt,t}]);
 
   /* Cargar ZIP desde Drive cuando cambia período y estamos en vista facturación */
-  const [zipStatus,setZipStatus]=useState("idle"); /* idle | loading | ready | missing | splitting | error */
+  const [zipStatus,setZipStatus]=useState("idle");
   const [zipError,setZipError]=useState(null);
 
-  const cargarZipDrive=useCallback(()=>{
-    if(!periodo)return;
-    setZipStatus("loading");setZipError(null);
-    fetch(`/api/zip?periodo=${encodeURIComponent(periodo)}`)
+  /* Un solo useEffect: busca el ZIP cada vez que cambia el período.
+     Cancel flag evita que un fetch anterior pise al actual. */
+  useEffect(()=>{
+    if(view!=="upload"||!periodo)return;
+    let cancelled=false;
+    setZipStatus("loading");
+    setZipError(null);
+    setFiles(p=>({...p,zip:null}));
+    fetch("/api/zip?periodo="+encodeURIComponent(periodo))
       .then(r=>{
-        if(r.status===404)return r.json().then(()=>{ throw Object.assign(new Error("no_zip"),{notFound:true}); });
+        if(r.status===404)return r.json().then(()=>{throw Object.assign(new Error("no_zip"),{notFound:true});});
+        if(!r.ok)return r.json().then(e=>{throw new Error(e.error||"Error "+r.status);});
+        return r.blob();
+      })
+      .then(blob=>{
+        if(cancelled)return;
+        const f=new File([blob],periodo.replace(" ","-")+".zip",{type:"application/zip"});
+        setFiles(p=>({...p,zip:f}));
+        setZipStatus("ready");
+      })
+      .catch(e=>{
+        if(cancelled)return;
+        if(e.notFound){setZipStatus("missing");}
+        else{setZipStatus("error");setZipError(e.message);}
+      });
+    return ()=>{cancelled=true;};
+  },[periodo,view]);
+
+  /* Reintentar manualmente */
+  const cargarZipDrive=React.useCallback(()=>{
+    if(!periodo)return;
+    setZipStatus("loading");setZipError(null);setFiles(p=>({...p,zip:null}));
+    fetch("/api/zip?periodo="+encodeURIComponent(periodo))
+      .then(r=>{
+        if(r.status===404)return r.json().then(()=>{throw Object.assign(new Error("no_zip"),{notFound:true});});
         if(!r.ok)return r.json().then(e=>{throw new Error(e.error||"Error "+r.status);});
         return r.blob();
       })
       .then(blob=>{
         const f=new File([blob],periodo.replace(" ","-")+".zip",{type:"application/zip"});
-        setFiles(p=>({...p,zip:f}));
-        setZipStatus("ready");
-        notify("✓ PDFs cargados desde Drive · "+periodo);
+        setFiles(p=>({...p,zip:f}));setZipStatus("ready");
       })
       .catch(e=>{
-        if(e.notFound){ setZipStatus("missing"); } /* auto-genera en useEffect */
-        else{ setZipStatus("error"); setZipError(e.message); }
+        if(e.notFound){setZipStatus("missing");}
+        else{setZipStatus("error");setZipError(e.message);}
       });
   },[periodo]);
-
-  useEffect(()=>{
-    if(view!=="upload"||!periodo)return;
-    setZipStatus("loading");
-    setFiles(p=>({...p,zip:null}));
-    const t=setTimeout(()=>cargarZipDrive(),50);
-    return ()=>clearTimeout(t);
-  },[periodo,view]);
-
-  /* Separar PDF maestro y subir ZIP a Drive */
   /* Auto-generar ZIP cuando no existe en Drive */
   useEffect(()=>{
     if(zipStatus==="missing"&&periodo) generarZip();
@@ -1851,8 +1868,8 @@ function App(){
       /* ── COLUMNA DERECHA: estado del proceso ── */
       h("div",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-start",gap:16,padding:"32px 48px",overflowY:"auto"}},
 
-        !periodo&&h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100%",gap:12,color:"var(--txd)"}},
-          h("div",{style:{fontSize:40,marginBottom:4}},"📋"),
+        !periodo&&h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:60,gap:12}},
+          h("div",{style:{fontSize:36,marginBottom:4}},"📋"),
           h("div",{style:{fontSize:15,fontWeight:600,color:"var(--txm)"}},"Selecciona un período"),
           h("div",{style:{fontSize:12,color:"var(--txd)"}},"Elige el mes en la lista para comenzar")
         ),
