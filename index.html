@@ -1202,17 +1202,32 @@ function App(){
   },[files.planilla]);
 
   const getToken=useCallback(async()=>{if(gmailToken)return gmailToken;const token=await getGoogleToken(clientId);setGmailToken(token);return token;},[gmailToken,clientId]);
-  const todosSubidos=files.planilla&&files.zip;
+  const todosSubidos=files.zip&&zipStatus==="ready"; /* planilla es opcional */
 
   /* ── PROCESAR ── */
   const procesar=useCallback(async()=>{
-    if(!todosSubidos)return;
+    if(!files.zip)return;
     setShowProc(true);setProcDone(false);setProcLogs([]);setProcProgress(5);
     try{
-      addLog("▶ Leyendo planilla de facturación...","info");
-      const clientes=await procesarPlanillaFacturacion(files.planilla,periodo);
-      addLog(`✓ ${clientes.length} filas detectadas para ${periodo}`,"ok");setProcProgress(25);
-      addLog("✓ Correos leídos desde columna M de la planilla","ok");setProcProgress(40);
+      /* ── PASO 1: PLANILLA (opcional — puede no tener datos del mes) ── */
+      let clientes=[];
+      let planillaOk=false;
+      if(files.planilla){
+        addLog("▶ Leyendo planilla de facturación...","info");
+        try{
+          clientes=await procesarPlanillaFacturacion(files.planilla,periodo);
+          addLog(`✓ ${clientes.length} filas detectadas para ${periodo}`,"ok");
+          planillaOk=true;
+        }catch(e){
+          addLog(`⚠ Planilla: ${e.message}`,"warn");
+          addLog("  Continuando solo con PDFs — cruce de datos no disponible","warn");
+        }
+      }else{
+        addLog("⚠ Sin planilla — procesando solo PDFs","warn");
+      }
+      setProcProgress(25);
+
+      /* ── PASO 2: PDFs (siempre) ── */
       addLog("▶ Procesando PDFs del ZIP...","info");
       const pdfs=await procesarPDFs(files.zip,addLog);setProcProgress(65);
       /* Obtener montos UF del servidor (extracción server-side) */
@@ -1306,15 +1321,31 @@ function App(){
         }
         filas.push({sitio:c.sitio,cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII,ufPlan:c.uf,ufPdf,enviado:false});
       }
+
+      /* ── Si no hay datos de planilla, mostrar igual los PDFs detectados ── */
+      if(!planillaOk){
+        for(const p of pdfs){
+          filas.push({
+            sitio:p.sitio,cliente:p.nombreEnArchivo||p.nroFact,rut:"",correo:"",
+            concepto:p.tipo==="arriendo"?"Arriendo":"Serv. Adm.",colRef:"",
+            factura:p.nroFact,matchScore:0,ufSII:null,ufPlan:p.ufPdf||0,ufPdf:p.ufPdf,enviado:false
+          });
+        }
+        addLog(`⚠ Sin datos de planilla — mostrando ${pdfs.length} PDFs detectados`,"warn");
+        addLog("  Agrega el período a la planilla para cruzar datos y enviar correos","warn");
+      }
+
       const nuevoMapa={};
       for(const p of pdfs){if(p.nroFact&&p.zipPath)nuevoMapa[p.nroFact]={zipPath:p.zipPath,nombre:p.pdfNombre};}
       setPdfMap(nuevoMapa);
       const sinPdf=filas.filter(f=>!f.factura);
       const revisar=filas.filter(f=>f.factura&&f.matchScore===1);
-      addLog(`✓ ${filas.filter(f=>f.factura).length}/${filas.length} facturas cruzadas`,"ok");
-      if(sinPdf.length>0){addLog(`  ⚠ Sin PDF (${sinPdf.length}): ${sinPdf.slice(0,3).map(f=>f.sitio+"/"+f.cliente.slice(0,20)).join(" | ")}`,"warn");}
-      if(revisar.length>0){addLog(`  ⚠ Revisar (${revisar.length}): cruce por candidato único, verificar manualmente`,"warn");}setProcProgress(100);setProcDone(true);
-      /* Auto-cerrar y mostrar tabla si no hubo errores */
+      if(planillaOk){
+        addLog(`✓ ${filas.filter(f=>f.factura).length}/${filas.length} facturas cruzadas`,"ok");
+        if(sinPdf.length>0){addLog(`  ⚠ Sin PDF (${sinPdf.length}): ${sinPdf.slice(0,3).map(f=>f.sitio+"/"+f.cliente.slice(0,20)).join(" | ")}`,"warn");}
+        if(revisar.length>0){addLog(`  ⚠ Revisar (${revisar.length}): cruce por candidato único, verificar manualmente`,"warn");}
+      }
+      setProcProgress(100);setProcDone(true);
       setTimeout(()=>{setShowProc(false);setView("table");},1800);
       setData(filas);
       const prevSent=new Set();
@@ -1844,16 +1875,19 @@ function App(){
         ),
 
         /* ── BOTÓN PROCESAR ── */
-        h("div",{style:{display:"flex",justifyContent:"center"}},
-          files.planilla&&zipStatus==="ready"?
+        h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",gap:10}},
+          zipStatus==="ready"&&!files.planilla&&h("div",{style:{
+            fontSize:11,color:"var(--amber)",background:"var(--abg)",
+            border:"1px solid var(--adim)",borderRadius:8,padding:"7px 16px",textAlign:"center"
+          }},"⚠ Sin planilla — se mostrarán los PDFs detectados sin datos de facturación"),
+          zipStatus==="ready"?
             h("button",{onClick:procesar,className:"btn-primary",style:{minWidth:240,fontSize:14}},"▶ Procesar "+periodo):
             h("span",{style:{fontSize:12,color:"var(--txd)"}},
-              !files.planilla?"Cargando planilla...":""+
               zipStatus==="loading"?"Buscando PDFs en Drive...":
               zipStatus==="missing"?"Genera los PDFs del mes para continuar":
               zipStatus==="splitting"?"Generando PDFs...":""+
               zipStatus==="error"?"Corrige el error para continuar":
-              "Esperando período..."
+              "Selecciona un período"
             )
         )
       )
