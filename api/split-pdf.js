@@ -37,25 +37,6 @@ async function driveDownload(token, fileId) {
   return Buffer.from(await res.arrayBuffer());
 }
 
-async function driveUpload(token, name, data, mime, parentId) {
-  const meta = JSON.stringify({ name, mimeType: mime, ...(parentId ? { parents: [parentId] } : {}) });
-  const boundary = "pat_split_boundary";
-  const body = Buffer.concat([
-    Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`),
-    Buffer.from(meta),
-    Buffer.from(`\r\n--${boundary}\r\nContent-Type: ${mime}\r\n\r\n`),
-    data,
-    Buffer.from(`\r\n--${boundary}--`),
-  ]);
-  const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/related; boundary=${boundary}` },
-    body,
-  });
-  const resp = await res.json();
-  if (!resp.id) throw new Error("Upload: " + JSON.stringify(resp));
-  return resp.id;
-}
 
 // ── PDF parser puro en JS ────────────────────────────────────────────────────
 // Separar un PDF multipágina en PDFs individuales de 1 página
@@ -306,7 +287,6 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   const { pdfFileId, periodo } = req.body || {};
-  const destFolderId = "1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u"; /* Carpeta Facturacion Mensual — siempre */
   if (!pdfFileId || !periodo) return res.status(400).json({ error: "Falta pdfFileId o periodo" });
 
   const saJson = process.env.GOOGLE_SERVICE_ACCOUNT;
@@ -384,11 +364,8 @@ export default async function handler(req, res) {
     console.log(`ZIP: ${zipBuf.length} bytes`);
 
     // 5. Devolver ZIP como base64 — el frontend lo sube a Drive con el token OAuth del usuario
-    //    (Las Service Accounts no tienen cuota de almacenamiento en drives personales)
     const zipName = `${periodo}.zip`;
     const zipBase64 = zipBuf.toString("base64");
-    console.log(`ZIP listo: ${zipBuf.length} bytes — devolviendo al cliente para subir a Drive`);
-
     const totalFacturas = Object.values(breakdown).reduce((a,b)=>a+b,0);
     return res.status(200).json({
       ok: true,
