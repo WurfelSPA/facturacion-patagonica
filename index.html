@@ -1177,7 +1177,7 @@ function App(){
       setZipStatus("error");setZipError(e.message);
       notify("Error al separar PDF: "+e.message,"err");
     }
-  },[periodo]);
+  },[periodo,pdfMaestroId]);
 
   /* No auto-generar — usuario decide cuándo generar */
 
@@ -1185,7 +1185,13 @@ function App(){
   const autoProcesado=React.useRef(false);
   useEffect(()=>{ autoProcesado.current=false; },[periodo]);
 
-  /* NO auto-procesar — el usuario decide cuándo ir a Facturación */
+  /* Auto-procesar cuando planilla OK + ZIP listo (ej. Mayo) */
+  useEffect(()=>{
+    if(planillaStatus==="ok"&&zipStatus==="ready"&&!autoProcesado.current&&data.length===0){
+      autoProcesado.current=true;
+      procesar();
+    }
+  },[planillaStatus,zipStatus]);
 
   /* Cargar UF del mes actual al inicio */
   useEffect(()=>{
