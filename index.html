@@ -1203,7 +1203,7 @@ function App(){
       setZipStatus("error");setZipError(e.message);
       notify("Error al separar PDF: "+e.message,"err");
     }
-  },[periodo,pdfMaestroId,getToken]);
+  },[periodo,pdfMaestroId]);
 
   /* No auto-generar — usuario decide cuándo generar */
 
