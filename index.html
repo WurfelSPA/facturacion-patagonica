@@ -1154,9 +1154,7 @@ function App(){
     }
   },[periodo]);
 
-  useEffect(()=>{
-    if(zipStatus==="missing"&&periodo)generarZip();
-  },[zipStatus]);
+  /* No auto-generar — usuario decide cuándo generar */
 
   /* Ref para lista de meses */
   const autoProcesado=React.useRef(false);
@@ -1845,95 +1843,112 @@ function App(){
       ),
 
       /* ── COLUMNA DERECHA: estado del proceso ── */
-      h("div",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-start",gap:16,padding:"32px 48px",overflowY:"auto"}},
+      h("div",{style:{flex:1,display:"flex",flexDirection:"column",overflowY:"auto",padding:"32px 40px"}},
 
-        !periodo&&h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:60,gap:12}},
-          h("div",{style:{fontSize:36,marginBottom:4}},"📋"),
-          h("div",{style:{fontSize:15,fontWeight:600,color:"var(--txm)"}},"Selecciona un período"),
-          h("div",{style:{fontSize:12,color:"var(--txd)"}},"Elige el mes en la lista para comenzar")
-        ),
+        !periodo
+        /* Sin período seleccionado */
+        ?h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:60,gap:12}},
+            h("div",{style:{fontSize:36,marginBottom:4}},"📋"),
+            h("div",{style:{fontSize:15,fontWeight:600,color:"var(--txm)"}},"Selecciona un período"),
+            h("div",{style:{fontSize:12,color:"var(--txd)"}},"Elige el mes en la lista para comenzar")
+          )
 
-        periodo&&h("div",{style:{width:"100%",maxWidth:420}},
+        /* Con período seleccionado */
+        :h("div",{style:{maxWidth:440}},
 
           h("h2",{style:{fontSize:18,fontWeight:700,marginBottom:20,color:"var(--tx)"}},periodo),
 
-          /* Planilla */
+          /* ── ROW 1: Planilla ── */
           h("div",{style:{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",background:"var(--surf)",border:"1px solid var(--bdr2)",borderRadius:10,marginBottom:10}},
             h("div",{style:{
-              width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
+              width:28,height:28,borderRadius:"50%",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",
               background:files.planilla?"var(--gbg)":"var(--surf2)",
               border:"1px solid "+(files.planilla?"var(--gdim)":"var(--bdr)")
             }},
               files.planilla
                 ?h("span",{style:{color:"var(--green)",fontSize:14}},"✓")
-                :h("span",{className:"spin",style:{color:"var(--txd)",fontSize:12}},"⟳")
+                :h("span",{className:"spin",style:{fontSize:12,color:"var(--txd)"}},"⟳")
             ),
             h("div",null,
-              h("div",{style:{fontSize:13,fontWeight:600,color:files.planilla?"var(--green)":"var(--txm)"}},
-                files.planilla?"Planilla Facturación.xlsx":"Cargando planilla..."
-              ),
+              h("div",{style:{fontSize:13,fontWeight:600,color:files.planilla?"var(--tx)":"var(--txm)"}},
+                "Planilla Facturación.xlsx"),
               h("div",{style:{fontSize:11,color:"var(--txd)"}},
-                files.planilla?"Google Drive · "+Math.round(files.planilla.size/1024)+" KB":"Buscando en Drive..."
-              )
+                files.planilla?"Google Drive · "+Math.round(files.planilla.size/1024)+" KB":"Buscando en Drive...")
             )
           ),
 
-          /* PDFs */
-          h("div",{style:{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",background:"var(--surf)",border:"1px solid var(--bdr2)",borderRadius:10,marginBottom:24}},
+          /* ── ROW 2: PDFs ── */
+          h("div",{style:{
+            display:"flex",alignItems:"center",gap:12,padding:"12px 16px",
+            background:zipStatus==="error"?"var(--rbg)":zipStatus==="missing"?"var(--abg)":"var(--surf)",
+            border:"1px solid "+(zipStatus==="error"?"var(--rdim)":zipStatus==="missing"?"var(--adim)":"var(--bdr2)"),
+            borderRadius:10,marginBottom:24
+          }},
             h("div",{style:{
-              width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
-              background:zipStatus==="ready"?"var(--gbg)":zipStatus==="error"?"var(--rbg)":"var(--surf2)",
-              border:"1px solid "+(zipStatus==="ready"?"var(--gdim)":zipStatus==="error"?"var(--rdim)":"var(--bdr)")
+              width:28,height:28,borderRadius:"50%",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",
+              background:zipStatus==="ready"?"var(--gbg)":zipStatus==="error"?"var(--rbg)":zipStatus==="missing"?"var(--abg)":"var(--surf2)",
+              border:"1px solid "+(zipStatus==="ready"?"var(--gdim)":zipStatus==="error"?"var(--rdim)":zipStatus==="missing"?"var(--adim)":"var(--bdr)")
             }},
-              zipStatus==="ready"
-                ?h("span",{style:{color:"var(--green)",fontSize:14}},"✓")
-                :zipStatus==="error"
-                ?h("span",{style:{color:"var(--red)",fontSize:14}},"✗")
-                :h("span",{className:"spin",style:{color:"var(--txd)",fontSize:12}},"⟳")
+              zipStatus==="ready"?h("span",{style:{color:"var(--green)",fontSize:14}},"✓")
+              :zipStatus==="error"?h("span",{style:{color:"var(--red)",fontSize:14}},"✗")
+              :zipStatus==="missing"?h("span",{style:{color:"var(--amber)",fontSize:14}},"⚠")
+              :h("span",{className:"spin",style:{fontSize:12,color:"var(--txd)"}},"⟳")
             ),
-            h("div",null,
-              h("div",{style:{fontSize:13,fontWeight:600,color:zipStatus==="ready"?"var(--green)":zipStatus==="error"?"var(--red)":"var(--txm)"}},
+            h("div",{style:{flex:1}},
+              h("div",{style:{fontSize:13,fontWeight:600,
+                color:zipStatus==="ready"?"var(--tx)":zipStatus==="error"?"var(--red)":zipStatus==="missing"?"var(--amber)":"var(--txm)"}},
                 zipStatus==="ready"?"PDFs "+periodo
                 :zipStatus==="loading"?"Buscando PDFs en Drive..."
-                :(zipStatus==="missing"||zipStatus==="splitting")?"Generando PDFs del mes..."
-                :zipStatus==="error"?"Error al cargar PDFs"
+                :zipStatus==="splitting"?"Generando PDFs del mes..."
+                :zipStatus==="missing"?"No existen PDFs para "+periodo
+                :zipStatus==="error"?"Error al buscar PDFs"
                 :"Esperando..."
               ),
-              h("div",{style:{fontSize:11,color:"var(--txd)"}},
+              h("div",{style:{fontSize:11,color:"var(--txd)",marginTop:2}},
                 zipStatus==="ready"?"Listos · "+Math.round((files.zip&&files.zip.size||0)/1024)+" KB"
-                :zipStatus==="splitting"?"Separando PDF maestro — puede tardar 1-2 min"
+                :zipStatus==="missing"?"El ZIP no está en Drive — puedes generarlo desde el PDF maestro"
+                :zipStatus==="splitting"?"Separando PDF maestro, espera un momento..."
                 :zipStatus==="error"?(zipError||"Error desconocido")
                 :""
-              )
+              ),
+              /* Botón generar — solo cuando missing */
+              zipStatus==="missing"&&h("button",{
+                onClick:generarZip,
+                style:{marginTop:8,fontSize:11,padding:"5px 14px",borderRadius:8,
+                  border:"1px solid var(--adim)",background:"var(--amber)",color:"#fff",cursor:"pointer",fontWeight:600}
+              },"⚙ Generar PDFs del mes"),
+              zipStatus==="error"&&h("button",{
+                onClick:cargarZipDrive,
+                style:{marginTop:8,fontSize:11,padding:"5px 14px",borderRadius:8,
+                  border:"1px solid var(--rdim)",background:"transparent",color:"var(--red)",cursor:"pointer"}
+              },"↺ Reintentar")
             )
           ),
 
-          /* Barra de progreso */
-          h("div",{style:{width:"100%",height:4,background:"var(--surf2)",borderRadius:2,marginBottom:16,overflow:"hidden"}},
+          /* ── Barra de progreso ── */
+          h("div",{style:{height:4,background:"var(--surf2)",borderRadius:2,marginBottom:20,overflow:"hidden"}},
             h("div",{style:{
               height:"100%",borderRadius:2,transition:"width .5s ease",
               background:"linear-gradient(90deg,var(--acc),var(--acc2))",
               width:files.planilla&&zipStatus==="ready"?"100%"
-                :files.planilla&&(zipStatus==="splitting"||zipStatus==="missing")?"60%"
+                :files.planilla&&zipStatus==="splitting"?"60%"
                 :files.planilla?"30%":"10%"
             }})
           ),
 
-          /* Botón Continuar / estado */
-          h("div",{style:{textAlign:"center",minHeight:40,display:"flex",alignItems:"center",justifyContent:"center"}},
-            zipStatus==="error"
-              ?h("button",{onClick:cargarZipDrive,style:{fontSize:12,padding:"8px 20px",borderRadius:8,border:"1px solid var(--rdim)",background:"transparent",color:"var(--red)",cursor:"pointer"}},"↺ Reintentar")
-              :files.planilla&&zipStatus==="ready"
-              ?h("button",{onClick:procesar,className:"btn-primary",style:{minWidth:200,fontSize:14}},"▶ Procesar "+periodo)
-              :h("span",{style:{fontSize:12,color:"var(--txm)"}},
-                !files.planilla?"Cargando planilla..."
-                :zipStatus==="loading"?"Buscando PDFs en Drive..."
-                :(zipStatus==="splitting"||zipStatus==="missing")?"Generando PDFs del mes..."
-                :""
-              )
-          )
+          /* ── Botón Procesar ── */
+          files.planilla&&zipStatus==="ready"
+            ?h("button",{onClick:procesar,className:"btn-primary",style:{minWidth:220,fontSize:14}},"▶ Procesar "+periodo)
+            :h("div",{style:{fontSize:12,color:"var(--txd)",fontStyle:"italic"}},
+              !files.planilla?"Cargando planilla..."
+              :zipStatus==="loading"?"Buscando PDFs en Drive..."
+              :zipStatus==="missing"?"Genera los PDFs del mes para continuar"
+              :zipStatus==="splitting"?"Generando PDFs..."
+              :zipStatus==="error"?"Corrige el error para continuar"
+              :""
+            )
         )
-      ) /* fin periodo&& */
+      )
     ),
     view==="table"&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflowX:"hidden",background:"#eef4fd"},className:"fade-up"},
       h("div",{style:{display:"grid",gridTemplateColumns:"repeat(5,1fr)",borderBottom:"1px solid #b8d0ee",background:"#ddeaf8"}},
