@@ -1030,7 +1030,7 @@ function App(){
   const clientId=PRESET_GID;
   const [gmailToken,setGmailToken]=useState(null);
   const [view,setView]=useState("dashboard");
-  const [periodo,setPeriodo]=useState("Mayo 2026");
+  const [periodo,setPeriodo]=useState("");
   const [files,setFiles]=useState({planilla:null,zip:null});
   const [data,setData]=useState([]);
   const [pdfMap,setPdfMap]=useState({});
@@ -1101,7 +1101,6 @@ function App(){
   const cargarZipDrive=useCallback(()=>{
     if(!periodo)return;
     setZipStatus("loading");setZipError(null);
-    setFiles(p=>({...p,zip:null}));
     fetch(`/api/zip?periodo=${encodeURIComponent(periodo)}`)
       .then(r=>{
         if(r.status===404)return r.json().then(()=>{ throw Object.assign(new Error("no_zip"),{notFound:true}); });
@@ -1121,18 +1120,17 @@ function App(){
   },[periodo]);
 
   useEffect(()=>{
-    if(view!=="upload")return;
-    setZipStatus("idle");
+    if(view!=="upload"||!periodo)return;
+    setZipStatus("loading");
     setFiles(p=>({...p,zip:null}));
-    // small delay so state clears before fetching
     const t=setTimeout(()=>cargarZipDrive(),50);
     return ()=>clearTimeout(t);
-  },[periodo]);
+  },[periodo,view]);
 
   /* Separar PDF maestro y subir ZIP a Drive */
   /* Auto-generar ZIP cuando no existe en Drive */
   useEffect(()=>{
-    if(zipStatus==="missing") generarZip();
+    if(zipStatus==="missing"&&periodo) generarZip();
   },[zipStatus]);
 
   /* Ref para lista de meses — no auto-procesar, usuario decide */
@@ -1140,6 +1138,7 @@ function App(){
   useEffect(()=>{ autoProcesado.current=false; },[periodo]);
 
   const generarZip=useCallback(async()=>{
+    if(!periodo)return;
     setZipStatus("splitting");setZipError(null);
     const [mesNombre,anio]=periodo.split(" ");
     const mesNum=MES_STR[mesNombre];
@@ -1851,7 +1850,14 @@ function App(){
 
       /* ── COLUMNA DERECHA: estado del proceso ── */
       h("div",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-start",gap:16,padding:"32px 48px",overflowY:"auto"}},
-        h("div",{style:{width:"100%",maxWidth:420}},
+
+        !periodo&&h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100%",gap:12,color:"var(--txd)"}},
+          h("div",{style:{fontSize:40,marginBottom:4}},"📋"),
+          h("div",{style:{fontSize:15,fontWeight:600,color:"var(--txm)"}},"Selecciona un período"),
+          h("div",{style:{fontSize:12,color:"var(--txd)"}},"Elige el mes en la lista para comenzar")
+        ),
+
+        periodo&&h("div",{style:{width:"100%",maxWidth:420}},
 
           h("h2",{style:{fontSize:18,fontWeight:700,marginBottom:20,color:"var(--tx)"}},periodo),
 
@@ -1931,6 +1937,7 @@ function App(){
               )
           )
         )
+        ) /* fin periodo&& */
       )
     ),
     view==="table"&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflowX:"hidden",background:"#eef4fd"},className:"fade-up"},
