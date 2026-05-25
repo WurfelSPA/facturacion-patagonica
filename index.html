@@ -1131,18 +1131,9 @@ function App(){
     if(zipStatus==="missing") generarZip();
   },[zipStatus]);
 
-  /* Auto-procesar cuando ZIP listo — sin intervención del usuario */
+  /* Ref para lista de meses — no auto-procesar, usuario decide */
   const autoProcesado=React.useRef(false);
-  useEffect(()=>{
-    /* Reset flag cuando cambia el período */
-    autoProcesado.current=false;
-  },[periodo]);
-  useEffect(()=>{
-    if(zipStatus==="ready"&&files.zip&&!autoProcesado.current){
-      autoProcesado.current=true;
-      procesar();
-    }
-  },[zipStatus,files.zip]);
+  useEffect(()=>{ autoProcesado.current=false; },[periodo]);
 
   const generarZip=useCallback(async()=>{
     setZipStatus("splitting");setZipError(null);
@@ -1922,15 +1913,18 @@ function App(){
             }})
           ),
 
-          /* Mensaje */
-          h("div",{style:{textAlign:"center",fontSize:12,color:"var(--txm)",minHeight:18}},
+          /* Botón Continuar / estado */
+          h("div",{style:{textAlign:"center",minHeight:40,display:"flex",alignItems:"center",justifyContent:"center"}},
             zipStatus==="error"
-              ?h("button",{onClick:cargarZipDrive,style:{fontSize:11,padding:"5px 14px",borderRadius:8,border:"1px solid var(--rdim)",background:"transparent",color:"var(--red)",cursor:"pointer"}},"↺ Reintentar")
-              :files.planilla&&zipStatus==="ready"?"Listo — iniciando proceso..."
-              :!files.planilla?"Cargando datos desde Drive..."
-              :zipStatus==="loading"?"Buscando PDFs en Drive..."
-              :(zipStatus==="splitting"||zipStatus==="missing")?"Generando PDFs del mes..."
-              :""
+              ?h("button",{onClick:cargarZipDrive,style:{fontSize:12,padding:"8px 20px",borderRadius:8,border:"1px solid var(--rdim)",background:"transparent",color:"var(--red)",cursor:"pointer"}},"↺ Reintentar")
+              :files.planilla&&zipStatus==="ready"
+              ?h("button",{onClick:procesar,className:"btn-primary",style:{minWidth:200,fontSize:14}},"▶ Procesar "+periodo)
+              :h("span",{style:{fontSize:12,color:"var(--txm)"}},
+                !files.planilla?"Cargando planilla..."
+                :zipStatus==="loading"?"Buscando PDFs en Drive..."
+                :(zipStatus==="splitting"||zipStatus==="missing")?"Generando PDFs del mes..."
+                :""
+              )
           )
         )
       )
