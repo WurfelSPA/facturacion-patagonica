@@ -383,17 +383,17 @@ export default async function handler(req, res) {
     const zipBuf = Buffer.from(await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }));
     console.log(`ZIP: ${zipBuf.length} bytes`);
 
-    // 5. Subir ZIP a Google Drive (carpeta Facturacion Mensual)
+    // 5. Devolver ZIP como base64 — el frontend lo sube a Drive con el token OAuth del usuario
+    //    (Las Service Accounts no tienen cuota de almacenamiento en drives personales)
     const zipName = `${periodo}.zip`;
-    console.log(`Subiendo ${zipName} a Drive...`);
-    const driveFileId = await driveUpload(token, zipName, zipBuf, "application/zip", destFolderId);
-    console.log(`ZIP subido a Drive: ${driveFileId}`);
+    const zipBase64 = zipBuf.toString("base64");
+    console.log(`ZIP listo: ${zipBuf.length} bytes — devolviendo al cliente para subir a Drive`);
 
     const totalFacturas = Object.values(breakdown).reduce((a,b)=>a+b,0);
     return res.status(200).json({
       ok: true,
       zipName,
-      driveFileId,
+      zipBase64,
       totalFacturas,
       sinCod,
       breakdown: Object.entries(breakdown).sort(([a],[b])=>a.localeCompare(b)),
