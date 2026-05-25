@@ -136,7 +136,7 @@ const SEND_PWD="patagonica2026";
 const DRIVE_PLANILLA_ID="1rAGS-b1MoPpEhMgN2BR9Hvg4cTYdcQDu";
 const DRIVE_FACTURACION_FOLDER_ID="1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u"; /* Carpeta Facturacion Mensual */
 const DRIVE_PDF_FACTURAS_ID="1Pl7s4FNyjVQOMcEBtgCcvCGD4FlzRg2W"; /* PDF Facturas del mes — actualizar cada mes */
-const GOOGLE_SCOPES="https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.readonly";
+const GOOGLE_SCOPES="https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive";
 const TG_BOT=window.__TG_BOT__||"";
 const TG_CHAT=window.__TG_CHAT__||"";
 const PRESET_KEY=window.__PAT_KEY__||"";
@@ -259,6 +259,27 @@ async function sendGmail(token,to,cco,from,subject,htmlBody,pdfBase64,pdfName){
 async function sendTelegram(botToken,chatId,mensaje){
   if(!botToken||!chatId)return;
   try{await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({chat_id:chatId,text:mensaje,parse_mode:"Markdown"})});}catch(e){console.warn("Telegram error:",e.message);}
+}
+async function uploadZipToDrive(token,zipName,zipBase64,folderId){
+  const binaryStr=atob(zipBase64);
+  const zipBytes=new Uint8Array(binaryStr.length);
+  for(let i=0;i<binaryStr.length;i++) zipBytes[i]=binaryStr.charCodeAt(i);
+  const meta=JSON.stringify({name:zipName,mimeType:"application/zip",parents:[folderId]});
+  const boundary="pat_zip_upload";
+  const metaPart=`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/zip\r\n\r\n`;
+  const endPart=`\r\n--${boundary}--`;
+  const metaBytes=new TextEncoder().encode(metaPart);
+  const endBytes=new TextEncoder().encode(endPart);
+  const body=new Uint8Array(metaBytes.length+zipBytes.length+endBytes.length);
+  body.set(metaBytes,0); body.set(zipBytes,metaBytes.length); body.set(endBytes,metaBytes.length+zipBytes.length);
+  const res=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{
+    method:"POST",
+    headers:{Authorization:"Bearer "+token,"Content-Type":`multipart/related; boundary=${boundary}`},
+    body:body.buffer
+  });
+  const data=await res.json();
+  if(!data.id) throw new Error("Upload Drive: "+JSON.stringify(data));
+  return data.id;
 }
 function buildEmailHtml(cliente,concepto,periodo,ufPlan,factura){
   const mes=periodo.toLowerCase();
@@ -1164,20 +1185,25 @@ function App(){
     const mesNum=String(MES_NUM[mesNombre]||0).padStart(2,"0");
     const periodoCode=anio+"-"+mesNum;
     try{
+      /* 1. Servidor separa el PDF y devuelve ZIP como base64 */
       const res=await fetch("/api/split-pdf",{
         method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({pdfFileId:pdfMaestroId,periodo:periodoCode}),
       });
       const data=await res.json();
       if(!res.ok)throw new Error(data.error||"Error desconocido");
-      /* ZIP ya fue subido a Drive por el servidor — ahora lo descargamos */
+      /* 2. Frontend sube ZIP a Drive con token OAuth del usuario */
+      notify("⬆ Subiendo "+data.zipName+" a Drive...","info");
+      const token=await getToken();
+      await uploadZipToDrive(token,data.zipName,data.zipBase64,DRIVE_FACTURACION_FOLDER_ID);
       notify("✓ "+data.totalFacturas+" facturas generadas y subidas a Drive","ok");
-      buscarZip(periodo);  /* recarga el ZIP desde Drive */
+      /* 3. Recargar ZIP desde Drive */
+      buscarZip(periodo);
     }catch(e){
       setZipStatus("error");setZipError(e.message);
       notify("Error al separar PDF: "+e.message,"err");
     }
-  },[periodo,pdfMaestroId]);
+  },[periodo,pdfMaestroId,getToken]);
 
   /* No auto-generar — usuario decide cuándo generar */
 
