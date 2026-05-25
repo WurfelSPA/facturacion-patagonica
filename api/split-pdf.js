@@ -256,8 +256,21 @@ function detectCod(text) {
   return COD_MAP[m[1].trim().replace(/-$/,"").toUpperCase()] || null;
 }
 function detectNro(text) {
-  const m = text.match(/N[º°]\s*(\d+)/);
+  /* Tolerante con variantes del carácter º (º, °, o, ø) y con o sin espacio */
+  const m = text.match(/N[\xBA\xB0o\u00BA\u00B0]?[\s°º]*\s*(\d+)/i)
+    || text.match(/N[^a-z\d]{0,3}(\d{2,6})/i);
   return m ? m[1] : null;
+}
+function detectCliente(text) {
+  /* Busca "Señor(es) NOMBRE RUT" — toma el nombre entre Señor(es) y RUT */
+  const m = text.match(/Se[ñn]or(?:es)?\.?\s+(.+?)\s+RUT/i);
+  if (!m) return null;
+  /* Limpiar y truncar a 30 chars para el nombre de archivo */
+  return m[1].trim()
+    .replace(/[/\\:*?"<>|]/g, "")   /* chars inválidos en nombres de archivo */
+    .replace(/\s+/g, " ")
+    .slice(0, 30)
+    .trim();
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -305,12 +318,20 @@ export default async function handler(req, res) {
       const nro = detectNro(text);
 
       if (!cod) {
+        /* Último recurso: buscar en el texto completo del PDF por posición de página */
         sinCod.push(i + 1);
-        console.log(`Pág ${i+1}: sin COD`);
+        console.log(`Pág ${i+1}: sin COD — texto: "${text.slice(0,80)}"`);
         continue;
       }
+      if (!nro) {
+        console.warn(`Pág ${i+1}: sin Nº (COD=${cod}) — texto: "${text.slice(0,120)}"`);
+      }
 
-      const fname = nro ? `F-${nro}.pdf` : `F-p${i+1}.pdf`;
+      const cliente = detectCliente(text);
+      let fname;
+      if (nro && cliente) fname = `F-${nro} ${cliente}.pdf`;
+      else if (nro)       fname = `F-${nro}.pdf`;
+      else                fname = `F-p${i+1}.pdf`;
       zip.file(`${periodo}/${cod}/${fname}`, pageBufs[i]);
       breakdown[cod] = (breakdown[cod] || 0) + 1;
       console.log(`Pág ${i+1}: ${cod} → ${fname}`);
@@ -319,6 +340,13 @@ export default async function handler(req, res) {
     if (sinCod.length > 0) {
       zip.file(`${periodo}/sin_cod.txt`, `Páginas sin COD: ${sinCod.join(", ")}\n`);
     }
+
+    /* Resumen legible para verificación */
+    const resumenLines = [`Período: ${periodo}`, `Total facturas: ${Object.values(breakdown).reduce((a,b)=>a+b,0)}`, ``];
+    for (const [cod, cnt] of Object.entries(breakdown).sort(([a],[b])=>a.localeCompare(b))) {
+      resumenLines.push(`  ${cod}: ${cnt} facturas`);
+    }
+    zip.file(`${periodo}/resumen.txt`, resumenLines.join("\n") + "\n");
 
     // 4. Generar ZIP
     const zipBuf = Buffer.from(await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }));
