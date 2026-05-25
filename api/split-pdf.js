@@ -47,7 +47,7 @@ async function driveUpload(token, name, data, mime, parentId) {
     data,
     Buffer.from(`\r\n--${boundary}--`),
   ]);
-  const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+  const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/related; boundary=${boundary}` },
     body,
