@@ -1115,7 +1115,7 @@ function App(){
         notify("✓ PDFs cargados desde Drive · "+periodo);
       })
       .catch(e=>{
-        if(e.notFound){ setZipStatus("missing"); }
+        if(e.notFound){ setZipStatus("missing"); } /* auto-genera en useEffect */
         else{ setZipStatus("error"); setZipError(e.message); }
       });
   },[periodo]);
@@ -1126,6 +1126,11 @@ function App(){
   },[periodo,view]);
 
   /* Separar PDF maestro y subir ZIP a Drive */
+  /* Auto-generar ZIP cuando no existe en Drive */
+  useEffect(()=>{
+    if(zipStatus==="missing") generarZip();
+  },[zipStatus]);
+
   const generarZip=useCallback(async()=>{
     setZipStatus("splitting");setZipError(null);
     const [mesNombre,anio]=periodo.split(" ");
@@ -1858,10 +1863,9 @@ function App(){
               h("div",{style:{fontSize:11,color:"var(--txd)"}},"Esto puede tardar 1-2 minutos")
             ):
           zipStatus==="missing"?
-            h("div",{className:"drop-zone",style:{cursor:"default",background:"var(--abg)",borderColor:"var(--adim)"}},
-              h("div",{style:{fontSize:13,fontWeight:600,color:"var(--amber)",marginBottom:8}},"⚠ No existe el ZIP para "+periodo),
-              h("div",{style:{fontSize:11,color:"var(--txm)",marginBottom:12}},"Se separará el PDF maestro y se creará la carpeta en Drive automáticamente."),
-              h("button",{onClick:generarZip,className:"btn-primary",style:{fontSize:12,padding:"7px 18px"}},"⚙ Generar PDFs del mes")
+            h("div",{className:"drop-zone",style:{cursor:"default",background:"var(--abg)",borderColor:"var(--adim)",opacity:1}},
+              h("div",{style:{fontSize:13,fontWeight:600,color:"var(--amber)",marginBottom:4}},h("span",{className:"spin",style:{marginRight:8}},"⟳"),"Separando PDF del mes..."),
+              h("div",{style:{fontSize:11,color:"var(--txd)"}},"No existe el ZIP — generando automáticamente")
             ):
           zipStatus==="error"?
             h("div",{className:"drop-zone",style:{cursor:"default",background:"var(--rbg)",borderColor:"var(--rdim)"}},
@@ -1884,7 +1888,7 @@ function App(){
             h("button",{onClick:procesar,className:"btn-primary",style:{minWidth:240,fontSize:14}},"▶ Procesar "+periodo):
             h("span",{style:{fontSize:12,color:"var(--txd)"}},
               zipStatus==="loading"?"Buscando PDFs en Drive...":
-              zipStatus==="missing"?"Genera los PDFs del mes para continuar":
+              zipStatus==="missing"?"Generando PDFs del mes...":
               zipStatus==="splitting"?"Generando PDFs...":""+
               zipStatus==="error"?"Corrige el error para continuar":
               "Selecciona un período"
