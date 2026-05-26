@@ -604,6 +604,7 @@ function VentasView({periodo}){
   }, []);
 
   React.useEffect(() => {
+    if (!periodo || !periodo.includes(" ")) return;
     const mes = getMes(periodo);
     setEmpresas(p => p.map(e => ({...e, result:null, error:null})));
     cargarEmpresa("multi", mes);
@@ -1061,7 +1062,7 @@ function App(){
   const clientId=PRESET_GID;
   const [gmailToken,setGmailToken]=useState(null);
   const [view,setView]=useState("dashboard");
-  const [periodo,setPeriodo]=useState("");
+  const [periodo,setPeriodo]=useState(PERIODOS[new Date().getMonth()]||PERIODOS[4]);
   const [files,setFiles]=useState({planilla:null,zip:null});
   const [planillaStatus,setPlanillaStatus]=useState("idle"); /* idle | checking | ok | nodata | error */
   const [planillaError,setPlanillaError]=useState(null);
