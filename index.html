@@ -584,16 +584,16 @@ function VentasView({periodo}){
   const [activeEmp, setActiveEmp] = React.useState("multi");
   const fmtCLP = v => "$"+Math.round(v).toLocaleString("es-CL");
 
-  const getMes = () => {
+  const getMes = (p) => {
     const MN={"Enero":"01","Febrero":"02","Marzo":"03","Abril":"04","Mayo":"05","Junio":"06","Julio":"07","Agosto":"08","Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12"};
-    const [nom,anio] = periodo.split(" ");
+    const [nom,anio] = (p||periodo).split(" ");
     return `${anio}-${MN[nom]||"05"}`;
   };
 
-  const cargarEmpresa = React.useCallback(async (empId) => {
+  // mes se pasa como argumento — sin closures sobre periodo
+  const cargarEmpresa = React.useCallback(async (empId, mes) => {
     setEmpresas(prev => prev.map(e => e.id===empId ? {...e, loading:true, error:null} : e));
     try {
-      const mes = getMes();
       const res = await fetch(`/api/cruce?empresa=${empId}&mes=${mes}`);
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || "Error al cruzar");
@@ -601,10 +601,13 @@ function VentasView({periodo}){
     } catch(err) {
       setEmpresas(prev => prev.map(e => e.id===empId ? {...e, loading:false, error:err.message} : e));
     }
-  }, [periodo]);
+  }, []);
 
   React.useEffect(() => {
-    cargarEmpresa("multi");
+    const mes = getMes(periodo);
+    setEmpresas(p => p.map(e => ({...e, result:null, error:null})));
+    cargarEmpresa("multi", mes);
+    cargarEmpresa("dko", mes);
   }, [periodo]);
 
   const emp = empresas.find(e => e.id===activeEmp);
@@ -625,7 +628,7 @@ function VentasView({periodo}){
         h("div",{style:{fontSize:13,color:"var(--txm)"}},"Cruce automático Odoo vs SII · Facturas tipo 33 · "+periodo)
       ),
       h("button",{
-        onClick:()=>{setEmpresas(p=>p.map(e=>({...e,result:null,error:null}))); cargarEmpresa("multi"); cargarEmpresa("dko");},
+        onClick:()=>{const mes=getMes(periodo); setEmpresas(p=>p.map(e=>({...e,result:null,error:null}))); cargarEmpresa("multi",mes); cargarEmpresa("dko",mes);},
         style:{fontSize:11,padding:"5px 14px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--txm)",cursor:"pointer",display:"flex",alignItems:"center",gap:5}
       },"↻ Actualizar")
     ),
