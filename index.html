@@ -367,7 +367,8 @@ async function parsePlanillaParaDashboard(file){
       sitio:String(row[7]||"").replace(/\s+/g," ").trim(),
       edificio:String(row[8]||"").trim(),
       email:String(row[12]||"").trim(),
-      termContrato:serialToDate(row[14]),   /* Col O: Fecha Término Contrato */
+      termContrato:serialToDate(row[14]),   /* Col O: Fecha Inicio Contrato */
+      termTermino:serialToDate(row[15]),    /* Col P: Fecha Término Contrato */
       renovacion:row[16]!=null?String(row[16]).trim():"",  /* Col Q: Antelación renovación */
       aviso:row[17]!=null?String(row[17]).trim():"",        /* Col R: Aviso */
       fechaReajuste:serialToDate(row[52]),  /* Col BA: Fecha Reajuste */
@@ -1014,6 +1015,104 @@ function EmailModal({row,periodo,onClose,onConfirm,sending}){
 }
 
 /* ═══════════════════════════════════
+   VISTA CONTRATOS
+═══════════════════════════════════ */
+function ContratosView({dashData,driveLoading}){
+  const [tab,setTab]=useState("vencimientos");
+  const [search,setSearch]=useState("");
+  const now=new Date();
+  const currentYear=now.getFullYear();
+  function avisoDias(str){if(!str||str==="-"||str==="")return null;const s=str.toLowerCase();const m=s.match(/(\d+)/);if(!m)return null;const n=parseInt(m[1]);if(s.includes("año")||s.includes("ano"))return n*365;if(s.includes("mes"))return n*30;return n;}
+  function parseDate(v){if(!v||v==="—"||v==="-"||v==="")return null;if(typeof v==="string"&&v.includes("/")){const[d,mm,y]=v.split("/").map(Number);if(!d||!mm||!y)return null;return new Date(y,mm-1,d);}return null;}
+  function diasDesde(str){const d=parseDate(str);if(!d)return null;return Math.ceil((d-now)/86400000);}
+  function urgBg(dias,isReaj){if(dias===null)return{bg:"var(--surf2)",col:"var(--txd)",bdr:"var(--bdr)"};const t1=isReaj?30:90,t2=isReaj?90:180;if(dias<0||dias<=t1)return{bg:"var(--rbg)",col:"var(--red)",bdr:"var(--rdim)"};if(dias<=t2)return{bg:"var(--abg)",col:"var(--amber)",bdr:"var(--adim)"};return{bg:"var(--gbg)",col:"var(--green)",bdr:"var(--gdim)";};}
+  function fechaNotif(termStr,avisoStr){const d=parseDate(termStr);const dias=avisoDias(avisoStr);if(!d||!dias)return null;const n=new Date(d);n.setDate(n.getDate()-dias);return`${String(n.getDate()).padStart(2,"0")}/${String(n.getMonth()+1).padStart(2,"0")}/${n.getFullYear()}`;}
+  const clients=dashData?dashData.clients:[];
+  const vencimientos=clients.filter(c=>{const d=parseDate(c.termTermino);return d&&d.getFullYear()===currentYear;}).filter(c=>!search||c.nombre.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>(parseDate(a.termTermino)||0)-(parseDate(b.termTermino)||0));
+  const reajustes=clients.filter(c=>{const d=parseDate(c.fechaReajuste);return d&&(d.getFullYear()===currentYear||d.getFullYear()===currentYear+1);}).filter(c=>!search||c.nombre.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>(parseDate(a.fechaReajuste)||0)-(parseDate(b.fechaReajuste)||0));
+  const vencPasados=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d<0;}).length;
+  const venc30=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d>=0&&d<=30;}).length;
+  const venc90=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d>30&&d<=90;}).length;
+  const vencMas=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d>90;}).length;
+  if(!dashData)return h("main",{style:{flex:1,padding:"40px",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12}},driveLoading?h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},h("span",{className:"spin",style:{fontSize:18}},"⟳"),"Cargando planilla desde Drive..."):h("div",{style:{fontSize:13,color:"var(--txd)"}},"Sin datos — carga la planilla de facturación"));
+  return h("main",{style:{flex:1,overflowY:"auto",padding:"20px 24px",display:"flex",flexDirection:"column",gap:16},className:"fade-up"},
+    h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}},
+      h("div",{style:{display:"flex",gap:6,flexWrap:"wrap"}},
+        h("button",{onClick:()=>setTab("vencimientos"),className:`pill${tab==="vencimientos"?" active":""}`},`📅 Vencimientos ${currentYear} (${vencimientos.length})`),
+        h("button",{onClick:()=>setTab("reajustes"),className:`pill${tab==="reajustes"?" active":""}`},`📈 Reajustes ${currentYear}–${currentYear+1} (${reajustes.length})`)
+      ),
+      h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente...",style:{width:200}})
+    ),
+    tab==="vencimientos"&&h("div",{style:{display:"flex",flexDirection:"column",gap:12}},
+      h("div",{style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}},
+        [{lbl:`Ya vencidos en ${currentYear}`,val:vencPasados,col:"var(--red)",sub:"requieren acción"},{lbl:"Próximos 30 días",val:venc30,col:"var(--red)",sub:"urgente — notificar ya"},{lbl:"31 a 90 días",val:venc90,col:"var(--amber)",sub:"atención próxima"},{lbl:"Más de 90 días",val:vencMas,col:"var(--green)",sub:"en plazo"},].map((k,i)=>h("div",{key:i,className:"dash-card",style:{borderLeft:"3px solid "+k.col}},h("div",{className:"dash-card-lbl"},k.lbl),h("div",{style:{fontSize:28,fontWeight:700,fontFamily:"'DM Mono',monospace",color:k.col,lineHeight:1,marginTop:2,letterSpacing:"-1px"}},k.val),h("div",{className:"dash-card-sub"},k.sub)))
+      ),
+      vencimientos.length===0?h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,padding:"40px",textAlign:"center",color:"var(--txd)",fontSize:13}},`No hay contratos con término registrado en ${currentYear}`):
+      h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
+        h("div",{style:{padding:"10px 16px",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:8}},
+          h("span",{style:{fontWeight:700,fontSize:12}},"Contratos con Término en "+currentYear),
+          h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},vencimientos.length)
+        ),
+        h("div",{style:{overflowX:"auto"}},
+          h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
+            h("thead",null,h("tr",{style:{background:"#f0f4f8"}},["Sitio","Cliente / RUT","Edificio","Fecha Término","Días Restantes","Renovación Auto.","Aviso","Fecha Notificación"].map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap"}},col.toUpperCase())))),
+            h("tbody",null,vencimientos.map((c,i)=>{
+              const dias=diasDesde(c.termTermino);
+              const{bg,col,bdr}=urgBg(dias,false);
+              const notif=fechaNotif(c.termTermino,c.aviso);
+              const sCol=SITIO_C[c.sitio]||"#888";
+              return h("tr",{key:c.rut+c.nombre+i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"var(--surf2)"}},
+                h("td",{style:{padding:"9px 12px"}},h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},c.sitio||"—")),
+                h("td",{style:{padding:"9px 12px",maxWidth:200}},h("div",{style:{fontWeight:600,fontSize:11,lineHeight:1.3}},c.nombre),h("div",{style:{fontSize:9,color:"var(--txd)",fontFamily:"'DM Mono',monospace",marginTop:2}},c.rut)),
+                h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)"}},c.edificio||"—"),
+                h("td",{style:{padding:"9px 12px"}},h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,color:dias!==null&&dias<0?"var(--red)":dias!==null&&dias<=90?"var(--amber)":"var(--tx)"}},c.termTermino||"—")),
+                h("td",{style:{padding:"9px 12px"}},dias!==null?h("span",{style:{padding:"2px 8px",borderRadius:10,fontSize:10,fontWeight:700,background:bg,color:col,border:"1px solid "+bdr}},dias<0?"Vencido hace "+Math.abs(dias)+"d":dias===0?"Hoy":dias+"d"):h("span",{style:{color:"var(--txd)"}},"—")),
+                h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.renovacion||"—"),
+                h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.aviso||"—"),
+                h("td",{style:{padding:"9px 12px"}},notif?h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600,color:"var(--accl)",background:"var(--bbg)",padding:"2px 8px",borderRadius:6,border:"1px solid #b5d0f0"}},notif):h("span",{style:{color:"var(--txd)",fontSize:10}},"Sin datos de aviso"))
+              );
+            }))
+          )
+        )
+      )
+    ),
+    tab==="reajustes"&&h("div",{style:{display:"flex",flexDirection:"column",gap:12}},
+      h("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}},
+        [{lbl:`Reajustes ${currentYear}`,val:reajustes.filter(c=>{const d=parseDate(c.fechaReajuste);return d&&d.getFullYear()===currentYear;}).length,col:"var(--accl)",sub:"en el año actual"},{lbl:`Reajustes ${currentYear+1}`,val:reajustes.filter(c=>{const d=parseDate(c.fechaReajuste);return d&&d.getFullYear()===currentYear+1;}).length,col:"var(--blue)",sub:"año siguiente"},{lbl:"Próximos 30 días",val:reajustes.filter(c=>{const d=diasDesde(c.fechaReajuste);return d!==null&&d>=0&&d<=30;}).length,col:"var(--red)",sub:"urgente"},].map((k,i)=>h("div",{key:i,className:"dash-card",style:{borderLeft:"3px solid "+k.col}},h("div",{className:"dash-card-lbl"},k.lbl),h("div",{style:{fontSize:28,fontWeight:700,fontFamily:"'DM Mono',monospace",color:k.col,lineHeight:1,marginTop:2,letterSpacing:"-1px"}},k.val),h("div",{className:"dash-card-sub"},k.sub)))
+      ),
+      reajustes.length===0?h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,padding:"40px",textAlign:"center",color:"var(--txd)",fontSize:13}},`No hay reajustes programados para ${currentYear}–${currentYear+1}`):
+      h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
+        h("div",{style:{padding:"10px 16px",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:8}},
+          h("span",{style:{fontWeight:700,fontSize:12}},"Reajustes "+currentYear+"–"+(currentYear+1)),
+          h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},reajustes.length)
+        ),
+        h("div",{style:{overflowX:"auto"}},
+          h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
+            h("thead",null,h("tr",{style:{background:"#f0f4f8"}},["Sitio","Cliente / RUT","Edificio","Fecha Reajuste","Días Restantes","% Reajuste","Periodicidad","UF Arriendo"].map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap"}},col.toUpperCase())))),
+            h("tbody",null,reajustes.map((c,i)=>{
+              const dias=diasDesde(c.fechaReajuste);
+              const{bg,col,bdr}=urgBg(dias,true);
+              const sCol=SITIO_C[c.sitio]||"#888";
+              const pct=c.pctReaj&&c.pctReaj!=="-"?parseFloat(c.pctReaj):null;
+              return h("tr",{key:c.rut+c.nombre+i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"var(--surf2)"}},
+                h("td",{style:{padding:"9px 12px"}},h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},c.sitio||"—")),
+                h("td",{style:{padding:"9px 12px",maxWidth:200}},h("div",{style:{fontWeight:600,fontSize:11,lineHeight:1.3}},c.nombre),h("div",{style:{fontSize:9,color:"var(--txd)",fontFamily:"'DM Mono',monospace",marginTop:2}},c.rut)),
+                h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)"}},c.edificio||"—"),
+                h("td",{style:{padding:"9px 12px"}},h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,color:dias!==null&&dias<0?"var(--red)":dias!==null&&dias<=30?"var(--amber)":"var(--tx)"}},c.fechaReajuste||"—")),
+                h("td",{style:{padding:"9px 12px"}},dias!==null?h("span",{style:{padding:"2px 8px",borderRadius:10,fontSize:10,fontWeight:700,background:bg,color:col,border:"1px solid "+bdr}},dias<0?"Hace "+Math.abs(dias)+"d":dias===0?"Hoy":dias+"d"):h("span",{style:{color:"var(--txd)"}},"—")),
+                h("td",{style:{padding:"9px 12px"}},pct!==null?h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:700,color:"var(--green)",background:"var(--gbg)",border:"1px solid var(--gdim)",padding:"3px 10px",borderRadius:8}},pct.toFixed(1)+"%"):h("span",{style:{color:"var(--txd)"}},"—")),
+                h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.cadaAnios||"—"),
+                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--blue)",fontWeight:600}},c.ufArr>0?c.ufArr.toFixed(2)+" UF":"—")
+              );
+            }))
+          )
+        )
+      )
+    )
+  );
+}
+
+/* ═══════════════════════════════════
    APP PRINCIPAL
 ═══════════════════════════════════ */
 
@@ -1023,6 +1122,7 @@ function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlo
     {id:"dashboard", icon:"📊", label:"Dashboard"},
     {id:"ventas",    icon:"📈", label:"Detalles Ventas"},
     {id:"factura",   icon:"📋", label:"Facturación"},
+    {id:"contratos", icon:"📄", label:"Contratos"},
   ];
   const isActive = id => id==="factura" ? (view==="table"||view==="upload") : view===id;
   const handleNav = id => {
@@ -1863,7 +1963,7 @@ function App(){
     h("header",{style:{background:view==="table"?"#1e3a5f":"var(--surf)",borderBottom:view==="table"?"1px solid #152d4a":"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:49,gap:10}},
       h("div",{style:{display:"flex",alignItems:"center",gap:10}},
         h("div",{style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px",color:view==="table"?"#fff":"var(--tx)"}},
-          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":"📋 Facturación"
+          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":"📋 Facturación"
         ),
         view==="table"&&h("span",{style:{fontSize:9,fontFamily:"'DM Mono',monospace",color:"#93b5d4",marginLeft:4}},periodo)
       ),
@@ -2106,6 +2206,7 @@ function App(){
       )
     )
     ,view==="ventas"&&h(VentasView,{periodo})
+    ,view==="contratos"&&h(ContratosView,{dashData,driveLoading})
   ));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(h(App));
