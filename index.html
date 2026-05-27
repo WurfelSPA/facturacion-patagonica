@@ -478,10 +478,11 @@ async function procesarPlanillaFacturacion(file,periodo){
     if(!cliente||excl.includes(String(cliente).trim()))continue;
     const sName=String(cliente).trim();
     const sito=sitio?String(sitio).trim():"";
+    const edif=row[8]?String(row[8]).trim():""; /* Col I: nro local / bodega / edif */
     const emailBilling=row[12]?String(row[12]).trim():"";
     const rutBilling=row[9]?String(row[9]).replace(/\./g,"").trim().toLowerCase():""; /* Col J: RUT normalizado */
-    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling});
-    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling});
+    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling});
+    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling});
   }
   return clientes;
 }
@@ -1595,7 +1596,7 @@ function App(){
             /* Si hay >1 candidato y score<umbral → dejar factura="" para revisión manual */
           }
         }
-        filas.push({sitio:c.sitio,cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,enviado:false});
+        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,enviado:false});
       }
 
       /* ── Si no hay datos de planilla, mostrar igual los PDFs detectados ── */
@@ -1647,12 +1648,12 @@ function App(){
     lines.push([esc("Total:"),esc(stats.total),esc("Coinciden:"),esc(stats.ok),esc("Revisar:"),esc(stats.total-stats.ok),esc("Enviados:"),esc(stats.sent),esc("")].join(";"));
     lines.push(["","","","","","","","",""].map(esc).join(";"));
     // Columnas
-    lines.push([esc("Sitio"),esc("Cliente"),esc("RUT"),esc("Correo"),esc("Concepto"),esc("Factura"),esc("UF Planilla"),esc("UF PDF"),esc("Estado")].join(";"));
+    lines.push([esc("Sitio"),esc("Local/Edif"),esc("Cliente"),esc("RUT"),esc("Correo"),esc("Concepto"),esc("Factura"),esc("UF Planilla"),esc("UF PDF"),esc("Estado")].join(";"));
     // Filas
     for(const r of rows){
       const estadoLabel=r.estado==="ok"?"Coincide":r.estado==="diff"?(r.matchScore===1?"Revisar":"Difiere"):"Sin PDF";
       const sentido=sentSet.has(r.i)?"✓ Enviado":estadoLabel;
-      lines.push([esc(r.sitio),esc(r.cliente),esc(r.rut||""),esc(r.correo||""),esc(r.concepto),esc(r.factura||""),esc(r.ufPlan!=null?r.ufPlan.toFixed(2):""),esc(r.ufPdf!=null?r.ufPdf.toFixed(2):""),esc(sentido)].join(";"));
+      lines.push([esc(r.sitio),esc(r.edificio||""),esc(r.cliente),esc(r.rut||""),esc(r.correo||""),esc(r.concepto),esc(r.factura||""),esc(r.ufPlan!=null?r.ufPlan.toFixed(2):""),esc(r.ufPdf!=null?r.ufPdf.toFixed(2):""),esc(sentido)].join(";"));
     }
     const bom="﻿"; // BOM para que Excel abra correctamente con caracteres especiales
     const blob=new Blob([bom+lines.join("\r\n")],{type:"text/csv;charset=utf-8;"});
@@ -2310,7 +2311,12 @@ function App(){
               const esArr=row.concepto==="Arriendo";
               const bg=sent?"#e6f7ef":esArr?"#ffffff":"#fffdf5";
               return h("tr",{key:i,className:"row-tr"},
-                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{display:"inline-block",padding:"2px 7px",borderRadius:5,fontSize:10,fontWeight:700,background:`${SITIO_C[row.sitio]||"#888"}18`,color:SITIO_C[row.sitio]||"#888",border:`1px solid ${SITIO_C[row.sitio]||"#888"}40`}},row.sitio)),
+                h("td",{style:{padding:"8px 11px",background:bg}},
+                  h("div",{style:{display:"flex",flexDirection:"column",gap:2}},
+                    h("span",{style:{display:"inline-block",padding:"2px 7px",borderRadius:5,fontSize:10,fontWeight:700,background:`${SITIO_C[row.sitio]||"#888"}18`,color:SITIO_C[row.sitio]||"#888",border:`1px solid ${SITIO_C[row.sitio]||"#888"}40`,alignSelf:"flex-start"}},row.sitio),
+                    row.edificio&&h("span",{style:{fontSize:9,color:"var(--txd)",fontFamily:"'DM Mono',monospace",paddingLeft:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:52}},row.edificio)
+                  )
+                ),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontWeight:600}},row.cliente),row.rut&&h("div",{style:{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--txd)",marginTop:2}},formatRUT(row.rut))),
                 h("td",{style:{padding:"8px 11px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",background:bg}},h("span",{style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:row.correo?"var(--accl)":"var(--txd)"}},row.correo||"— sin correo")),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{className:esArr?"tag-arr":"tag-srv"},row.concepto)),
