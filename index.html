@@ -2082,37 +2082,19 @@ function App(){
 
     view==="upload"&&h("main",{style:{flex:1,display:"flex",flexDirection:"row",overflow:"hidden"},className:"fade-up"},
 
-      /* ── COLUMNA IZQUIERDA: lista de meses ── */
-      h("div",{style:{
-        width:180,minWidth:180,background:"var(--surf)",borderRight:"1px solid var(--bdr2)",
-        display:"flex",flexDirection:"column",overflowY:"auto",padding:"16px 0"
-      }},
-        h("div",{style:{fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:"0.1em",padding:"0 18px 10px"}},"PERÍODO"),
-        PERIODOS.map(p=>{
-          const isActive=p===periodo;
-          const [mesN,anioN]=p.split(" ");
-          return h("button",{
-            key:p,
-            onClick:()=>{ if(p!==periodo){ setPeriodo(p);setZipStatus("idle");setData([]);autoProcesado.current=false;buscarZip(p); } },
-            style:{
-              display:"flex",alignItems:"center",gap:10,width:"100%",
-              padding:"10px 18px",border:"none",textAlign:"left",cursor:"pointer",
-              background:isActive?"var(--acc)":"transparent",
-              color:isActive?"#fff":"var(--tx)",
-              borderLeft:isActive?"3px solid var(--acc2)":"3px solid transparent",
-              transition:"all .12s"
-            }
-          },
-            h("div",null,
-              h("div",{style:{fontSize:13,fontWeight:isActive?700:500}},mesN),
-              h("div",{style:{fontSize:10,color:isActive?"rgba(255,255,255,0.7)":"var(--txd)"}},anioN)
-            )
-          );
-        })
-      ),
-
-      /* ── COLUMNA DERECHA: estado del proceso ── */
+      /* ── PANEL: selector + estado ── */
       h("div",{style:{flex:1,display:"flex",flexDirection:"column",overflowY:"auto",padding:"32px 40px"}},
+        /* Selector de período compacto */
+        h("div",{style:{marginBottom:24,display:"flex",alignItems:"center",gap:10}},
+          h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:"0.08em"}},"PERÍODO"),
+          h("select",{
+            value:periodo,
+            onChange:e=>{ const p=e.target.value; if(p!==periodo){ setPeriodo(p);setZipStatus("idle");setData([]);autoProcesado.current=false;buscarZip(p); } },
+            style:{fontSize:13,fontWeight:600,padding:"6px 12px",background:"var(--surf2)",color:"var(--tx)",border:"1px solid var(--bdr)",borderRadius:8,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",minWidth:160}
+          },
+            [...PERIODOS].reverse().map(p=>h("option",{key:p,value:p},p))
+          )
+        ),
 
         !periodo
         /* Sin período seleccionado */
