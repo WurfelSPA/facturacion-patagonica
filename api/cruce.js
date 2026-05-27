@@ -1,5 +1,5 @@
 // /api/cruce.js
-// Cruce automático Odoo vs SII para facturas tipo 33
+// Cruce automático Odoo vs SII para facturas tipo 33 y notas de crédito tipo 61
 // Uso: GET /api/cruce?empresa=multi&mes=2026-05
 //      GET /api/cruce?empresa=dko&mes=2026-05
 
@@ -34,37 +34,65 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Ejecutar en paralelo: Odoo + SII
-    const [odooResult, siiResult] = await Promise.allSettled([
-      getOdooFacturas(cfg, mes),
-      getSIIFacturas(cfg, mes),
+    // Obtener token SII una sola vez (se reutiliza para tipo 33 y tipo 61)
+    const siiToken = await getSIIToken(cfg);
+
+    // Ejecutar en paralelo: Odoo facturas + SII facturas + Odoo NC + SII NC
+    const [odooResult, siiResult, odooNcResult, siiNcResult] = await Promise.allSettled([
+      getOdooDocumentos(cfg, mes, "out_invoice", "33"),
+      getSIIDocumentos(cfg, mes, "33", siiToken),
+      getOdooDocumentos(cfg, mes, "out_refund", "61"),
+      getSIIDocumentos(cfg, mes, "61", siiToken),
     ]);
 
     if (odooResult.status === "rejected") {
-      return res.status(500).json({ error: "Error Odoo: " + odooResult.reason.message });
+      return res.status(500).json({ error: "Error Odoo facturas: " + odooResult.reason.message });
     }
     if (siiResult.status === "rejected") {
-      return res.status(500).json({ error: "Error SII: " + siiResult.reason.message });
+      return res.status(500).json({ error: "Error SII facturas: " + siiResult.reason.message });
     }
 
-    const odoo = odooResult.value;
-    const sii  = siiResult.value;
+    const odoo   = odooResult.value;
+    const sii    = siiResult.value;
+    const odooNc = odooNcResult.status === "fulfilled" ? odooNcResult.value : [];
+    const siiNc  = siiNcResult.status  === "fulfilled" ? siiNcResult.value  : [];
 
-    // Cruce por folio
+    // Cruce facturas (tipo 33)
     const cruce = cruzar(odoo, sii);
+
+    // Cruce notas de crédito (tipo 61)
+    const cruceNc = cruzar(odooNc, siiNc);
+
+    const totalOdoo   = odoo.reduce((s, f) => s + f.total, 0);
+    const totalSii    = sii.reduce((s, f) => s + f.total, 0);
+    const totalNcOdoo = odooNc.reduce((s, f) => s + f.total, 0);
+    const totalNcSii  = siiNc.reduce((s, f) => s + f.total, 0);
 
     return res.json({
       ok: true,
       empresa,
       mes,
+      // Facturas tipo 33
       odoo_count:  odoo.length,
       sii_count:   sii.length,
       coinciden:   cruce.coinciden.length,
       diff_monto:  cruce.diff_monto,
       solo_odoo:   cruce.solo_odoo,
       solo_sii:    cruce.solo_sii,
-      total_odoo:  odoo.reduce((s, f) => s + f.total, 0),
-      total_sii:   sii.reduce((s, f) => s + f.total, 0),
+      total_odoo:  totalOdoo,
+      total_sii:   totalSii,
+      // Notas de crédito tipo 61
+      nc_odoo_count:  odooNc.length,
+      nc_sii_count:   siiNc.length,
+      nc_coinciden:   cruceNc.coinciden.length,
+      nc_diff_monto:  cruceNc.diff_monto,
+      nc_solo_odoo:   cruceNc.solo_odoo,
+      nc_solo_sii:    cruceNc.solo_sii,
+      total_nc_odoo:  totalNcOdoo,
+      total_nc_sii:   totalNcSii,
+      // Totales netos (facturas − NC)
+      total_odoo_neto: totalOdoo - totalNcOdoo,
+      total_sii_neto:  totalSii  - totalNcSii,
     });
 
   } catch (e) {
@@ -128,8 +156,8 @@ function cruzar(odoo, sii) {
   return { coinciden, diff_monto, solo_odoo, solo_sii };
 }
 
-/* ── Obtener facturas desde Odoo ── */
-async function getOdooFacturas(cfg, mes) {
+/* ── Obtener documentos desde Odoo (facturas out_invoice/33 o NC out_refund/61) ── */
+async function getOdooDocumentos(cfg, mes, moveType, codDoc) {
   const ODOO_URL = process.env.ODOO_DKO_URL;
   const db   = process.env[cfg.odooDb];
   const user = process.env[cfg.odooUser];
@@ -157,11 +185,11 @@ async function getOdooFacturas(cfg, mes) {
     [[["vat", "like", rutSinDv]]], ["id","name","vat"]);
 
   const domain = [
-    ["move_type", "=", "out_invoice"],
+    ["move_type", "=", moveType],
     ["state", "=", "posted"],
     ["invoice_date", ">=", fechaDesde],
     ["invoice_date", "<=", fechaHasta],
-    ["l10n_latam_document_type_id.code", "=", "33"],
+    ["l10n_latam_document_type_id.code", "=", codDoc],
   ];
   if (companies.length > 0) {
     domain.push(["company_id", "=", companies[0].id]);
@@ -176,7 +204,7 @@ async function getOdooFacturas(cfg, mes) {
     folio:      String(f.l10n_latam_document_number || "").trim(),
     cliente:    f.partner_id?.[1] || "",
     fecha:      f.invoice_date || "",
-    total:      Math.round(f.amount_total),
+    total:      Math.round(Math.abs(f.amount_total)), // NC en Odoo vienen negativas
     estado_sii: f.l10n_cl_dte_status || "",
   })).filter(f => f.folio);
 }
@@ -193,8 +221,8 @@ async function odooCall(url, cookie, model, method, args, fields, limit = 5000) 
   return data.result;
 }
 
-/* ── Obtener facturas desde SII ── */
-async function getSIIFacturas(cfg, mes) {
+/* ── Autenticación SII (token reutilizable) ── */
+async function getSIIToken(cfg) {
   const certB64  = process.env[cfg.certEnv] || process.env.SII_CERT;
   const certPass = process.env[cfg.passEnv] || process.env.SII_CERT_PASS;
   if (!certB64 || !certPass) throw new Error(`Faltan ${cfg.certEnv} o ${cfg.passEnv}`);
@@ -204,12 +232,16 @@ async function getSIIFacturas(cfg, mes) {
 
   const semilla    = await getSemilla();
   const xmlFirmado = firmarSemilla(semilla, privateKeyPem, certificatePem);
-  const token      = await getToken(xmlFirmado);
+  return await getToken(xmlFirmado);
+}
 
+/* ── Obtener documentos desde SII (facturas tipo 33 o NC tipo 61) ── */
+async function getSIIDocumentos(cfg, mes, codTipoDoc, token) {
   const [anio, mesNum] = mes.split("-");
   const [rutNum, dv]   = cfg.rut.split("-");
   const periodo        = `${anio}${mesNum.padStart(2,"0")}`;
 
+  // Para NC (tipo 61) usamos operacion VENTA igualmente (NC emitidas por la empresa)
   const r = await fetch("https://www4.sii.cl/consdcvinternetui/services/data/facadeService/getDetalleVentaExport", {
     method: "POST",
     headers: {
@@ -219,7 +251,7 @@ async function getSIIFacturas(cfg, mes) {
     },
     body: JSON.stringify({
       metaData: { conversationId:token, transactionId:"0", namespace:"cl.sii.sdi.lob.diii.consdcv.data.api.interfaces.FacadeService/getDetalleVentaExport", page:null },
-      data: { rutEmisor:rutNum, dvEmisor:dv, ptributario:periodo, operacion:"VENTA", estadoContab:"REGISTRO", codTipoDoc:"33", accionRecaptcha:"RCV_DDETV", tokenRecaptcha:"c3" },
+      data: { rutEmisor:rutNum, dvEmisor:dv, ptributario:periodo, operacion:"VENTA", estadoContab:"REGISTRO", codTipoDoc:codTipoDoc, accionRecaptcha:"RCV_DDETV", tokenRecaptcha:"c3" },
     }),
   });
 
@@ -240,7 +272,7 @@ async function getSIIFacturas(cfg, mes) {
       rut:   g(iRut, 2),
       razon: g(iRazon, 3),
       fecha: g(iFecha, 5).split(" ")[0],
-      total: parseInt(g(iTotal, 12)) || 0,
+      total: Math.abs(parseInt(g(iTotal, 12)) || 0), // NC pueden venir negativas en SII
     };
   }).filter(f => f.folio);
 }
