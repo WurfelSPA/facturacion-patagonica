@@ -290,9 +290,14 @@ async function uploadZipToDrive(token,zipName,zipBase64,folderId){
   if(!data.id) throw new Error("Upload Drive: "+JSON.stringify(data));
   return data.id;
 }
-function buildEmailHtml(cliente,concepto,periodo,ufPlan,factura){
+function buildEmailHtml(cliente,concepto,periodo,ufPlan,factura,ufRate){
   const mes=periodo.toLowerCase();
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#f4f4f4;font-family:Helvetica,Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:28px 0"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;border:1px solid #e0e0e0;overflow:hidden"><tr><td style="background:#0f1117;padding:22px 32px"><div style="font-size:18px;font-weight:700;color:#fff">Patagónica Inmobiliaria SpA</div><div style="font-size:11px;color:#7b8299;margin-top:4px">Av. Américo Vespucio 2680, Conchalí, Santiago</div></td></tr><tr><td style="padding:28px 32px"><p style="font-size:14px;color:#333;margin:0 0 16px">Estimado(a) cliente,</p><p style="font-size:14px;color:#333;line-height:1.7;margin:0 0 20px">Junto con saludar, hacemos envío de la factura correspondiente al <strong>${concepto.toLowerCase()} del mes de ${mes}</strong>:</p><table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e8e8;border-radius:6px;margin:0 0 20px"><tr style="background:#f8f8f8"><td style="padding:10px 16px;font-size:11px;font-weight:600;color:#999;border-bottom:1px solid #e8e8e8">CONCEPTO</td><td style="padding:10px 16px;font-size:11px;font-weight:600;color:#999;border-bottom:1px solid #e8e8e8">DETALLE</td></tr><tr><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">N° Factura</td><td style="padding:11px 16px;font-size:13px;color:#111;font-weight:600;font-family:monospace;border-bottom:1px solid #f0f0f0">${factura}</td></tr><tr style="background:#fafafa"><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">Cliente</td><td style="padding:11px 16px;font-size:13px;color:#111;border-bottom:1px solid #f0f0f0">${cliente}</td></tr><tr><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">Período</td><td style="padding:11px 16px;font-size:13px;color:#111;border-bottom:1px solid #f0f0f0">${periodo}</td></tr><tr><td style="padding:14px 16px;font-size:13px;color:#555">Monto</td><td style="padding:14px 16px"><span style="font-size:20px;font-weight:700;color:#111">${ufPlan.toFixed(2)} UF</span></td></tr></table><p style="font-size:14px;color:#333;line-height:1.7;margin:0 0 20px">Adjunto encontrará el documento PDF para su registro y gestión de pago.</p><p style="font-size:13px;color:#666;margin:0">Ante cualquier consulta, no dude en contactarnos.</p></td></tr><tr><td style="background:#f8f8f8;border-top:1px solid #e8e8e8;padding:18px 32px"><p style="font-size:13px;font-weight:600;color:#111;margin:0 0 2px">Área de Administración</p><p style="font-size:12px;color:#666;margin:0">Patagónica Inmobiliaria SpA · RUT 96.673.250-4</p><p style="font-size:11px;color:#999;margin:6px 0 0">Correo generado automáticamente.</p></td></tr></table></td></tr></table></body></html>`;
+  const clp=ufRate?Math.round(ufPlan*ufRate):null;
+  const fmtClp=v=>"$"+v.toLocaleString("es-CL");
+  const montoHtml=clp
+    ?`<span style="font-size:22px;font-weight:700;color:#111">${fmtClp(clp)}</span><span style="font-size:13px;color:#888;margin-left:8px">(${ufPlan.toFixed(2)} UF)</span>`
+    :`<span style="font-size:20px;font-weight:700;color:#111">${ufPlan.toFixed(2)} UF</span>`;
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#f4f4f4;font-family:Helvetica,Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:28px 0"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;border:1px solid #e0e0e0;overflow:hidden"><tr><td style="background:#0f1117;padding:22px 32px"><div style="font-size:18px;font-weight:700;color:#fff">Patagónica Inmobiliaria SpA</div><div style="font-size:11px;color:#7b8299;margin-top:4px">Av. Américo Vespucio 2680, Conchalí, Santiago</div></td></tr><tr><td style="padding:28px 32px"><p style="font-size:14px;color:#333;margin:0 0 16px">Estimado(a) cliente,</p><p style="font-size:14px;color:#333;line-height:1.7;margin:0 0 20px">Junto con saludar, hacemos envío de la factura correspondiente al <strong>${concepto.toLowerCase()} del mes de ${mes}</strong>:</p><table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e8e8;border-radius:6px;margin:0 0 20px"><tr style="background:#f8f8f8"><td style="padding:10px 16px;font-size:11px;font-weight:600;color:#999;border-bottom:1px solid #e8e8e8">CONCEPTO</td><td style="padding:10px 16px;font-size:11px;font-weight:600;color:#999;border-bottom:1px solid #e8e8e8">DETALLE</td></tr><tr><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">N° Factura</td><td style="padding:11px 16px;font-size:13px;color:#111;font-weight:600;font-family:monospace;border-bottom:1px solid #f0f0f0">${factura}</td></tr><tr style="background:#fafafa"><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">Cliente</td><td style="padding:11px 16px;font-size:13px;color:#111;border-bottom:1px solid #f0f0f0">${cliente}</td></tr><tr><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">Período</td><td style="padding:11px 16px;font-size:13px;color:#111;border-bottom:1px solid #f0f0f0">${periodo}</td></tr><tr><td style="padding:14px 16px;font-size:13px;color:#555">Monto</td><td style="padding:14px 16px">${montoHtml}</td></tr></table><p style="font-size:14px;color:#333;line-height:1.7;margin:0 0 20px">Adjunto encontrará el documento PDF para su registro y gestión de pago.</p><p style="font-size:13px;color:#666;margin:0">Ante cualquier consulta, no dude en contactarnos.</p></td></tr><tr><td style="background:#f8f8f8;border-top:1px solid #e8e8e8;padding:18px 32px"><p style="font-size:13px;font-weight:600;color:#111;margin:0 0 2px">Área de Administración</p><p style="font-size:12px;color:#666;margin:0">Patagónica Inmobiliaria SpA · RUT 96.673.250-4</p><p style="font-size:11px;color:#999;margin:6px 0 0">Correo generado automáticamente.</p></td></tr></table></td></tr></table></body></html>`;
 }
 const MESES_NOMBRES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const ANIOS_VENTAS=[2022,2023,2024,2025,2026];
@@ -1412,6 +1417,13 @@ function App(){
   const autoProcesado=React.useRef(false);
   useEffect(()=>{ autoProcesado.current=false; },[periodo]);
 
+  /* Auto-buscar ZIP al entrar a la vista upload o al cambiar período */
+  useEffect(()=>{
+    if((view==="upload"||view==="table")&&periodo&&zipStatus==="idle"){
+      buscarZip(periodo);
+    }
+  },[view,periodo]);
+
   /* Auto-procesar cuando planilla OK + ZIP listo (ej. Mayo) */
   useEffect(()=>{
     if(planillaStatus==="ok"&&zipStatus==="ready"&&!autoProcesado.current&&data.length===0){
@@ -1628,7 +1640,7 @@ function App(){
     try{
       const token=await getToken();
       const subject="Factura "+row.factura+" — "+row.concepto+" "+periodo+" — Patagónica Inmobiliaria SpA";
-      const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura);
+      const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura,ufSII);
       const pdf=pdfMap[row.factura];let pdfB64=null;
       if(pdf?.zipPath&&files.zip){try{pdfB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}}
       await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);
@@ -1688,7 +1700,7 @@ function App(){
       for(const row of pend){
         const dest=MODO_PRUEBA?TEST_DEST:row.correo;
         const subject="Factura "+row.factura+" — "+row.concepto+" "+periodo+" — Patagónica Inmobiliaria SpA";
-        const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura);
+        const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura,ufSII);
         const pdf=pdfMap[row.factura];let pdfB64=null;
         if(pdf?.zipPath&&files.zip){try{pdfB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}}
         try{await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(row.i,key);enviados++;await new Promise(r=>setTimeout(r,400));}
@@ -2162,19 +2174,21 @@ function App(){
             h("div",{style:{flex:1}},
               h("div",{style:{fontSize:13,fontWeight:600,
                 color:zipStatus==="ready"?"var(--tx)":zipStatus==="error"?"var(--red)":zipStatus==="missing"?"var(--amber)":"var(--txm)"}},
-                zipStatus==="ready"?"PDFs "+periodo
-                :zipStatus==="loading"?"Buscando PDFs en Drive..."
-                :zipStatus==="splitting"?"Generando PDFs del mes..."
-                :zipStatus==="missing"?"No existen PDFs para "+periodo
+                zipStatus==="ready"?"PDFs de "+periodo+" encontrados"
+                :zipStatus==="loading"?"Buscando PDFs en Google Drive..."
+                :zipStatus==="splitting"?"Generando PDFs individuales..."
+                :zipStatus==="missing"?"No hay PDFs para "+periodo
                 :zipStatus==="error"?"Error al buscar PDFs"
-                :"Esperando..."
+                :"Iniciando búsqueda en Drive..."
               ),
               h("div",{style:{fontSize:11,color:"var(--txd)",marginTop:2}},
-                zipStatus==="ready"?"Listos · "+Math.round((files.zip&&files.zip.size||0)/1024)+" KB"
-                :zipStatus==="missing"&&canGenerate?"El PDF maestro está disponible — puedes generar el ZIP":zipStatus==="missing"?"No hay ZIP ni PDF maestro para este mes en Drive"
-                :zipStatus==="splitting"?"Separando PDF maestro, espera un momento..."
+                zipStatus==="ready"?"ZIP listo · "+Math.round((files.zip&&files.zip.size||0)/1024)+" KB · Se procesará automáticamente"
+                :zipStatus==="loading"?"Conectando con Google Drive, puede tomar unos segundos..."
+                :zipStatus==="missing"&&canGenerate?"Se encontró el PDF maestro — puedes generar los PDFs individuales del mes"
+                :zipStatus==="missing"?"No se encontró ZIP ni PDF maestro para este período en Drive"
+                :zipStatus==="splitting"?"Separando el PDF maestro en facturas individuales, espera un momento..."
                 :zipStatus==="error"?(zipError||"Error desconocido")
-                :""
+                :"Conectando con Google Drive..."
               ),
               /* Botón generar — solo si hay PDF maestro disponible */
               zipStatus==="missing"&&canGenerate&&h("button",{
@@ -2197,7 +2211,8 @@ function App(){
               background:"linear-gradient(90deg,var(--acc),var(--acc2))",
               width:files.planilla&&zipStatus==="ready"?"100%"
                 :files.planilla&&zipStatus==="splitting"?"60%"
-                :files.planilla?"30%":"10%"
+                :files.planilla&&zipStatus==="loading"?"40%"
+                :files.planilla?"20%":"10%"
             }})
           ),
 
