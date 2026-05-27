@@ -621,7 +621,7 @@ function VentasView({periodo}){
 
   const totalCoinciden = empresas.reduce((s,e) => s+(e.result?.coinciden||0), 0);
   const totalFacturas  = empresas.reduce((s,e) => s+(e.result?.odoo_count||0), 0);
-  const totalNeto      = empresas.reduce((s,e) => s+(e.result?.total_odoo||0), 0);
+  const totalNeto      = empresas.reduce((s,e) => s+(e.result?.total_odoo_neto ?? e.result?.total_odoo ?? 0), 0);
   const totalAlertas   = empresas.reduce((s,e) => s+(e.result?.solo_odoo?.length||0)+(e.result?.diff_monto?.length||0), 0);
   const pct = r ? Math.round(r.coinciden / Math.max(r.odoo_count,1) * 100) : 0;
 
@@ -643,7 +643,7 @@ function VentasView({periodo}){
         {lbl:"Facturas Odoo",    val:allLoaded?totalFacturas:"—",  sub:"ambas empresas",           col:"var(--accl)"},
         {lbl:"Coinciden SII",    val:allLoaded?totalCoinciden:"—", sub:"Odoo = SII monto exacto",  col:"var(--green)"},
         {lbl:"Alertas",          val:allLoaded?totalAlertas:"—",   sub:totalAlertas===0?"✓ Sin diferencias":"requieren revisión", col:totalAlertas>0?"var(--red)":"var(--green)"},
-        {lbl:"Total Neto",       val:allLoaded?fmtCLP(totalNeto):"—", sub:"suma ambas empresas",   col:"var(--blue)", mono:true},
+        {lbl:"Total Neto",       val:allLoaded?fmtCLP(totalNeto):"—", sub:"facturas − NC · ambas empresas", col:"var(--blue)", mono:true},
       ].map((k,i) => h("div",{key:i,className:"dash-card",style:{borderLeft:"3px solid "+k.col}},
         h("div",{className:"dash-card-lbl"},k.lbl),
         h("div",{style:{fontSize:k.mono?15:28,fontWeight:700,fontFamily:"'DM Mono',monospace",color:k.col,lineHeight:1,marginTop:2,letterSpacing:"-1px"}},
@@ -672,7 +672,7 @@ function VentasView({periodo}){
           ),
           h("div",{style:{fontSize:10,fontFamily:"'DM Mono',monospace",opacity:isActive?0.85:0.5}},e.rut),
           h("div",{style:{fontSize:10,opacity:isActive?0.85:0.5}},
-            e.result ? `${e.result.coinciden}/${e.result.odoo_count} coinciden · ${fmtCLP(e.result.total_odoo)}` :
+            e.result ? `${e.result.coinciden}/${e.result.odoo_count} coinciden · ${fmtCLP(e.result.total_odoo_neto ?? e.result.total_odoo)}` :
             e.error  ? "⚠ "+e.error.slice(0,40) :
             e.loading ? "Cargando..." : "Click para cargar"
           )
@@ -713,6 +713,7 @@ function VentasView({periodo}){
             h("span",{style:{fontSize:11,color:"var(--txm)"}},s.lbl),
             h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:s.col}},s.val)
           )),
+          /* Totales brutos */
           h("div",{style:{marginTop:12,paddingTop:10,borderTop:"1px solid var(--bdr)"}},
             h("div",{style:{fontSize:10,color:"var(--txd)",marginBottom:2}},"Total Odoo"),
             h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:"var(--blue)"}},fmtCLP(r.total_odoo)),
@@ -720,6 +721,35 @@ function VentasView({periodo}){
             h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:"var(--blue)"}},fmtCLP(r.total_sii)),
             r.total_odoo !== r.total_sii && h("div",{style:{marginTop:6,background:"var(--abg)",border:"1px solid var(--adim)",borderRadius:6,padding:"5px 8px",fontSize:10,color:"var(--amber)",fontWeight:600}},
               "Δ "+fmtCLP(Math.abs(r.total_odoo-r.total_sii))
+            )
+          ),
+          /* Notas de crédito (tipo 61) */
+          (r.nc_odoo_count>0||r.nc_sii_count>0) && h("div",{style:{marginTop:10,paddingTop:10,borderTop:"1px solid var(--bdr)"}},
+            h("div",{style:{fontSize:10,fontWeight:700,color:"var(--txm)",marginBottom:6,letterSpacing:".04em"}},"NC TIPO 61"),
+            [
+              {lbl:"NC Odoo",   val:r.nc_odoo_count||0, col:"var(--blue)"},
+              {lbl:"NC SII",    val:r.nc_sii_count||0,  col:"var(--blue)"},
+              {lbl:"✓ Coinciden", val:r.nc_coinciden||0, col:"var(--green)"},
+              {lbl:"Solo en SII",val:r.nc_solo_sii?.length||0, col:(r.nc_solo_sii?.length||0)>0?"var(--amber)":"var(--txd)"},
+            ].map((s,i) => h("div",{key:i,style:{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:"1px solid var(--bdr)"}},
+              h("span",{style:{fontSize:11,color:"var(--txm)"}},s.lbl),
+              h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:s.col}},s.val)
+            )),
+            h("div",{style:{marginTop:8}}),
+            h("div",{style:{fontSize:10,color:"var(--txd)",marginBottom:2}},"NC Odoo"),
+            h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:"var(--red)"}},r.total_nc_odoo>0?"−"+fmtCLP(r.total_nc_odoo):"—"),
+            h("div",{style:{fontSize:10,color:"var(--txd)",marginTop:4,marginBottom:2}},"NC SII"),
+            h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:"var(--red)"}},r.total_nc_sii>0?"−"+fmtCLP(r.total_nc_sii):"—")
+          ),
+          /* Neto final */
+          (r.total_odoo_neto!=null) && h("div",{style:{marginTop:10,paddingTop:10,borderTop:"2px solid var(--acc)",background:"linear-gradient(135deg,rgba(var(--acc-rgb),.06),transparent)",borderRadius:8,padding:"10px 8px"}},
+            h("div",{style:{fontSize:10,fontWeight:700,color:"var(--txm)",marginBottom:4,letterSpacing:".04em"}},"NETO (Facturas − NC)"),
+            h("div",{style:{fontSize:10,color:"var(--txd)",marginBottom:2}},"Neto Odoo"),
+            h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:700,color:"var(--acc)"}},fmtCLP(r.total_odoo_neto)),
+            h("div",{style:{fontSize:10,color:"var(--txd)",marginTop:5,marginBottom:2}},"Neto SII"),
+            h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:700,color:"var(--acc)"}},fmtCLP(r.total_sii_neto)),
+            r.total_odoo_neto !== r.total_sii_neto && h("div",{style:{marginTop:6,background:"var(--abg)",border:"1px solid var(--adim)",borderRadius:6,padding:"5px 8px",fontSize:10,color:"var(--amber)",fontWeight:600}},
+              "Δ "+fmtCLP(Math.abs(r.total_odoo_neto-r.total_sii_neto))
             )
           )
         )
@@ -749,7 +779,9 @@ function VentasView({periodo}){
             h("div",null,
               h("div",{style:{fontWeight:700,fontSize:15,color:"var(--green)",marginBottom:6}},r.coinciden+"/"+r.odoo_count+" facturas coinciden exactamente"),
               h("div",{style:{fontSize:12,color:"var(--txm)",lineHeight:1.6}},"Odoo y SII tienen exactamente los mismos folios y montos."),
-              h("div",{style:{fontSize:11,color:"var(--txd)",marginTop:8,fontFamily:"'DM Mono',monospace"}},"Total: "+fmtCLP(r.total_odoo)+" · "+r.coinciden+" facturas tipo 33")
+              h("div",{style:{fontSize:11,color:"var(--txd)",marginTop:8,fontFamily:"'DM Mono',monospace"}},
+                "Neto: "+fmtCLP(r.total_odoo_neto??r.total_odoo)+" · "+r.coinciden+" facturas"+(r.nc_coinciden>0?" · "+r.nc_coinciden+" NC":"")
+              )
             )
           ) :
           h("div",{style:{display:"flex",flexDirection:"column",gap:10}},
@@ -830,6 +862,62 @@ function VentasView({periodo}){
                   h("td",{style:{padding:"8px 14px",fontFamily:"'DM Mono',monospace",fontSize:11}},f.fecha),
                   h("td",{style:{padding:"8px 14px",fontFamily:"'DM Mono',monospace",fontSize:11}},fmtCLP(f.total))
                 )))
+              )
+            ),
+
+            /* Notas de crédito (tipo 61) — NC emitidas */
+            (r.nc_odoo_count>0||r.nc_sii_count>0) && h("div",{style:{background:"var(--surf)",border:"2px solid var(--rdim)",borderRadius:12,overflow:"hidden"}},
+              h("div",{style:{padding:"12px 16px",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:8,background:"var(--rbg)"}},
+                h("span",{style:{fontSize:16}},"📋"),
+                h("div",{style:{flex:1}},
+                  h("div",{style:{fontWeight:700,fontSize:12,color:"var(--red)"}},"Notas de Crédito emitidas (tipo 61)"),
+                  h("div",{style:{fontSize:11,color:"var(--txm)"}},
+                    `Odoo: ${r.nc_odoo_count} NC · SII: ${r.nc_sii_count} NC · Monto: −${fmtCLP(r.total_nc_sii??r.total_nc_odoo??0)}`
+                  )
+                )
+              ),
+              /* NC solo en SII que no están en Odoo */
+              r.nc_solo_sii?.length>0 && h("div",null,
+                h("div",{style:{padding:"8px 14px",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:".05em",background:"rgba(0,0,0,0.02)"}},"SOLO EN SII (no encontradas en Odoo)"),
+                h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
+                  h("thead",null,h("tr",{style:{background:"rgba(255,255,255,0.5)"}},
+                    ["Folio","Razón Social","Fecha","Monto NC"].map(c=>h("th",{key:c,style:{padding:"6px 14px",fontSize:9,fontWeight:700,color:"var(--txm)",textAlign:"left",letterSpacing:".06em"}},c.toUpperCase()))
+                  )),
+                  h("tbody",null,r.nc_solo_sii.map((f,i)=>h("tr",{key:i,style:{borderTop:"1px solid var(--bdr)"}},
+                    h("td",{style:{padding:"7px 14px",fontFamily:"'DM Mono',monospace",fontWeight:700,color:"var(--red)"}},f.folio),
+                    h("td",{style:{padding:"7px 14px",fontSize:11,maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},f.razon),
+                    h("td",{style:{padding:"7px 14px",fontFamily:"'DM Mono',monospace",fontSize:11}},f.fecha),
+                    h("td",{style:{padding:"7px 14px",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,color:"var(--red)"}},"−"+fmtCLP(f.total))
+                  )))
+                )
+              ),
+              /* NC que coinciden entre Odoo y SII */
+              r.nc_coinciden>0 && h("div",{style:{padding:"8px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:"1px solid var(--bdr)"}},
+                h("span",{style:{fontSize:11,color:"var(--txm)"}},"✓ "+r.nc_coinciden+" NC coinciden Odoo ↔ SII"),
+                h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:"var(--green)"}},r.nc_coinciden)
+              )
+            ),
+
+            /* Resumen neto */
+            (r.total_odoo_neto!=null) && h("div",{style:{background:"var(--gbg)",border:"1px solid var(--gdim)",borderRadius:12,padding:"14px 16px",display:"flex",gap:24,flexWrap:"wrap",alignItems:"center"}},
+              h("span",{style:{fontSize:16}},"🧮"),
+              h("div",{style:{flex:1}},
+                h("div",{style:{fontWeight:700,fontSize:12,color:"var(--green)",marginBottom:4}},"Total Neto del período"),
+                h("div",{style:{fontSize:11,color:"var(--txm)"}},"Facturas tipo 33 menos Notas de Crédito tipo 61")
+              ),
+              h("div",{style:{display:"flex",gap:20,flexWrap:"wrap"}},
+                h("div",{style:{textAlign:"right"}},
+                  h("div",{style:{fontSize:10,color:"var(--txd)",marginBottom:2}},"Odoo"),
+                  h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:14,fontWeight:700,color:"var(--green)"}},fmtCLP(r.total_odoo_neto))
+                ),
+                h("div",{style:{textAlign:"right"}},
+                  h("div",{style:{fontSize:10,color:"var(--txd)",marginBottom:2}},"SII"),
+                  h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:14,fontWeight:700,color:"var(--green)"}},fmtCLP(r.total_sii_neto))
+                ),
+                r.total_odoo_neto !== r.total_sii_neto && h("div",{style:{textAlign:"right"}},
+                  h("div",{style:{fontSize:10,color:"var(--txd)",marginBottom:2}},"Δ"),
+                  h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:14,fontWeight:700,color:"var(--amber)"}},fmtCLP(Math.abs(r.total_odoo_neto-r.total_sii_neto)))
+                )
               )
             )
           )
