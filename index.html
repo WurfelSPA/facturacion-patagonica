@@ -1583,7 +1583,7 @@ function App(){
             /* Si hay >1 candidato y score<umbral → dejar factura="" para revisión manual */
           }
         }
-        filas.push({sitio:c.sitio,cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII,ufPlan:c.uf,ufPdf,enviado:false});
+        filas.push({sitio:c.sitio,cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,enviado:false});
       }
 
       /* ── Si no hay datos de planilla, mostrar igual los PDFs detectados ── */
