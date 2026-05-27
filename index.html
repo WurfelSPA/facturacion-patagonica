@@ -1633,6 +1633,38 @@ function App(){
 
   const finishProc=()=>{setShowProc(false);setView("table");notify(`${data.length} filas procesadas — ${periodo}`);};
 
+  /* ── DESCARGAR REPORTE CSV ── */
+  const descargarReporte=()=>{
+    const ahora=new Date();
+    const fechaStr=ahora.toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric"});
+    const horaStr=ahora.toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"});
+    const rows=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
+    const esc=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
+    const lines=[];
+    // Encabezado del reporte
+    lines.push([esc("Reporte Facturación Patagónica Inmobiliaria"),esc(""),esc(""),esc(""),esc(""),esc(""),esc(""),esc(""),esc("")].join(";"));
+    lines.push([esc("Período:"),esc(periodo),esc(""),esc("Fecha:"),esc(fechaStr+" "+horaStr),esc(""),esc(""),esc(""),esc("")].join(";"));
+    lines.push([esc("Total:"),esc(stats.total),esc("Coinciden:"),esc(stats.ok),esc("Revisar:"),esc(stats.total-stats.ok),esc("Enviados:"),esc(stats.sent),esc("")].join(";"));
+    lines.push(["","","","","","","","",""].map(esc).join(";"));
+    // Columnas
+    lines.push([esc("Sitio"),esc("Cliente"),esc("RUT"),esc("Correo"),esc("Concepto"),esc("Factura"),esc("UF Planilla"),esc("UF PDF"),esc("Estado")].join(";"));
+    // Filas
+    for(const r of rows){
+      const estadoLabel=r.estado==="ok"?"Coincide":r.estado==="diff"?(r.matchScore===1?"Revisar":"Difiere"):"Sin PDF";
+      const sentido=sentSet.has(r.i)?"✓ Enviado":estadoLabel;
+      lines.push([esc(r.sitio),esc(r.cliente),esc(r.rut||""),esc(r.correo||""),esc(r.concepto),esc(r.factura||""),esc(r.ufPlan!=null?r.ufPlan.toFixed(2):""),esc(r.ufPdf!=null?r.ufPdf.toFixed(2):""),esc(sentido)].join(";"));
+    }
+    const bom="﻿"; // BOM para que Excel abra correctamente con caracteres especiales
+    const blob=new Blob([bom+lines.join("\r\n")],{type:"text/csv;charset=utf-8;"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download=`Reporte_Facturacion_${periodo.replace(" ","_")}_${fechaStr.replace(/\//g,"-")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    notify("✓ Reporte descargado — "+rows.length+" filas");
+  };
+
   /* ── ENVÍO ── */
   const confirmSend=async()=>{
     const{idx,row}=preview;setPreview(null);setSendingIdx(idx);
@@ -2250,7 +2282,15 @@ function App(){
         h("span",{style:{color:"var(--txd)",fontSize:11,marginLeft:3}},"·"),
         [{k:"all",l:"Ambos"},{k:"arr",l:"Arriendo"},{k:"srv",l:"Serv.Adm."}]
         .map(f=>h("button",{key:f.k,className:`pill${concFilter===f.k?" active":""}`,onClick:()=>setConcFilter(f.k),style:{fontSize:10}},f.l)),
-        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{marginLeft:"auto",width:190,fontFamily:"'DM Sans',sans-serif"}})
+        data.length>0&&h("button",{
+          onClick:descargarReporte,
+          title:"Descargar reporte CSV con el estado actual",
+          style:{marginLeft:"auto",fontSize:11,fontWeight:600,padding:"5px 12px",borderRadius:8,
+            border:"1px solid var(--bdr)",background:"var(--surf)",color:"var(--txm)",
+            cursor:"pointer",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap",
+            fontFamily:"'DM Sans',sans-serif"}
+        },"⬇ Reporte"),
+        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:190,fontFamily:"'DM Sans',sans-serif"}})
       ),
       h("div",{style:{flex:1,overflowX:"auto"}},
         h("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:880}},
