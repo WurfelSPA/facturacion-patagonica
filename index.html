@@ -527,16 +527,16 @@ async function procesarPDFs(zipFile,addLog){
     let ufPdf=null;
     try{
       if(texto.length>10){
-        /* P1: col Cant/Unidad con layout  →  "10,24 UF   40.186,79" */
-        let m=texto.match(/([\d]+(?:[,.][\d]+)?)\s+UF\s+4[09][,.\d]/);
+        /* P1: col Cant/Unidad con layout  →  "1,59 UF  39.841,72"  o  "10,24 UF  40.186,79" */
+        let m=texto.match(/([\d]+(?:[,.][\d]+)?)\s+UF\s+[3-5]\d[,.\d]/);
         if(m) ufPdf=parseFloat(m[1].replace(",","."));
-        /* P2: UF en descripción con layout  →  "UF 85,37 x 40186" */
-        if(!ufPdf){m=texto.match(/UF\s+([\d]+(?:[,.][\d]+)?)\s+x\s+4[09]/);if(m) ufPdf=parseFloat(m[1].replace(",","."));}
-        /* P3: layout partido — colapsar todo y buscar número antes de "x 4X" */
+        /* P2: UF en descripción con layout  →  "UF 85,37 x 40186"  o  "UF 85,37 x 39841" */
+        if(!ufPdf){m=texto.match(/UF\s+([\d]+(?:[,.][\d]+)?)\s+x\s+[3-5]\d/);if(m) ufPdf=parseFloat(m[1].replace(",","."));}
+        /* P3: layout partido — colapsar todo y buscar número UF */
         if(!ufPdf){
           const flat=texto.replace(/\s+/g," ");
           m=flat.match(/UF\s+([\d]+(?:[,.][\d]+)?)\s+x\s+/);if(m) ufPdf=parseFloat(m[1].replace(",","."));
-          if(!ufPdf){m=flat.match(/([\d]+[,.][\d]+)\s+x\s+4[09]/);if(m) ufPdf=parseFloat(m[1].replace(",","."));}
+          if(!ufPdf){m=flat.match(/([\d]+[,.][\d]+)\s+x\s+[3-5]\d/);if(m) ufPdf=parseFloat(m[1].replace(",","."));}
         }
         if(ufPdf) ufPdf=Math.round(ufPdf*10000)/10000;
       }
@@ -1639,7 +1639,7 @@ function App(){
     const ahora=new Date();
     const fechaStr=ahora.toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric"});
     const horaStr=ahora.toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"});
-    const rows=data.map((r,i)=>({...r,i,ufSII,estado:getEstado({...r,ufSII})}));
+    const rows=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
     const esc=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
     const lines=[];
     // Encabezado del reporte
@@ -1724,7 +1724,7 @@ function App(){
     else{setPwdError(true);setPwdInput("");}
   };
   const sendAll=async()=>{
-    const enriched=data.map((r,i)=>({...r,i,ufSII,estado:getEstado({...r,ufSII})}));
+    const enriched=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
     const pend=enriched.filter(r=>r.estado==="ok"&&r.correo&&!sentSet.has(r.i));
     if(!pend.length)return notify("No hay correos pendientes","warn");
     try{
@@ -1746,7 +1746,7 @@ function App(){
 
   /* Sin SetupPanel — siempre va al dashboard */
 
-  const enriched=data.map((r,i)=>({...r,i,ufSII,estado:getEstado({...r,ufSII})}));
+  const enriched=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
   const stats={total:enriched.length,ok:enriched.filter(r=>r.estado==="ok").length,diff:enriched.filter(r=>r.estado!=="ok").length,sent:sentSet.size,conPdf:enriched.filter(r=>r.factura&&r.ufPdf!==null).length,sinPdf:enriched.filter(r=>!r.factura||r.ufPdf===null).length};
   const filtered=enriched.filter(r=>{
     const mf=filter==="all"||(filter==="ok"&&r.estado==="ok"&&!sentSet.has(r.i))||(filter==="diff"&&r.estado!=="ok")||(filter==="sent"&&sentSet.has(r.i));
@@ -2023,7 +2023,7 @@ function App(){
   /* ══════════════════════════════════════════════════════════
      RENDER PRINCIPAL
   ══════════════════════════════════════════════════════════ */
-  const enrichedSB=data.map((r,i)=>({...r,i,ufSII,estado:getEstado({...r,ufSII})}));
+  const enrichedSB=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
   const statsSB={ok:enrichedSB.filter(r=>r.estado==="ok").length};
   return h("div",{style:{display:"flex",minHeight:"100vh"}},
     h(Sidebar,{view,setView,procesar,files,periodo,splitLoading,splitPDF,unlocked,setShowPwdModal,sendAll,setUnlocked,stats:statsSB,sentSet}),
