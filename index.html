@@ -1032,10 +1032,9 @@ function getEstado(r){
   if(r.ufPdf===null||r.ufPdf===undefined)return r.factura?"ok":"missing";
   // Match por fallback de único candidato — marcar como "diff" para revisión
   if(r.matchScore===1)return"diff";
-  // Comparar UF: PDF vs Planilla, y Planilla vs SII
+  // Comparar UF: PDF vs Planilla (ufSII es valor de cambio, no cantidad — no comparar)
   const diffPdf=Math.abs(r.ufPdf-r.ufPlan)>0.5;
-  const diffSII=r.ufSII!=null&&Math.abs(r.ufPlan-r.ufSII)>0.5;
-  if(diffPdf||diffSII)return"diff";
+  if(diffPdf)return"diff";
   return"ok";
 }
 
@@ -1596,7 +1595,7 @@ function App(){
             /* Si hay >1 candidato y score<umbral → dejar factura="" para revisión manual */
           }
         }
-        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,enviado:false});
+        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:ufSII,ufPlan:c.uf,ufPdf,enviado:false});
       }
 
       /* ── Si no hay datos de planilla, mostrar igual los PDFs detectados ── */
@@ -2309,8 +2308,7 @@ function App(){
             filtered.map(row=>{
               const i=row.i,sent=sentSet.has(i),sending=sendingIdx===i,noEmail=!row.correo;
               const diffPdf=row.ufPdf!==null&&row.ufPdf!==undefined&&Math.abs(row.ufPdf-row.ufPlan)>0.5;
-              const diffSII=row.ufSII!=null&&row.ufPlan<=500&&Math.abs(row.ufPlan-row.ufSII)>0.5;
-              const diff=diffPdf||diffSII;
+              const diff=diffPdf;
               const esArr=row.concepto==="Arriendo";
               const bg=sent?"#e6f7ef":esArr?"#ffffff":"#fffdf5";
               return h("tr",{key:i,className:"row-tr"},
