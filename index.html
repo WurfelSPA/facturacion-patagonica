@@ -1639,7 +1639,7 @@ function App(){
     const ahora=new Date();
     const fechaStr=ahora.toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric"});
     const horaStr=ahora.toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"});
-    const rows=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
+    const rows=data.map((r,i)=>({...r,i,ufSII,estado:getEstado({...r,ufSII})}));
     const esc=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
     const lines=[];
     // Encabezado del reporte
@@ -1724,7 +1724,7 @@ function App(){
     else{setPwdError(true);setPwdInput("");}
   };
   const sendAll=async()=>{
-    const enriched=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
+    const enriched=data.map((r,i)=>({...r,i,ufSII,estado:getEstado({...r,ufSII})}));
     const pend=enriched.filter(r=>r.estado==="ok"&&r.correo&&!sentSet.has(r.i));
     if(!pend.length)return notify("No hay correos pendientes","warn");
     try{
@@ -1746,7 +1746,7 @@ function App(){
 
   /* Sin SetupPanel — siempre va al dashboard */
 
-  const enriched=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
+  const enriched=data.map((r,i)=>({...r,i,ufSII,estado:getEstado({...r,ufSII})}));
   const stats={total:enriched.length,ok:enriched.filter(r=>r.estado==="ok").length,diff:enriched.filter(r=>r.estado!=="ok").length,sent:sentSet.size,conPdf:enriched.filter(r=>r.factura&&r.ufPdf!==null).length,sinPdf:enriched.filter(r=>!r.factura||r.ufPdf===null).length};
   const filtered=enriched.filter(r=>{
     const mf=filter==="all"||(filter==="ok"&&r.estado==="ok"&&!sentSet.has(r.i))||(filter==="diff"&&r.estado!=="ok")||(filter==="sent"&&sentSet.has(r.i));
@@ -2023,7 +2023,7 @@ function App(){
   /* ══════════════════════════════════════════════════════════
      RENDER PRINCIPAL
   ══════════════════════════════════════════════════════════ */
-  const enrichedSB=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
+  const enrichedSB=data.map((r,i)=>({...r,i,ufSII,estado:getEstado({...r,ufSII})}));
   const statsSB={ok:enrichedSB.filter(r=>r.estado==="ok").length};
   return h("div",{style:{display:"flex",minHeight:"100vh"}},
     h(Sidebar,{view,setView,procesar,files,periodo,splitLoading,splitPDF,unlocked,setShowPwdModal,sendAll,setUnlocked,stats:statsSB,sentSet}),
