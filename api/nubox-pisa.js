@@ -1,57 +1,36 @@
 /**
- * /api/nubox-pdf
+ * /api/nubox-pisa
  *
- * Automatiza el login en Nubox, descarga el PDF consolidado de facturas PISA
- * del mes indicado y lo sube a Google Drive.
+ * Automatiza la descarga del PDF consolidado de facturas PISA desde Nubox.
  *
- * Variables de entorno requeridas (Vercel):
- *   NUBOX_PISA_USER  — RUT sin puntos con dígito verificador  (ej: 12345678-9)
- *   NUBOX_PISA_PASS  — Contraseña del usuario Nubox
- *   NUBOX_PISA_RUT   — (opcional) RUT numérico de PISA sin guión  (ej: 96673250)
- *
- * Parámetros POST (JSON):
- *   mes           — período YYYY-MM  (ej: 2026-06)
- *   googleToken   — OAuth access token con scope drive
- *   destFolderId  — ID de la carpeta en Google Drive donde guardar el PDF
+ * Parámetros GET:
+ *   mes  — período en formato YYYY-MM  (ej: 2026-05)
+ *   utn  — token de sesión obtenido de la URL de Nubox
+ *            (la parte que sigue a ?utn= en app.nubox.com/ServiFactura/paginas/dtePrincipal.aspx?utn=...)
  *
  * Respuesta exitosa:
- *   { ok: true, fileId, fileName, total, mes }
+ *   { ok: true, pdfUrl: "https://app.nubox.com/...", total: 130, mes: "2026-05" }
  *
  * Flujo interno:
- *   1. POST /Login/?Pais=CL  → cookies de sesión
- *   2. POST /Inicio/ObtenerListaClientes  → SistemasComputacionalesDeUsuario[]
- *   3. Busca el producto con ParentCode != null (Factura Electrónica PISA)
- *   4. POST /Inicio/ObtieneClienteRedirect con Idkey=<value>  → NombreTab (utn)
- *   5. GET dtePrincipal.aspx?utn=...  → cookies app.nubox.com + token interno
- *   6. POST ObtenerPorFiltro  → lista de IDs del mes
- *   7. POST VerPDF  → path del PDF
- *   8. GET PDF  → bytes
- *   9. Upload a Google Drive como Facturas_PISA_YYYY-MM.pdf
+ *   1. GET dtePrincipal.aspx?utn=... → establece sesión (cookies) + extrae token de página
+ *   2. POST ObtenerPorFiltro con rango de fechas del mes → lista de IDs
+ *   3. POST VerPDF con todos los IDs → path del PDF generado
+ *   4. Devuelve URL completa del PDF
  */
 
 export default async function handler(req, res) {
+  // CORS para llamadas desde el frontend
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
-  const { mes, googleToken, destFolderId } = req.body || {};
+  const { mes, utn } = req.query;
 
+  if (!utn) {
+    return res.status(400).json({ error: 'Se requiere el parámetro utn' });
+  }
   if (!mes || !/^\d{4}-\d{2}$/.test(mes)) {
-    return res.status(400).json({ error: 'Se requiere mes en formato YYYY-MM' });
-  }
-  if (!googleToken) {
-    return res.status(400).json({ error: 'Se requiere googleToken' });
-  }
-  if (!destFolderId) {
-    return res.status(400).json({ error: 'Se requiere destFolderId' });
-  }
-
-  const nuboxUser = process.env.NUBOX_PISA_USER;
-  const nuboxPass = process.env.NUBOX_PISA_PASS;
-  if (!nuboxUser || !nuboxPass) {
-    return res.status(500).json({ error: 'Variables de entorno NUBOX_PISA_USER / NUBOX_PISA_PASS no configuradas' });
+    return res.status(400).json({ error: 'Se requiere el parámetro mes en formato YYYY-MM' });
   }
 
   const [year, month] = mes.split('-');
@@ -59,184 +38,64 @@ export default async function handler(req, res) {
   const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
   const fechaHasta = `${String(lastDay).padStart(2, '0')}/${month}/${year}`;
 
-  const WEB_BASE  = 'https://web.nubox.com';
-  const APP_BASE  = 'https://app.nubox.com';
-  const DTE_PAGE  = `${APP_BASE}/ServiFactura/paginas/dteDocumentosTributarios.aspx`;
-
-  const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
-
-  /** Extrae cookies Set-Cookie y las devuelve como string para el header Cookie */
-  function parseCookies(response, existing = '') {
-    const setCookies = response.headers.getSetCookie
-      ? response.headers.getSetCookie()
-      : (response.headers.get('set-cookie') ? [response.headers.get('set-cookie')] : []);
-
-    const map = {};
-    for (const pair of (existing || '').split(';').map(s => s.trim()).filter(Boolean)) {
-      const [k, ...v] = pair.split('=');
-      if (k) map[k.trim()] = v.join('=');
-    }
-    for (const raw of setCookies) {
-      const part = raw.split(';')[0];
-      const [k, ...v] = part.split('=');
-      if (k) map[k.trim()] = v.join('=');
-    }
-    return Object.entries(map).map(([k, v]) => `${k}=${v}`).join('; ');
-  }
+  const BASE = 'https://app.nubox.com';
+  const HEADERS_BASE = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept-Language': 'es-CL,es;q=0.9',
+  };
 
   try {
-    // ── PASO 1: Login ──────────────────────────────────────────────────────────
-    const loginPageRes = await fetch(`${WEB_BASE}/Login/?Pais=CL`, {
-      headers: { 'User-Agent': UA },
+    // ── PASO 1: Establecer sesión con utn y extraer token de página ───────────
+    const principalUrl = `${BASE}/ServiFactura/paginas/dtePrincipal.aspx?utn=${encodeURIComponent(utn)}`;
+    const principalRes = await fetch(principalUrl, {
+      headers: HEADERS_BASE,
       redirect: 'follow',
     });
-    let cookies = parseCookies(loginPageRes);
-    const loginHtml = await loginPageRes.text();
 
-    // Extraer __RequestVerificationToken si existe
-    const rvtMatch = loginHtml.match(/name="__RequestVerificationToken"\s+(?:type="[^"]*"\s+)?value="([^"]+)"/);
-    const rvt = rvtMatch ? rvtMatch[1] : '';
+    // Recolectar cookies de sesión
+    const rawCookies = principalRes.headers.getSetCookie
+      ? principalRes.headers.getSetCookie()
+      : (principalRes.headers.get('set-cookie') ? [principalRes.headers.get('set-cookie')] : []);
+    const cookieHeader = rawCookies.map(c => c.split(';')[0]).join('; ');
 
-    // Campos obfuscados del formulario de login (estáticos en Nubox)
-    const RUT_FIELD  = 'ae740e71936fa3eec403935de72a7aa3a68bbe7';
-    const PASS_FIELD = 'd70911c2de484460cf9f927ee6c6166585718189';
-
-    const loginBody = new URLSearchParams({
-      [RUT_FIELD]: nuboxUser,
-      [PASS_FIELD]: nuboxPass,
-      gToken: '',
-      ...(rvt ? { __RequestVerificationToken: rvt } : {}),
-    });
-
-    const loginRes = await fetch(`${WEB_BASE}/Login/?Pais=CL`, {
-      method: 'POST',
-      headers: {
-        'User-Agent': UA,
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Cookie': cookies,
-        'Referer': `${WEB_BASE}/Login/?Pais=CL`,
-      },
-      body: loginBody.toString(),
+    // Cargar la página de documentos para obtener el token embebido
+    const dtePage = `${BASE}/ServiFactura/paginas/dteDocumentosTributarios.aspx`;
+    const dteRes = await fetch(dtePage, {
+      headers: { ...HEADERS_BASE, Cookie: cookieHeader },
       redirect: 'follow',
     });
-    cookies = parseCookies(loginRes, cookies);
 
-    // Verificar que el login fue exitoso (debería redirigir a SistemaLogin)
-    const loginFinalUrl = loginRes.url || '';
-    if (!loginFinalUrl.includes('SistemaLogin') && !loginFinalUrl.includes('nubox.com')) {
-      const loginText = await loginRes.text();
-      // Buscar mensaje de error en HTML
-      const errMatch = loginText.match(/class="[^"]*error[^"]*"[^>]*>([^<]{5,200})</i);
-      return res.status(401).json({
-        error: 'Login fallido. Verificar credenciales NUBOX_PISA_USER / NUBOX_PISA_PASS',
-        hint: errMatch ? errMatch[1].trim() : loginText.substring(0, 400),
-      });
-    }
+    const html = await dteRes.text();
 
-    // ── PASO 2: Obtener lista de productos ─────────────────────────────────────
-    const listaRes = await fetch(`${WEB_BASE}/SistemaLogin/Inicio/ObtenerListaClientes`, {
-      method: 'POST',
-      headers: {
-        'User-Agent': UA,
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'X-Requested-With': 'XMLHttpRequest',
-        'Cookie': cookies,
-        'Referer': `${WEB_BASE}/SistemaLogin/`,
-      },
-    });
-    cookies = parseCookies(listaRes, cookies);
-
-    if (!listaRes.ok) {
-      return res.status(502).json({ error: `ObtenerListaClientes respondió ${listaRes.status}` });
-    }
-
-    const listaJson = await listaRes.json();
-    if (listaJson.CodigoError !== 'E_00') {
-      return res.status(401).json({
-        error: 'Sesión no válida: ' + (listaJson.MensajeHumano || listaJson.CodigoError),
-      });
-    }
-
-    // ── PASO 3: Buscar el producto Factura Electrónica de PISA ─────────────────
-    const sistemas = listaJson.SistemasComputacionalesDeUsuario || [];
-    const pisaRut = (process.env.NUBOX_PISA_RUT || '96673250').replace(/[^0-9]/g, '');
-
-    // El producto tiene ParentCode (es hijo de la empresa) y coincide con el RUT de PISA
-    let producto = sistemas.find(s => s.ParentCode && s.Rut === pisaRut);
-    if (!producto) {
-      producto = sistemas.find(s => s.ParentCode); // fallback: primer producto con padre
-    }
-    if (!producto || !producto.value) {
-      return res.status(404).json({
-        error: 'No se encontró el producto Factura Electrónica PISA',
-        sistemas: sistemas.map(s => ({ Id: s.Id, Rut: s.Rut, ParentCode: s.ParentCode })),
-      });
-    }
-
-    // ── PASO 4: Obtener utn ────────────────────────────────────────────────────
-    const redirectRes = await fetch(`${WEB_BASE}/SistemaLogin/Inicio/ObtieneClienteRedirect`, {
-      method: 'POST',
-      headers: {
-        'User-Agent': UA,
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'X-Requested-With': 'XMLHttpRequest',
-        'Cookie': cookies,
-        'Referer': `${WEB_BASE}/SistemaLogin/`,
-      },
-      body: `Idkey=${encodeURIComponent(producto.value)}&hubspot=&TagRedirect=`,
-    });
-    cookies = parseCookies(redirectRes, cookies);
-
-    const redirectJson = await redirectRes.json();
-    if (redirectJson.CodigoError !== 'E_00' || !redirectJson.NombreTab) {
-      return res.status(502).json({
-        error: 'No se pudo obtener utn: ' + (redirectJson.MensajeHumano || redirectJson.CodigoError),
-      });
-    }
-    const utn = redirectJson.NombreTab;
-
-    // ── PASO 5: Establecer sesión en app.nubox.com ─────────────────────────────
-    const principalRes = await fetch(
-      `${APP_BASE}/ServiFactura/paginas/dtePrincipal.aspx?utn=${encodeURIComponent(utn)}`,
-      { headers: { 'User-Agent': UA, 'Cookie': cookies }, redirect: 'follow' }
-    );
-    let appCookies = parseCookies(principalRes);
-
-    const dteRes = await fetch(DTE_PAGE, {
-      headers: { 'User-Agent': UA, 'Cookie': appCookies },
-      redirect: 'follow',
-    });
-    appCookies = parseCookies(dteRes, appCookies);
-    const dteHtml = await dteRes.text();
-
-    // Extraer token interno
+    // Extraer token — aparece como: var token = "xxxx"  o  token: "xxxx"
     const tokenMatch =
-      dteHtml.match(/var\s+token\s*=\s*["']([A-Za-z0-9+/=]{20,})["']/) ||
-      dteHtml.match(/"token"\s*:\s*"([A-Za-z0-9+/=]{20,})"/) ||
-      dteHtml.match(/token\s*=\s*["']([A-Za-z0-9+/=]{20,})["']/);
+      html.match(/var\s+token\s*=\s*["']([A-Za-z0-9+/=]{20,})["']/) ||
+      html.match(/"token"\s*:\s*"([A-Za-z0-9+/=]{20,})"/) ||
+      html.match(/token\s*=\s*["']([A-Za-z0-9+/=]{20,})["']/);
 
     if (!tokenMatch) {
       return res.status(500).json({
-        error: 'No se pudo extraer el token DTE. El utn puede haber expirado.',
-        utn,
-        htmlSnippet: dteHtml.substring(0, 600),
+        error: 'No se pudo extraer el token de la página de Nubox. El utn puede haber expirado.',
+        hint: 'Obtén un utn fresco desde la URL de tu sesión activa en Nubox.',
+        htmlSnippet: html.substring(0, 800),
       });
     }
     const token = tokenMatch[1];
 
+    // Extraer funcionarioId — aparece como: funcionarioId: "339708"  o similar
     const funcMatch =
-      dteHtml.match(/funcionarioId\s*[=:]\s*["']?(\d{4,})["']?/) ||
-      dteHtml.match(/"funcionarioId"\s*:\s*"(\d+)"/);
-    const funcionarioId = funcMatch ? funcMatch[1] : '339708';
+      html.match(/funcionarioId\s*[=:]\s*["']?(\d{4,})["']?/) ||
+      html.match(/"funcionarioId"\s*:\s*"(\d+)"/);
+    const funcionarioId = funcMatch ? funcMatch[1] : '339708'; // fallback conocido
 
-    // ── PASO 6: ObtenerPorFiltro ───────────────────────────────────────────────
-    const filtroRes = await fetch(`${DTE_PAGE}/ObtenerPorFiltro`, {
+    // ── PASO 2: ObtenerPorFiltro → lista de IDs del mes ──────────────────────
+    const filtroRes = await fetch(`${dtePage}/ObtenerPorFiltro`, {
       method: 'POST',
       headers: {
-        'User-Agent': UA,
+        ...HEADERS_BASE,
         'Content-Type': 'application/json; charset=utf-8',
-        'Cookie': appCookies,
-        'Referer': DTE_PAGE,
+        Cookie: cookieHeader,
+        Referer: dtePage,
       },
       body: JSON.stringify({
         token,
@@ -252,88 +111,54 @@ export default async function handler(req, res) {
     });
 
     if (!filtroRes.ok) {
-      return res.status(502).json({ error: `ObtenerPorFiltro respondió ${filtroRes.status}` });
+      return res.status(502).json({
+        error: `ObtenerPorFiltro respondió ${filtroRes.status}`,
+        body: await filtroRes.text(),
+      });
     }
+
     const filtroJson = await filtroRes.json();
     const filtroInner = JSON.parse(filtroJson.d);
     const documentos = filtroInner.data || [];
     const totalDocs = filtroInner.total?.[0]?.Total ?? documentos.length;
 
     if (documentos.length === 0) {
-      return res.status(404).json({ error: `Sin facturas PISA para ${mes}`, fechaDesde, fechaHasta });
+      return res.status(404).json({
+        error: `No se encontraron documentos para ${mes}`,
+        fechaDesde,
+        fechaHasta,
+      });
     }
+
     const ids = documentos.map(d => d.Id).join(',');
 
-    // ── PASO 7: VerPDF ─────────────────────────────────────────────────────────
-    const pdfGenRes = await fetch(`${DTE_PAGE}/VerPDF`, {
+    // ── PASO 3: VerPDF → genera PDF con todos los documentos ─────────────────
+    const pdfRes = await fetch(`${dtePage}/VerPDF`, {
       method: 'POST',
       headers: {
-        'User-Agent': UA,
+        ...HEADERS_BASE,
         'Content-Type': 'application/json; charset=utf-8',
-        'Cookie': appCookies,
-        'Referer': DTE_PAGE,
+        Cookie: cookieHeader,
+        Referer: dtePage,
       },
       body: JSON.stringify({ token, funcionarioId, id: ids }),
     });
 
-    if (!pdfGenRes.ok) {
-      return res.status(502).json({ error: `VerPDF respondió ${pdfGenRes.status}` });
-    }
-    const pdfGenJson = await pdfGenRes.json();
-    const pdfPath = pdfGenJson.d;
-    if (!pdfPath) {
-      return res.status(500).json({ error: 'VerPDF no devolvió path', respuesta: pdfGenJson });
-    }
-
-    // ── PASO 8: Descargar bytes del PDF ───────────────────────────────────────
-    const pdfDownRes = await fetch(`${APP_BASE}${pdfPath}`, {
-      headers: { 'User-Agent': UA, 'Cookie': appCookies },
-    });
-    if (!pdfDownRes.ok) {
-      return res.status(502).json({ error: `Descarga PDF respondió ${pdfDownRes.status}` });
-    }
-    const pdfBuffer = Buffer.from(await pdfDownRes.arrayBuffer());
-    const fileName = `Facturas_PISA_${mes}.pdf`;
-
-    // ── PASO 9: Subir a Google Drive ───────────────────────────────────────────
-    const metadata = JSON.stringify({
-      name: fileName,
-      mimeType: 'application/pdf',
-      parents: [destFolderId],
-    });
-    const boundary = 'nubox_pdf_boundary_XYZ';
-    const multipartBody = Buffer.concat([
-      Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`),
-      pdfBuffer,
-      Buffer.from(`\r\n--${boundary}--`),
-    ]);
-
-    const uploadRes = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${googleToken}`,
-          'Content-Type': `multipart/related; boundary=${boundary}`,
-        },
-        body: multipartBody,
-      }
-    );
-
-    if (!uploadRes.ok) {
-      const errText = await uploadRes.text();
+    if (!pdfRes.ok) {
       return res.status(502).json({
-        error: `Google Drive upload respondió ${uploadRes.status}`,
-        detail: errText.substring(0, 400),
+        error: `VerPDF respondió ${pdfRes.status}`,
+        body: await pdfRes.text(),
       });
     }
 
-    const uploadJson = await uploadRes.json();
+    const pdfJson = await pdfRes.json();
+    // pdfJson.d es el path: "/ServiFactura/paginas/temp/DTE....pdf"
+    const pdfPath = pdfJson.d;
+    const pdfUrl = `${BASE}${pdfPath}`;
 
     return res.status(200).json({
       ok: true,
-      fileId: uploadJson.id,
-      fileName,
+      pdfUrl,
       total: totalDocs,
       mes,
       fechaDesde,
