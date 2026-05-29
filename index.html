@@ -527,16 +527,16 @@ async function procesarPDFs(zipFile,addLog){
     let ufPdf=null;
     try{
       if(texto.length>10){
-        /* P1: col Cant/Unidad con layout  →  "10,24 UF   40.186,79" */
-        let m=texto.match(/([\d]+(?:[,.][\d]+)?)\s+UF\s+4[09][,.\d]/);
+        /* P1: col Cant/Unidad con layout  →  "10,24 UF   40.186,79" (acepta cualquier CLP) */
+        let m=texto.match(/([\d]+(?:[,.][\d]+)?)\s+UF\s+\d{2}[,.\d]/);
         if(m) ufPdf=parseFloat(m[1].replace(",","."));
         /* P2: UF en descripción con layout  →  "UF 85,37 x 40186" */
-        if(!ufPdf){m=texto.match(/UF\s+([\d]+(?:[,.][\d]+)?)\s+x\s+4[09]/);if(m) ufPdf=parseFloat(m[1].replace(",","."));}
-        /* P3: layout partido — colapsar todo y buscar número antes de "x 4X" */
+        if(!ufPdf){m=texto.match(/UF\s+([\d]+(?:[,.][\d]+)?)\s+x\s+\d{2}/);if(m) ufPdf=parseFloat(m[1].replace(",","."));}
+        /* P3: layout partido — colapsar todo y buscar número antes de "x NNN" */
         if(!ufPdf){
           const flat=texto.replace(/\s+/g," ");
           m=flat.match(/UF\s+([\d]+(?:[,.][\d]+)?)\s+x\s+/);if(m) ufPdf=parseFloat(m[1].replace(",","."));
-          if(!ufPdf){m=flat.match(/([\d]+[,.][\d]+)\s+x\s+4[09]/);if(m) ufPdf=parseFloat(m[1].replace(",","."));}
+          if(!ufPdf){m=flat.match(/([\d]+[,.][\d]+)\s+x\s+\d{2}/);if(m) ufPdf=parseFloat(m[1].replace(",","."));}
         }
         if(ufPdf) ufPdf=Math.round(ufPdf*10000)/10000;
       }

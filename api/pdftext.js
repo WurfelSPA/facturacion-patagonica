@@ -139,13 +139,13 @@ function extractData(text, tipo) {
   let uf = null;
   let m;
 
-  // P1: "XX,XX UF   40.186"
-  m = text.match(/([\d]+(?:[,.][\d]+)?)\s+UF\s+4[09][,.\d]/);
+  // P1: "XX,XX UF   40.186" (acepta cualquier valor CLP, no solo 4X)
+  m = text.match(/([\d]+(?:[,.][\d]+)?)\s+UF\s+\d{2}[,.\d]/);
   if (m) uf = parseFloat(m[1].replace(",", "."));
 
   // P2: "UF XX,XX x 40186"
   if (!uf) {
-    m = text.match(/UF\s+([\d]+(?:[,.][\d]+)?)\s+x\s+4[09]/);
+    m = text.match(/UF\s+([\d]+(?:[,.][\d]+)?)\s+x\s+\d{2}/);
     if (m) uf = parseFloat(m[1].replace(",", "."));
   }
 
@@ -155,7 +155,7 @@ function extractData(text, tipo) {
     m = flat.match(/UF\s+([\d]+(?:[,.][\d]+)?)\s+x\s+/);
     if (m) uf = parseFloat(m[1].replace(",", "."));
     if (!uf) {
-      m = flat.match(/([\d]+[,.][\d]+)\s+x\s+4[09]/);
+      m = flat.match(/([\d]+[,.][\d]+)\s+x\s+\d{2}/);
       if (m) uf = parseFloat(m[1].replace(",", "."));
     }
   }
