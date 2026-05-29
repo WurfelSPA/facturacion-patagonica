@@ -109,12 +109,17 @@ export default async function handler(req, res) {
     const rvt = rvtMatch ? rvtMatch[1] : '';
 
     // ── PASO 2: POST login ─────────────────────────────────────────────────────
-    const RUT_FIELD  = 'ae740e71936fa3eec403935de72a7aa3a68bbe7';
-    const PASS_FIELD = 'd70911c2de484460cf9f927ee6c6166585718189';
+    const RUT_FIELD      = 'ae740e71936fa3eec403935de72a7aa3a68bbe7';
+    const PASS_FIELD     = 'd70911c2de484460cf9f927ee6c6166585718189';
+    const HONEYPOT_FIELD = 'c2414766d5fa42e71a24f97b559f2b1320cec4ee'; // campo invisible, debe ir vacío
+
+    // Normalizar RUT: quitar puntos, mantener guión y DV  (ej: "96.673.250-4" → "96673250-4")
+    const rutNormalizado = nuboxUser.replace(/\./g, '').trim();
 
     const loginBody = new URLSearchParams({
-      [RUT_FIELD]: nuboxUser,
+      [RUT_FIELD]: rutNormalizado,
       [PASS_FIELD]: nuboxPass,
+      [HONEYPOT_FIELD]: '',
       gToken: '',
       ...(rvt ? { __RequestVerificationToken: rvt } : {}),
     }).toString();
@@ -133,12 +138,18 @@ export default async function handler(req, res) {
     // Verificar login exitoso
     if (!finalUrl.includes('SistemaLogin') && !finalUrl.includes('nubox.com/Sistema')) {
       const body = await loginResp.text();
-      // Buscar mensaje de error en HTML
       const errMsg = body.match(/class="[^"]*(?:error|alert|danger|warning)[^"]*"[^>]*>\s*([^<]{5,200})/i);
+      // Buscar campo RUT en la página para confirmar que los field names son correctos
+      const rutFieldInPage = body.match(/name="([a-f0-9]{30,})"/g);
       return res.status(401).json({
         error: 'Login fallido. Verificar NUBOX_PISA_USER y NUBOX_PISA_PASS',
         finalUrl,
-        hint: errMsg ? errMsg[1].trim() : body.substring(0, 300),
+        loginStatus: loginResp.status,
+        nuboxUser_enviado: nuboxUser,
+        rvtFound: !!rvt,
+        rutFieldsEnPagina: rutFieldInPage ? rutFieldInPage.slice(0, 3) : 'ninguno',
+        htmlError: errMsg ? errMsg[1].trim() : null,
+        htmlSnippet: body.substring(0, 500),
       });
     }
 
