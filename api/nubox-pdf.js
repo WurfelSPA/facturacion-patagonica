@@ -102,62 +102,43 @@ export default async function handler(req, res) {
 
     console.log(`[nubox] Auth OK. Token obtenido. NumeroSerie: ${numeroSerie}`);
 
-    const tokenHeaders = {
-      'Token': token,
-      ...(partnerKey ? { 'PartnerKey': partnerKey } : {}),
+    // Headers para Partner API v1
+    const v1Headers = {
+      'Authorization': partnerKey,
+      'X-Api-Key': process.env.NUBOX_PISA_API_KEY,
       'Content-Type': 'application/json',
     };
 
-    // ── PASO 2: Listar documentos via portal web Nubox ────────────────────────
-    // La Partner API no expone endpoint de listado. Usamos el portal web interno
-    // (app.nubox.com) con el Token obtenido de la Partner API.
-    const APP = 'https://app.nubox.com';
-    const DTE = `${APP}/ServiFactura/paginas/dteDocumentosTributarios.aspx`;
-    const UA  = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36';
-
-    // Intentar ObtenerPorFiltro con el token de la Partner API
-    const filtroResp = await fetch(`${DTE}/ObtenerPorFiltro`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Referer': DTE,
-        'User-Agent': UA,
-        'Token': token,
-        ...(partnerKey ? { 'PartnerKey': partnerKey } : {}),
-      },
-      body: JSON.stringify({
-        token,
-        EstadoId: 3,
-        estadoEnvio: 0,
-        fechaDesde,
-        fechaHasta,
-        filtro: '<Terminos></Terminos>',
-        folioDesde: 0,
-        folioHasta: 0,
-        usaFormatoImpresionEspecial: false,
-      }),
-    });
-
-    const filtroTxt = await filtroResp.text();
-    console.log(`[nubox] ObtenerPorFiltro status: ${filtroResp.status}, body: ${filtroTxt.substring(0, 300)}`);
+    // ── PASO 2: GET /v1/sales — listar documentos del período ─────────────────
+    // Probamos variantes de URL base y parámetros de fecha
+    const salesUrls = [
+      `${API}/v1/sales?period=${mes}`,
+      `${APIV}/v1/sales?period=${mes}`,
+      `https://api.nubox.com/v1/sales?period=${mes}`,
+      `${API}/v1/sales?fechaDesde=${encodeURIComponent(fechaDesde)}&fechaHasta=${encodeURIComponent(fechaHasta)}`,
+      `${APIV}/v1/sales?fechaDesde=${encodeURIComponent(fechaDesde)}&fechaHasta=${encodeURIComponent(fechaHasta)}`,
+    ];
 
     let documentos = [];
-    if (filtroResp.ok) {
-      try {
-        const filtroJson = JSON.parse(filtroTxt);
-        const inner = typeof filtroJson.d === 'string' ? JSON.parse(filtroJson.d) : filtroJson;
-        documentos = inner.data || inner.documentos || inner.Documentos || (Array.isArray(inner) ? inner : []);
-      } catch (e) {
-        console.warn('[nubox] Error parseando ObtenerPorFiltro:', e.message);
+    let salesDebug = [];
+    for (const url of salesUrls) {
+      console.log(`[nubox] GET ${url}`);
+      const r = await fetch(url, { headers: v1Headers });
+      const txt = await r.text();
+      salesDebug.push({ url, status: r.status, body: txt.substring(0, 300) });
+      if (r.ok) {
+        try {
+          const j = JSON.parse(txt);
+          documentos = Array.isArray(j) ? j : (j.data || j.items || j.sales || j.documentos || []);
+          if (documentos.length > 0) { console.log(`[nubox] Lista OK en: ${url}`); break; }
+        } catch { /* no JSON */ }
       }
     }
 
     if (documentos.length === 0) {
       return res.status(404).json({
         error: `No se encontraron documentos para ${mes}.`,
-        filtroStatus: filtroResp.status,
-        filtroBody: filtroTxt.substring(0, 500),
-        sugerencia: 'El Token de la Partner API no funciona en el portal web. Contactar soporte Nubox para obtener endpoint de listado.',
+        intentos: salesDebug,
       });
     }
 
@@ -180,7 +161,11 @@ export default async function handler(req, res) {
       console.log(`[nubox] Descargando PDF folio ${folio}: ${pdfUrl}`);
 
       const pdfResp = await fetch(pdfUrl, {
-        headers: { 'Token': token, ...(partnerKey ? { 'PartnerKey': partnerKey } : {}) },
+        headers: {
+          'Token': token,
+          'Authorization': partnerKey,
+          'X-Api-Key': process.env.NUBOX_PISA_API_KEY,
+        },
       });
 
       if (!pdfResp.ok) {
