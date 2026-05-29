@@ -5,8 +5,11 @@
  * las une en un solo PDF con pdf-lib y sube el resultado a Google Drive.
  *
  * Variables de entorno (Vercel):
- *   NUBOX_PARTNER_TOKEN  — Bearer token de la Partner API
- *   NUBOX_PISA_API_KEY   — X-Api-Key para la empresa PISA
+ *   NUBOX_PISA_USER     — Usuario API (ej: QE710sHnJCrt)
+ *   NUBOX_PISA_PASS     — Contraseña API
+ *   NUBOX_PARTNER_TOKEN — PartnerKey (sk_live_...)
+ *   NUBOX_PISA_RUT      — RUT empresa sin DV (ej: 96673250)
+ *   NUBOX_PISA_RUT_DV   — DV del RUT (ej: 4)
  *
  * POST body (JSON):
  *   mes          — YYYY-MM
@@ -16,7 +19,8 @@
 
 import { PDFDocument } from 'pdf-lib';
 
-const API_BASE = 'https://api.pyme.nubox.com/nbxpymapi-environment-pyme';
+const API  = 'https://api.nubox.com/nubox.api';
+const APIV = 'https://api.nubox.com/Nubox.API';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -31,91 +35,164 @@ export default async function handler(req, res) {
   if (!googleToken) return res.status(400).json({ error: 'Se requiere googleToken' });
   if (!destFolderId) return res.status(400).json({ error: 'Se requiere destFolderId' });
 
-  const partnerToken = process.env.NUBOX_PARTNER_TOKEN;
-  const apiKey       = process.env.NUBOX_PISA_API_KEY;
-  if (!partnerToken || !apiKey)
-    return res.status(500).json({ error: 'Faltan NUBOX_PARTNER_TOKEN o NUBOX_PISA_API_KEY en variables de entorno.' });
+  const nuboxUser   = process.env.NUBOX_API_USER;
+  const nuboxPass   = process.env.NUBOX_API_PASS;
+  const partnerKey  = process.env.NUBOX_PARTNER_TOKEN;
+  const pisaRutNum  = (process.env.NUBOX_PISA_RUT || '96673250').replace(/[^0-9]/g, '');
+  const pisaRutDV   = process.env.NUBOX_PISA_RUT_DV || '4';
+  const pisaRut     = `${pisaRutNum}-${pisaRutDV}`;  // ej: 96673250-4
 
-  const authHeaders = {
-    'Authorization': `Bearer ${partnerToken}`,
-    'X-Api-Key': apiKey,
-    'Accept': 'application/json',
-  };
+  if (!nuboxUser || !nuboxPass)
+    return res.status(500).json({ error: 'Faltan NUBOX_API_USER o NUBOX_API_PASS en variables de entorno.' });
+
+  const [year, month] = mes.split('-');
+  const lastDay   = new Date(parseInt(year), parseInt(month), 0).getDate();
+  const fechaDesde = `01/${month}/${year}`;
+  const fechaHasta = `${String(lastDay).padStart(2,'0')}/${month}/${year}`;
 
   try {
-    // ── PASO 1: Listar documentos del período ─────────────────────────────────
-    console.log(`[nubox] Obteniendo facturas para período ${mes}...`);
-    const listResp = await fetch(
-      `${API_BASE}/v1/sales?period=${mes}&size=200`,
-      { headers: authHeaders }
-    );
+    // ── PASO 1: Autenticación ─────────────────────────────────────────────────
+    console.log('[nubox] Autenticando via Partner API...');
+    const basicCreds = Buffer.from(`${nuboxUser}:${nuboxPass}`).toString('base64');
 
-    if (!listResp.ok) {
-      const errText = await listResp.text();
-      return res.status(502).json({
-        error: `Partner API /v1/sales respondió ${listResp.status}`,
-        detail: errText.substring(0, 400),
+    const authResp = await fetch(`${API}/autenticar`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${basicCreds}`,
+        'Content-Type': 'application/json',
+        ...(partnerKey ? { 'PartnerKey': partnerKey } : {}),
+      },
+    });
+
+    if (!authResp.ok) {
+      const body = await authResp.text();
+      return res.status(401).json({
+        error: `Auth respondió ${authResp.status}`,
+        detail: body.substring(0, 400),
+        hint: 'Revisa NUBOX_PISA_USER y NUBOX_PISA_PASS en Vercel.',
       });
     }
 
-    const listData = await listResp.json();
+    // Token viene en el header de respuesta (no en el body)
+    const token = authResp.headers.get('Token') || authResp.headers.get('token') || '';
+    const authBody = await authResp.json().catch(() => []);
 
-    // La API puede devolver { data: [...] } o directamente un array
-    const documentos = Array.isArray(listData) ? listData : (listData.data || listData.items || listData.sales || []);
+    if (!token)
+      return res.status(401).json({
+        error: 'Auth no devolvió Token en el header de respuesta.',
+        authBodySample: JSON.stringify(authBody).substring(0, 300),
+        headers: Object.fromEntries([...authResp.headers.entries()]),
+      });
 
-    if (documentos.length === 0)
-      return res.status(404).json({ error: `Sin facturas PISA para ${mes}` });
+    // NumeroSerie del sistema PISA (viene en el body de auth)
+    const sistemas = Array.isArray(authBody) ? authBody : (authBody.sistemas || authBody.Sistemas || [authBody]);
+    const sistema  = sistemas.find(s => {
+      const rutS = String(s.Rut || s.rut || '').replace(/[^0-9]/g, '');
+      return rutS === pisaRutNum;
+    }) || sistemas[0];
+    const numeroSerie = sistema?.NumeroSerie || sistema?.numeroSerie || sistema?.NumSerie;
+
+    if (!numeroSerie)
+      return res.status(500).json({
+        error: 'No se encontró NumeroSerie en la respuesta de auth.',
+        sistemas: sistemas.slice(0, 3),
+      });
+
+    console.log(`[nubox] Auth OK. Token obtenido. NumeroSerie: ${numeroSerie}`);
+
+    const tokenHeaders = {
+      'Token': token,
+      'Authorization': `Basic ${basicCreds}`,
+      ...(partnerKey ? { 'PartnerKey': partnerKey } : {}),
+      'Content-Type': 'application/json',
+    };
+
+    // ── PASO 2: Listar documentos del período ─────────────────────────────────
+    // Intentamos el endpoint de listado por fecha. La URL exacta no está
+    // documentada públicamente, probamos variantes comunes.
+    let documentos = null;
+    const listEndpoints = [
+      `${API}/factura/documentos/${pisaRut}/${numeroSerie}?fechaDesde=${encodeURIComponent(fechaDesde)}&fechaHasta=${encodeURIComponent(fechaHasta)}&tipoDocumento=FAC-EL`,
+      `${APIV}/factura/documentos/${pisaRut}/${numeroSerie}?fechaDesde=${encodeURIComponent(fechaDesde)}&fechaHasta=${encodeURIComponent(fechaHasta)}`,
+      `${API}/factura/documento/${pisaRut}/${numeroSerie}/listar?fechaDesde=${encodeURIComponent(fechaDesde)}&fechaHasta=${encodeURIComponent(fechaHasta)}`,
+      `${APIV}/factura/documento/${pisaRut}/${numeroSerie}/listar?fechaDesde=${encodeURIComponent(fechaDesde)}&fechaHasta=${encodeURIComponent(fechaHasta)}`,
+    ];
+
+    let listDebug = [];
+    for (const url of listEndpoints) {
+      console.log(`[nubox] Intentando listar: ${url}`);
+      const r = await fetch(url, { headers: tokenHeaders });
+      const txt = await r.text();
+      listDebug.push({ url, status: r.status, body: txt.substring(0, 200) });
+      if (r.ok) {
+        try {
+          const j = JSON.parse(txt);
+          documentos = Array.isArray(j) ? j : (j.data || j.documentos || j.Documentos || j.items || []);
+          if (documentos.length > 0) { console.log(`[nubox] Lista OK en: ${url}`); break; }
+        } catch { /* no JSON */ }
+      }
+    }
+
+    if (!documentos || documentos.length === 0) {
+      return res.status(404).json({
+        error: `No se encontraron documentos para ${mes}. Posiblemente el endpoint de listado necesita ajuste.`,
+        intentos: listDebug,
+        sugerencia: 'Comparte este error con el soporte de Nubox para obtener la URL exacta del endpoint de listado.',
+      });
+    }
 
     console.log(`[nubox] ${documentos.length} documentos encontrados.`);
 
-    // ── PASO 2: Descargar cada PDF individualmente ────────────────────────────
+    // ── PASO 3: Descargar cada PDF ────────────────────────────────────────────
     const pdfBuffers = [];
     for (const doc of documentos) {
-      const docId = doc.id || doc.documentId || doc.Id || doc.folio;
-      if (!docId) {
-        console.warn('[nubox] Documento sin ID, omitiendo:', JSON.stringify(doc).substring(0, 100));
+      const folio = doc.Folio || doc.folio || doc.NumeroFolio || doc.numeroFolio;
+      const tipo  = doc.TipoDocumento || doc.tipoDocumento || doc.Tipo || 'FAC-EL';
+      // Los tipos con / deben codificarse: N/C-EL → N%2FC-EL
+      const tipoEncoded = tipo.replace(/\//g, '%2F');
+
+      if (!folio) {
+        console.warn('[nubox] Documento sin folio:', JSON.stringify(doc).substring(0, 100));
         continue;
       }
 
-      const pdfResp = await fetch(
-        `${API_BASE}/v1/sales/${docId}/pdf`,
-        { headers: { ...authHeaders, Accept: 'application/pdf,*/*' } }
-      );
+      const pdfUrl = `${APIV}/factura/documento/${pisaRut}/${numeroSerie}/${folio}/${tipoEncoded}/pdf`;
+      console.log(`[nubox] Descargando PDF folio ${folio}: ${pdfUrl}`);
+
+      const pdfResp = await fetch(pdfUrl, {
+        headers: { 'Token': token, ...(partnerKey ? { 'PartnerKey': partnerKey } : {}) },
+      });
 
       if (!pdfResp.ok) {
-        console.warn(`[nubox] PDF para ${docId} respondió ${pdfResp.status}, omitiendo.`);
+        console.warn(`[nubox] PDF folio ${folio} respondió ${pdfResp.status}, omitiendo.`);
         continue;
       }
 
       const buf = Buffer.from(await pdfResp.arrayBuffer());
       pdfBuffers.push(buf);
-      console.log(`[nubox] PDF ${docId} descargado (${buf.length} bytes)`);
+      console.log(`[nubox] PDF folio ${folio} OK (${buf.length} bytes)`);
     }
 
     if (pdfBuffers.length === 0)
-      return res.status(404).json({ error: 'No se pudo descargar ningún PDF para el período indicado.' });
+      return res.status(404).json({ error: 'No se pudo descargar ningún PDF para el período.' });
 
-    // ── PASO 3: Unir todos los PDFs en uno solo ───────────────────────────────
+    // ── PASO 4: Unir PDFs ─────────────────────────────────────────────────────
     console.log(`[nubox] Uniendo ${pdfBuffers.length} PDFs...`);
     const merged = await PDFDocument.create();
-
     for (const buf of pdfBuffers) {
       try {
-        const src = await PDFDocument.load(buf, { ignoreEncryption: true });
+        const src   = await PDFDocument.load(buf, { ignoreEncryption: true });
         const pages = await merged.copyPages(src, src.getPageIndices());
         for (const page of pages) merged.addPage(page);
       } catch (e) {
-        console.warn('[nubox] Error al procesar un PDF, omitiendo:', e.message);
+        console.warn('[nubox] Error procesando un PDF, omitiendo:', e.message);
       }
     }
-
-    const mergedBytes = await merged.save();
-    const pdfBuffer = Buffer.from(mergedBytes);
+    const pdfBuffer = Buffer.from(await merged.save());
     const fileName  = `Facturas_PISA_${mes}.pdf`;
-
     console.log(`[nubox] PDF unificado: ${pdfBuffer.length} bytes (${merged.getPageCount()} páginas)`);
 
-    // ── PASO 4: Subir a Google Drive ──────────────────────────────────────────
+    // ── PASO 5: Subir a Google Drive ──────────────────────────────────────────
     const metadata  = JSON.stringify({ name: fileName, mimeType: 'application/pdf', parents: [destFolderId] });
     const boundary  = 'nubox_pdf_boundary';
     const multipart = Buffer.concat([
@@ -129,7 +206,7 @@ export default async function handler(req, res) {
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${googleToken}`,
+          'Authorization': `Bearer ${googleToken}`,
           'Content-Type': `multipart/related; boundary=${boundary}`,
         },
         body: multipart,
