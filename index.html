@@ -1257,6 +1257,9 @@ function App(){
   const apiKey=PRESET_KEY;
   const clientId=PRESET_GID;
   const [gmailToken,setGmailToken]=useState(null);
+  const [nuboxCookies,setNuboxCookies]=useState(()=>{ try{ return localStorage.getItem('nuboxCookies')||''; }catch(e){ return ''; } });
+  const [showNuboxSession,setShowNuboxSession]=useState(false);
+  const saveNuboxCookies=(v)=>{ setNuboxCookies(v); try{ localStorage.setItem('nuboxCookies',v); }catch(e){} };
   const [view,setView]=useState("dashboard");
   const [periodo,setPeriodo]=useState(()=>{const now=new Date();return`${MESES_NOMBRES[now.getMonth()]} ${now.getFullYear()}`;});
   const [files,setFiles]=useState({planilla:null,zip:null});
@@ -1716,7 +1719,7 @@ function App(){
         const nbRes=await fetch("/api/nubox-pdf",{
           method:"POST",
           headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({mes:mesCode,googleToken:gToken,destFolderId:DRIVE_FACTURACION_FOLDER_ID}),
+          body:JSON.stringify({mes:mesCode,googleToken:gToken,destFolderId:DRIVE_FACTURACION_FOLDER_ID,...(nuboxCookies?{nuboxCookies}:{})}),
         });
         const nbData=await nbRes.json();
         if(!nbRes.ok)throw new Error("Nubox: "+(nbData.error||"Error desconocido"));
@@ -2161,6 +2164,38 @@ function App(){
 
       /* ── PANEL: selector + estado ── */
       h("div",{style:{flex:1,display:"flex",flexDirection:"column",overflowY:"auto",padding:"32px 40px"}},
+        /* ── Sesión Nubox ── */
+        h("div",{style:{marginBottom:16}},
+          h("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:showNuboxSession?8:0}},
+            h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:"0.08em"}},"SESIÓN NUBOX"),
+            nuboxCookies
+              ? h("span",{style:{fontSize:10,background:"var(--gbg)",border:"1px solid var(--gdim)",color:"var(--green)",padding:"2px 8px",borderRadius:10,fontWeight:600}},"✓ Configurada")
+              : h("span",{style:{fontSize:10,background:"var(--rbg)",border:"1px solid var(--rdim)",color:"var(--red)",padding:"2px 8px",borderRadius:10,fontWeight:600}},"⚠ Requerida"),
+            h("button",{
+              onClick:()=>setShowNuboxSession(v=>!v),
+              style:{fontSize:11,padding:"3px 10px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--txm)",cursor:"pointer"}
+            },showNuboxSession?"Cerrar":"Configurar")
+          ),
+          showNuboxSession&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr2)",borderRadius:10,padding:"14px 16px"}},
+            h("p",{style:{fontSize:11,color:"var(--txm)",marginBottom:10,lineHeight:1.6}},
+              "1. Entra a ",h("strong",null,"web.nubox.com")," (ya logueado)",h("br"),
+              "2. F12 → Network → recarga (F5) → clic en cualquier request a nubox.com",h("br"),
+              "3. En Request Headers copia el valor completo de ",h("strong",null,"Cookie:"),h("br"),
+              "4. Pégalo abajo y guarda. Válido por ~7 días."
+            ),
+            h("textarea",{
+              value:nuboxCookies,
+              onChange:e=>saveNuboxCookies(e.target.value),
+              placeholder:"AWSALB=...; NUBOX=CODIGOPAIS=CL; ...",
+              style:{width:"100%",height:72,fontSize:10,fontFamily:"'DM Mono',monospace",padding:"8px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)",resize:"vertical",boxSizing:"border-box"}
+            }),
+            nuboxCookies&&h("button",{
+              onClick:()=>{saveNuboxCookies('');},
+              style:{marginTop:6,fontSize:11,padding:"3px 10px",borderRadius:6,border:"1px solid var(--rdim)",background:"var(--rbg)",color:"var(--red)",cursor:"pointer"}
+            },"✕ Borrar sesión")
+          )
+        ),
+
         /* Selector de período compacto */
         h("div",{style:{marginBottom:24,display:"flex",alignItems:"center",gap:10}},
           h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:"0.08em"}},"PERÍODO"),
