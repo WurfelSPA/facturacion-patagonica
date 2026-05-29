@@ -86,11 +86,13 @@ export default async function handler(req, res) {
 
     // NumeroSerie del sistema PISA (viene en el body de auth)
     const sistemas = Array.isArray(authBody) ? authBody : (authBody.sistemas || authBody.Sistemas || [authBody]);
-    const sistema  = sistemas.find(s => {
-      const rutS = String(s.Rut || s.rut || '').replace(/[^0-9]/g, '');
-      return rutS === pisaRutNum;
-    }) || sistemas[0];
-    const numeroSerie = sistema?.NumeroSerie || sistema?.numeroSerie || sistema?.NumSerie;
+    // Preferir SERVIFACTURA (facturación electrónica); filtrar por RUT PISA
+    const sistema  =
+      sistemas.find(s => s.Sistema === 'SERVIFACTURA' && String(s.Rut) === pisaRutNum) ||
+      sistemas.find(s => String(s.Rut) === pisaRutNum) ||
+      sistemas.find(s => s.Sistema === 'SERVIFACTURA') ||
+      sistemas[0];
+    const numeroSerie = sistema?.NumeroDeSerie || sistema?.NumeroSerie || sistema?.numeroSerie || sistema?.NumSerie;
 
     if (!numeroSerie)
       return res.status(500).json({
