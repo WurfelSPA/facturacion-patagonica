@@ -101,12 +101,16 @@ export default async function handler(req, res) {
 
   try {
     // ── PASO 1: GET página de login → cookies iniciales + CSRF token ──────────
-    const { resp: loginPageResp, cookies: c0 } = await fetchManual(`${WEB}/Login/?Pais=CL`, {});
+    const LOGIN_PAGE = `${WEB}/Login/Account/login`;
+    const { resp: loginPageResp, cookies: c0 } = await fetchManual(LOGIN_PAGE, {});
     const loginHtml = await loginPageResp.text();
     let cookies = c0;
 
-    const rvtMatch = loginHtml.match(/name="__RequestVerificationToken"[^>]*value="([^"]+)"/);
-    const rvt = rvtMatch ? rvtMatch[1] : '';
+    // El token puede tener value= antes o después de name=, buscamos el input completo
+    const rvtInputMatch = loginHtml.match(/<input[^>]*__RequestVerificationToken[^>]*>/i);
+    const rvtValueMatch = rvtInputMatch ? rvtInputMatch[0].match(/value="([^"]+)"/) : null;
+    const rvt = rvtValueMatch ? rvtValueMatch[1] : '';
+    console.log('[nubox] rvt:', !!rvt, rvt ? rvt.substring(0,20)+'...' : 'NO ENCONTRADO');
 
     // ── PASO 2: POST login ─────────────────────────────────────────────────────
     const RUT_FIELD      = 'ae740e71936fa3eec403935de72a7aa3a68bbe7';
@@ -125,10 +129,10 @@ export default async function handler(req, res) {
     }).toString();
 
     const { resp: loginResp, cookies: c1, finalUrl } = await fetchFollow(
-      `${WEB}/Login/?Pais=CL`,
+      LOGIN_PAGE,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Referer: `${WEB}/Login/?Pais=CL` },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Referer: LOGIN_PAGE },
         body: loginBody,
       },
       cookies
