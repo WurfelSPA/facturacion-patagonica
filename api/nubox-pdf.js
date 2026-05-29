@@ -102,15 +102,20 @@ export default async function handler(req, res) {
   try {
     // ── PASO 1: GET página de login → cookies iniciales + CSRF token ──────────
     const LOGIN_PAGE = `${WEB}/Login/Account/login`;
-    const { resp: loginPageResp, cookies: c0 } = await fetchManual(LOGIN_PAGE, {});
+    // Usamos fetchFollow para acumular cookies en cada redirect
+    const { resp: loginPageResp, cookies: c0, finalUrl: loginPageUrl } = await fetchFollow(LOGIN_PAGE, {
+      headers: { Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'es-CL,es;q=0.9' },
+    });
     const loginHtml = await loginPageResp.text();
     let cookies = c0;
 
-    // El token puede tener value= antes o después de name=, buscamos el input completo
+    // Buscar token CSRF — puede estar como hidden input o meta tag
     const rvtInputMatch = loginHtml.match(/<input[^>]*__RequestVerificationToken[^>]*>/i);
     const rvtValueMatch = rvtInputMatch ? rvtInputMatch[0].match(/value="([^"]+)"/) : null;
-    const rvt = rvtValueMatch ? rvtValueMatch[1] : '';
-    console.log('[nubox] rvt:', !!rvt, rvt ? rvt.substring(0,20)+'...' : 'NO ENCONTRADO');
+    // También buscar en meta tag (algunos frameworks lo ponen ahí)
+    const rvtMetaMatch = loginHtml.match(/<meta[^>]*name="__RequestVerificationToken"[^>]*content="([^"]+)"/i);
+    const rvt = (rvtValueMatch ? rvtValueMatch[1] : '') || (rvtMetaMatch ? rvtMetaMatch[1] : '');
+    console.log('[nubox] loginPageUrl:', loginPageUrl, 'rvt:', !!rvt);
 
     // ── PASO 2: POST login ─────────────────────────────────────────────────────
     const RUT_FIELD      = 'ae740e71936fa3eec403935de72a7aa3a68bbe7';
@@ -132,7 +137,14 @@ export default async function handler(req, res) {
       LOGIN_PAGE,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Referer: LOGIN_PAGE },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Referer: LOGIN_PAGE,
+          Origin: WEB,
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'es-CL,es;q=0.9',
+          'Cache-Control': 'no-cache',
+        },
         body: loginBody,
       },
       cookies
@@ -143,8 +155,9 @@ export default async function handler(req, res) {
     if (!finalUrl.includes('SistemaLogin') && !finalUrl.includes('nubox.com/Sistema')) {
       const body = await loginResp.text();
       const errMsg = body.match(/class="[^"]*(?:error|alert|danger|warning)[^"]*"[^>]*>\s*([^<]{5,200})/i);
-      // Buscar campo RUT en la página para confirmar que los field names son correctos
       const rutFieldInPage = body.match(/name="([a-f0-9]{30,})"/g);
+      // Buscar token en el HTML de respuesta también
+      const rvtInResp = body.includes('__RequestVerificationToken');
       return res.status(401).json({
         error: 'Login fallido. Verificar NUBOX_PISA_USER y NUBOX_PISA_PASS',
         finalUrl,
@@ -153,7 +166,8 @@ export default async function handler(req, res) {
         rvtFound: !!rvt,
         rutFieldsEnPagina: rutFieldInPage ? rutFieldInPage.slice(0, 3) : 'ninguno',
         htmlError: errMsg ? errMsg[1].trim() : null,
-        htmlSnippet: body.substring(0, 500),
+        rvtInRespuesta: rvtInResp,
+        htmlSnippet: body.substring(0, 1500),
       });
     }
 
