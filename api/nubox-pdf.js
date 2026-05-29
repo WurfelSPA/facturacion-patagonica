@@ -104,42 +104,60 @@ export default async function handler(req, res) {
 
     const tokenHeaders = {
       'Token': token,
-      'Authorization': `Basic ${basicCreds}`,
       ...(partnerKey ? { 'PartnerKey': partnerKey } : {}),
       'Content-Type': 'application/json',
     };
 
-    // ── PASO 2: Listar documentos del período ─────────────────────────────────
-    // Intentamos el endpoint de listado por fecha. La URL exacta no está
-    // documentada públicamente, probamos variantes comunes.
-    let documentos = null;
-    const listEndpoints = [
-      `${API}/factura/documentos/${pisaRut}/${numeroSerie}?fechaDesde=${encodeURIComponent(fechaDesde)}&fechaHasta=${encodeURIComponent(fechaHasta)}&tipoDocumento=FAC-EL`,
-      `${APIV}/factura/documentos/${pisaRut}/${numeroSerie}?fechaDesde=${encodeURIComponent(fechaDesde)}&fechaHasta=${encodeURIComponent(fechaHasta)}`,
-      `${API}/factura/documento/${pisaRut}/${numeroSerie}/listar?fechaDesde=${encodeURIComponent(fechaDesde)}&fechaHasta=${encodeURIComponent(fechaHasta)}`,
-      `${APIV}/factura/documento/${pisaRut}/${numeroSerie}/listar?fechaDesde=${encodeURIComponent(fechaDesde)}&fechaHasta=${encodeURIComponent(fechaHasta)}`,
-    ];
+    // ── PASO 2: Listar documentos via portal web Nubox ────────────────────────
+    // La Partner API no expone endpoint de listado. Usamos el portal web interno
+    // (app.nubox.com) con el Token obtenido de la Partner API.
+    const APP = 'https://app.nubox.com';
+    const DTE = `${APP}/ServiFactura/paginas/dteDocumentosTributarios.aspx`;
+    const UA  = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36';
 
-    let listDebug = [];
-    for (const url of listEndpoints) {
-      console.log(`[nubox] Intentando listar: ${url}`);
-      const r = await fetch(url, { headers: tokenHeaders });
-      const txt = await r.text();
-      listDebug.push({ url, status: r.status, body: txt.substring(0, 200) });
-      if (r.ok) {
-        try {
-          const j = JSON.parse(txt);
-          documentos = Array.isArray(j) ? j : (j.data || j.documentos || j.Documentos || j.items || []);
-          if (documentos.length > 0) { console.log(`[nubox] Lista OK en: ${url}`); break; }
-        } catch { /* no JSON */ }
+    // Intentar ObtenerPorFiltro con el token de la Partner API
+    const filtroResp = await fetch(`${DTE}/ObtenerPorFiltro`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Referer': DTE,
+        'User-Agent': UA,
+        'Token': token,
+        ...(partnerKey ? { 'PartnerKey': partnerKey } : {}),
+      },
+      body: JSON.stringify({
+        token,
+        EstadoId: 3,
+        estadoEnvio: 0,
+        fechaDesde,
+        fechaHasta,
+        filtro: '<Terminos></Terminos>',
+        folioDesde: 0,
+        folioHasta: 0,
+        usaFormatoImpresionEspecial: false,
+      }),
+    });
+
+    const filtroTxt = await filtroResp.text();
+    console.log(`[nubox] ObtenerPorFiltro status: ${filtroResp.status}, body: ${filtroTxt.substring(0, 300)}`);
+
+    let documentos = [];
+    if (filtroResp.ok) {
+      try {
+        const filtroJson = JSON.parse(filtroTxt);
+        const inner = typeof filtroJson.d === 'string' ? JSON.parse(filtroJson.d) : filtroJson;
+        documentos = inner.data || inner.documentos || inner.Documentos || (Array.isArray(inner) ? inner : []);
+      } catch (e) {
+        console.warn('[nubox] Error parseando ObtenerPorFiltro:', e.message);
       }
     }
 
-    if (!documentos || documentos.length === 0) {
+    if (documentos.length === 0) {
       return res.status(404).json({
-        error: `No se encontraron documentos para ${mes}. Posiblemente el endpoint de listado necesita ajuste.`,
-        intentos: listDebug,
-        sugerencia: 'Comparte este error con el soporte de Nubox para obtener la URL exacta del endpoint de listado.',
+        error: `No se encontraron documentos para ${mes}.`,
+        filtroStatus: filtroResp.status,
+        filtroBody: filtroTxt.substring(0, 500),
+        sugerencia: 'El Token de la Partner API no funciona en el portal web. Contactar soporte Nubox para obtener endpoint de listado.',
       });
     }
 
