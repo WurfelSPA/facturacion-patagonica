@@ -1433,6 +1433,16 @@ function App(){
     }
   },[planillaStatus,zipStatus]);
 
+  /* Auto-descargar desde Nubox cuando no hay PDF ni ZIP para el mes */
+  const autoNuboxRef=React.useRef(false);
+  useEffect(()=>{ autoNuboxRef.current=false; },[periodo]);
+  useEffect(()=>{
+    if(planillaStatus==="ok"&&zipStatus==="missing"&&!canGenerate&&!splitLoading&&!autoNuboxRef.current){
+      autoNuboxRef.current=true;
+      splitPDF();
+    }
+  },[planillaStatus,zipStatus,canGenerate]);
+
   /* Cargar UF del mes actual al inicio */
   useEffect(()=>{
     const now=new Date();
@@ -2243,7 +2253,7 @@ function App(){
                 zipStatus==="ready"?"ZIP listo · "+Math.round((files.zip&&files.zip.size||0)/1024)+" KB · Se procesará automáticamente"
                 :zipStatus==="loading"?"Conectando con Google Drive, puede tomar unos segundos..."
                 :zipStatus==="missing"&&canGenerate?"Se encontró el PDF maestro — puedes generar los PDFs individuales del mes"
-                :zipStatus==="missing"?"No se encontró ZIP ni PDF maestro para este período en Drive"
+                :zipStatus==="missing"?"Conectando con Nubox para descargar facturas del mes..."
                 :zipStatus==="splitting"?"Separando el PDF maestro en facturas individuales, espera un momento..."
                 :zipStatus==="error"?(zipError||"Error desconocido")
                 :"Conectando con Google Drive..."
@@ -2285,7 +2295,7 @@ function App(){
               :zipStatus==="loading"?"Buscando PDFs en Drive..."
               :zipStatus==="splitting"?"Generando y subiendo PDFs a Drive..."
               :zipStatus==="missing"&&canGenerate?"Genera los PDFs del mes para continuar"
-              :zipStatus==="missing"?"No hay PDF maestro disponible para este mes"
+              :zipStatus==="missing"?"Descargando facturas PISA desde Nubox..."
               :zipStatus==="error"?"Corrige el error de PDFs para continuar"
               :planillaStatus==="error"?"Error en la planilla"
               :""
