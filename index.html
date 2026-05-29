@@ -527,16 +527,16 @@ async function procesarPDFs(zipFile,addLog){
     let ufPdf=null;
     try{
       if(texto.length>10){
-        /* P1: col Cant/Unidad con layout  →  "1,59 UF  39.841,72"  o  "10,24 UF  40.186,79" */
-        let m=texto.match(/([\d]+(?:[,.][\d]+)?)\s+UF\s+[3-5]\d[,.\d]/);
+        /* P1: col Cant/Unidad con layout  →  "10,24 UF   40.186,79" */
+        let m=texto.match(/([\d]+(?:[,.][\d]+)?)\s+UF\s+4[09][,.\d]/);
         if(m) ufPdf=parseFloat(m[1].replace(",","."));
-        /* P2: UF en descripción con layout  →  "UF 85,37 x 40186"  o  "UF 85,37 x 39841" */
-        if(!ufPdf){m=texto.match(/UF\s+([\d]+(?:[,.][\d]+)?)\s+x\s+[3-5]\d/);if(m) ufPdf=parseFloat(m[1].replace(",","."));}
-        /* P3: layout partido — colapsar todo y buscar número UF */
+        /* P2: UF en descripción con layout  →  "UF 85,37 x 40186" */
+        if(!ufPdf){m=texto.match(/UF\s+([\d]+(?:[,.][\d]+)?)\s+x\s+4[09]/);if(m) ufPdf=parseFloat(m[1].replace(",","."));}
+        /* P3: layout partido — colapsar todo y buscar número antes de "x 4X" */
         if(!ufPdf){
           const flat=texto.replace(/\s+/g," ");
           m=flat.match(/UF\s+([\d]+(?:[,.][\d]+)?)\s+x\s+/);if(m) ufPdf=parseFloat(m[1].replace(",","."));
-          if(!ufPdf){m=flat.match(/([\d]+[,.][\d]+)\s+x\s+[3-5]\d/);if(m) ufPdf=parseFloat(m[1].replace(",","."));}
+          if(!ufPdf){m=flat.match(/([\d]+[,.][\d]+)\s+x\s+4[09]/);if(m) ufPdf=parseFloat(m[1].replace(",","."));}
         }
         if(ufPdf) ufPdf=Math.round(ufPdf*10000)/10000;
       }
@@ -1032,9 +1032,10 @@ function getEstado(r){
   if(r.ufPdf===null||r.ufPdf===undefined)return r.factura?"ok":"missing";
   // Match por fallback de único candidato — marcar como "diff" para revisión
   if(r.matchScore===1)return"diff";
-  // Comparar UF: PDF vs Planilla (ufSII es valor de cambio, no cantidad — no comparar)
+  // Comparar UF: PDF vs Planilla, y Planilla vs SII
   const diffPdf=Math.abs(r.ufPdf-r.ufPlan)>0.5;
-  if(diffPdf)return"diff";
+  const diffSII=r.ufSII!=null&&Math.abs(r.ufPlan-r.ufSII)>0.5;
+  if(diffPdf||diffSII)return"diff";
   return"ok";
 }
 
@@ -1595,7 +1596,7 @@ function App(){
             /* Si hay >1 candidato y score<umbral → dejar factura="" para revisión manual */
           }
         }
-        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:ufSII,ufPlan:c.uf,ufPdf,enviado:false});
+        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,enviado:false});
       }
 
       /* ── Si no hay datos de planilla, mostrar igual los PDFs detectados ── */
@@ -1685,25 +1686,47 @@ function App(){
 
   const MES_STR={"Enero":"01","Febrero":"02","Marzo":"03","Abril":"04","Mayo":"05","Junio":"06","Julio":"07","Agosto":"08","Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12"};
   const splitPDF=async()=>{
-    
     setSplitLoading(true);setSplitResult(null);
     const [mesNombre,anio]=periodo.split(" ");
     const mesNum=MES_STR[mesNombre];
-    const periodoCode=`${anio}-${mesNum} prueba`;
+    const mesCode=`${anio}-${mesNum}`;
+    const periodoCode=`${mesCode} prueba`;
+    const pdfNombre=`Facturas_PISA_${mesCode}.pdf`;
     try{
+      // 1. Token Google
+      const gToken=await getToken();
+      // 2. Buscar PDF en Drive
+      notify(`Buscando ${pdfNombre} en Drive...`,"info");
+      const qRes=await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent("name='"+pdfNombre+"' and '"+DRIVE_FACTURACION_FOLDER_ID+"' in parents and trashed=false")}&fields=files(id,name)&pageSize=1`,
+        {headers:{Authorization:"Bearer "+gToken}}
+      );
+      const qData=await qRes.json();
+      let pdfFileId=qData.files&&qData.files.length>0?qData.files[0].id:null;
+      // 3. Si no existe, descargar de Nubox automáticamente
+      if(!pdfFileId){
+        notify(`PDF no encontrado. Descargando facturas PISA ${mesCode} desde Nubox...`,"info");
+        const nbRes=await fetch("/api/nubox-pdf",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({mes:mesCode,googleToken:gToken,destFolderId:DRIVE_FACTURACION_FOLDER_ID}),
+        });
+        const nbData=await nbRes.json();
+        if(!nbRes.ok)throw new Error("Nubox: "+(nbData.error||"Error desconocido"));
+        pdfFileId=nbData.fileId;
+        notify(`✓ ${nbData.total} facturas descargadas desde Nubox y guardadas en Drive`,"ok");
+      }else{
+        notify(`✓ PDF encontrado en Drive`,"ok");
+      }
+      // 4. Separar PDF por cliente
       const res=await fetch("/api/split-pdf",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          pdfFileId:DRIVE_PDF_FACTURAS_ID,
-          periodo:periodoCode,
-          destFolderId:DRIVE_FACTURACION_FOLDER_ID,
-        }),
+        body:JSON.stringify({pdfFileId,periodo:periodoCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID}),
       });
       const data=await res.json();
       if(!res.ok)throw new Error(data.error||"Error desconocido");
       setSplitResult(data);
-      // Descargar ZIP directamente en el navegador
       if(data.zipBase64){
         const bytes=Uint8Array.from(atob(data.zipBase64),c=>c.charCodeAt(0));
         const blob=new Blob([bytes],{type:"application/zip"});
@@ -2308,7 +2331,8 @@ function App(){
             filtered.map(row=>{
               const i=row.i,sent=sentSet.has(i),sending=sendingIdx===i,noEmail=!row.correo;
               const diffPdf=row.ufPdf!==null&&row.ufPdf!==undefined&&Math.abs(row.ufPdf-row.ufPlan)>0.5;
-              const diff=diffPdf;
+              const diffSII=row.ufSII!=null&&row.ufPlan<=500&&Math.abs(row.ufPlan-row.ufSII)>0.5;
+              const diff=diffPdf||diffSII;
               const esArr=row.concepto==="Arriendo";
               const bg=sent?"#e6f7ef":esArr?"#ffffff":"#fffdf5";
               return h("tr",{key:i,className:"row-tr"},
