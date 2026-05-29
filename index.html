@@ -2314,10 +2314,10 @@ function App(){
                       const file=ev.target.files[0]; if(!file)return;
                       try{
                         const gToken=await getToken();
-                        const[y,m]=periodo.split(" ").reverse();
                         const MN={"Enero":"01","Febrero":"02","Marzo":"03","Abril":"04","Mayo":"05","Junio":"06","Julio":"07","Agosto":"08","Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12"};
-                        const mesCode=`${y}-${MN[periodo.split(" ")[0]]||"01"}`;
+                        const mesCode=`${periodo.split(" ")[1]}-${MN[periodo.split(" ")[0]]||"01"}`;
                         const fileName=`Facturas_PISA_${mesCode}.pdf`;
+                        /* 1. Subir PDF a Drive */
                         notify("Subiendo PDF a Drive...","info");
                         const meta=JSON.stringify({name:fileName,mimeType:"application/pdf",parents:[DRIVE_FACTURACION_FOLDER_ID]});
                         const boundary="pdf_manual_boundary";
@@ -2327,15 +2327,30 @@ function App(){
                           ...new Uint8Array(buf),
                           ...new TextEncoder().encode(`\r\n--${boundary}--`)
                         ]);
-                        const resp=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{
+                        const uploadResp=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{
                           method:"POST",
                           headers:{Authorization:`Bearer ${gToken}`,"Content-Type":`multipart/related; boundary=${boundary}`},
                           body
                         });
-                        if(!resp.ok)throw new Error("Drive error "+resp.status);
-                        notify("✓ PDF subido — buscando en Drive...","ok");
+                        if(!uploadResp.ok)throw new Error("Drive upload error "+uploadResp.status);
+                        const uploadJson=await uploadResp.json();
+                        const fileId=uploadJson.id;
+                        notify("✓ PDF subido — separando facturas...","ok");
+                        /* 2. Separar PDF en facturas individuales (igual que generarZip) */
+                        setZipStatus("splitting");
+                        const splitRes=await fetch("/api/split-pdf",{
+                          method:"POST",headers:{"Content-Type":"application/json"},
+                          body:JSON.stringify({pdfFileId:fileId,periodo:mesCode}),
+                        });
+                        const splitData=await splitRes.json();
+                        if(!splitRes.ok)throw new Error(splitData.error||"Error al separar PDF");
+                        /* 3. Subir ZIP a Drive */
+                        notify("⬆ Subiendo "+splitData.zipName+" a Drive...","info");
+                        await uploadZipToDrive(gToken,splitData.zipName,splitData.zipBase64,DRIVE_FACTURACION_FOLDER_ID);
+                        notify("✓ "+splitData.totalFacturas+" facturas generadas","ok");
+                        /* 4. Recargar ZIP para continuar flujo */
                         buscarZip(periodo);
-                      }catch(e){notify("Error: "+e.message,"err");}
+                      }catch(e){setZipStatus("error");setZipError(e.message);notify("Error: "+e.message,"err");}
                       ev.target.value="";
                     }
                   }),
