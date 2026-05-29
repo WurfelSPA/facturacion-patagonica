@@ -19,8 +19,9 @@
 
 import { PDFDocument } from 'pdf-lib';
 
-const API  = 'https://api.nubox.com/nubox.api';
-const APIV = 'https://api.nubox.com/Nubox.API';
+const API    = 'https://api.nubox.com/nubox.api';
+const APIV   = 'https://api.nubox.com/Nubox.API';
+const APIV1  = 'https://api.pyme.nubox.com/nbxpymapi-environment-pyme';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -102,68 +103,52 @@ export default async function handler(req, res) {
 
     console.log(`[nubox] Auth OK. Token obtenido. NumeroSerie: ${numeroSerie}`);
 
-    // Headers para Partner API v1
+    // Headers para Partner API v1 (Bearer obligatorio)
     const v1Headers = {
-      'Authorization': partnerKey,
+      'Authorization': `Bearer ${partnerKey}`,
       'X-Api-Key': process.env.NUBOX_PISA_API_KEY,
       'Content-Type': 'application/json',
     };
 
-    // ── PASO 2: GET /v1/sales — listar documentos del período ─────────────────
-    // Probamos variantes de URL base y parámetros de fecha
-    const salesUrls = [
-      `${API}/v1/sales?period=${mes}`,
-      `${APIV}/v1/sales?period=${mes}`,
-      `https://api.nubox.com/v1/sales?period=${mes}`,
-      `${API}/v1/sales?fechaDesde=${encodeURIComponent(fechaDesde)}&fechaHasta=${encodeURIComponent(fechaHasta)}`,
-      `${APIV}/v1/sales?fechaDesde=${encodeURIComponent(fechaDesde)}&fechaHasta=${encodeURIComponent(fechaHasta)}`,
-    ];
+    // ── PASO 2: GET /v1/sales?period=YYYY-MM ──────────────────────────────────
+    console.log(`[nubox] Listando ventas: ${APIV1}/v1/sales?period=${mes}`);
+    const salesResp = await fetch(`${APIV1}/v1/sales?period=${mes}`, { headers: v1Headers });
+    const salesTxt  = await salesResp.text();
+    console.log(`[nubox] /v1/sales status: ${salesResp.status}, body: ${salesTxt.substring(0, 300)}`);
 
-    let documentos = [];
-    let salesDebug = [];
-    for (const url of salesUrls) {
-      console.log(`[nubox] GET ${url}`);
-      const r = await fetch(url, { headers: v1Headers });
-      const txt = await r.text();
-      salesDebug.push({ url, status: r.status, body: txt.substring(0, 300) });
-      if (r.ok) {
-        try {
-          const j = JSON.parse(txt);
-          documentos = Array.isArray(j) ? j : (j.data || j.items || j.sales || j.documentos || []);
-          if (documentos.length > 0) { console.log(`[nubox] Lista OK en: ${url}`); break; }
-        } catch { /* no JSON */ }
-      }
-    }
-
-    if (documentos.length === 0) {
-      return res.status(404).json({
-        error: `No se encontraron documentos para ${mes}.`,
-        intentos: salesDebug,
+    if (!salesResp.ok) {
+      return res.status(502).json({
+        error: `GET /v1/sales respondió ${salesResp.status}`,
+        detail: salesTxt.substring(0, 500),
       });
     }
+
+    const salesJson = JSON.parse(salesTxt);
+    const documentos = Array.isArray(salesJson)
+      ? salesJson
+      : (salesJson.data || salesJson.items || salesJson.sales || []);
+
+    if (documentos.length === 0)
+      return res.status(404).json({ error: `Sin documentos de venta para ${mes}.` });
 
     console.log(`[nubox] ${documentos.length} documentos encontrados.`);
 
     // ── PASO 3: Descargar cada PDF ────────────────────────────────────────────
     const pdfBuffers = [];
     for (const doc of documentos) {
-      const folio = doc.Folio || doc.folio || doc.NumeroFolio || doc.numeroFolio;
-      const tipo  = doc.TipoDocumento || doc.tipoDocumento || doc.Tipo || 'FAC-EL';
-      // Los tipos con / deben codificarse: N/C-EL → N%2FC-EL
-      const tipoEncoded = tipo.replace(/\//g, '%2F');
+      const docId = doc.id || doc.documentId || doc.Id || doc.documentID;
 
-      if (!folio) {
-        console.warn('[nubox] Documento sin folio:', JSON.stringify(doc).substring(0, 100));
+      if (!docId) {
+        console.warn('[nubox] Documento sin id:', JSON.stringify(doc).substring(0, 100));
         continue;
       }
 
-      const pdfUrl = `${APIV}/factura/documento/${pisaRut}/${numeroSerie}/${folio}/${tipoEncoded}/pdf`;
-      console.log(`[nubox] Descargando PDF folio ${folio}: ${pdfUrl}`);
+      const pdfUrl = `${APIV1}/v1/sales/${docId}/pdf`;
+      console.log(`[nubox] Descargando PDF id ${docId}`);
 
       const pdfResp = await fetch(pdfUrl, {
         headers: {
-          'Token': token,
-          'Authorization': partnerKey,
+          'Authorization': `Bearer ${partnerKey}`,
           'X-Api-Key': process.env.NUBOX_PISA_API_KEY,
         },
       });
