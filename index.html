@@ -542,7 +542,17 @@ async function procesarPDFs(zipFile,addLog){
       }
     }catch(e){}
 
-    pdfs.push({sitio,nroFact,tipo,ufPdf,nombreEnArchivo,zipPath:path,pdfNombre:nombre});
+    /* Extraer Monto Total directamente del texto del PDF */
+    let montoTotal=null;
+    try{
+      if(texto.length>10){
+        const flat=texto.replace(/\s+/g," ");
+        const mt=flat.match(/Monto\s+Total\s+([\d.]+)/i);
+        if(mt) montoTotal=parseInt(mt[1].replace(/\./g,""),10)||null;
+      }
+    }catch(e){}
+
+    pdfs.push({sitio,nroFact,tipo,ufPdf,montoTotal,nombreEnArchivo,zipPath:path,pdfNombre:nombre});
   }
 
   const conUF=pdfs.filter(p=>p.ufPdf!==null).length;
