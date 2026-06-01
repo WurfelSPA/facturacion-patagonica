@@ -209,22 +209,48 @@ function extractText(pdfBuf) {
   const re = /stream\r?\n([\s\S]*?)endstream/g;
   let m;
   while ((m = re.exec(str)) !== null) streams.push(Buffer.from(m[1], "latin1"));
+
+  // Descomprimir streams (zlib) y recolectar también los no comprimidos
+  const decoded = [];
+  for (const s of streams) {
+    try { decoded.push(require("zlib").inflateSync(s).toString("latin1")); } catch {
+      // stream sin compresión — intentar directo
+      const raw = s.toString("latin1");
+      if (raw.includes("Tj") || raw.includes("TJ")) decoded.push(raw);
+    }
+  }
+
+  // CMap para fuentes con codificación propia
   const mapping = {};
-  for (const s of streams) {
-    try { const d=require("zlib").inflateSync(s).toString("latin1");
-      if(d.includes("beginbfchar")||d.includes("beginbfrange")) Object.assign(mapping,parseCMap(d));
-    } catch {}
+  for (const d of decoded) {
+    if (d.includes("beginbfchar") || d.includes("beginbfrange")) Object.assign(mapping, parseCMap(d));
   }
+
   let text = "";
-  for (const s of streams) {
-    try { const d=require("zlib").inflateSync(s).toString("latin1");
-      for(const[,h] of d.matchAll(/<([0-9a-fA-F]+)>\s*Tj/g)){
-        const code=parseInt(h,16);
-        text+=mapping[code]!==undefined?mapping[code]:(code>=32&&code<127?String.fromCharCode(code):" ");
+  for (const d of decoded) {
+    // Formato 1: hex  →  <0041> Tj  o  [<0041><0042>] TJ
+    for (const [, h] of d.matchAll(/<([0-9a-fA-F]+)>\s*Tj/g)) {
+      const code = parseInt(h, 16);
+      text += mapping[code] !== undefined ? mapping[code] : (code >= 32 && code < 127 ? String.fromCharCode(code) : " ");
+    }
+    for (const [, arr] of d.matchAll(/\[([^\]]+)\]\s*TJ/g)) {
+      for (const [, h] of arr.matchAll(/<([0-9a-fA-F]+)>/g)) {
+        const code = parseInt(h, 16);
+        text += mapping[code] !== undefined ? mapping[code] : (code >= 32 && code < 127 ? String.fromCharCode(code) : " ");
       }
-    } catch {}
+    }
+    // Formato 2: literal  →  (texto) Tj  o  [(texto)] TJ
+    for (const [, s] of d.matchAll(/\(([^)]*)\)\s*Tj/g)) {
+      text += s.replace(/\\n/g, " ").replace(/\\r/g, " ") + " ";
+    }
+    for (const [, arr] of d.matchAll(/\[([^\]]*)\]\s*TJ/g)) {
+      for (const [, s] of arr.matchAll(/\(([^)]*)\)/g)) {
+        text += s.replace(/\\n/g, " ").replace(/\\r/g, " ");
+      }
+      text += " ";
+    }
   }
-  return text.replace(/\s+/g," ").trim();
+  return text.replace(/\s+/g, " ").trim();
 }
 
 // ── Dividir texto completo en bloques por página ────────────────────────────
