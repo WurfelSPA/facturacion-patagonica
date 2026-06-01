@@ -1666,12 +1666,13 @@ function App(){
     lines.push([esc("Total:"),esc(stats.total),esc("Coinciden:"),esc(stats.ok),esc("Revisar:"),esc(stats.total-stats.ok),esc("Enviados:"),esc(stats.sent),esc(ufSII?"UF día 5: "+ufSII.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2}):"")].join(";"));
     lines.push(["","","","","","","","",""].map(esc).join(";"));
     // Columnas
-    lines.push([esc("Sitio"),esc("Local/Edif"),esc("Cliente"),esc("RUT"),esc("Correo"),esc("Concepto"),esc("Factura"),esc("UF Planilla"),esc("UF PDF"),esc("Estado")].join(";"));
+    lines.push([esc("Sitio"),esc("Local/Edif"),esc("Cliente"),esc("RUT"),esc("Correo"),esc("Concepto"),esc("Factura"),esc("UF Planilla"),esc("UF PDF"),esc("Monto CLP"),esc("Estado")].join(";"));
     // Filas
     for(const r of rows){
       const estadoLabel=r.estado==="ok"?"Coincide":r.estado==="diff"?(r.matchScore===1?"Revisar":"Difiere"):"Sin PDF";
       const sentido=sentSet.has(r.i)?"✓ Enviado":estadoLabel;
-      lines.push([esc(r.sitio),esc(r.edificio||""),esc(r.cliente),esc(r.rut||""),esc(r.correo||""),esc(r.concepto),esc(r.factura||""),esc(r.ufPlan!=null?r.ufPlan.toFixed(2):""),esc(r.ufPdf!=null?r.ufPdf.toFixed(2):""),esc(sentido)].join(";"));
+      const montoCLP=r.ufPdf!=null&&ufSII?Math.round(r.ufPdf*ufSII):r.ufPlan>500?Math.round(r.ufPlan):"";
+      lines.push([esc(r.sitio),esc(r.edificio||""),esc(r.cliente),esc(r.rut||""),esc(r.correo||""),esc(r.concepto),esc(r.factura||""),esc(r.ufPlan!=null?r.ufPlan.toFixed(2):""),esc(r.ufPdf!=null?r.ufPdf.toFixed(2):""),esc(montoCLP),esc(sentido)].join(";"));
     }
     const bom="﻿"; // BOM para que Excel abra correctamente con caracteres especiales
     const blob=new Blob([bom+lines.join("\r\n")],{type:"text/csv;charset=utf-8;"});
@@ -2305,9 +2306,9 @@ function App(){
       ),
       h("div",{style:{flex:1,overflowX:"auto"}},
         h("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:880}},
-          h("colgroup",null,h("col",{style:{width:58}}),h("col",{style:{width:"15%"}}),h("col",{style:{width:"17%"}}),h("col",{style:{width:88}}),h("col",{style:{width:48}}),h("col",{style:{width:88}}),h("col",{style:{width:80}}),h("col",{style:{width:80}}),h("col",{style:{width:110}})),
+          h("colgroup",null,h("col",{style:{width:58}}),h("col",{style:{width:"15%"}}),h("col",{style:{width:"17%"}}),h("col",{style:{width:88}}),h("col",{style:{width:88}}),h("col",{style:{width:72}}),h("col",{style:{width:72}}),h("col",{style:{width:96}}),h("col",{style:{width:110}})),
           h("thead",null,h("tr",{style:{background:"#ddeaf8"}},
-            ["Sitio","Cliente","Correo","Concepto","Col.","Factura","UF planilla","UF PDF","Estado/Acción"].map(hd=>
+            ["Sitio","Cliente","Correo","Concepto","Factura","UF planilla","UF PDF","Monto","Estado/Acción"].map(hd=>
               h("th",{key:hd,style:{padding:"8px 11px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:"0.07em",borderBottom:"1px solid var(--bdr)"}},hd.toUpperCase())
             )
           )),
@@ -2330,10 +2331,14 @@ function App(){
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontWeight:600}},row.cliente),row.rut&&h("div",{style:{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--txd)",marginTop:2}},formatRUT(row.rut))),
                 h("td",{style:{padding:"8px 11px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",background:bg}},h("span",{style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:row.correo?"var(--accl)":"var(--txd)"}},row.correo||"— sin correo")),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{className:esArr?"tag-arr":"tag-srv"},row.concepto)),
-                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{className:esArr?"col-gs":"col-gt"},row.colRef)),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:"var(--txm)"}},row.factura||"—")),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace"}},row.ufPlan>500?"$"+Math.round(row.ufPlan).toLocaleString("es-CL"):row.ufPlan.toFixed(2))),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",color:diffPdf?"var(--amber)":"var(--tx)"}},row.ufPdf!==null&&row.ufPdf!==undefined?row.ufPdf.toFixed(2):"—")),
+                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",fontWeight:600,color:"var(--tx)"}},
+                  row.ufPdf!=null&&ufSII?("$"+Math.round(row.ufPdf*ufSII).toLocaleString("es-CL"))
+                  :row.ufPlan>500?("$"+Math.round(row.ufPlan).toLocaleString("es-CL"))
+                  :"—"
+                )),
                 h("td",{style:{padding:"8px 11px",background:bg}},
                   sent?h("span",{style:{color:"var(--green)",fontSize:11,fontWeight:600}},"✓ Enviado"):
                   sending?h("span",{style:{color:"var(--blue)",fontSize:11,display:"inline-flex",alignItems:"center",gap:4}},h("span",{className:"spin"},"⟳")," Enviando..."):
