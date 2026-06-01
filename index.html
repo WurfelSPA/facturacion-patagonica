@@ -1663,7 +1663,7 @@ function App(){
     // Encabezado del reporte
     lines.push([esc("Reporte Facturación Patagónica Inmobiliaria"),esc(""),esc(""),esc(""),esc(""),esc(""),esc(""),esc(""),esc("")].join(";"));
     lines.push([esc("Período:"),esc(periodo),esc(""),esc("Fecha:"),esc(fechaStr+" "+horaStr),esc(""),esc(""),esc(""),esc("")].join(";"));
-    lines.push([esc("Total:"),esc(stats.total),esc("Coinciden:"),esc(stats.ok),esc("Revisar:"),esc(stats.total-stats.ok),esc("Enviados:"),esc(stats.sent),esc("")].join(";"));
+    lines.push([esc("Total:"),esc(stats.total),esc("Coinciden:"),esc(stats.ok),esc("Revisar:"),esc(stats.total-stats.ok),esc("Enviados:"),esc(stats.sent),esc(ufSII?"UF día 5: "+ufSII.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2}):"")].join(";"));
     lines.push(["","","","","","","","",""].map(esc).join(";"));
     // Columnas
     lines.push([esc("Sitio"),esc("Local/Edif"),esc("Cliente"),esc("RUT"),esc("Correo"),esc("Concepto"),esc("Factura"),esc("UF Planilla"),esc("UF PDF"),esc("Estado")].join(";"));
@@ -2411,26 +2411,33 @@ function App(){
         h("span",{style:{color:"var(--txd)",fontSize:11,marginLeft:3}},"·"),
         [{k:"all",l:"Ambos"},{k:"arr",l:"Arriendo"},{k:"srv",l:"Serv.Adm."}]
         .map(f=>h("button",{key:f.k,className:`pill${concFilter===f.k?" active":""}`,onClick:()=>setConcFilter(f.k),style:{fontSize:10}},f.l)),
-        data.length>0&&h("button",{
-          onClick:descargarReporte,
-          title:"Descargar reporte CSV con el estado actual",
-          style:{marginLeft:"auto",fontSize:11,fontWeight:600,padding:"5px 12px",borderRadius:8,
-            border:"1px solid var(--bdr)",background:"var(--surf)",color:"var(--txm)",
-            cursor:"pointer",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap",
-            fontFamily:"'DM Sans',sans-serif"}
-        },"⬇ Reporte"),
+        h("div",{style:{marginLeft:"auto",display:"flex",alignItems:"center",gap:8}},
+          ufSII&&h("span",{style:{fontSize:11,fontFamily:"'DM Mono',monospace",fontWeight:600,
+            background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:6,padding:"4px 10px",
+            color:"var(--blue)",whiteSpace:"nowrap"}},
+            `UF día 5: ${ufSII.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`
+          ),
+          data.length>0&&h("button",{
+            onClick:descargarReporte,
+            title:"Descargar reporte CSV con el estado actual",
+            style:{fontSize:11,fontWeight:600,padding:"5px 12px",borderRadius:8,
+              border:"1px solid var(--bdr)",background:"var(--surf)",color:"var(--txm)",
+              cursor:"pointer",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap",
+              fontFamily:"'DM Sans',sans-serif"}
+          },"⬇ Reporte")
+        ),
         h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:190,fontFamily:"'DM Sans',sans-serif"}})
       ),
       h("div",{style:{flex:1,overflowX:"auto"}},
         h("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:880}},
-          h("colgroup",null,h("col",{style:{width:58}}),h("col",{style:{width:"15%"}}),h("col",{style:{width:"17%"}}),h("col",{style:{width:88}}),h("col",{style:{width:48}}),h("col",{style:{width:88}}),h("col",{style:{width:76}}),h("col",{style:{width:76}}),h("col",{style:{width:76}}),h("col",{style:{width:102}})),
+          h("colgroup",null,h("col",{style:{width:58}}),h("col",{style:{width:"15%"}}),h("col",{style:{width:"17%"}}),h("col",{style:{width:88}}),h("col",{style:{width:48}}),h("col",{style:{width:88}}),h("col",{style:{width:80}}),h("col",{style:{width:80}}),h("col",{style:{width:110}})),
           h("thead",null,h("tr",{style:{background:"#ddeaf8"}},
-            ["Sitio","Cliente","Correo","Concepto","Col.","Factura","UF SII","UF planilla","UF PDF","Estado/Acción"].map(hd=>
+            ["Sitio","Cliente","Correo","Concepto","Col.","Factura","UF planilla","UF PDF","Estado/Acción"].map(hd=>
               h("th",{key:hd,style:{padding:"8px 11px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:"0.07em",borderBottom:"1px solid var(--bdr)"}},hd.toUpperCase())
             )
           )),
           h("tbody",null,filtered.length===0?
-            h("tr",null,h("td",{colSpan:10,style:{padding:"48px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados")):
+            h("tr",null,h("td",{colSpan:9,style:{padding:"48px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados")):
             filtered.map(row=>{
               const i=row.i,sent=sentSet.has(i),sending=sendingIdx===i,noEmail=!row.correo;
               const diffPdf=row.ufPdf!==null&&row.ufPdf!==undefined&&Math.abs(row.ufPdf-row.ufPlan)>0.5;
@@ -2450,7 +2457,6 @@ function App(){
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{className:esArr?"tag-arr":"tag-srv"},row.concepto)),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{className:esArr?"col-gs":"col-gt"},row.colRef)),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:"var(--txm)"}},row.factura||"—")),
-                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",color:"#1a5fa8",fontWeight:600}},row.ufSII!=null?row.ufSII.toFixed(2):"—")),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace"}},row.ufPlan>500?"$"+Math.round(row.ufPlan).toLocaleString("es-CL"):row.ufPlan.toFixed(2))),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",color:diffPdf?"var(--amber)":"var(--tx)"}},row.ufPdf!==null&&row.ufPdf!==undefined?row.ufPdf.toFixed(2):"—")),
                 h("td",{style:{padding:"8px 11px",background:bg}},
