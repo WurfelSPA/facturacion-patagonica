@@ -160,7 +160,16 @@ function extractData(text, tipo) {
     }
   }
 
-  return { rut, uf: uf ? Math.round(uf * 10000) / 10000 : null };
+  // Extraer Monto Total directamente del PDF (más preciso que calcular UF × valor)
+  // Formato: "Monto Total 4.995.800" o "MontoTotal4995800"
+  let montoTotal = null;
+  const mtMatch = text.match(/Monto\s+Total\s+([\d.]+)/i)
+    || text.replace(/\s+/g," ").match(/Monto Total ([\d.]+)/i);
+  if (mtMatch) {
+    montoTotal = parseInt(mtMatch[1].replace(/\./g, ""), 10) || null;
+  }
+
+  return { rut, uf: uf ? Math.round(uf * 10000) / 10000 : null, montoTotal };
 }
 
 export default async function handler(req, res) {

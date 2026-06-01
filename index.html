@@ -1537,6 +1537,7 @@ function App(){
               const d=ufData.pdfs[p.nroFact];
               p.ufPdf=d.uf;
               p.rutPdf=d.rut;
+              p.montoTotal=d.montoTotal||null;
               if(p.ufPdf!==null)conUF++;
               if(p.rutPdf)conRUT++;
             }
@@ -1571,7 +1572,7 @@ function App(){
         const concepto=c.tipo==="arriendo"?"Arriendo":"Serv. Adm.";
         const colRef=c.tipo==="arriendo"?"GS":"GT";
         const mk=`${c.sitio}|${c.cliente}|${c.uf}|${c.tipo}`;
-        let factura="",ufPdf=null,matchScore=0;
+        let factura="",ufPdf=null,montoTotal=null,matchScore=0;
         if(MANUAL[mk]){factura=MANUAL[mk];ufPdf=c.uf;matchScore=999;}
         else{
           let bestIdx=-1,bestScore=0;
@@ -1594,27 +1595,23 @@ function App(){
             if(score>bestScore){bestScore=score;bestIdx=idx;}
           }
 
-          /* Determinar umbral mínimo para aceptar el match */
-          const UMBRAL_RUT=200;   /* tiene RUT match */
-          const UMBRAL_UF=50;     /* UF exacta sin RUT */
+          const UMBRAL_RUT=200;
+          const UMBRAL_UF=50;
 
           if(bestScore>=UMBRAL_RUT||bestScore>=UMBRAL_UF){
-            /* Match confiable */
-            pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;matchScore=bestScore;
+            pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;montoTotal=pdfs[bestIdx].montoTotal||null;matchScore=bestScore;
           } else {
-            /* Fallback: solo asignar si hay exactamente 1 candidato disponible (sin ambigüedad) */
             const candidatos=pdfs.reduce((acc,p,idx)=>{
               if(!pdfUsado.has(idx)&&p.sitio===c.sitio&&p.tipo===c.tipo)acc.push(idx);
               return acc;
             },[]);
             if(candidatos.length===1){
               bestIdx=candidatos[0];
-              pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;matchScore=1;
+              pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;montoTotal=pdfs[bestIdx].montoTotal||null;matchScore=1;
             }
-            /* Si hay >1 candidato y score<umbral → dejar factura="" para revisión manual */
           }
         }
-        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,enviado:false});
+        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,montoTotal,enviado:false});
       }
 
       /* ── Si no hay datos de planilla, mostrar igual los PDFs detectados ── */
@@ -1623,7 +1620,7 @@ function App(){
           filas.push({
             sitio:p.sitio,cliente:p.nombreEnArchivo||p.nroFact,rut:"",correo:"",
             concepto:p.tipo==="arriendo"?"Arriendo":"Serv. Adm.",colRef:"",
-            factura:p.nroFact,matchScore:0,ufSII:null,ufPlan:p.ufPdf||0,ufPdf:p.ufPdf,enviado:false
+            factura:p.nroFact,matchScore:0,ufSII:null,ufPlan:p.ufPdf||0,ufPdf:p.ufPdf,montoTotal:p.montoTotal||null,enviado:false
           });
         }
         addLog(`⚠ Sin datos de planilla — mostrando ${pdfs.length} PDFs detectados`,"warn");
@@ -1671,7 +1668,7 @@ function App(){
     for(const r of rows){
       const estadoLabel=r.estado==="ok"?"Coincide":r.estado==="diff"?(r.matchScore===1?"Revisar":"Difiere"):"Sin PDF";
       const sentido=sentSet.has(r.i)?"✓ Enviado":estadoLabel;
-      const montoCLP=r.ufPdf!=null&&ufSII?Math.round(r.ufPdf*ufSII):r.ufPlan>500?Math.round(r.ufPlan):"";
+      const montoCLP=r.montoTotal||( r.ufPdf!=null&&ufSII?Math.round(r.ufPdf*ufSII):r.ufPlan>500?Math.round(r.ufPlan):"");
       lines.push([esc(r.sitio),esc(r.edificio||""),esc(r.cliente),esc(r.rut||""),esc(r.correo||""),esc(r.concepto),esc(r.factura||""),esc(r.ufPlan!=null?r.ufPlan.toFixed(2):""),esc(r.ufPdf!=null?r.ufPdf.toFixed(2):""),esc(montoCLP),esc(sentido)].join(";"));
     }
     const bom="﻿"; // BOM para que Excel abra correctamente con caracteres especiales
@@ -2335,7 +2332,8 @@ function App(){
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace"}},row.ufPlan>500?"$"+Math.round(row.ufPlan).toLocaleString("es-CL"):row.ufPlan.toFixed(2))),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",color:diffPdf?"var(--amber)":"var(--tx)"}},row.ufPdf!==null&&row.ufPdf!==undefined?row.ufPdf.toFixed(2):"—")),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",fontWeight:600,color:"var(--tx)"}},
-                  row.ufPdf!=null&&ufSII?("$"+Math.round(row.ufPdf*ufSII).toLocaleString("es-CL"))
+                  row.montoTotal?("$"+row.montoTotal.toLocaleString("es-CL"))
+                  :row.ufPdf!=null&&ufSII?("$"+Math.round(row.ufPdf*ufSII).toLocaleString("es-CL"))
                   :row.ufPlan>500?("$"+Math.round(row.ufPlan).toLocaleString("es-CL"))
                   :"—"
                 )),
