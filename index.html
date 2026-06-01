@@ -2198,8 +2198,7 @@ function App(){
         ),
 
         /* ── Estado / feedback ── */
-        (zipStatus==="loading"||zipStatus==="splitting"||splitLoading||zipStatus==="error"||
-         (zipStatus==="missing"&&!autoNuboxRef.current))&&
+        (zipStatus==="loading"||zipStatus==="splitting"||splitLoading||zipStatus==="error"||zipStatus==="missing")&&
         h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",gap:10,minWidth:320}},
           /* Barra de progreso */
           (zipStatus==="loading"||zipStatus==="splitting"||splitLoading)&&
