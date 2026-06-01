@@ -542,27 +542,28 @@ async function procesarPDFs(zipFile,addLog){
       }
     }catch(e){}
 
-    /* Extraer Monto Total directamente del texto del PDF */
-    let montoTotal=null;
+    /* Extraer IVA y Monto Total del PDF */
+    let montoTotal=null,ivaAmount=null;
     try{
       if(texto.length>10){
         const flat=texto.replace(/\s+/g," ");
-        // P1: "Monto Total 4.995.800" — adyacente
-        let mt=flat.match(/Monto\s*Total\s*([\d]+(?:[\.\d]+)*)/i);
-        // P2: "Total" seguido por número (tablas con columnas separadas)
-        if(!mt) mt=flat.match(/Total\s+([\d]{1,3}(?:\.\d{3})+)\b/i);
-        // P3: último número grande en el documento (≥6 dígitos, formato CLP)
-        if(!mt){
-          const nums=[...flat.matchAll(/\b(\d{1,3}(?:\.\d{3}){1,3})\b/g)];
-          if(nums.length) mt={1:nums[nums.length-1][1]};
+        console.log(`[pdf-texto] ${nroFact}: "${flat.slice(0,400)}"`);
+        // P1: "Monto Total 4.995.800"
+        let mt=flat.match(/Monto\s*Total\s*([\d]+(?:\.\d{3})+)/i);
+        if(mt) montoTotal=parseInt(mt[1].replace(/\./g,""),10)||null;
+        // P2: IVA para calcular total = subtotal + IVA
+        if(!montoTotal){
+          const im=flat.match(/IVA\s+([\d]+(?:\.\d{3})+)/i)
+            ||flat.match(/19%\s*IVA\s*([\d]+(?:\.\d{3})+)/i);
+          if(im) ivaAmount=parseInt(im[1].replace(/\./g,""),10)||null;
+          console.log(`[monto] ${nroFact}: Monto Total no encontrado, IVA=${ivaAmount}`);
+        } else {
+          console.log(`[monto] ${nroFact}: Monto Total directo = $${montoTotal}`);
         }
-        if(mt) montoTotal=parseInt(String(mt[1]).replace(/\./g,""),10)||null;
-        if(montoTotal) console.log(`[monto] ${nroFact}: ${montoTotal} (texto: "${flat.slice(flat.indexOf("Total")-5,flat.indexOf("Total")+30)}")`);
-        else console.warn(`[monto] ${nroFact}: no encontrado. Texto muestra: "${flat.slice(0,200)}"`);
       }
     }catch(e){console.warn("[monto] error:",e.message);}
 
-    pdfs.push({sitio,nroFact,tipo,ufPdf,montoTotal,nombreEnArchivo,zipPath:path,pdfNombre:nombre});
+    pdfs.push({sitio,nroFact,tipo,ufPdf,montoTotal,ivaAmount,nombreEnArchivo,zipPath:path,pdfNombre:nombre});
   }
 
   const conUF=pdfs.filter(p=>p.ufPdf!==null).length;
@@ -1592,7 +1593,7 @@ function App(){
         const concepto=c.tipo==="arriendo"?"Arriendo":"Serv. Adm.";
         const colRef=c.tipo==="arriendo"?"GS":"GT";
         const mk=`${c.sitio}|${c.cliente}|${c.uf}|${c.tipo}`;
-        let factura="",ufPdf=null,montoTotal=null,matchScore=0;
+        let factura="",ufPdf=null,montoTotal=null,ivaAmount=null,matchScore=0;
         if(MANUAL[mk]){factura=MANUAL[mk];ufPdf=c.uf;matchScore=999;}
         else{
           let bestIdx=-1,bestScore=0;
@@ -1619,7 +1620,7 @@ function App(){
           const UMBRAL_UF=50;
 
           if(bestScore>=UMBRAL_RUT||bestScore>=UMBRAL_UF){
-            pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;montoTotal=pdfs[bestIdx].montoTotal||null;matchScore=bestScore;
+            pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;montoTotal=pdfs[bestIdx].montoTotal||null;ivaAmount=pdfs[bestIdx].ivaAmount||null;matchScore=bestScore;
           } else {
             const candidatos=pdfs.reduce((acc,p,idx)=>{
               if(!pdfUsado.has(idx)&&p.sitio===c.sitio&&p.tipo===c.tipo)acc.push(idx);
@@ -1627,11 +1628,11 @@ function App(){
             },[]);
             if(candidatos.length===1){
               bestIdx=candidatos[0];
-              pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;montoTotal=pdfs[bestIdx].montoTotal||null;matchScore=1;
+              pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;montoTotal=pdfs[bestIdx].montoTotal||null;ivaAmount=pdfs[bestIdx].ivaAmount||null;matchScore=1;
             }
           }
         }
-        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,montoTotal,enviado:false});
+        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,montoTotal,ivaAmount,enviado:false});
       }
 
       /* ── Si no hay datos de planilla, mostrar igual los PDFs detectados ── */
@@ -2352,10 +2353,13 @@ function App(){
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace"}},row.ufPlan>500?"$"+Math.round(row.ufPlan).toLocaleString("es-CL"):row.ufPlan.toFixed(2))),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",color:diffPdf?"var(--amber)":"var(--tx)"}},row.ufPdf!==null&&row.ufPdf!==undefined?row.ufPdf.toFixed(2):"—")),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",fontWeight:600,color:"var(--tx)"}},
-                  row.montoTotal?("$"+row.montoTotal.toLocaleString("es-CL"))
-                  :row.ufPdf!=null&&ufSII?("$"+Math.round(row.ufPdf*ufSII).toLocaleString("es-CL"))
-                  :row.ufPlan>500?("$"+Math.round(row.ufPlan).toLocaleString("es-CL"))
-                  :"—"
+                  (()=>{
+                    if(row.montoTotal) return "$"+row.montoTotal.toLocaleString("es-CL");
+                    const sub=row.ufPdf!=null&&ufSII?Math.round(row.ufPdf*ufSII):row.ufPlan>500?Math.round(row.ufPlan):null;
+                    if(sub&&row.ivaAmount) return "$"+(sub+row.ivaAmount).toLocaleString("es-CL");
+                    if(sub) return "$"+sub.toLocaleString("es-CL");
+                    return "—";
+                  })()
                 )),
                 h("td",{style:{padding:"8px 11px",background:bg}},
                   sent?h("span",{style:{color:"var(--green)",fontSize:11,fontWeight:600}},"✓ Enviado"):
