@@ -1,4 +1,5 @@
 import JSZip from "jszip";
+import { PDFDocument } from "pdf-lib";
 
 export const config = { api: { bodyParser: true, responseLimit: '60mb' } };
 
@@ -337,11 +338,18 @@ export default async function handler(req, res) {
     const pageTexts = splitByPages(fullText);
     console.log(`Texto extraído: ${fullText.length} chars, páginas detectadas: ${pageTexts.length}`);
 
-    // Separar páginas usando el parser puro
-    const pageBufs = splitPDFPages(pdfBuf);
-    if (!pageBufs || pageBufs.length === 0) {
-      throw new Error("No se pudieron separar las páginas del PDF");
+    // Separar páginas con pdf-lib (preserva fuentes y recursos compartidos)
+    const srcDoc = await PDFDocument.load(pdfBuf, { ignoreEncryption: true });
+    const totalPages = srcDoc.getPageCount();
+    console.log(`Páginas a separar: ${totalPages}`);
+    const pageBufs = [];
+    for (let i = 0; i < totalPages; i++) {
+      const singleDoc = await PDFDocument.create();
+      const [copiedPage] = await singleDoc.copyPages(srcDoc, [i]);
+      singleDoc.addPage(copiedPage);
+      pageBufs.push(Buffer.from(await singleDoc.save()));
     }
+    if (pageBufs.length === 0) throw new Error("No se pudieron separar las páginas del PDF");
     console.log(`Páginas separadas: ${pageBufs.length}`);
 
     // 3. Usar el texto del PDF completo para nombrar cada página
