@@ -272,6 +272,8 @@ async function extraerComentariosMes(xlsxFile, periodo){
   if(!ws)throw new Error("Hoja 'Flujo' no encontrada en la planilla");
   const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
   const headerRow=rows[3]||[];
+  // Debug: mostrar valores alrededor de la columna 207
+  console.log("[planilla] headerRow cols 200-215:", headerRow.slice(200,215).map((v,i)=>`${200+i}:${JSON.stringify(v)}`).join(" | "));
   // Buscar columna de fecha del mes target (robusto: Date UTC, Date local, serial numérico)
   // Excel serial: días desde 1900-01-01; Jun 2026 = ~46000
   function excelSerialToDate(serial){
