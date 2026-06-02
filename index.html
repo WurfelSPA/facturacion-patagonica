@@ -272,11 +272,24 @@ async function extraerComentariosMes(xlsxFile, periodo){
   if(!ws)throw new Error("Hoja 'Flujo' no encontrada en la planilla");
   const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
   const headerRow=rows[3]||[];
-  // Buscar columna de fecha del mes target
+  // Buscar columna de fecha del mes target (robusto: Date UTC, Date local, serial numérico)
+  // Excel serial: días desde 1900-01-01; Jun 2026 = ~46000
+  function excelSerialToDate(serial){
+    const d=new Date(Math.round((serial-25569)*86400*1000));return d;
+  }
   let monthCol=-1;
   for(let c=0;c<headerRow.length;c++){
     const v=headerRow[c];
-    if(v instanceof Date&&v.getFullYear()===targetYear&&v.getMonth()===targetMonth){monthCol=c;break;}
+    let match=false;
+    if(v instanceof Date){
+      match=(v.getUTCFullYear()===targetYear&&v.getUTCMonth()===targetMonth)
+        ||(v.getFullYear()===targetYear&&v.getMonth()===targetMonth);
+    } else if(typeof v==="number"&&v>40000&&v<60000){
+      const d=excelSerialToDate(v);
+      match=(d.getUTCFullYear()===targetYear&&d.getUTCMonth()===targetMonth)
+        ||(d.getFullYear()===targetYear&&d.getMonth()===targetMonth);
+    }
+    if(match){monthCol=c;break;}
   }
   if(monthCol===-1)throw new Error(`Columna del mes ${periodo} no encontrada en la planilla`);
   const comentariosCol=monthCol+2; // fecha → GC → Comentarios
