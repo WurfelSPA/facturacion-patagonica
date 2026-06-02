@@ -248,19 +248,58 @@ async function descargarPlanillaDrive(token){
   const blob=await res.blob();
   return new File([blob],"Planilla Facturación.xlsx",{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
 }
-function makeEmail(to,cco,from,subject,body,pdfBase64,pdfName){
+function makeEmail(to,cco,from,subject,body,attachBase64,attachName,attachMime){
+  attachMime=attachMime||"application/pdf";
   const boundary="PAT_BOUNDARY_"+Date.now();
   const fromHeader=`=?UTF-8?B?${btoa(unescape(encodeURIComponent("Patagónica Inmobiliaria")))}?= <${from}>`;
   let msg;
-  if(pdfBase64&&pdfName){
-    msg=[`From: ${fromHeader}`,`To: ${to}`,`Bcc: ${cco}`,`Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,`MIME-Version: 1.0`,`Content-Type: multipart/mixed; boundary="${boundary}"`,``,`--${boundary}`,`Content-Type: text/html; charset=UTF-8`,`Content-Transfer-Encoding: base64`,``,btoa(unescape(encodeURIComponent(body))),``,`--${boundary}`,`Content-Type: application/pdf; name="${pdfName}"`,`Content-Disposition: attachment; filename="${pdfName}"`,`Content-Transfer-Encoding: base64`,``,pdfBase64,``,`--${boundary}--`].join("\r\n");
+  if(attachBase64&&attachName){
+    msg=[`From: ${fromHeader}`,`To: ${to}`,`Bcc: ${cco}`,`Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,`MIME-Version: 1.0`,`Content-Type: multipart/mixed; boundary="${boundary}"`,``,`--${boundary}`,`Content-Type: text/html; charset=UTF-8`,`Content-Transfer-Encoding: base64`,``,btoa(unescape(encodeURIComponent(body))),``,`--${boundary}`,`Content-Type: ${attachMime}; name="${attachName}"`,`Content-Disposition: attachment; filename="${attachName}"`,`Content-Transfer-Encoding: base64`,``,attachBase64,``,`--${boundary}--`].join("\r\n");
   }else{
     msg=[`From: ${fromHeader}`,`To: ${to}`,`Bcc: ${cco}`,`Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,`MIME-Version: 1.0`,`Content-Type: text/html; charset=UTF-8`,`Content-Transfer-Encoding: base64`,``,btoa(unescape(encodeURIComponent(body)))].join("\r\n");
   }
   return btoa(unescape(encodeURIComponent(msg))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
-async function sendGmail(token,to,cco,from,subject,htmlBody,pdfBase64,pdfName){
-  const raw=makeEmail(to,cco,from,subject,htmlBody,pdfBase64,pdfName);
+
+/* ── Extraer comentarios de la planilla para el mes indicado ── */
+async function extraerComentariosMes(xlsxFile, periodo){
+  const MESES={Enero:0,Febrero:1,Marzo:2,Abril:3,Mayo:4,Junio:5,Julio:6,Agosto:7,Septiembre:8,Octubre:9,Noviembre:10,Diciembre:11};
+  const[mesNombre,anio]=periodo.split(" ");
+  const targetYear=parseInt(anio),targetMonth=MESES[mesNombre];
+  const buf=await readFileAsBuffer(xlsxFile);
+  const wb=XLSX.read(buf,{type:"buffer",cellDates:true});
+  const ws=wb.Sheets["Flujo"];
+  if(!ws)throw new Error("Hoja 'Flujo' no encontrada en la planilla");
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+  const headerRow=rows[3]||[];
+  // Buscar columna de fecha del mes target
+  let monthCol=-1;
+  for(let c=0;c<headerRow.length;c++){
+    const v=headerRow[c];
+    if(v instanceof Date&&v.getFullYear()===targetYear&&v.getMonth()===targetMonth){monthCol=c;break;}
+  }
+  if(monthCol===-1)throw new Error(`Columna del mes ${periodo} no encontrada en la planilla`);
+  const comentariosCol=monthCol+2; // fecha → GC → Comentarios
+  const SITIO_ORDER=["5-A","4-A","A-1","A-2","B","D-2","D-3"];
+  const grupos={};
+  for(let r=4;r<rows.length;r++){
+    const row=rows[r];if(!row)continue;
+    const sitio=row[7],edif=row[8],cliente=row[11];
+    const comentario=row[comentariosCol];
+    if(!sitio||!cliente)continue;
+    const comStr=comentario!=null?String(comentario).trim():"";
+    if(!comStr)continue;
+    if(!grupos[sitio])grupos[sitio]=[];
+    grupos[sitio].push({edif:edif?String(edif).trim():"",cliente:String(cliente).trim(),comentario:comStr});
+  }
+  // Ordenar sitios
+  const ordenados={};
+  SITIO_ORDER.forEach(s=>{if(grupos[s])ordenados[s]=grupos[s];});
+  Object.keys(grupos).forEach(s=>{if(!ordenados[s])ordenados[s]=grupos[s];});
+  return ordenados;
+}
+async function sendGmail(token,to,cco,from,subject,htmlBody,pdfBase64,pdfName,attachMime){
+  const raw=makeEmail(to,cco,from,subject,htmlBody,pdfBase64,pdfName,attachMime);
   const res=await fetch("https://www.googleapis.com/gmail/v1/users/me/messages/send",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({raw})});
   if(!res.ok){const e=await res.json();throw new Error(e.error?.message||"Error Gmail API");}
   return await res.json();
@@ -2189,6 +2228,48 @@ function App(){
 
     view==="upload"&&h("main",{style:{flex:1,display:"flex",alignItems:"flex-start",justifyContent:"center"},className:"fade-up"},
       h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",gap:24,padding:"40px 40px 40px"}},
+
+        /* ── Botón Enviar Planilla ── */
+        files.planilla&&h("button",{
+          style:{fontSize:13,fontWeight:600,padding:"8px 20px",borderRadius:10,border:"1px solid var(--bdr)",
+            background:"var(--surf)",color:"var(--txm)",cursor:"pointer",display:"flex",alignItems:"center",gap:6,
+            fontFamily:"'DM Sans',sans-serif"},
+          onClick:async()=>{
+            try{
+              const token=await getToken();
+              notify("Leyendo comentarios de la planilla...","info");
+              const grupos=await extraerComentariosMes(files.planilla,periodo);
+              const sitiosConComentarios=Object.keys(grupos).filter(s=>grupos[s].length>0);
+              // Construir cuerpo del correo
+              let bodyHtml=`<p>Adjunto planilla facturación <strong>${periodo}</strong></p>`;
+              if(sitiosConComentarios.length===0){
+                bodyHtml+=`<p>Sin comentarios especiales para este período.</p>`;
+              } else {
+                for(const sitio of sitiosConComentarios){
+                  bodyHtml+=`<p><strong>Sitio ${sitio}</strong></p><ul>`;
+                  for(const {edif,cliente,comentario} of grupos[sitio]){
+                    bodyHtml+=`<li><strong>${cliente}</strong>${edif?` ${edif}`:""}:&nbsp;${comentario}</li>`;
+                  }
+                  bodyHtml+=`</ul>`;
+                }
+              }
+              bodyHtml+=`<br><p>Quedo atenta a sus comentarios</p><p>Saludos</p>`;
+              bodyHtml+=`<br><hr><p style="color:#999;font-size:11px">Este correo fue generado automáticamente con apoyo de inteligencia artificial — Sistema de Facturación Patagónica Inmobiliaria SpA</p>`;
+              // Adjuntar planilla como base64
+              const planBuf=await readFileAsBuffer(files.planilla);
+              const planBytes=new Uint8Array(planBuf);
+              let binary="";
+              for(let i=0;i<planBytes.length;i+=8192) binary+=String.fromCharCode(...planBytes.subarray(i,i+8192));
+              const planB64=btoa(binary);
+              const planNombre=`Planilla Facturación ${periodo}.xlsx`;
+              const subject=`Facturación ${periodo}`;
+              const TO="amelendez@patagonica.cl";
+              await sendGmail(token,TO,"",REMITENTE,subject,bodyHtml,planB64,planNombre,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+              notify(`✓ Planilla ${periodo} enviada a ${TO}`,"ok");
+            }catch(e){notify("Error: "+e.message,"err");}
+          }
+        },"📧 Enviar Planilla "+periodo),
 
         /* ── Selector + Botón ── */
         h("div",{style:{display:"flex",alignItems:"center",gap:12}},
