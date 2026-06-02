@@ -253,10 +253,17 @@ function makeEmail(to,cco,from,subject,body,attachBase64,attachName,attachMime){
   const boundary="PAT_BOUNDARY_"+Date.now();
   const fromHeader=`=?UTF-8?B?${btoa(unescape(encodeURIComponent("Patagónica Inmobiliaria")))}?= <${from}>`;
   let msg;
+  const ccLine=cco?`Cc: ${cco}`:"";
   if(attachBase64&&attachName){
-    msg=[`From: ${fromHeader}`,`To: ${to}`,`Bcc: ${cco}`,`Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,`MIME-Version: 1.0`,`Content-Type: multipart/mixed; boundary="${boundary}"`,``,`--${boundary}`,`Content-Type: text/html; charset=UTF-8`,`Content-Transfer-Encoding: base64`,``,btoa(unescape(encodeURIComponent(body))),``,`--${boundary}`,`Content-Type: ${attachMime}; name="${attachName}"`,`Content-Disposition: attachment; filename="${attachName}"`,`Content-Transfer-Encoding: base64`,``,attachBase64,``,`--${boundary}--`].join("\r\n");
+    const headers=[`From: ${fromHeader}`,`To: ${to}`];
+    if(ccLine)headers.push(ccLine);
+    headers.push(`Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,`MIME-Version: 1.0`,`Content-Type: multipart/mixed; boundary="${boundary}"`,``,`--${boundary}`,`Content-Type: text/html; charset=UTF-8`,`Content-Transfer-Encoding: base64`,``,btoa(unescape(encodeURIComponent(body))),``,`--${boundary}`,`Content-Type: ${attachMime}; name="${attachName}"`,`Content-Disposition: attachment; filename="${attachName}"`,`Content-Transfer-Encoding: base64`,``,attachBase64,``,`--${boundary}--`);
+    msg=headers.join("\r\n");
   }else{
-    msg=[`From: ${fromHeader}`,`To: ${to}`,`Bcc: ${cco}`,`Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,`MIME-Version: 1.0`,`Content-Type: text/html; charset=UTF-8`,`Content-Transfer-Encoding: base64`,``,btoa(unescape(encodeURIComponent(body)))].join("\r\n");
+    const headers=[`From: ${fromHeader}`,`To: ${to}`];
+    if(ccLine)headers.push(ccLine);
+    headers.push(`Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,`MIME-Version: 1.0`,`Content-Type: text/html; charset=UTF-8`,`Content-Transfer-Encoding: base64`,``,btoa(unescape(encodeURIComponent(body))));
+    msg=headers.join("\r\n");
   }
   return btoa(unescape(encodeURIComponent(msg))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
@@ -2256,7 +2263,7 @@ function App(){
               const grupos=await extraerComentariosMes(files.planilla,periodo);
               const sitiosConComentarios=Object.keys(grupos).filter(s=>grupos[s].length>0);
               // Construir cuerpo del correo
-              let bodyHtml=`<p>Adjunto planilla facturación <strong>${periodo}</strong></p>`;
+              let bodyHtml=`<p>Estimados,</p><p>Adjunto planilla facturación <strong>${periodo}</strong></p>`;
               if(sitiosConComentarios.length===0){
                 bodyHtml+=`<p>Sin comentarios especiales para este período.</p>`;
               } else {
@@ -2278,10 +2285,11 @@ function App(){
               const planB64=btoa(binary);
               const planNombre=`Planilla Facturación ${periodo}.xlsx`;
               const subject=`Facturación ${periodo}`;
-              const TO="amelendez@patagonica.cl";
-              await sendGmail(token,TO,"",REMITENTE,subject,bodyHtml,planB64,planNombre,
+              const TO="bpulgar@patagonica.cl,contabilidad@patagonica.cl";
+              const CC="mmunoz@patagonica.cl,alagies@patagonica.cl";
+              await sendGmail(token,TO,CC,REMITENTE,subject,bodyHtml,planB64,planNombre,
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-              notify(`✓ Planilla ${periodo} enviada a ${TO}`,"ok");
+              notify(`✓ Planilla ${periodo} enviada`,"ok");
             }catch(e){notify("Error: "+e.message,"err");}
           }
         },"📧 Enviar Planilla "+periodo),
