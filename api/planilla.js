@@ -63,7 +63,7 @@ export default async function handler(req, res) {
   const saJson = process.env.GOOGLE_SERVICE_ACCOUNT;
   if (!saJson) return res.status(500).json({ error: "GOOGLE_SERVICE_ACCOUNT no configurada" });
 
-  const fileId = process.env.DRIVE_PLANILLA_ID || "1rAGS-b1MoPpEhMgN2BR9Hvg4cTYdcQDu";
+  const fileId = process.env.DRIVE_PLANILLA_ID || "1yIKK0ZgU5C1ARsD6NIryRlHnom2Qilml";
 
   try {
     const serviceAccount = JSON.parse(saJson);
