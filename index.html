@@ -1120,7 +1120,8 @@ function Badge({e,row}){
   const cfg={
     ok:{l:"Coincide",bg:"var(--gbg)",col:"var(--green)",bdr:"var(--gdim)",ic:"✓"},
     diff:{l:row&&row.matchScore===1?"Revisar":"Difiere",bg:"var(--abg)",col:"var(--amber)",bdr:"var(--adim)",ic:"△"},
-    missing:{l:"Sin PDF",bg:"var(--rbg)",col:"var(--red)",bdr:"var(--rdim)",ic:"○"}
+    missing:{l:"Sin PDF",bg:"var(--rbg)",col:"var(--red)",bdr:"var(--rdim)",ic:"○"},
+    sent_sheet:{l:"Enviado",bg:"var(--bbg)",col:"var(--blue)",bdr:"#b5d0f0",ic:"✉"}
   };
   const c=cfg[e]||cfg.missing;
   return h("span",{style:{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 9px",borderRadius:20,fontSize:10,fontWeight:600,background:c.bg,color:c.col,border:`1px solid ${c.bdr}`}},c.ic," ",c.l);
@@ -2464,10 +2465,7 @@ function App(){
                   })()
                 )),
                 h("td",{style:{padding:"8px 11px",background:bg}},
-                  row.yaEnviado&&!sent?h("span",{
-                    title:"Correo enviado en período anterior (registrado en planilla)",
-                    style:{color:"var(--green)",fontSize:11,fontWeight:600,display:"inline-flex",alignItems:"center",gap:4,opacity:0.7}
-                  },"📋 En planilla"):
+                  row.yaEnviado&&!sent?h(Badge,{e:"sent_sheet",row}):
                   sent?h("span",{style:{color:"var(--green)",fontSize:11,fontWeight:600}},"✓ Enviado"):
                   sending?h("span",{style:{color:"var(--blue)",fontSize:11,display:"inline-flex",alignItems:"center",gap:4}},h("span",{className:"spin"},"⟳")," Enviando..."):
                   row.estado==="ok"&&!noEmail?h("button",{
