@@ -136,7 +136,7 @@ const SEND_PWD="patagonica2026";
 const DRIVE_PLANILLA_ID="1rAGS-b1MoPpEhMgN2BR9Hvg4cTYdcQDu";
 const DRIVE_FACTURACION_FOLDER_ID="1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u"; /* Carpeta Facturacion Mensual */
 const DRIVE_PDF_FACTURAS_ID="1Pl7s4FNyjVQOMcEBtgCcvCGD4FlzRg2W"; /* PDF Facturas del mes — actualizar cada mes */
-const GOOGLE_SCOPES="https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive";
+const GOOGLE_SCOPES="https://www.googleapis.com/auth/gmail.send";
 const TG_BOT=window.__TG_BOT__||"";
 const TG_CHAT=window.__TG_CHAT__||"";
 const PRESET_KEY=window.__PAT_KEY__||"";
@@ -330,25 +330,15 @@ async function sendTelegram(botToken,chatId,mensaje){
   if(!botToken||!chatId)return;
   try{await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({chat_id:chatId,text:mensaje,parse_mode:"Markdown"})});}catch(e){console.warn("Telegram error:",e.message);}
 }
-async function uploadZipToDrive(token,zipName,zipBase64,folderId){
-  const binaryStr=atob(zipBase64);
-  const zipBytes=new Uint8Array(binaryStr.length);
-  for(let i=0;i<binaryStr.length;i++) zipBytes[i]=binaryStr.charCodeAt(i);
-  const meta=JSON.stringify({name:zipName,mimeType:"application/zip",parents:[folderId]});
-  const boundary="pat_zip_upload";
-  const metaPart=`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/zip\r\n\r\n`;
-  const endPart=`\r\n--${boundary}--`;
-  const metaBytes=new TextEncoder().encode(metaPart);
-  const endBytes=new TextEncoder().encode(endPart);
-  const body=new Uint8Array(metaBytes.length+zipBytes.length+endBytes.length);
-  body.set(metaBytes,0); body.set(zipBytes,metaBytes.length); body.set(endBytes,metaBytes.length+zipBytes.length);
-  const res=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{
+async function uploadZipToDrive(_token,zipName,zipBase64,folderId){
+  // Usa el Service Account en el servidor — no necesita token OAuth del usuario
+  const res=await fetch("/api/drive-upload",{
     method:"POST",
-    headers:{Authorization:"Bearer "+token,"Content-Type":`multipart/related; boundary=${boundary}`},
-    body:body.buffer
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({base64:zipBase64,filename:zipName,mimeType:"application/zip",folderId})
   });
   const data=await res.json();
-  if(!data.id) throw new Error("Upload Drive: "+JSON.stringify(data));
+  if(!res.ok||!data.id) throw new Error("Upload Drive: "+(data.error||JSON.stringify(data)));
   return data.id;
 }
 function buildEmailHtml(cliente,concepto,periodo,ufPlan,factura,ufRate){
@@ -1791,23 +1781,18 @@ function App(){
     const periodoCode=`${mesCode} prueba`;
     const pdfNombre=`Facturas_PISA_${mesCode}.pdf`;
     try{
-      // 1. Token Google
-      const gToken=await getToken();
-      // 2. Buscar PDF en Drive
+      // 1. Buscar PDF en Drive (via servidor con Service Account)
       notify(`Buscando ${pdfNombre} en Drive...`,"info");
-      const qRes=await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent("name='"+pdfNombre+"' and '"+DRIVE_FACTURACION_FOLDER_ID+"' in parents and trashed=false")}&fields=files(id,name)&pageSize=1`,
-        {headers:{Authorization:"Bearer "+gToken}}
-      );
+      const qRes=await fetch(`/api/zip?buscarPdf=${encodeURIComponent(pdfNombre)}&folderId=${DRIVE_FACTURACION_FOLDER_ID}`);
       const qData=await qRes.json();
-      let pdfFileId=qData.files&&qData.files.length>0?qData.files[0].id:null;
-      // 3. Si no existe, descargar de Nubox automáticamente
+      let pdfFileId=qData.pdfFileId||null;
+      // 2. Si no existe, descargar de Nubox automáticamente
       if(!pdfFileId){
         notify(`PDF no encontrado. Descargando facturas PISA ${mesCode} desde Nubox...`,"info");
         const nbRes=await fetch("/api/nubox-pdf",{
           method:"POST",
           headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({mes:mesCode,googleToken:gToken,destFolderId:DRIVE_FACTURACION_FOLDER_ID,...(nuboxCookies?{nuboxCookies}:{})}),
+          body:JSON.stringify({mes:mesCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID}),
         });
         const nbData=await nbRes.json();
         if(!nbRes.ok)throw new Error("Nubox: "+(nbData.error||"Error desconocido"));
@@ -2307,10 +2292,9 @@ function App(){
             className:"btn-primary",
             style:{fontSize:14,minWidth:190,opacity:(zipStatus==="loading"||zipStatus==="splitting"||splitLoading)?0.6:1},
             disabled:zipStatus==="loading"||zipStatus==="splitting"||splitLoading,
-            onClick:async()=>{
+            onClick:()=>{
               periodoActivado.current=true;autoProcesado.current=false;autoNuboxRef.current=false;
               setZipStatus("idle");setData([]);
-              try{await getToken();}catch(err){notify("Autoriza Google para continuar","warn");return;}
               buscarZip(periodo);
             }
           },
@@ -2352,26 +2336,22 @@ function App(){
               onChange:async ev=>{
                 const file=ev.target.files[0]; if(!file)return;
                 try{
-                  const gToken=await getToken();
                   const MN={"Enero":"01","Febrero":"02","Marzo":"03","Abril":"04","Mayo":"05","Junio":"06","Julio":"07","Agosto":"08","Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12"};
                   const mesCode=`${periodo.split(" ")[1]}-${MN[periodo.split(" ")[0]]||"01"}`;
                   const fileName=`Facturas_PISA_${mesCode}.pdf`;
                   notify("Subiendo PDF a Drive...","info");
-                  const meta=JSON.stringify({name:fileName,mimeType:"application/pdf",parents:[DRIVE_FACTURACION_FOLDER_ID]});
-                  const boundary="pdf_manual_boundary";
+                  // Convertir a base64 para enviar al servidor (Service Account)
                   const buf=await file.arrayBuffer();
-                  const body=new Uint8Array([
-                    ...new TextEncoder().encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`),
-                    ...new Uint8Array(buf),
-                    ...new TextEncoder().encode(`\r\n--${boundary}--`)
-                  ]);
-                  const uploadResp=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{
-                    method:"POST",
-                    headers:{Authorization:`Bearer ${gToken}`,"Content-Type":`multipart/related; boundary=${boundary}`},
-                    body
+                  const bytes=new Uint8Array(buf);
+                  let binary="";
+                  for(let i=0;i<bytes.length;i+=8192) binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
+                  const pdfB64=btoa(binary);
+                  const uploadResp=await fetch("/api/drive-upload",{
+                    method:"POST",headers:{"Content-Type":"application/json"},
+                    body:JSON.stringify({base64:pdfB64,filename:fileName,mimeType:"application/pdf",folderId:DRIVE_FACTURACION_FOLDER_ID})
                   });
-                  if(!uploadResp.ok)throw new Error("Drive upload error "+uploadResp.status);
                   const uploadJson=await uploadResp.json();
+                  if(!uploadResp.ok||!uploadJson.id)throw new Error("Drive upload error: "+(uploadJson.error||uploadResp.status));
                   const fileId=uploadJson.id;
                   notify("✓ PDF subido — separando facturas...","ok");
                   setZipStatus("splitting");
@@ -2390,7 +2370,8 @@ function App(){
                   // Email
                   try{
                     const notifHtml=`<p>Las facturas PISA de <strong>${periodo}</strong> han sido separadas y subidas a Google Drive.</p><p><strong>${splitData.totalFacturas} PDFs</strong> listos para procesar.</p><p>Ingresa a la app y presiona <strong>Procesar ${periodo}</strong> para continuar.</p>`;
-                    await sendGmail(gToken,"amelendez@patagonica.cl","",REMITENTE,`📋 Facturas PISA ${periodo} listas en Drive`,notifHtml,null,null);
+                    const gmailTok=await getToken();
+                    await sendGmail(gmailTok,"amelendez@patagonica.cl","",REMITENTE,`📋 Facturas PISA ${periodo} listas en Drive`,notifHtml,null,null);
                   }catch(e){console.warn("Email notif error:",e.message);}
                   // Telegram
                   try{

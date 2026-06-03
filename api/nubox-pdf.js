@@ -19,6 +19,27 @@
 
 import { PDFDocument } from 'pdf-lib';
 
+async function signJWT(payload, privateKey) {
+  const header = { alg: "RS256", typ: "JWT" };
+  const encode = obj => btoa(JSON.stringify(obj)).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
+  const signingInput = `${encode(header)}.${encode(payload)}`;
+  const pem = privateKey.replace(/-----BEGIN PRIVATE KEY-----/,"").replace(/-----END PRIVATE KEY-----/,"").replace(/\s/g,"");
+  const binaryKey = Uint8Array.from(atob(pem), c => c.charCodeAt(0));
+  const cryptoKey = await crypto.subtle.importKey("pkcs8", binaryKey.buffer, {name:"RSASSA-PKCS1-v1_5",hash:"SHA-256"}, false, ["sign"]);
+  const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", cryptoKey, new TextEncoder().encode(signingInput));
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
+  return `${signingInput}.${sigB64}`;
+}
+async function getSAToken() {
+  const sa = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
+  const now = Math.floor(Date.now() / 1000);
+  const jwt = await signJWT({ iss: sa.client_email, scope: "https://www.googleapis.com/auth/drive", aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 }, sa.private_key);
+  const res = await fetch("https://oauth2.googleapis.com/token", { method:"POST", headers:{"Content-Type":"application/x-www-form-urlencoded"}, body:`grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}` });
+  const data = await res.json();
+  if (!data.access_token) throw new Error("SA token error: " + JSON.stringify(data));
+  return data.access_token;
+}
+
 const API    = 'https://api.nubox.com/nubox.api';
 const APIV   = 'https://api.nubox.com/Nubox.API';
 const APIV1  = 'https://api.pyme.nubox.com/nbxpymapi-environment-pyme';
@@ -30,10 +51,9 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
-  const { mes, googleToken, destFolderId } = req.body || {};
+  const { mes, destFolderId } = req.body || {};
   if (!mes || !/^\d{4}-\d{2}$/.test(mes))
     return res.status(400).json({ error: 'Se requiere mes en formato YYYY-MM' });
-  if (!googleToken) return res.status(400).json({ error: 'Se requiere googleToken' });
   if (!destFolderId) return res.status(400).json({ error: 'Se requiere destFolderId' });
 
   const nuboxUser   = process.env.NUBOX_API_USER;
@@ -182,7 +202,8 @@ export default async function handler(req, res) {
     const fileName  = `Facturas_PISA_${mes}.pdf`;
     console.log(`[nubox] PDF unificado: ${pdfBuffer.length} bytes (${merged.getPageCount()} páginas)`);
 
-    // ── PASO 5: Subir a Google Drive ──────────────────────────────────────────
+    // ── PASO 5: Subir a Google Drive con Service Account ─────────────────────
+    const saToken   = await getSAToken();
     const metadata  = JSON.stringify({ name: fileName, mimeType: 'application/pdf', parents: [destFolderId] });
     const boundary  = 'nubox_pdf_boundary';
     const multipart = Buffer.concat([
@@ -196,7 +217,7 @@ export default async function handler(req, res) {
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${googleToken}`,
+          'Authorization': `Bearer ${saToken}`,
           'Content-Type': `multipart/related; boundary=${boundary}`,
         },
         body: multipart,

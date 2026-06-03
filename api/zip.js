@@ -60,6 +60,25 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
+  // Modo búsqueda de PDF por nombre (usado por splitPDF en index.html)
+  if (req.query.buscarPdf) {
+    const pdfName = req.query.buscarPdf;
+    const folderId = req.query.folderId || FACTURACION_FOLDER_ID;
+    const saJson2 = process.env.GOOGLE_SERVICE_ACCOUNT;
+    if (!saJson2) return res.status(500).json({ error: "GOOGLE_SERVICE_ACCOUNT no configurada" });
+    try {
+      const sa2 = JSON.parse(saJson2);
+      const tok2 = await getAccessToken(sa2);
+      const q = `name='${pdfName}' and '${folderId}' in parents and trashed=false`;
+      const r = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=1`, { headers: { Authorization: `Bearer ${tok2}` } });
+      const d = await r.json();
+      const found = d.files && d.files.length > 0 ? d.files[0].id : null;
+      return res.status(200).json({ pdfFileId: found });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   const periodo = req.query.periodo;
   if (!periodo) return res.status(400).json({ error: "Falta parametro periodo" });
 
