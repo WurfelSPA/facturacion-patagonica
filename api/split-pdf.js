@@ -313,7 +313,7 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { pdfFileId, periodo, destFolderId } = req.body || {};
+  const { pdfFileId, periodo, destFolderId, userToken } = req.body || {};
   if (!pdfFileId || !periodo) return res.status(400).json({ error: "Falta pdfFileId o periodo" });
 
   const saJson = process.env.GOOGLE_SERVICE_ACCOUNT;
@@ -402,6 +402,8 @@ export default async function handler(req, res) {
     const totalFacturas = Object.values(breakdown).reduce((a,b)=>a+b,0);
 
     if (destFolderId) {
+      // Usar token del usuario para subir a su Drive (SA no tiene cuota de almacenamiento)
+      const uploadToken = userToken || token;
       const meta = JSON.stringify({ name: zipName, mimeType: "application/zip", parents: [destFolderId] });
       const boundary = "split_zip_boundary";
       const metaPart = Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/zip\r\n\r\n`);
@@ -412,7 +414,7 @@ export default async function handler(req, res) {
         "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
         {
           method: "POST",
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/related; boundary=${boundary}` },
+          headers: { Authorization: `Bearer ${uploadToken}`, "Content-Type": `multipart/related; boundary=${boundary}` },
           body: multipart,
         }
       );

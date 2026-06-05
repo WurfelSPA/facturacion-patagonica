@@ -1471,9 +1471,10 @@ function App(){
     const periodoCode=anio+"-"+mesNum;
     try{
       /* 1. Servidor separa el PDF y sube ZIP directo a Drive */
+      const uTok=await getToken();
       const res=await fetch("/api/split-pdf",{
         method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({pdfFileId:pdfMaestroId,periodo:periodoCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID}),
+        body:JSON.stringify({pdfFileId:pdfMaestroId,periodo:periodoCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID,userToken:uTok}),
       });
       const data=await res.json();
       if(!res.ok)throw new Error(data.error||"Error desconocido");
@@ -1806,7 +1807,7 @@ function App(){
       const res=await fetch("/api/split-pdf",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({pdfFileId,periodo:periodoCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID}),
+        body:JSON.stringify({pdfFileId,periodo:periodoCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID,userToken:await getToken().catch(()=>null)}),
       });
       const data=await res.json();
       if(!res.ok)throw new Error(data.error||"Error desconocido");
@@ -2363,7 +2364,7 @@ function App(){
                   setZipStatus("splitting");
                   const splitRes=await fetch("/api/split-pdf",{
                     method:"POST",headers:{"Content-Type":"application/json"},
-                    body:JSON.stringify({pdfFileId:fileId,periodo:mesCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID}),
+                    body:JSON.stringify({pdfFileId:fileId,periodo:mesCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID,userToken:gToken}),
                   });
                   const splitData=await splitRes.json();
                   if(!splitRes.ok)throw new Error(splitData.error||"Error al separar PDF");
