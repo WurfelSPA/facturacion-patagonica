@@ -136,7 +136,7 @@ const SEND_PWD="patagonica2026";
 const DRIVE_PLANILLA_ID="1yIKK0ZgU5C1ARsD6NIryRlHnom2Qilml";
 const DRIVE_FACTURACION_FOLDER_ID="1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u"; /* Carpeta Facturacion Mensual */
 const DRIVE_PDF_FACTURAS_ID="1Pl7s4FNyjVQOMcEBtgCcvCGD4FlzRg2W"; /* PDF Facturas del mes — actualizar cada mes */
-const GOOGLE_SCOPES="https://www.googleapis.com/auth/gmail.send";
+const GOOGLE_SCOPES="https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.file";
 const TG_BOT=window.__TG_BOT__||"";
 const TG_CHAT=window.__TG_CHAT__||"";
 const PRESET_KEY=window.__PAT_KEY__||"";
@@ -2345,23 +2345,23 @@ function App(){
                   const mesCode=`${periodo.split(" ")[1]}-${MN[periodo.split(" ")[0]]||"01"}`;
                   const fileName=`Facturas_PISA_${mesCode}.pdf`;
                   notify("Subiendo PDF a Drive...","info");
-                  // Paso 1: obtener URL de subida del servidor (sin enviar el archivo)
-                  const urlRes=await fetch("/api/drive",{
-                    method:"POST",headers:{"Content-Type":"application/json"},
-                    body:JSON.stringify({action:"upload-url",filename:fileName,mimeType:"application/pdf",folderId:DRIVE_FACTURACION_FOLDER_ID})
-                  });
-                  const urlData=await urlRes.json();
-                  if(!urlRes.ok||!urlData.uploadUrl)throw new Error("Error obteniendo URL: "+(urlData.error||urlRes.status));
-                  // Paso 2: subir el PDF directo a Google Drive (no pasa por Vercel)
+                  // Subir PDF directo a Drive con OAuth del usuario (drive.file scope)
+                  const gToken=await getToken();
                   const buf=await file.arrayBuffer();
-                  const driveRes=await fetch(urlData.uploadUrl,{
-                    method:"PUT",
-                    headers:{"Content-Type":"application/pdf","Content-Length":buf.byteLength},
-                    body:buf
+                  const meta=JSON.stringify({name:fileName,mimeType:"application/pdf",parents:[DRIVE_FACTURACION_FOLDER_ID]});
+                  const boundary="pdf_upload_boundary";
+                  const metaBytes=new TextEncoder().encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`);
+                  const endBytes=new TextEncoder().encode(`\r\n--${boundary}--`);
+                  const bodyBytes=new Uint8Array(metaBytes.length+buf.byteLength+endBytes.length);
+                  bodyBytes.set(metaBytes,0);bodyBytes.set(new Uint8Array(buf),metaBytes.length);bodyBytes.set(endBytes,metaBytes.length+buf.byteLength);
+                  const uploadResp=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{
+                    method:"POST",
+                    headers:{Authorization:`Bearer ${gToken}`,"Content-Type":`multipart/related; boundary=${boundary}`},
+                    body:bodyBytes
                   });
-                  if(!driveRes.ok){const t=await driveRes.text();throw new Error("Drive upload error "+driveRes.status+": "+t.slice(0,100));}
-                  const driveJson=await driveRes.json();
-                  const fileId=driveJson.id;
+                  if(!uploadResp.ok){const t=await uploadResp.text();throw new Error("Drive upload error "+uploadResp.status+": "+t.slice(0,100));}
+                  const uploadJson=await uploadResp.json();
+                  const fileId=uploadJson.id;
                   if(!fileId)throw new Error("Drive no devolvió fileId");
                   notify("✓ PDF subido — separando facturas...","ok");
                   setZipStatus("splitting");
