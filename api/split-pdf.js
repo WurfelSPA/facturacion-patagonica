@@ -313,7 +313,7 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { pdfFileId, periodo } = req.body || {};
+  const { pdfFileId, periodo, destFolderId } = req.body || {};
   if (!pdfFileId || !periodo) return res.status(400).json({ error: "Falta pdfFileId o periodo" });
 
   const saJson = process.env.GOOGLE_SERVICE_ACCOUNT;
@@ -397,16 +397,39 @@ export default async function handler(req, res) {
     const zipBuf = Buffer.from(await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }));
     console.log(`ZIP: ${zipBuf.length} bytes`);
 
-    // 5. Devolver ZIP como base64 — el frontend lo sube a Drive con el token OAuth del usuario
+    // 5. Subir ZIP directo a Drive con Service Account (sin pasar por el frontend)
     const zipName = `${periodo}.zip`;
-    const zipBase64 = zipBuf.toString("base64");
     const totalFacturas = Object.values(breakdown).reduce((a,b)=>a+b,0);
+
+    if (destFolderId) {
+      const meta = JSON.stringify({ name: zipName, mimeType: "application/zip", parents: [destFolderId] });
+      const boundary = "split_zip_boundary";
+      const metaPart = Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/zip\r\n\r\n`);
+      const endPart = Buffer.from(`\r\n--${boundary}--`);
+      const multipart = Buffer.concat([metaPart, zipBuf, endPart]);
+
+      const uploadRes = await fetch(
+        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/related; boundary=${boundary}` },
+          body: multipart,
+        }
+      );
+      if (!uploadRes.ok) {
+        const err = await uploadRes.text();
+        return res.status(502).json({ error: `ZIP upload Drive ${uploadRes.status}: ${err.slice(0,200)}` });
+      }
+      const uploadJson = await uploadRes.json();
+      return res.status(200).json({
+        ok: true, zipName, zipFileId: uploadJson.id, totalFacturas, sinCod,
+        breakdown: Object.entries(breakdown).sort(([a],[b])=>a.localeCompare(b)),
+      });
+    }
+
+    // Fallback: devolver base64 si no se pasó destFolderId
     return res.status(200).json({
-      ok: true,
-      zipName,
-      zipBase64,
-      totalFacturas,
-      sinCod,
+      ok: true, zipName, zipBase64: zipBuf.toString("base64"), totalFacturas, sinCod,
       breakdown: Object.entries(breakdown).sort(([a],[b])=>a.localeCompare(b)),
     });
 

@@ -1470,19 +1470,15 @@ function App(){
     const mesNum=String(MES_NUM[mesNombre]||0).padStart(2,"0");
     const periodoCode=anio+"-"+mesNum;
     try{
-      /* 1. Servidor separa el PDF y devuelve ZIP como base64 */
+      /* 1. Servidor separa el PDF y sube ZIP directo a Drive */
       const res=await fetch("/api/split-pdf",{
         method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({pdfFileId:pdfMaestroId,periodo:periodoCode}),
+        body:JSON.stringify({pdfFileId:pdfMaestroId,periodo:periodoCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID}),
       });
       const data=await res.json();
       if(!res.ok)throw new Error(data.error||"Error desconocido");
-      /* 2. Frontend sube ZIP a Drive con token OAuth del usuario */
-      notify("⬆ Subiendo "+data.zipName+" a Drive...","info");
-      const token=await getToken();
-      await uploadZipToDrive(token,data.zipName,data.zipBase64,DRIVE_FACTURACION_FOLDER_ID);
       notify("✓ "+data.totalFacturas+" facturas generadas y subidas a Drive","ok");
-      /* 3. Recargar ZIP desde Drive */
+      /* 2. Recargar ZIP desde Drive */
       buscarZip(periodo);
     }catch(e){
       setZipStatus("error");setZipError(e.message);
@@ -2367,12 +2363,10 @@ function App(){
                   setZipStatus("splitting");
                   const splitRes=await fetch("/api/split-pdf",{
                     method:"POST",headers:{"Content-Type":"application/json"},
-                    body:JSON.stringify({pdfFileId:fileId,periodo:mesCode}),
+                    body:JSON.stringify({pdfFileId:fileId,periodo:mesCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID}),
                   });
                   const splitData=await splitRes.json();
                   if(!splitRes.ok)throw new Error(splitData.error||"Error al separar PDF");
-                  notify("⬆ Subiendo "+splitData.zipName+" a Drive...","info");
-                  await uploadZipToDrive(gToken,splitData.zipName,splitData.zipBase64,DRIVE_FACTURACION_FOLDER_ID);
                   notify("✓ "+splitData.totalFacturas+" facturas de "+periodo+" listas en Drive","ok");
                   setZipStatus("idle");
                   /* ── Notificaciones: email + Telegram ── */
