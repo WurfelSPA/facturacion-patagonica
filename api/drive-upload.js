@@ -7,7 +7,7 @@
  * Response:  { id, name }
  */
 
-export const config = { api: { bodyParser: true, responseLimit: '60mb' } };
+export const config = { api: { bodyParser: { sizeLimit: '60mb' }, responseLimit: '60mb' } };
 
 async function signJWT(payload, privateKey) {
   const header = { alg: "RS256", typ: "JWT" };
