@@ -332,10 +332,10 @@ async function sendTelegram(botToken,chatId,mensaje){
 }
 async function uploadZipToDrive(_token,zipName,zipBase64,folderId){
   // Usa el Service Account en el servidor — no necesita token OAuth del usuario
-  const res=await fetch("/api/drive-upload",{
+  const res=await fetch("/api/drive",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({base64:zipBase64,filename:zipName,mimeType:"application/zip",folderId})
+    body:JSON.stringify({action:"upload",base64:zipBase64,filename:zipName,mimeType:"application/zip",folderId})
   });
   const data=await res.json();
   if(!res.ok||!data.id) throw new Error("Upload Drive: "+(data.error||JSON.stringify(data)));
@@ -1771,7 +1771,7 @@ function App(){
       const key=`${periodo}|${row.cliente}|${row.concepto}`;
       marcarEnviado(idx,key);
       /* Marcar en planilla Google Sheets */
-      if(row.sheetRow&&!MODO_PRUEBA){fetch("/api/mark-sent",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sheetRow:row.sheetRow})}).catch(e=>console.warn("mark-sent:",e.message));}
+      if(row.sheetRow&&!MODO_PRUEBA){fetch("/api/planilla",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sheetRow:row.sheetRow})}).catch(e=>console.warn("mark-sent:",e.message));}
       notify("✓ Correo enviado"+(MODO_PRUEBA?" (PRUEBA)":"")+" → "+dest+(pdfB64?" · con PDF":""));
     }catch(e){if(e.message.includes("invalid_grant")||e.message.includes("Token"))setGmailToken(null);notify("Error: "+e.message,"err");}
     setSendingIdx(null);
@@ -2345,19 +2345,24 @@ function App(){
                   const mesCode=`${periodo.split(" ")[1]}-${MN[periodo.split(" ")[0]]||"01"}`;
                   const fileName=`Facturas_PISA_${mesCode}.pdf`;
                   notify("Subiendo PDF a Drive...","info");
-                  // Convertir a base64 para enviar al servidor (Service Account)
-                  const buf=await file.arrayBuffer();
-                  const bytes=new Uint8Array(buf);
-                  let binary="";
-                  for(let i=0;i<bytes.length;i+=8192) binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
-                  const pdfB64=btoa(binary);
-                  const uploadResp=await fetch("/api/drive-upload",{
+                  // Paso 1: obtener URL de subida del servidor (sin enviar el archivo)
+                  const urlRes=await fetch("/api/drive",{
                     method:"POST",headers:{"Content-Type":"application/json"},
-                    body:JSON.stringify({base64:pdfB64,filename:fileName,mimeType:"application/pdf",folderId:DRIVE_FACTURACION_FOLDER_ID})
+                    body:JSON.stringify({action:"upload-url",filename:fileName,mimeType:"application/pdf",folderId:DRIVE_FACTURACION_FOLDER_ID})
                   });
-                  const uploadJson=await uploadResp.json();
-                  if(!uploadResp.ok||!uploadJson.id)throw new Error("Drive upload error: "+(uploadJson.error||uploadResp.status));
-                  const fileId=uploadJson.id;
+                  const urlData=await urlRes.json();
+                  if(!urlRes.ok||!urlData.uploadUrl)throw new Error("Error obteniendo URL: "+(urlData.error||urlRes.status));
+                  // Paso 2: subir el PDF directo a Google Drive (no pasa por Vercel)
+                  const buf=await file.arrayBuffer();
+                  const driveRes=await fetch(urlData.uploadUrl,{
+                    method:"PUT",
+                    headers:{"Content-Type":"application/pdf","Content-Length":buf.byteLength},
+                    body:buf
+                  });
+                  if(!driveRes.ok){const t=await driveRes.text();throw new Error("Drive upload error "+driveRes.status+": "+t.slice(0,100));}
+                  const driveJson=await driveRes.json();
+                  const fileId=driveJson.id;
+                  if(!fileId)throw new Error("Drive no devolvió fileId");
                   notify("✓ PDF subido — separando facturas...","ok");
                   setZipStatus("splitting");
                   const splitRes=await fetch("/api/split-pdf",{
