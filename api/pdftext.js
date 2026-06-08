@@ -141,8 +141,8 @@ function extractData(text, tipo) {
 
   const flat = text.replace(/\s+/g, " ");
 
-  // P1: "11,84 UF 40.695" — número ANTES de UF (Serv. Adm.)
-  m = flat.match(/([\d]+(?:[,.][\d]+)?)\s*UF\s*\d{2}[,.\d]/);
+  // P1: "11,84 UF 40.695" — decimal obligatorio antes de UF (evita capturar nº de edificio)
+  m = flat.match(/([\d]+[,.][\d]+)\s*UF\s*\d{2}[,.\d]/);
   if (m) uf = parseFloat(m[1].replace(",", "."));
 
   // P2: "UF 85,37 x 40186" — número DESPUÉS de UF (Arriendo)
