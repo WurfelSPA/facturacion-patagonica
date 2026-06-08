@@ -2578,7 +2578,7 @@ function App(){
         h("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:880}},
           h("colgroup",null,h("col",{style:{width:58}}),h("col",{style:{width:"15%"}}),h("col",{style:{width:"17%"}}),h("col",{style:{width:88}}),h("col",{style:{width:88}}),h("col",{style:{width:72}}),h("col",{style:{width:72}}),h("col",{style:{width:96}}),h("col",{style:{width:110}})),
           h("thead",null,h("tr",{style:{background:"#ddeaf8"}},
-            ["Sitio","Cliente","Correo","Concepto","Factura","UF planilla","UF PDF","Monto","Estado/Acción"].map(hd=>
+            ["Sitio","Cliente","Correo","Concepto","Factura","UF planilla","UF PDF","Monto+IVA","Estado/Acción"].map(hd=>
               h("th",{key:hd,style:{padding:"8px 11px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:"0.07em",borderBottom:"1px solid var(--bdr)"}},hd.toUpperCase())
             )
           )),
