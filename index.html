@@ -1483,6 +1483,7 @@ function App(){
   const [filter,setFilter]=useState("all");
   const [concFilter,setConcFilter]=useState("all");
   const [search,setSearch]=useState("");
+  const [searchFactura,setSearchFactura]=useState("");
   const [sentSet,setSentSet]=useState(new Set());
   const [sentKeys,setSentKeys]=useState(()=>{try{return new Set(JSON.parse(localStorage.getItem("pat_sent")||"[]"));}catch{return new Set();}});
   const marcarEnviado=useCallback((idx,key)=>{setSentSet(p=>new Set([...p,idx]));setSentKeys(p=>{const s=new Set([...p,key]);localStorage.setItem("pat_sent",JSON.stringify([...s]));return s;});},[]);
@@ -1997,7 +1998,8 @@ function App(){
     const mf=filter==="all"||(filter==="ok"&&r.estado==="ok"&&!sentSet.has(r.i))||(filter==="diff"&&r.estado!=="ok")||(filter==="sent"&&sentSet.has(r.i));
     const mc=concFilter==="all"||(concFilter==="arr"&&r.concepto==="Arriendo")||(concFilter==="srv"&&r.concepto==="Serv. Adm.");
     const ms=!search||r.cliente.toLowerCase().includes(search.toLowerCase())||r.sitio.includes(search.toUpperCase())||(r.rut&&r.rut.replace(/\./g,"").includes(search.replace(/\./g,"")));
-    return mf&&mc&&ms;
+    const mfact=!searchFactura||( r.factura&&r.factura.toLowerCase().includes(searchFactura.toLowerCase()));
+    return mf&&mc&&ms&&mfact;
   });
 
   /* ══════════════════════════════════════════════════════════
@@ -2561,7 +2563,8 @@ function App(){
               fontFamily:"'DM Sans',sans-serif"}
           },"⬇ Reporte")
         ),
-        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:190,fontFamily:"'DM Sans',sans-serif"}})
+        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:190,fontFamily:"'DM Sans',sans-serif"}}),
+        h("input",{value:searchFactura,onChange:e=>setSearchFactura(e.target.value),placeholder:"N° Factura...",style:{width:130,fontFamily:"'DM Mono',monospace"}})
       ),
       h("div",{style:{flex:1,overflowX:"auto"}},
         h("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:880}},
