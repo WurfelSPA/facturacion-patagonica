@@ -2601,7 +2601,23 @@ function App(){
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontWeight:600}},row.cliente),row.rut&&h("div",{style:{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--txd)",marginTop:2}},formatRUT(row.rut))),
                 h("td",{style:{padding:"8px 11px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",background:bg}},h("span",{style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:row.correo?"var(--accl)":"var(--txd)"}},row.correo||"— sin correo")),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{className:esArr?"tag-arr":"tag-srv"},row.concepto)),
-                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:"var(--txm)"}},row.factura||"—")),
+                h("td",{style:{padding:"8px 11px",background:bg}},
+                  row.factura&&pdfMap[row.factura]
+                  ?h("button",{
+                      title:"Ver PDF de "+row.factura,
+                      style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:"var(--blue)",background:"none",border:"none",cursor:"pointer",padding:0,textDecoration:"underline",fontWeight:600},
+                      onClick:async()=>{
+                        try{
+                          const b64=await getPdfBase64FromZip(files.zip,pdfMap[row.factura].zipPath);
+                          const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+                          const url=URL.createObjectURL(new Blob([bytes],{type:"application/pdf"}));
+                          window.open(url,"_blank");
+                          setTimeout(()=>URL.revokeObjectURL(url),30000);
+                        }catch(e){notify("Error abriendo PDF: "+e.message,"err");}
+                      }
+                    },row.factura)
+                  :h("span",{style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:"var(--txm)"}},row.factura||"—")
+                ),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace"}},row.ufPlan>500?"$"+Math.round(row.ufPlan).toLocaleString("es-CL"):row.ufPlan.toFixed(2))),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",color:diffPdf?"var(--amber)":"var(--tx)"}},
   row.ufPdf!==null&&row.ufPdf!==undefined
