@@ -1107,7 +1107,7 @@ function formatRUT(rut){
 function getEstado(r){
   if(!r.factura)return"missing";
   // Facturas grandes (>500 UF): solo verificar que tengan PDF asignado
-  if(r.ufPlan>500)return r.factura?"ok":"missing";
+  if(r.ufPlan>5000)return r.factura?"ok":"missing";
   // Facturas CLP fijo (ufPdf===null): si hay factura asignada es ok
   if(r.ufPdf===null||r.ufPdf===undefined)return r.factura?"ok":"missing";
   // Match por fallback de único candidato — marcar como "diff" para revisión
@@ -2618,7 +2618,7 @@ function App(){
                     },row.factura)
                   :h("span",{style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:"var(--txm)"}},row.factura||"—")
                 ),
-                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace"}},row.ufPlan>500?"$"+Math.round(row.ufPlan).toLocaleString("es-CL"):row.ufPlan.toFixed(2))),
+                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace"}},row.ufPlan>5000?"$"+Math.round(row.ufPlan).toLocaleString("es-CL"):row.ufPlan.toFixed(2))),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",color:diffPdf?"var(--amber)":"var(--tx)"}},
   row.ufPdf!==null&&row.ufPdf!==undefined
     ?(row.ufPdf>5000?"$"+Math.round(row.ufPdf).toLocaleString("es-CL"):row.ufPdf.toFixed(2))
