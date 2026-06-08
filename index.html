@@ -2586,7 +2586,7 @@ function App(){
             h("tr",null,h("td",{colSpan:9,style:{padding:"48px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados")):
             filtered.map(row=>{
               const i=row.i,sent=sentSet.has(i),sending=sendingIdx===i,noEmail=!row.correo;
-              const diffPdf=row.ufPdf!==null&&row.ufPdf!==undefined&&(row.ufPdf>500?Math.abs(row.ufPdf-row.ufPlan)>500:Math.abs(row.ufPdf-row.ufPlan)>0.5);
+              const diffPdf=row.ufPdf!==null&&row.ufPdf!==undefined&&(row.ufPdf>5000?Math.abs(row.ufPdf-row.ufPlan)>500:Math.abs(row.ufPdf-row.ufPlan)>0.5);
               const diffSII=row.ufSII!=null&&row.ufPlan<=500&&Math.abs(row.ufPlan-row.ufSII)>0.5;
               const diff=diffPdf||diffSII;
               const esArr=row.concepto==="Arriendo";
@@ -2621,7 +2621,7 @@ function App(){
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace"}},row.ufPlan>500?"$"+Math.round(row.ufPlan).toLocaleString("es-CL"):row.ufPlan.toFixed(2))),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",color:diffPdf?"var(--amber)":"var(--tx)"}},
   row.ufPdf!==null&&row.ufPdf!==undefined
-    ?(row.ufPdf>500?"$"+Math.round(row.ufPdf).toLocaleString("es-CL"):row.ufPdf.toFixed(2))
+    ?(row.ufPdf>5000?"$"+Math.round(row.ufPdf).toLocaleString("es-CL"):row.ufPdf.toFixed(2))
     :"—"
 )),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",fontWeight:600,color:"var(--tx)"}},
