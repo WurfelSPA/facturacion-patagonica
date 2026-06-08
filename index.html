@@ -1186,11 +1186,148 @@ function EmailModal({row,periodo,onClose,onConfirm,sending}){
 }
 
 /* ═══════════════════════════════════
+   GENERAR BORRADOR CONTRATO WORD
+═══════════════════════════════════ */
+async function generarBorrador(c){
+  function xe(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+  function pd(v){if(!v||v==="—"||v==="-"||v==="")return null;if(typeof v==="string"&&v.includes("/")){const[d,mm,y]=v.split("/").map(Number);if(!d||!mm||!y)return null;return new Date(y,mm-1,d);}return null;}
+  const MES_ES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  function fmtL(d){return`${String(d.getDate()).padStart(2,"0")} de ${MES_ES[d.getMonth()]} de ${d.getFullYear()}`;}
+  function fmtC(d){return`${String(d.getDate()).padStart(2,"0")}-${String(d.getMonth()+1).padStart(2,"0")}-${d.getFullYear()}`;}
+  const termDate=pd(c.termTermino);
+  let fi=termDate?new Date(termDate.getTime()+86400000):new Date();
+  let ft=new Date(fi);ft.setFullYear(ft.getFullYear()+2);ft.setDate(ft.getDate()-1);
+  const ufRenta=c.ufArr>0?c.ufArr.toFixed(1):"[UF RENTA]";
+  const ufGarantia=c.ufArr>0?(c.ufArr*2).toFixed(1):"[UF GARANTIA]";
+  const pctReaj=c.pctReaj&&c.pctReaj!=="-"&&c.pctReaj!==""?parseFloat(c.pctReaj).toFixed(1):"5.0";
+  const m2=c.m2?c.m2+" metros cuadrados":"[SUPERFICIE]";
+  const sitio=c.sitio||"[LOCAL]";const edificio=c.edificio||"[EDIFICIO]";
+  const nombre=c.nombre||"[ARRENDATARIA]";const rut=c.rut||"[RUT]";
+  function wp(text,opts){
+    opts=opts||{};
+    const sz=opts.sz||22;const bold=opts.bold||false;const center=opts.center||false;
+    const sb=opts.sb||0;const sa=opts.sa!==undefined?opts.sa:120;
+    const jc=center?'<w:jc w:val="center"/>':"";
+    const b=bold?"<w:b/>":"";
+    return`<w:p><w:pPr>${jc}<w:spacing w:before="${sb}" w:after="${sa}"/><w:rPr>${b}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr></w:pPr><w:r><w:rPr>${b}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr><w:t xml:space="preserve">${xe(text)}</w:t></w:r></w:p>`;
+  }
+  const body=[
+    wp("BORRADOR — CONTRATO DE ARRENDAMIENTO COMERCIAL",{bold:true,center:true,sz:28,sb:0,sa:80}),
+    wp("DOCUMENTO DE USO INTERNO — REVISAR ANTES DE ENVIAR AL CLIENTE",{center:true,sz:18,sa:200}),
+    wp("PATAGONICA INMOBILIARIA SpA",{bold:true,center:true,sz:24,sa:40}),
+    wp("en adelante LA ARRENDADORA",{center:true,sa:40}),
+    wp("y",{center:true,sa:40}),
+    wp(nombre.toUpperCase(),{bold:true,center:true,sz:24,sa:40}),
+    wp("en adelante LA ARRENDATARIA",{center:true,sa:200}),
+    wp("COMPARECENCIA",{bold:true,center:true,sz:24,sb:200,sa:120}),
+    wp(`En Santiago de Chile, a ${fmtL(fi)}, comparecen:`,{sa:120}),
+    wp("Por la ARRENDADORA: don ALEJANDRO ENRIQUE SANCHEZ DOBERTI, RUT 7.001.569-2, y don RUDOLF MARCOS MIJAC GYSLING, RUT 9.562.956-3, en representacion de Patagonica Inmobiliaria SpA, RUT 96.673.250-4;",{sa:120}),
+    wp(`Por la ARRENDATARIA: [NOMBRE REPRESENTANTE], RUT [RUT REPRESENTANTE], en representacion de ${nombre}, RUT ${rut}, domiciliada en [DOMICILIO ARRENDATARIA];`,{sa:120}),
+    wp("Ambas partes convienen en celebrar el siguiente contrato de arrendamiento, regido por el Codigo Civil, Ley 18.101 y demas disposiciones aplicables:",{sa:240}),
+    wp("CLAUSULA PRIMERA: OBJETO DEL ARRENDAMIENTO",{bold:true,sb:160,sa:80}),
+    wp(`1.1. La Arrendadora da en arrendamiento a la Arrendataria el local comercial denominado ${sitio}, de una superficie aproximada de ${m2}, ubicado en ${edificio}.`,{sa:80}),
+    wp("1.2. La superficie senalada es aproximada. Dentro de los 15 dias habiles siguientes a la entrega, las partes podran encargar una medicion pericial. Si la diferencia fuere superior al 5%, se ajustara la renta proporcionalmente.",{sa:80}),
+    wp("1.3. El detalle de instalaciones, estado del inmueble y bienes entregados constara en el Acta de Entrega (Anexo N.1), suscrita obligatoriamente por ambas partes.",{sa:160}),
+    wp("CLAUSULA SEGUNDA: DESTINO",{bold:true,sb:160,sa:80}),
+    wp(`2.1. El inmueble arrendado se destinara exclusiva y unicamente al funcionamiento de local comercial bajo la marca ${nombre}.`,{sa:80}),
+    wp("2.2. Cualquier cambio de destino requerira autorizacion previa y escrita de la Arrendadora.",{sa:80}),
+    wp("2.3. El uso del logotipo y marca de la Arrendataria por parte de la Arrendadora solo podra realizarse previa solicitud escrita, con aprobacion expresa en plazo no superior a 5 dias habiles.",{sa:160}),
+    wp("CLAUSULA TERCERA: PLAZO Y RENOVACION",{bold:true,sb:160,sa:80}),
+    wp(`3.1. El presente contrato tendra una duracion de DOS (2) anos, contados desde el ${fmtL(fi)} hasta el ${fmtL(ft)}.`,{sa:80}),
+    wp("3.2. El contrato se renovara automaticamente por periodos anuales iguales y sucesivos, salvo que cualquiera de las partes comunique su voluntad de no renovarlo mediante carta certificada con acuse de recibo, con al menos 90 dias de anticipacion al termino del periodo vigente.",{sa:80}),
+    wp("3.3. Si el inmueble se tornara inutilizable por causas imputables a la Arrendadora, el pago de renta y servicios se suspendera respecto del area afectada desde la fecha de la afectacion.",{sa:80}),
+    wp("3.4. La Arrendataria tendra derecho preferente de renovacion en igualdad de condiciones frente a cualquier tercero, debiendo ser notificada con al menos 60 dias de anticipacion.",{sa:160}),
+    wp("CLAUSULA CUARTA: RENTA DE ARRENDAMIENTO",{bold:true,sb:160,sa:80}),
+    wp(`4.1. La renta mensual inicial sera de ${ufRenta} Unidades de Fomento (UF), pagadera en pesos moneda corriente equivalente al valor de la UF del dia de pago efectivo, mas IVA.`,{sa:80}),
+    wp(`4.2. La renta comenzara a devengarse a partir del ${fmtL(fi)}, fecha de entrega material del inmueble.`,{sa:80}),
+    wp("4.3. Periodo de carencia: La Arrendadora concede a la Arrendataria un periodo de carencia de ____________ meses, correspondiente al tiempo de habilitacion del local, a contar del inicio del contrato.",{sa:80}),
+    wp(`4.4. Reajuste anual: La renta se reajustara cada 12 meses a contar del inicio del contrato, incrementandose en el mayor valor entre: (a) el ${pctReaj}% fijo, o (b) la variacion del IPC del periodo respectivo.`,{sa:80}),
+    wp("4.5. La renta debera pagarse dentro de los primeros cinco dias habiles de cada mes, mediante transferencia bancaria a la cuenta que la Arrendadora informe por escrito.",{sa:80}),
+    wp("4.6. Multa por atraso: El pago entre el dia 6 y el dia 10 generara un recargo del 1% diario sobre el saldo insoluto. Pasado el dia 10, se aplicara adicionalmente una multa fija de 1 UF.",{sa:160}),
+    wp("CLAUSULA QUINTA: GARANTIA",{bold:true,sb:160,sa:80}),
+    wp(`5.1. La Arrendataria entrega en este acto, a titulo de garantia, la suma equivalente a DOS (2) meses de renta inicial, esto es, ${ufGarantia} UF, pagadera en pesos al valor de la UF del dia de pago.`,{sa:80}),
+    wp("5.2. La Arrendadora mantendra la garantia en una cuenta bancaria exclusiva para este fin, sin mezclarla con fondos propios.",{sa:80}),
+    wp("5.3. La garantia no podra compensarse con rentas adeudadas sin previo aviso por escrito y sin acuerdo de las partes o resolucion judicial.",{sa:80}),
+    wp("5.4. Restitucion: La garantia o su saldo se devolvera dentro de los 30 dias habiles siguientes a la firma del finiquito, previa revision del inmueble (maximo 10 dias habiles tras restitucion).",{sa:160}),
+    wp("CLAUSULA SEXTA: ENTREGA Y RESTITUCION",{bold:true,sb:160,sa:80}),
+    wp(`6.1. La entrega material se realizara el ${fmtL(fi)}, mediante la suscripcion obligatoria de un Acta de Entrega por ambas partes, que incluira: estado general del inmueble, inventario de bienes, fotografias y medicion real de superficies.`,{sa:80}),
+    wp("6.2. Si la Arrendadora no entregare el inmueble en la fecha acordada, la Arrendataria tendra derecho a una compensacion equivalente al valor diario de la renta por cada dia de retraso.",{sa:80}),
+    wp("6.3. La restitucion del inmueble debera efectuarse en el estado en que fue entregado, conforme al Acta de Entrega, considerando el desgaste normal por uso.",{sa:80}),
+    wp("6.4. Las mejoras no removibles quedaran en beneficio del inmueble sin derecho a reembolso, salvo las expresamente listadas en el Anexo N.2.",{sa:160}),
+    wp("CLAUSULA SEPTIMA: SERVICIOS DE ADMINISTRACION",{bold:true,sb:160,sa:80}),
+    wp("7.1. La Arrendataria pagara mensualmente, junto con la renta, los Servicios de Administracion del Centro equivalentes al 12% de la renta mensual mas IVA, segun detalle en Anexo N.3.",{sa:80}),
+    wp("7.2. El monto de los Servicios de Administracion podra modificarse con un aviso previo de 60 dias, con un incremento maximo anual equivalente a la variacion del IPC mas 2 puntos porcentuales.",{sa:160}),
+    wp("CLAUSULA OCTAVA: CONSERVACION, MEJORAS Y RIESGOS",{bold:true,sb:160,sa:80}),
+    wp("8.1. La Arrendataria mantendra el inmueble en buen estado de conservacion, siendo responsable de las reparaciones locativas (pintura interior, cerraduras, vidrios, artefactos de iluminacion, etc.).",{sa:80}),
+    wp("8.2. La Arrendadora sera responsable de todas las reparaciones estructurales, exteriores, de fachada, techo, fundaciones y sistemas principales (instalaciones electricas de distribucion, agua potable, alcantarillado y climatizacion central).",{sa:80}),
+    wp("8.3. Toda mejora que la Arrendataria desee efectuar requerira aprobacion previa escrita de la Arrendadora dentro de los 15 dias habiles siguientes. El silencio se entendera como denegacion.",{sa:160}),
+    wp("CLAUSULA NOVENA: SEGUROS",{bold:true,sb:160,sa:80}),
+    wp("9.1. La Arrendataria contratara y mantendra vigente durante todo el contrato un seguro de responsabilidad civil y contra todo riesgo (incendio, sismo, inundacion, explosion, actos maliciosos), con cobertura minima de UF 5.000.",{sa:80}),
+    wp("9.2. La Arrendadora mantendra vigente un seguro de incendio sobre la estructura del inmueble. Ambos seguros deberan indicarse mutuamente como beneficiarios adicionales.",{sa:160}),
+    wp("CLAUSULA DECIMA: TERMINO ANTICIPADO",{bold:true,sb:160,sa:80}),
+    wp("10.1. La Arrendadora podra poner termino anticipado al contrato en los siguientes casos: (a) insolvencia de la Arrendataria; (b) incumplimiento grave y reiterado de obligaciones; (c) cambio de destino no autorizado.",{sa:80}),
+    wp("10.2. La Arrendataria podra poner termino anticipado en los siguientes casos: (a) incumplimiento de la Arrendadora en mantencion estructural, previo aviso y plazo de 30 dias para subsanar; (b) inhabilitacion del inmueble por causa imputable a la Arrendadora por mas de 30 dias.",{sa:80}),
+    wp("10.3. En caso de termino por incumplimiento de la Arrendadora, esta debera devolver la garantia integra dentro de los 10 dias habiles siguientes, mas una indemnizacion equivalente a 3 meses de renta.",{sa:160}),
+    wp("CLAUSULA DECIMO PRIMERA: CESION DEL CONTRATO",{bold:true,sb:160,sa:80}),
+    wp("11.1. La Arrendadora podra ceder el presente contrato a un tercero, debiendo notificar a la Arrendataria por carta certificada con al menos 30 dias de anticipacion.",{sa:80}),
+    wp("11.2. La Arrendataria no podra ceder ni subarrendar el inmueble o el contrato sin autorizacion previa y escrita de la Arrendadora.",{sa:160}),
+    wp("CLAUSULA DECIMO SEGUNDA: FUERZA MAYOR Y CASO FORTUITO",{bold:true,sb:160,sa:80}),
+    wp("12.1. Ninguna de las partes sera responsable por el incumplimiento de sus obligaciones derivado de eventos de fuerza mayor o caso fortuito, entendiendo por tales: terremotos, inundaciones, incendios no imputables, pandemias, disposiciones sanitarias de cierre, actos de guerra o terrorismo.",{sa:80}),
+    wp("12.2. La parte afectada debera notificar a la otra dentro de los 5 dias habiles siguientes al inicio del evento. Si la imposibilidad de uso se extiende por mas de 90 dias, cualquier parte podra poner termino al contrato sin indemnizacion.",{sa:160}),
+    wp("CLAUSULA DECIMO TERCERA: CONFIDENCIALIDAD",{bold:true,sb:160,sa:80}),
+    wp("13.1. Las partes se obligan a mantener en estricta reserva los terminos y condiciones del presente contrato, incluyendo montos de renta, garantia y condiciones de renovacion.",{sa:160}),
+    wp("CLAUSULA DECIMO CUARTA: RESOLUCION DE CONFLICTOS",{bold:true,sb:160,sa:80}),
+    wp("14.1. Ante cualquier diferencia, las partes se comprometen a intentar una solucion directa en un plazo de 15 dias habiles desde que la parte afectada notifique el conflicto.",{sa:80}),
+    wp("14.2. Si no hubiere acuerdo directo, las partes someteran el conflicto a mediacion ante el Centro de Mediacion y Arbitraje de la Camara de Comercio de Santiago.",{sa:80}),
+    wp("14.3. Agotadas las instancias anteriores, el conflicto sera resuelto por los Tribunales Ordinarios de Justicia de la ciudad de Santiago.",{sa:160}),
+    wp("CLAUSULA DECIMO QUINTA: GASTOS E IMPUESTOS",{bold:true,sb:160,sa:80}),
+    wp("15.1. Los gastos notariales y de legalizacion del presente contrato seran de cargo compartido entre ambas partes, en partes iguales.",{sa:160}),
+    wp("CLAUSULA DECIMO SEXTA: DOMICILIO Y COMUNICACIONES",{bold:true,sb:160,sa:80}),
+    wp("16.1. Para todos los efectos del presente contrato, las partes fijan domicilio en la ciudad de Santiago.",{sa:80}),
+    wp(`16.2. Comunicaciones: Correo electronico Arrendataria: ${xe(c.email||"[EMAIL]")}. Correo electronico Arrendadora: [EMAIL ARRENDADORA].`,{sa:160}),
+    wp("CLAUSULA DECIMO SEPTIMA: DISPOSICIONES FINALES",{bold:true,sb:160,sa:80}),
+    wp(`17.1. El presente instrumento constituye el acuerdo integro entre las partes respecto del arrendamiento del local ${sitio}, dejando sin efecto cualquier acuerdo previo sobre la misma materia.`,{sa:80}),
+    wp("17.2. Cualquier modificacion al presente contrato debera constar por escrito y ser firmada por ambas partes.",{sa:80}),
+    wp("17.3. Si alguna clausula fuere declarada nula o inaplicable, las restantes mantendran plena vigencia.",{sa:240}),
+    wp("PERSONERIA",{bold:true,center:true,sz:24,sb:240,sa:120}),
+    wp("La personeria de Alejandro Enrique Sanchez Doberti y Rudolf Marcos Mijac Gysling para representar a Patagonica Inmobiliaria SpA consta en escritura publica de fecha 4 de abril de 2014, Notaria de Santiago.",{sa:120}),
+    wp(`La personeria de [NOMBRE REPRESENTANTE] para representar a ${nombre} consta en escritura publica de fecha [FECHA], otorgada ante notaria [NOTARIA].`,{sa:240}),
+    wp("En conformidad, las partes firman el presente contrato en dos ejemplares de un mismo tenor y efecto.",{sa:400}),
+    wp("_________________________________",{center:true,sa:40}),
+    wp("PATAGONICA INMOBILIARIA SpA",{bold:true,center:true,sa:40}),
+    wp("Alejandro Sanchez D. / Rudolf Mijac G.",{center:true,sa:40}),
+    wp("RUT: 96.673.250-4",{center:true,sa:240}),
+    wp("_________________________________",{center:true,sa:40}),
+    wp(nombre.toUpperCase(),{bold:true,center:true,sa:40}),
+    wp("[NOMBRE REPRESENTANTE LEGAL]",{center:true,sa:40}),
+    wp(`RUT: ${rut}`,{center:true,sa:240}),
+    wp("ANEXOS: N.1 Acta de Entrega | N.2 Lista de Mejoras | N.3 Detalle Servicios de Administracion | N.4 Planos del Inmueble",{center:true,sa:80}),
+  ].join("");
+  const docXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="709" w:footer="709" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const ct=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/></Types>`;
+  const rels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+  const drels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/></Relationships>`;
+  const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:rPrDefault></w:docDefaults></w:styles>`;
+  const sets=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:defaultTabStop w:val="708"/></w:settings>`;
+  const zip=new JSZip();
+  zip.file("[Content_Types].xml",ct);zip.file("_rels/.rels",rels);
+  zip.file("word/document.xml",docXml);zip.file("word/_rels/document.xml.rels",drels);
+  zip.file("word/styles.xml",styles);zip.file("word/settings.xml",sets);
+  const blob=await zip.generateAsync({type:"blob",mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=url;
+  a.download=`Borrador_Contrato_${(c.nombre||"cliente").replace(/[^a-zA-Z0-9]/g,"_")}_${fmtC(fi)}.docx`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+}
+
+/* ═══════════════════════════════════
    VISTA CONTRATOS
 ═══════════════════════════════════ */
 function ContratosView({dashData,driveLoading}){
   const [tab,setTab]=useState("vencimientos");
   const [search,setSearch]=useState("");
+  const [borradorLoading,setBorradorLoading]=useState({});
   const now=new Date();
   const currentYear=now.getFullYear();
   function avisoDias(str){if(!str||str==="-"||str==="")return null;const s=str.toLowerCase();const m=s.match(/(\d+)/);if(!m)return null;const n=parseInt(m[1]);if(s.includes("año")||s.includes("ano"))return n*365;if(s.includes("mes"))return n*30;return n;}
@@ -1226,7 +1363,7 @@ function ContratosView({dashData,driveLoading}){
         ),
         h("div",{style:{overflowX:"auto"}},
           h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
-            h("thead",null,h("tr",{style:{background:"#f0f4f8"}},["Sitio","Cliente / RUT","Edificio","Fecha Término","Días Restantes","Renovación Auto.","Aviso","Fecha Notificación"].map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap"}},col.toUpperCase())))),
+            h("thead",null,h("tr",{style:{background:"#f0f4f8"}},["Sitio","Cliente / RUT","Edificio","Fecha Término","Días Restantes","Renovación Auto.","Aviso","Fecha Notificación","Borrador"].map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap"}},col.toUpperCase())))),
             h("tbody",null,vencimientos.map((c,i)=>{
               const dias=diasDesde(c.termTermino);
               const{bg,col,bdr}=urgBg(dias,false);
@@ -1240,7 +1377,8 @@ function ContratosView({dashData,driveLoading}){
                 h("td",{style:{padding:"9px 12px"}},dias!==null?h("span",{style:{padding:"2px 8px",borderRadius:10,fontSize:10,fontWeight:700,background:bg,color:col,border:"1px solid "+bdr}},dias<0?"Vencido hace "+Math.abs(dias)+"d":dias===0?"Hoy":dias+"d"):h("span",{style:{color:"var(--txd)"}},"—")),
                 h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.renovacion||"—"),
                 h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.aviso||"—"),
-                h("td",{style:{padding:"9px 12px"}},notif?h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600,color:"var(--accl)",background:"var(--bbg)",padding:"2px 8px",borderRadius:6,border:"1px solid #b5d0f0"}},notif):h("span",{style:{color:"var(--txd)",fontSize:10}},"Sin datos de aviso"))
+                h("td",{style:{padding:"9px 12px"}},notif?h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600,color:"var(--accl)",background:"var(--bbg)",padding:"2px 8px",borderRadius:6,border:"1px solid #b5d0f0"}},notif):h("span",{style:{color:"var(--txd)",fontSize:10}},"Sin datos de aviso")),
+                h("td",{style:{padding:"6px 12px",whiteSpace:"nowrap"}},h("button",{onClick:()=>{const key=c.rut+i;setBorradorLoading(prev=>({...prev,[key]:true}));generarBorrador(c).catch(e=>console.error(e)).finally(()=>setBorradorLoading(prev=>({...prev,[key]:false})));},disabled:!!borradorLoading[c.rut+i],title:"Generar borrador Word",style:{background:borradorLoading[c.rut+i]?"var(--surf3)":"linear-gradient(135deg,#1a5fa8,#2676c8)",color:borradorLoading[c.rut+i]?"var(--txm)":"#fff",border:"1px solid #b5d0f0",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:borradorLoading[c.rut+i]?"not-allowed":"pointer",display:"inline-flex",alignItems:"center",gap:4,opacity:borradorLoading[c.rut+i]?0.65:1}},borradorLoading[c.rut+i]?h("span",{className:"spin"},"⟳"):"📄",borradorLoading[c.rut+i]?" Generando...":" Borrador"))
               );
             }))
           )
