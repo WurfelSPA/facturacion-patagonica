@@ -139,23 +139,24 @@ function extractData(text, tipo) {
   let uf = null;
   let m;
 
-  // P1: "XX,XX UF   40.186" (acepta cualquier valor CLP, no solo 4X)
-  m = text.match(/([\d]+(?:[,.][\d]+)?)\s+UF\s+\d{2}[,.\d]/);
+  const flat = text.replace(/\s+/g, " ");
+
+  // P1: "11,84 UF 40.695" — número ANTES de UF (Serv. Adm.)
+  m = flat.match(/([\d]+(?:[,.][\d]+)?)\s*UF\s*\d{2}[,.\d]/);
   if (m) uf = parseFloat(m[1].replace(",", "."));
 
-  // P2: "UF XX,XX x 40186"
+  // P2: "UF 85,37 x 40186" — número DESPUÉS de UF (Arriendo)
   if (!uf) {
-    m = text.match(/UF\s+([\d]+(?:[,.][\d]+)?)\s+x\s+\d{2}/);
+    m = flat.match(/UF\s*([\d]+(?:[,.][\d]+)?)\s*x\s*\d{2}/);
     if (m) uf = parseFloat(m[1].replace(",", "."));
   }
 
-  // P3: layout partido — colapsar whitespace y reintentar
+  // P3: fallback
   if (!uf) {
-    const flat = text.replace(/\s+/g, " ");
-    m = flat.match(/UF\s+([\d]+(?:[,.][\d]+)?)\s+x\s+/);
+    m = flat.match(/UF\s*([\d]+(?:[,.][\d]+)?)\s*x\s/);
     if (m) uf = parseFloat(m[1].replace(",", "."));
     if (!uf) {
-      m = flat.match(/([\d]+[,.][\d]+)\s+x\s+\d{2}/);
+      m = flat.match(/([\d]+[,.][\d]+)\s*x\s*\d{2}/);
       if (m) uf = parseFloat(m[1].replace(",", "."));
     }
   }
