@@ -591,6 +591,12 @@ async function procesarPDFs(zipFile,addLog){
           m=flat0.match(/UF\s*([\d]+(?:[,.][\d]+)?)\s*x\s/);if(m) ufPdf=parseFloat(m[1].replace(",","."));
           if(!ufPdf){m=flat0.match(/([\d]+[,.][\d]+)\s*x\s*\d{2}/);if(m) ufPdf=parseFloat(m[1].replace(",","."));}
         }
+        /* P4: precio CLP fijo "1 UNID 317.000" — Serv. Adm. sin UF */
+        if(!ufPdf){
+          m=flat0.match(/1\s*UNID\s+([\d]+(?:\.[\d]{3})+(?:,[\d]+)?)/i)
+            ||flat0.match(/1\s*UNID\s+([\d]{4,})/i);
+          if(m){const raw=m[1].replace(/\./g,"").replace(",",".");ufPdf=parseFloat(raw)||null;}
+        }
         if(ufPdf) ufPdf=Math.round(ufPdf*10000)/10000;
       }
     }catch(e){}
@@ -2580,7 +2586,7 @@ function App(){
             h("tr",null,h("td",{colSpan:9,style:{padding:"48px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados")):
             filtered.map(row=>{
               const i=row.i,sent=sentSet.has(i),sending=sendingIdx===i,noEmail=!row.correo;
-              const diffPdf=row.ufPdf!==null&&row.ufPdf!==undefined&&Math.abs(row.ufPdf-row.ufPlan)>0.5;
+              const diffPdf=row.ufPdf!==null&&row.ufPdf!==undefined&&(row.ufPdf>500?Math.abs(row.ufPdf-row.ufPlan)>500:Math.abs(row.ufPdf-row.ufPlan)>0.5);
               const diffSII=row.ufSII!=null&&row.ufPlan<=500&&Math.abs(row.ufPlan-row.ufSII)>0.5;
               const diff=diffPdf||diffSII;
               const esArr=row.concepto==="Arriendo";
@@ -2597,7 +2603,11 @@ function App(){
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{className:esArr?"tag-arr":"tag-srv"},row.concepto)),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:"var(--txm)"}},row.factura||"—")),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace"}},row.ufPlan>500?"$"+Math.round(row.ufPlan).toLocaleString("es-CL"):row.ufPlan.toFixed(2))),
-                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",color:diffPdf?"var(--amber)":"var(--tx)"}},row.ufPdf!==null&&row.ufPdf!==undefined?row.ufPdf.toFixed(2):"—")),
+                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",color:diffPdf?"var(--amber)":"var(--tx)"}},
+  row.ufPdf!==null&&row.ufPdf!==undefined
+    ?(row.ufPdf>500?"$"+Math.round(row.ufPdf).toLocaleString("es-CL"):row.ufPdf.toFixed(2))
+    :"—"
+)),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",fontWeight:600,color:"var(--tx)"}},
                   (()=>{
                     if(row.montoTotal) return "$"+row.montoTotal.toLocaleString("es-CL");

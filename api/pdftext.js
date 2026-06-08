@@ -161,6 +161,16 @@ function extractData(text, tipo) {
     }
   }
 
+  // P4: precio CLP fijo "1 UNID 317.000" — Serv. Adm. sin UF
+  if (!uf) {
+    m = flat.match(/1\s*UNID\s+([\d]+(?:\.[\d]{3})+(?:,[\d]+)?)/i)
+      || flat.match(/1\s*UNID\s+([\d]{4,})/i);
+    if (m) {
+      const raw = m[1].replace(/\./g, "").replace(",", ".");
+      uf = parseFloat(raw) || null;
+    }
+  }
+
   // Extraer Monto Total directamente del PDF (más preciso que calcular UF × valor)
   // Formato: "Monto Total 4.995.800" o "MontoTotal4995800"
   let montoTotal = null;
