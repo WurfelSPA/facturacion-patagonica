@@ -1752,8 +1752,8 @@ function App(){
           for(const p of pdfs){
             if(ufData.pdfs&&ufData.pdfs[p.nroFact]){
               const d=ufData.pdfs[p.nroFact];
-              p.ufPdf=d.uf;
-              p.rutPdf=d.rut;
+              if(d.uf!==null&&d.uf!==undefined) p.ufPdf=d.uf;  /* no sobreescribir si servidor devuelve null */
+              if(d.rut) p.rutPdf=d.rut;
               p.montoTotal=d.montoTotal||p.montoTotal||null;
               if(p.ufPdf!==null)conUF++;
               if(p.rutPdf)conRUT++;
