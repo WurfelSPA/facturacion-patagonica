@@ -1327,6 +1327,84 @@ async function generarBorrador(c){
   setTimeout(()=>URL.revokeObjectURL(url),5000);
 }
 
+async function generarBorradorDenominacion(c){
+  function xe(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+  function pd(v){if(!v||v==="—"||v==="-"||v==="")return null;if(typeof v==="string"&&v.includes("/")){const[d,mm,y]=v.split("/").map(Number);if(!d||!mm||!y)return null;return new Date(y,mm-1,d);}return null;}
+  const MES_ES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  function fmtL(d){return`${String(d.getDate()).padStart(2,"0")} de ${MES_ES[d.getMonth()]} de ${d.getFullYear()}`;}
+  function fmtC(d){return`${String(d.getDate()).padStart(2,"0")}-${String(d.getMonth()+1).padStart(2,"0")}-${d.getFullYear()}`;}
+  const hoy=new Date();
+  const nombre=c.nombre||"[DENOMINACION ANTERIOR]";
+  const rut=c.rut||"[RUT]";
+  const sitio=c.sitio||"[LOCAL]";
+  const edificio=c.edificio||"[EDIFICIO]";
+  const ufRenta=c.ufArr>0?c.ufArr.toFixed(2):"[UF RENTA]";
+  const termDate=pd(c.termTermino);
+  const termStr=termDate?fmtL(termDate):"[FECHA TERMINO]";
+  function wp(text,opts){
+    opts=opts||{};
+    const sz=opts.sz||22;const bold=opts.bold||false;const center=opts.center||false;
+    const sb=opts.sb||0;const sa=opts.sa!==undefined?opts.sa:120;
+    const jc=center?'<w:jc w:val="center"/>':"";
+    const b=bold?"<w:b/>":"";
+    return`<w:p><w:pPr>${jc}<w:spacing w:before="${sb}" w:after="${sa}"/><w:rPr>${b}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr></w:pPr><w:r><w:rPr>${b}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr><w:t xml:space="preserve">${xe(text)}</w:t></w:r></w:p>`;
+  }
+  const body=[
+    wp("BORRADOR — USO INTERNO — REVISAR ANTES DE ENVIAR AL NOTARIO",{center:true,sz:18,sa:60}),
+    wp("Repertorio N° ___________",{sa:60}),
+    wp("MODIFICACION DE CONTRATO DE ARRENDAMIENTO",{bold:true,center:true,sz:28,sb:60,sa:60}),
+    wp("POR CAMBIO DE DENOMINACION SOCIAL",{bold:true,center:true,sz:24,sa:60}),
+    wp("PATAGONICA INMOBILIARIA SpA",{bold:true,center:true,sz:22,sa:40}),
+    wp("y",{center:true,sa:40}),
+    wp("[NUEVA DENOMINACION SOCIAL]",{bold:true,center:true,sz:22,sa:40}),
+    wp("(antes: "+nombre+")",{center:true,sz:20,sa:200}),
+    wp(`En Santiago de Chile, a ${fmtL(hoy)}, ante mi, [NOMBRE NOTARIO], Abogado, Notario Titular de la Notaria de Santiago con asiento en [COMUNA], con oficio en [DIRECCION NOTARIA], comparecen:`,{sa:120}),
+    wp("Por una parte, don ALEJANDRO ENRIQUE SANCHEZ DOBERTI, chileno, empresario, RUT 7.001.569-2, y don RUDOLF MARCOS MIJAC GYSLING, chileno, empresario, RUT 9.562.956-3, ambos domiciliados en Avenida Americo Vespucio 2680, piso 12, Conchali, Santiago, en representacion de PATAGONICA INMOBILIARIA SpA, RUT 96.673.250-4, segun se acreditara, en adelante indistintamente \"La Arrendadora\";",{sa:120}),
+    wp(`Por otra parte, [NOMBRE REPRESENTANTE LEGAL], [NACIONALIDAD], [PROFESION], RUT [RUT REPRESENTANTE], domiciliado en [DOMICILIO], en representacion de [NUEVA DENOMINACION SOCIAL], RUT ${rut}, segun se acreditara, sociedad que es continuadora legal de ${nombre}, con el mismo RUT, en adelante \"La Arrendataria\";`,{sa:200}),
+    wp("EXPONEN:",{bold:true,center:true,sz:24,sb:160,sa:120}),
+    wp("PRIMERO: Antecedentes del Contrato Original.",{bold:true,sb:120,sa:80}),
+    wp(`1.1. Con fecha [FECHA CONTRATO ORIGINAL], por escritura publica otorgada ante la Notaria de Santiago de [NOTARIO ORIGINAL], Repertorio N° [REPERTORIO], Patagonica Inmobiliaria SpA, como arrendadora, y ${nombre}, RUT ${rut}, como arrendataria, celebraron un Contrato de Arrendamiento respecto del local comercial individualizado como ${sitio}, ubicado en ${edificio}, con una renta mensual de ${ufRenta} Unidades de Fomento (UF), mas IVA, con vigencia hasta el ${termStr} (en adelante, \"El Contrato\").`,{sa:120}),
+    wp("SEGUNDO: Cambio de Denominacion Social.",{bold:true,sb:120,sa:80}),
+    wp(`2.1. Por escritura publica de fecha [FECHA TRANSFORMACION], otorgada ante la Notaria de Santiago de [NOTARIO TRANSFORMACION], Repertorio N° [REPERTORIO TRANSFORMACION], ${nombre}, RUT ${rut}, modifico su denominacion social, pasando a llamarse [NUEVA DENOMINACION SOCIAL], manteniendo el mismo RUT ${rut}, el mismo objeto social y los mismos socios y/o accionistas, constituyendo por tanto la misma persona juridica bajo nueva razon social.`,{sa:120}),
+    wp("2.2. Como consecuencia de lo anterior, todos los derechos y obligaciones de El Contrato, incluyendo la calidad de arrendataria, el domicilio contratado, las condiciones economicas y los plazos vigentes, son plenamente exigibles por y en contra de [NUEVA DENOMINACION SOCIAL] en su calidad de continuadora legal.",{sa:120}),
+    wp("TERCERO: Modificacion del Contrato.",{bold:true,sb:120,sa:80}),
+    wp(`3.1. En merito de lo expuesto, las partes convienen en modificar El Contrato en lo que respecta a la individualizacion de La Arrendataria, reemplazando en todo el texto del instrumento y sus anexos la mencion a \"${nombre}\" por \"[NUEVA DENOMINACION SOCIAL]\", manteniendose en lo demas vigente El Contrato sin modificacion alguna.`,{sa:120}),
+    wp("3.2. En consecuencia, las condiciones economicas del arrendamiento, esto es, renta mensual, garantia, fecha de termino, reajustes y demas estipulaciones del Contrato, permanecen vigentes sin alteracion.",{sa:200}),
+    wp("CUARTO: Gastos e Impuestos.",{bold:true,sb:120,sa:80}),
+    wp("4.1. Los gastos, derechos e impuestos derivados del otorgamiento del presente instrumento seran de cargo de La Arrendataria.",{sa:200}),
+    wp("PERSONERIA",{bold:true,center:true,sz:24,sb:200,sa:120}),
+    wp("La personeria de don Alejandro Enrique Sanchez Doberti y de don Rudolf Marcos Mijac Gysling para representar a Patagonica Inmobiliaria SpA consta en escritura publica de fecha 4 de abril de 2014, otorgada ante la Notaria de Santiago de don Humberto Santelices Narvaez.",{sa:120}),
+    wp(`La personeria de [NOMBRE REPRESENTANTE LEGAL] para representar a [NUEVA DENOMINACION SOCIAL] (antes ${nombre}) consta en escritura publica de fecha [FECHA PERSONERIA], otorgada ante la Notaria de [NOTARIA PERSONERIA].`,{sa:120}),
+    wp("Personerias no se insertan por ser conocidas por las partes y por el Notario que autoriza.",{sa:300}),
+    wp("_________________________________________",{center:true,sa:40}),
+    wp("Alejandro Enrique Sanchez Doberti",{center:true,sa:20}),
+    wp("p.p. PATAGONICA INMOBILIARIA SpA",{center:true,sa:200}),
+    wp("_________________________________________",{center:true,sa:40}),
+    wp("Rudolf Marcos Mijac Gysling",{center:true,sa:20}),
+    wp("p.p. PATAGONICA INMOBILIARIA SpA",{center:true,sa:200}),
+    wp("_________________________________________",{center:true,sa:40}),
+    wp("[NOMBRE REPRESENTANTE LEGAL]",{center:true,sa:20}),
+    wp("p.p. [NUEVA DENOMINACION SOCIAL]",{center:true,sa:20}),
+    wp("(antes: "+nombre+")",{center:true,sa:40}),
+  ].join("");
+  const docXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="709" w:footer="709" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const ct=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/></Types>`;
+  const rels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+  const drels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/></Relationships>`;
+  const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:rPrDefault></w:docDefaults></w:styles>`;
+  const sets=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:defaultTabStop w:val="708"/></w:settings>`;
+  const zip=new JSZip();
+  zip.file("[Content_Types].xml",ct);zip.file("_rels/.rels",rels);
+  zip.file("word/document.xml",docXml);zip.file("word/_rels/document.xml.rels",drels);
+  zip.file("word/styles.xml",styles);zip.file("word/settings.xml",sets);
+  const blob=await zip.generateAsync({type:"blob",mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=url;
+  a.download=`Borrador_CambioDenominacion_${(c.nombre||"cliente").replace(/[^a-zA-Z0-9]/g,"_")}.docx`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+}
+
 /* ═══════════════════════════════════
    VISTA CONTRATOS
 ═══════════════════════════════════ */
@@ -1369,7 +1447,7 @@ function ContratosView({dashData,driveLoading}){
         ),
         h("div",{style:{overflowX:"auto"}},
           h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
-            h("thead",null,h("tr",{style:{background:"#f0f4f8"}},["Sitio","Cliente / RUT","Edificio","Fecha Término","Días Restantes","Renovación Auto.","Aviso","Fecha Notificación","Borrador"].map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap"}},col.toUpperCase())))),
+            h("thead",null,h("tr",{style:{background:"#f0f4f8"}},["Sitio","Cliente / RUT","Edificio","Fecha Término","Días Restantes","Renovación Auto.","Aviso","Fecha Notificación","Borrador Contrato","Borrador Nueva Denominación"].map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap"}},col.toUpperCase())))),
             h("tbody",null,vencimientos.map((c,i)=>{
               const dias=diasDesde(c.termTermino);
               const{bg,col,bdr}=urgBg(dias,false);
@@ -1384,7 +1462,8 @@ function ContratosView({dashData,driveLoading}){
                 h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.renovacion||"—"),
                 h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.aviso||"—"),
                 h("td",{style:{padding:"9px 12px"}},notif?h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600,color:"var(--accl)",background:"var(--bbg)",padding:"2px 8px",borderRadius:6,border:"1px solid #b5d0f0"}},notif):h("span",{style:{color:"var(--txd)",fontSize:10}},"Sin datos de aviso")),
-                h("td",{style:{padding:"6px 12px",whiteSpace:"nowrap"}},h("button",{onClick:()=>{const key=c.rut+i;setBorradorLoading(prev=>({...prev,[key]:true}));generarBorrador(c).catch(e=>console.error(e)).finally(()=>setBorradorLoading(prev=>({...prev,[key]:false})));},disabled:!!borradorLoading[c.rut+i],title:"Generar borrador Word",style:{background:borradorLoading[c.rut+i]?"var(--surf3)":"linear-gradient(135deg,#1a5fa8,#2676c8)",color:borradorLoading[c.rut+i]?"var(--txm)":"#fff",border:"1px solid #b5d0f0",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:borradorLoading[c.rut+i]?"not-allowed":"pointer",display:"inline-flex",alignItems:"center",gap:4,opacity:borradorLoading[c.rut+i]?0.65:1}},borradorLoading[c.rut+i]?h("span",{className:"spin"},"⟳"):"📄",borradorLoading[c.rut+i]?" Generando...":" Borrador"))
+                h("td",{style:{padding:"6px 12px",whiteSpace:"nowrap"}},h("button",{onClick:()=>{const key=c.rut+i;setBorradorLoading(prev=>({...prev,[key]:true}));generarBorrador(c).catch(e=>console.error(e)).finally(()=>setBorradorLoading(prev=>({...prev,[key]:false})));},disabled:!!borradorLoading[c.rut+i],title:"Generar borrador contrato",style:{background:borradorLoading[c.rut+i]?"var(--surf3)":"linear-gradient(135deg,#1a5fa8,#2676c8)",color:borradorLoading[c.rut+i]?"var(--txm)":"#fff",border:"1px solid #b5d0f0",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:borradorLoading[c.rut+i]?"not-allowed":"pointer",display:"inline-flex",alignItems:"center",gap:4,opacity:borradorLoading[c.rut+i]?0.65:1}},borradorLoading[c.rut+i]?h("span",{className:"spin"},"⟳"):"📄",borradorLoading[c.rut+i]?" Generando...":" Borrador Contrato")),
+                h("td",{style:{padding:"6px 12px",whiteSpace:"nowrap"}},h("button",{onClick:()=>{const key2="den"+c.rut+i;setBorradorLoading(prev=>({...prev,[key2]:true}));generarBorradorDenominacion(c).catch(e=>console.error(e)).finally(()=>setBorradorLoading(prev=>({...prev,[key2]:false})));},disabled:!!borradorLoading["den"+c.rut+i],title:"Generar borrador cambio de denominación legal",style:{background:borradorLoading["den"+c.rut+i]?"var(--surf3)":"linear-gradient(135deg,#0a7c4e,#12a066)",color:borradorLoading["den"+c.rut+i]?"var(--txm)":"#fff",border:"1px solid var(--gdim)",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:borradorLoading["den"+c.rut+i]?"not-allowed":"pointer",display:"inline-flex",alignItems:"center",gap:4,opacity:borradorLoading["den"+c.rut+i]?0.65:1}},borradorLoading["den"+c.rut+i]?h("span",{className:"spin"},"⟳"):"🏢",borradorLoading["den"+c.rut+i]?" Generando...":" Nueva Denominación"))
               );
             }))
           )
