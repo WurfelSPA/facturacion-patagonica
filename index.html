@@ -1412,6 +1412,8 @@ function ContratosView({dashData,driveLoading}){
   const [tab,setTab]=useState("vencimientos");
   const [search,setSearch]=useState("");
   const [borradorLoading,setBorradorLoading]=useState({});
+  const [borradorCliente,setBorradorCliente]=useState("");
+  const [borradorTipo,setBorradorTipo]=useState("contrato");
   const now=new Date();
   const currentYear=now.getFullYear();
   function avisoDias(str){if(!str||str==="-"||str==="")return null;const s=str.toLowerCase();const m=s.match(/(\d+)/);if(!m)return null;const n=parseInt(m[1]);if(s.includes("año")||s.includes("ano"))return n*365;if(s.includes("mes"))return n*30;return n;}
@@ -1427,7 +1429,45 @@ function ContratosView({dashData,driveLoading}){
   const venc90=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d>30&&d<=90;}).length;
   const vencMas=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d>90;}).length;
   if(!dashData)return h("main",{style:{flex:1,padding:"40px",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12}},driveLoading?h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},h("span",{className:"spin",style:{fontSize:18}},"⟳"),"Cargando planilla desde Drive..."):h("div",{style:{fontSize:13,color:"var(--txd)"}},"Sin datos — carga la planilla de facturación"));
+  const todosClientes=[...new Map(clients.map(c=>[c.rut,c])).values()].sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  const clienteSeleccionado=todosClientes.find(c=>c.rut===borradorCliente)||null;
   return h("main",{style:{flex:1,overflowY:"auto",padding:"20px 24px",display:"flex",flexDirection:"column",gap:16},className:"fade-up"},
+    /* ── Panel generador de borradores ── */
+    h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,padding:"14px 18px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}},
+      h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",whiteSpace:"nowrap"}},"📄 GENERAR BORRADOR"),
+      h("select",{
+        value:borradorCliente,
+        onChange:e=>setBorradorCliente(e.target.value),
+        style:{flex:1,minWidth:200,fontSize:12,padding:"6px 10px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)",fontFamily:"'DM Sans',sans-serif"}
+      },
+        h("option",{value:""},"— Seleccionar cliente —"),
+        todosClientes.map(c=>h("option",{key:c.rut,value:c.rut},c.nombre+" ("+c.sitio+")"))
+      ),
+      h("select",{
+        value:borradorTipo,
+        onChange:e=>setBorradorTipo(e.target.value),
+        style:{width:220,fontSize:12,padding:"6px 10px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)",fontFamily:"'DM Sans',sans-serif"}
+      },
+        h("option",{value:"contrato"},"Contrato de Arrendamiento"),
+        h("option",{value:"denominacion"},"Cambio de Denominación Legal")
+      ),
+      h("button",{
+        disabled:!clienteSeleccionado||!!borradorLoading["panel"],
+        onClick:async()=>{
+          if(!clienteSeleccionado)return;
+          setBorradorLoading(p=>({...p,panel:true}));
+          try{
+            if(borradorTipo==="contrato") await generarBorrador(clienteSeleccionado);
+            else await generarBorradorDenominacion(clienteSeleccionado);
+          }catch(e){console.error(e);}
+          setBorradorLoading(p=>({...p,panel:false}));
+        },
+        style:{padding:"7px 18px",borderRadius:8,border:"none",fontWeight:700,fontSize:12,cursor:clienteSeleccionado?"pointer":"not-allowed",
+          background:borradorLoading["panel"]||!clienteSeleccionado?"var(--surf3)":"linear-gradient(135deg,var(--acc),var(--acc2))",
+          color:borradorLoading["panel"]||!clienteSeleccionado?"var(--txm)":"#fff",
+          display:"inline-flex",alignItems:"center",gap:6,whiteSpace:"nowrap"}
+      },borradorLoading["panel"]?h("span",{className:"spin"},"⟳"):"⬇","  Descargar Borrador")
+    ),
     h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}},
       h("div",{style:{display:"flex",gap:6,flexWrap:"wrap"}},
         h("button",{onClick:()=>setTab("vencimientos"),className:`pill${tab==="vencimientos"?" active":""}`},`📅 Vencimientos ${currentYear} (${vencimientos.length})`),
@@ -1447,7 +1487,7 @@ function ContratosView({dashData,driveLoading}){
         ),
         h("div",{style:{overflowX:"auto"}},
           h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
-            h("thead",null,h("tr",{style:{background:"#f0f4f8"}},["Sitio","Cliente / RUT","Edificio","Fecha Término","Días Restantes","Renovación Auto.","Aviso","Fecha Notificación","Borrador Contrato","Borrador Nueva Denominación"].map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap"}},col.toUpperCase())))),
+            h("thead",null,h("tr",{style:{background:"#f0f4f8"}},["Sitio","Cliente / RUT","Edificio","Fecha Término","Días Restantes","Renovación Auto.","Aviso","Fecha Notificación"].map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap"}},col.toUpperCase())))),
             h("tbody",null,vencimientos.map((c,i)=>{
               const dias=diasDesde(c.termTermino);
               const{bg,col,bdr}=urgBg(dias,false);
@@ -1462,8 +1502,6 @@ function ContratosView({dashData,driveLoading}){
                 h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.renovacion||"—"),
                 h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.aviso||"—"),
                 h("td",{style:{padding:"9px 12px"}},notif?h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600,color:"var(--accl)",background:"var(--bbg)",padding:"2px 8px",borderRadius:6,border:"1px solid #b5d0f0"}},notif):h("span",{style:{color:"var(--txd)",fontSize:10}},"Sin datos de aviso")),
-                h("td",{style:{padding:"6px 12px",whiteSpace:"nowrap"}},h("button",{onClick:()=>{const key=c.rut+i;setBorradorLoading(prev=>({...prev,[key]:true}));generarBorrador(c).catch(e=>console.error(e)).finally(()=>setBorradorLoading(prev=>({...prev,[key]:false})));},disabled:!!borradorLoading[c.rut+i],title:"Generar borrador contrato",style:{background:borradorLoading[c.rut+i]?"var(--surf3)":"linear-gradient(135deg,#1a5fa8,#2676c8)",color:borradorLoading[c.rut+i]?"var(--txm)":"#fff",border:"1px solid #b5d0f0",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:borradorLoading[c.rut+i]?"not-allowed":"pointer",display:"inline-flex",alignItems:"center",gap:4,opacity:borradorLoading[c.rut+i]?0.65:1}},borradorLoading[c.rut+i]?h("span",{className:"spin"},"⟳"):"📄",borradorLoading[c.rut+i]?" Generando...":" Borrador Contrato")),
-                h("td",{style:{padding:"6px 12px",whiteSpace:"nowrap"}},h("button",{onClick:()=>{const key2="den"+c.rut+i;setBorradorLoading(prev=>({...prev,[key2]:true}));generarBorradorDenominacion(c).catch(e=>console.error(e)).finally(()=>setBorradorLoading(prev=>({...prev,[key2]:false})));},disabled:!!borradorLoading["den"+c.rut+i],title:"Generar borrador cambio de denominación legal",style:{background:borradorLoading["den"+c.rut+i]?"var(--surf3)":"linear-gradient(135deg,#0a7c4e,#12a066)",color:borradorLoading["den"+c.rut+i]?"var(--txm)":"#fff",border:"1px solid var(--gdim)",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:borradorLoading["den"+c.rut+i]?"not-allowed":"pointer",display:"inline-flex",alignItems:"center",gap:4,opacity:borradorLoading["den"+c.rut+i]?0.65:1}},borradorLoading["den"+c.rut+i]?h("span",{className:"spin"},"⟳"):"🏢",borradorLoading["den"+c.rut+i]?" Generando...":" Nueva Denominación"))
               );
             }))
           )
