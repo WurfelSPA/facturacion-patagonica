@@ -1978,6 +1978,17 @@ function App(){
       filas.forEach((f,i)=>{const key=`${periodo}|${f.cliente}|${f.concepto}`;if(sentKeys.has(key))prevSent.add(i);});
       setSentSet(prevSent);
       if(prevSent.size>0)addLog(`✓ ${prevSent.size} correos ya enviados en sesiones anteriores`,"ok");
+      /* ── Email de notificación con stats reales ── */
+      try{
+        const eTotal=filas.length;
+        const eConPdf=filas.filter(f=>f.factura&&f.ufPdf!==null).length;
+        const eSinPdf=filas.filter(f=>!f.factura||f.ufPdf===null).length;
+        const eCoinc=filas.filter(f=>getEstado(f)==="ok").length;
+        const notifHtml=`<p>Las facturas PISA de <strong>${periodo}</strong> han sido separadas y subidas a Google Drive.</p><p><strong>TOTAL ${eTotal}</strong> | <strong style="color:#16a34a">CON PDF ${eConPdf}</strong> Facturas cruzadas | <strong style="color:#dc2626">SIN PDF ${eSinPdf}</strong> revisar | <strong style="color:#2563eb">COINCIDEN ${eCoinc}</strong> listos para enviar</p><p>Ingresa a la app y presiona <strong>Procesar ${periodo}</strong> para continuar.</p>`;
+        const gmailTok=await getToken();
+        await sendGmail(gmailTok,"amelendez@patagonica.cl","",REMITENTE,`📋 Facturas PISA ${periodo} listas en Drive`,notifHtml,null,null);
+        addLog("✓ Email de notificación enviado","ok");
+      }catch(e){console.warn("Email notif error:",e.message);}
     }catch(e){addLog("✗ Error: "+e.message,"err");setProcDone(true);notify("Error: "+e.message,"err");}
   },[files,periodo]);
 
@@ -2633,19 +2644,11 @@ function App(){
                   if(!splitRes.ok)throw new Error(splitData.error||"Error al separar PDF");
                   notify("✓ "+splitData.totalFacturas+" facturas de "+periodo+" listas en Drive","ok");
                   setZipStatus("idle");
-                  /* ── Notificaciones: email + Telegram ── */
-                  const msgTexto=`✅ Facturas PISA ${periodo} listas\n${splitData.totalFacturas} PDFs separados y subidos a Drive.\nPresiona Procesar para continuar.`;
-                  // Email
-                  try{
-                    const notifHtml=`<p>Las facturas PISA de <strong>${periodo}</strong> han sido separadas y subidas a Google Drive.</p><p><strong>${splitData.totalFacturas} PDFs</strong> listos para procesar.</p><p>Ingresa a la app y presiona <strong>Procesar ${periodo}</strong> para continuar.</p>`;
-                    const gmailTok=await getToken();
-                    await sendGmail(gmailTok,"amelendez@patagonica.cl","",REMITENTE,`📋 Facturas PISA ${periodo} listas en Drive`,notifHtml,null,null);
-                  }catch(e){console.warn("Email notif error:",e.message);}
-                  // Telegram
+                  /* ── Notificación Telegram al subir ── */
                   try{
                     const tgBot=window.__TG_BOT__;
                     const tgChat=window.__TG_CHAT__;
-                    if(tgBot&&tgChat) await sendTelegram(tgBot,tgChat,msgTexto);
+                    if(tgBot&&tgChat) await sendTelegram(tgBot,tgChat,`✅ Facturas PISA ${periodo} listas\n${splitData.totalFacturas} PDFs subidos a Drive.\nPresiona Procesar para continuar.`);
                   }catch(e){console.warn("Telegram notif error:",e.message);}
                 }catch(e){setZipStatus("error");setZipError(e.message);notify("Error: "+e.message,"err");}
                 ev.target.value="";
