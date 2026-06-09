@@ -2124,6 +2124,21 @@ function App(){
     }catch(e){notify(e.message.includes("popup")?"Autorización cancelada":"Error: "+e.message,"warn");}
   };
 
+  /* ── Sincronizar planilla: escribe "Enviado" en HC para todos los ya enviados ── */
+  const sincronizarPlanilla=useCallback(async()=>{
+    const enviadas=data.filter((_,i)=>sentSet.has(i)&&data[i]?.sheetRow);
+    if(!enviadas.length)return notify("No hay enviados con fila de planilla para sincronizar","warn");
+    notify(`Sincronizando ${enviadas.length} filas en planilla...`,"info");
+    let ok=0,err=0;
+    for(const row of enviadas){
+      try{
+        const r=await fetch("/api/planilla",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sheetRow:row.sheetRow})});
+        if(r.ok)ok++; else err++;
+      }catch(e){err++;console.warn("sync planilla:",e.message);}
+    }
+    notify(err===0?`✓ ${ok} filas sincronizadas en planilla`:`✓ ${ok} OK · ${err} errores — revisa consola`,"ok");
+  },[data,sentSet]);
+
   /* Sin SetupPanel — siempre va al dashboard */
 
   const enriched=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
@@ -2772,10 +2787,17 @@ function App(){
       ),
       h("footer",{style:{background:"#ddeaf8",borderTop:"1px solid #b8d0ee",padding:"9px 18px",display:"flex",alignItems:"center",justifyContent:"space-between"}},
         h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},`${filtered.length}/${stats.total} · ${stats.sent} enviados · ${periodo}`),
-        h("button",{
-            onClick:unlocked?sendAll:()=>setShowPwdModal(true),
-            style:{background:unlocked?"var(--gbg)":"var(--surf2)",border:unlocked?"1px solid var(--gdim)":"1px solid var(--bdr)",color:unlocked?"var(--green)":"var(--txm)",borderRadius:8,padding:"7px 16px",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:6,cursor:"pointer"}
-          },unlocked?`✉ Enviar todos (${Math.max(0,stats.ok-stats.sent)})`:`🔒 Enviar todos (${Math.max(0,stats.ok-stats.sent)})`)
+        h("div",{style:{display:"flex",gap:8,alignItems:"center"}},
+          stats.sent>0&&h("button",{
+              onClick:sincronizarPlanilla,
+              title:"Escribe 'Enviado' en columna HC de la planilla para todos los correos enviados esta sesión",
+              style:{background:"var(--surf2)",border:"1px solid var(--bdr)",color:"var(--txm)",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:5}
+            },"📋 Sincronizar planilla"),
+          h("button",{
+              onClick:unlocked?sendAll:()=>setShowPwdModal(true),
+              style:{background:unlocked?"var(--gbg)":"var(--surf2)",border:unlocked?"1px solid var(--gdim)":"1px solid var(--bdr)",color:unlocked?"var(--green)":"var(--txm)",borderRadius:8,padding:"7px 16px",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:6,cursor:"pointer"}
+            },unlocked?`✉ Enviar todos (${Math.max(0,stats.ok-stats.sent)})`:`🔒 Enviar todos (${Math.max(0,stats.ok-stats.sent)})`)
+        )
       )
     )
     ,view==="ventas"&&h(VentasView,{periodo})
