@@ -44,11 +44,49 @@ const API    = 'https://api.nubox.com/nubox.api';
 const APIV   = 'https://api.nubox.com/Nubox.API';
 const APIV1  = 'https://api.pyme.nubox.com/nbxpymapi-environment-pyme';
 
+// ── Handler legado nubox-pisa (GET ?utn=...&mes=YYYY-MM) ─────────────────────
+async function handlePisa(req, res) {
+  const { mes, utn } = req.query;
+  if (!utn) return res.status(400).json({ error: 'Se requiere el parámetro utn' });
+  if (!mes || !/^\d{4}-\d{2}$/.test(mes)) return res.status(400).json({ error: 'Se requiere mes en formato YYYY-MM' });
+  const [year, month] = mes.split('-');
+  const fechaDesde = `01/${month}/${year}`;
+  const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+  const fechaHasta = `${String(lastDay).padStart(2,'0')}/${month}/${year}`;
+  const BASE = 'https://app.nubox.com';
+  const H = { 'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept-Language':'es-CL,es;q=0.9' };
+  try {
+    const p1 = await fetch(`${BASE}/ServiFactura/paginas/dtePrincipal.aspx?utn=${encodeURIComponent(utn)}`, { headers:H, redirect:'follow' });
+    const rawCookies = p1.headers.getSetCookie ? p1.headers.getSetCookie() : (p1.headers.get('set-cookie')?[p1.headers.get('set-cookie')]:[]);
+    const cookieHeader = rawCookies.map(c=>c.split(';')[0]).join('; ');
+    const dtePage = `${BASE}/ServiFactura/paginas/dteDocumentosTributarios.aspx`;
+    const dteRes = await fetch(dtePage, { headers:{...H,Cookie:cookieHeader}, redirect:'follow' });
+    const html = await dteRes.text();
+    const tokenMatch = html.match(/var\s+token\s*=\s*["']([A-Za-z0-9+/=]{20,})["']/) || html.match(/"token"\s*:\s*"([A-Za-z0-9+/=]{20,})"/) || html.match(/token\s*=\s*["']([A-Za-z0-9+/=]{20,})["']/);
+    if (!tokenMatch) return res.status(500).json({ error:'No se pudo extraer el token. El utn puede haber expirado.', htmlSnippet:html.substring(0,800) });
+    const token = tokenMatch[1];
+    const funcMatch = html.match(/funcionarioId\s*[=:]\s*["']?(\d{4,})["']?/) || html.match(/"funcionarioId"\s*:\s*"(\d+)"/);
+    const funcionarioId = funcMatch ? funcMatch[1] : '339708';
+    const filtroRes = await fetch(`${dtePage}/ObtenerPorFiltro`, { method:'POST', headers:{...H,'Content-Type':'application/json; charset=utf-8',Cookie:cookieHeader,Referer:dtePage}, body:JSON.stringify({token,EstadoId:3,estadoEnvio:0,fechaDesde,fechaHasta,filtro:'<Terminos></Terminos>',folioDesde:0,folioHasta:0,usaFormatoImpresionEspecial:false}) });
+    if (!filtroRes.ok) return res.status(502).json({ error:`ObtenerPorFiltro ${filtroRes.status}`, body:await filtroRes.text() });
+    const filtroInner = JSON.parse((await filtroRes.json()).d);
+    const documentos = filtroInner.data || [];
+    if (documentos.length === 0) return res.status(404).json({ error:`No se encontraron documentos para ${mes}` });
+    const ids = documentos.map(d=>d.Id).join(',');
+    const pdfRes = await fetch(`${dtePage}/VerPDF`, { method:'POST', headers:{...H,'Content-Type':'application/json; charset=utf-8',Cookie:cookieHeader,Referer:dtePage}, body:JSON.stringify({token,funcionarioId,id:ids}) });
+    if (!pdfRes.ok) return res.status(502).json({ error:`VerPDF ${pdfRes.status}`, body:await pdfRes.text() });
+    const pdfPath = (await pdfRes.json()).d;
+    return res.status(200).json({ ok:true, pdfUrl:`${BASE}${pdfPath}`, total:filtroInner.total?.[0]?.Total??documentos.length, mes, fechaDesde, fechaHasta });
+  } catch(err) { return res.status(500).json({ error:err.message }); }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
+  // GET con utn → flujo legado nubox-pisa
+  if (req.method === 'GET') return handlePisa(req, res);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
   const { mes, destFolderId } = req.body || {};
