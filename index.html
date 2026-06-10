@@ -269,6 +269,45 @@ function makeEmail(to,cco,from,subject,body,attachBase64,attachName,attachMime){
   return btoa(unescape(encodeURIComponent(msg))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
 
+/* ── Test de escritura Google Sheets (ejecutar desde consola) ── */
+window.__testSheets=async function(celda){
+  celda=celda||"HC2";
+  console.log("=== TEST SHEETS ===");
+  console.log("Spreadsheet ID:", DRIVE_PLANILLA_ID);
+  console.log("Celda destino: Flujo!"+celda);
+  let token;
+  try{
+    console.log("Obteniendo token Google (puede aparecer popup)...");
+    token=await getGoogleToken(window.__PAT_GID__||PRESET_GID||"",true);
+    console.log("Token OK, primeros 30 chars:", token.substring(0,30)+"...");
+  }catch(e){
+    console.error("ERROR obteniendo token:", e.message);
+    return {ok:false,step:"token",error:e.message};
+  }
+  const range=encodeURIComponent("Flujo!"+celda);
+  const url=`https://sheets.googleapis.com/v4/spreadsheets/${DRIVE_PLANILLA_ID}/values/${range}?valueInputOption=RAW`;
+  console.log("PUT →", url);
+  try{
+    const r=await fetch(url,{
+      method:"PUT",
+      headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},
+      body:JSON.stringify({values:[["TEST_OK"]]})
+    });
+    const body=await r.json().catch(()=>({}));
+    if(r.ok){
+      console.log("✅ ÉXITO — respuesta:", JSON.stringify(body));
+      return {ok:true,status:r.status,body};
+    }else{
+      console.error("❌ ERROR HTTP "+r.status+":", JSON.stringify(body));
+      return {ok:false,status:r.status,body};
+    }
+  }catch(e){
+    console.error("❌ ERROR fetch:", e.message);
+    return {ok:false,step:"fetch",error:e.message};
+  }
+};
+console.log("💡 Prueba disponible: await window.__testSheets() — escribe TEST_OK en Flujo!HC2");
+
 /* ── Extraer comentarios de la planilla para el mes indicado ── */
 async function extraerComentariosMes(xlsxFile, periodo){
   const MESES={Enero:0,Febrero:1,Marzo:2,Abril:3,Mayo:4,Junio:5,Julio:6,Agosto:7,Septiembre:8,Octubre:9,Noviembre:10,Diciembre:11};
