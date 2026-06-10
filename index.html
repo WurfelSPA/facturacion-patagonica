@@ -2405,7 +2405,7 @@ function App(){
       const nuevoMapa={};
       for(const p of pdfs){if(p.nroFact&&p.zipPath)nuevoMapa[p.nroFact]={zipPath:p.zipPath,nombre:p.pdfNombre};}
       /* Habilitaciones desde Drive */
-      for(const h of habDrive){nuevoMapa[h.nroFact]={driveFileId:h.driveFileId,nombre:h.pdfNombre};}
+      for(const h of habDrive){nuevoMapa[h.nroFact]={...(nuevoMapa[h.nroFact]||{}),driveFileId:h.driveFileId,nombre:h.pdfNombre};}
       setPdfMap(nuevoMapa);
       const sinPdf=filas.filter(f=>!f.factura);
       const revisar=filas.filter(f=>f.factura&&f.matchScore===1);
