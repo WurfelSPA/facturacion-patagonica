@@ -2,84 +2,171 @@
  * /api/planilla
  * GET        → descarga la planilla xlsx desde Google Drive (Service Account)
  * GET ?diag  → diagnóstico SA
- * POST       → escribe "Enviado" en columna HC del XLSX y re-sube a Drive
+ * POST       → escribe "Enviado" en columna HC sin tocar formato
  *              Body: { sheetRow: number } | { sheetRows: number[] }
+ *
+ * Estrategia de escritura: abre el .xlsx como ZIP, modifica sólo el XML de la
+ * celda HC (sin re-parsear ni re-generar el libro completo), y re-sube.
+ * Así se preservan 100 % los estilos, colores y formatos originales.
  */
 
-import XLSX from 'xlsx';
+import JSZip from 'jszip';
 
 export const config = { api: { bodyParser: true } };
 
 const SPREADSHEET_ID = process.env.DRIVE_PLANILLA_ID || "1yIKK0ZgU5C1ARsD6NIryRlHnom2Qilml";
 const SHEET_NAME     = "Flujo";
-const HC_COL         = 210; // columna HC (0-indexed): (8-1)*26+3 = 185... recalculado abajo
+const HC_COL         = "HC";   // columna 211 (1-indexed), 210 (0-indexed)
 
-// HC en Google Sheets: H=8, C=3
-// Fórmula para columnas de 2 letras: (letra1_num * 26) + letra2_num - 1 (0-indexed)
-// H=8, C=3 → (8*26)+3 - 1 = 210   ← 0-indexed correcto
-
-// ── JWT / SA helpers ──────────────────────────────────────────────────────────
+// ── JWT / SA ──────────────────────────────────────────────────────────────────
 async function signJWT(payload, privateKey) {
   const header = { alg: "RS256", typ: "JWT" };
-  const encode = obj => btoa(JSON.stringify(obj)).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
-  const signingInput = `${encode(header)}.${encode(payload)}`;
-  const pem = privateKey.replace(/-----BEGIN PRIVATE KEY-----/,"").replace(/-----END PRIVATE KEY-----/,"").replace(/\s/g,"");
-  const binaryKey = Uint8Array.from(atob(pem), c => c.charCodeAt(0));
-  const cryptoKey = await crypto.subtle.importKey("pkcs8", binaryKey.buffer, {name:"RSASSA-PKCS1-v1_5",hash:"SHA-256"}, false, ["sign"]);
-  const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", cryptoKey, new TextEncoder().encode(signingInput));
+  const enc = o => btoa(JSON.stringify(o)).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
+  const input = `${enc(header)}.${enc(payload)}`;
+  const pem = privateKey.replace(/-----[^-]+-----/g,"").replace(/\s/g,"");
+  const key = await crypto.subtle.importKey(
+    "pkcs8", Uint8Array.from(atob(pem), c=>c.charCodeAt(0)).buffer,
+    { name:"RSASSA-PKCS1-v1_5", hash:"SHA-256" }, false, ["sign"]
+  );
+  const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(input));
   const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
-  return `${signingInput}.${sigB64}`;
+  return `${input}.${sigB64}`;
 }
-
 async function getAccessToken(sa, scope) {
-  const now = Math.floor(Date.now() / 1000);
+  const now = Math.floor(Date.now()/1000);
   const jwt = await signJWT({
-    iss: sa.client_email,
-    scope: scope || "https://www.googleapis.com/auth/drive",
-    aud: "https://oauth2.googleapis.com/token",
-    iat: now, exp: now + 3600,
+    iss: sa.client_email, scope: scope || "https://www.googleapis.com/auth/drive",
+    aud: "https://oauth2.googleapis.com/token", iat: now, exp: now+3600,
   }, sa.private_key);
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
+  const r = await fetch("https://oauth2.googleapis.com/token", {
+    method:"POST", headers:{"Content-Type":"application/x-www-form-urlencoded"},
+    body:`grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
   });
-  const data = await res.json();
-  if (!data.access_token) throw new Error("SA token error: " + JSON.stringify(data));
-  return data.access_token;
+  const d = await r.json();
+  if (!d.access_token) throw new Error("SA token: " + JSON.stringify(d));
+  return d.access_token;
 }
 
-// ── Drive helpers ─────────────────────────────────────────────────────────────
-async function downloadXlsx(token) {
+// ── Drive ─────────────────────────────────────────────────────────────────────
+async function downloadFile(token) {
   const r = await fetch(
     `https://www.googleapis.com/drive/v3/files/${SPREADSHEET_ID}?alt=media`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
-  if (!r.ok) {
-    const txt = await r.text();
-    throw new Error(`Drive download ${r.status}: ${txt.slice(0, 200)}`);
-  }
+  if (!r.ok) throw new Error(`Drive download ${r.status}: ${(await r.text()).slice(0,200)}`);
   return Buffer.from(await r.arrayBuffer());
 }
-
-async function uploadXlsx(token, buffer) {
+async function uploadFile(token, buf) {
   const r = await fetch(
     `https://www.googleapis.com/upload/drive/v3/files/${SPREADSHEET_ID}?uploadType=media`,
-    {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Length": String(buffer.length),
-      },
-      body: buffer,
-    }
+    { method:"PATCH", headers:{
+        Authorization:`Bearer ${token}`,
+        "Content-Type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Length": String(buf.length),
+      }, body: buf }
   );
-  if (!r.ok) {
-    const txt = await r.text();
-    throw new Error(`Drive upload ${r.status}: ${txt.slice(0, 200)}`);
+  if (!r.ok) throw new Error(`Drive upload ${r.status}: ${(await r.text()).slice(0,200)}`);
+  return r.json();
+}
+
+// ── XML cell helpers ──────────────────────────────────────────────────────────
+function escXml(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+/**
+ * Devuelve la ruta dentro del ZIP para la hoja llamada SHEET_NAME.
+ */
+async function getSheetPath(zip) {
+  const wb = await zip.file("xl/workbook.xml").async("string");
+  // Busca r:id para la hoja — los atributos pueden venir en distinto orden
+  let rId = null;
+  for (const re of [
+    new RegExp(`name="${SHEET_NAME}"[^>]+r:id="([^"]+)"`),
+    new RegExp(`r:id="([^"]+)"[^>]+name="${SHEET_NAME}"`),
+  ]) {
+    const m = wb.match(re); if (m) { rId = m[1]; break; }
   }
-  return await r.json();
+  if (!rId) throw new Error(`Hoja "${SHEET_NAME}" no encontrada en workbook.xml`);
+
+  const rels = await zip.file("xl/_rels/workbook.xml.rels").async("string");
+  const rm = rels.match(new RegExp(`Id="${rId}"[^>]+Target="([^"]+)"`));
+  if (!rm) throw new Error(`Relación ${rId} no encontrada`);
+  let t = rm[1];
+  if (t.startsWith("/")) t = t.slice(1);          // /xl/worksheets/... → xl/worksheets/...
+  if (!t.startsWith("xl/")) t = `xl/${t}`;         // worksheets/... → xl/worksheets/...
+  return t;
+}
+
+/**
+ * Modifica el XML de la hoja para escribir `value` en la celda HC{rowNum}.
+ * Solo toca el nodo <c> concreto — el resto del XML queda idéntico.
+ */
+function patchCellXml(xml, rowNum, value) {
+  const cellRef  = `${HC_COL}${rowNum}`;
+  const newCell  = `<c r="${cellRef}" t="inlineStr"><is><t>${escXml(value)}</t></is></c>`;
+
+  // ── 1. Reemplazar celda existente ─────────────────────────────────────────
+  const refStr = `r="${cellRef}"`;
+  const refIdx = xml.indexOf(refStr);
+  if (refIdx !== -1) {
+    // Localizar inicio del tag <c
+    const cStart = xml.lastIndexOf("<c", refIdx);
+    if (cStart !== -1 && refIdx - cStart < 120) {
+      const gtIdx = xml.indexOf(">", cStart);
+      if (gtIdx !== -1) {
+        if (xml[gtIdx - 1] === "/") {
+          // Celda vacía auto-cerrada:  <c r="HC5" ... />
+          return xml.slice(0, cStart) + newCell + xml.slice(gtIdx + 1);
+        } else {
+          // Celda con contenido:  <c ...>...</c>
+          const closeIdx = xml.indexOf("</c>", cStart);
+          if (closeIdx !== -1)
+            return xml.slice(0, cStart) + newCell + xml.slice(closeIdx + 4);
+        }
+      }
+    }
+  }
+
+  // ── 2. Celda no existe — insertar en la fila existente ────────────────────
+  for (const rowTag of [`<row r="${rowNum}" `, `<row r="${rowNum}">`]) {
+    const rowIdx = xml.indexOf(rowTag);
+    if (rowIdx !== -1) {
+      const rowEnd = xml.indexOf("</row>", rowIdx);
+      if (rowEnd !== -1)
+        return xml.slice(0, rowEnd) + newCell + xml.slice(rowEnd);
+    }
+  }
+
+  // ── 3. Fila no existe — insertar fila antes de </sheetData> ───────────────
+  const sdEnd = xml.lastIndexOf("</sheetData>");
+  if (sdEnd !== -1) {
+    const newRow = `<row r="${rowNum}">${newCell}</row>`;
+    return xml.slice(0, sdEnd) + newRow + xml.slice(sdEnd);
+  }
+
+  return xml; // no se pudo — devuelve sin cambio
+}
+
+/**
+ * Abre el .xlsx como ZIP, modifica celdas HC y devuelve el ZIP corregido.
+ * El resto de archivos del ZIP (estilos, imágenes, etc.) se preservan intactos.
+ */
+async function patchXlsx(buffer, rows, value) {
+  const zip = await JSZip.loadAsync(buffer);
+  const sheetPath = await getSheetPath(zip);
+  let sheetXml = await zip.file(sheetPath).async("string");
+
+  for (const row of rows) {
+    sheetXml = patchCellXml(sheetXml, row, value);
+  }
+
+  zip.file(sheetPath, sheetXml);
+  return zip.generateAsync({
+    type: "nodebuffer",
+    compression: "DEFLATE",
+    compressionOptions: { level: 6 },
+  });
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -93,65 +180,39 @@ export default async function handler(req, res) {
   if (!saJson) return res.status(500).json({ error: "GOOGLE_SERVICE_ACCOUNT no configurada" });
   const sa = JSON.parse(saJson);
 
-  // ── GET ?diag ──────────────────────────────────────────────────────────────
-  if (req.method === "GET" && req.query.diag === "1") {
+  // ── GET ?diag ─────────────────────────────────────────────────────────────
+  if (req.method === "GET" && req.query.diag === "1")
     return res.status(200).json({ client_email: sa.client_email, project_id: sa.project_id });
-  }
 
-  // ── POST: escribe "Enviado" en columna HC ──────────────────────────────────
+  // ── POST ──────────────────────────────────────────────────────────────────
   if (req.method === "POST") {
     const body = req.body || {};
-
-    // Acepta { sheetRow: number } o { sheetRows: number[] }
     let rows = [];
-    if (Array.isArray(body.sheetRows)) rows = body.sheetRows.filter(n => typeof n === "number" && n > 0);
-    else if (typeof body.sheetRow === "number" && body.sheetRow > 0) rows = [body.sheetRow];
+    if (Array.isArray(body.sheetRows))            rows = body.sheetRows.filter(n=>typeof n==="number"&&n>0);
+    else if (typeof body.sheetRow==="number"&&body.sheetRow>0) rows = [body.sheetRow];
     if (!rows.length) return res.status(400).json({ error: "Se requiere sheetRow o sheetRows" });
 
     try {
-      const token = await getAccessToken(sa, "https://www.googleapis.com/auth/drive");
-
-      // 1. Descargar XLSX
-      const buffer = await downloadXlsx(token);
-
-      // 2. Parsear
-      const wb = XLSX.read(buffer, { type: "buffer", cellStyles: true });
-      const ws = wb.Sheets[SHEET_NAME];
-      if (!ws) throw new Error(`Hoja "${SHEET_NAME}" no encontrada en el archivo`);
-
-      // 3. Modificar celda HC{sheetRow} = "Enviado" para cada fila
-      const ref = ws["!ref"] ? XLSX.utils.decode_range(ws["!ref"]) : { s:{r:0,c:0}, e:{r:0,c:0} };
-      for (const sheetRow of rows) {
-        const cellAddr = XLSX.utils.encode_cell({ r: sheetRow - 1, c: HC_COL });
-        ws[cellAddr] = { v: "Enviado", t: "s" };
-        if (sheetRow - 1 > ref.e.r) ref.e.r = sheetRow - 1;
-        if (HC_COL > ref.e.c) ref.e.c = HC_COL;
-      }
-      ws["!ref"] = XLSX.utils.encode_range(ref);
-
-      // 4. Re-generar XLSX
-      const outBuffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-
-      // 5. Re-subir a Drive (mismo fileId, mismo nombre)
-      await uploadXlsx(token, outBuffer);
-
+      const token  = await getAccessToken(sa);
+      const buf    = await downloadFile(token);
+      const patched = await patchXlsx(buf, rows, "Enviado");
+      await uploadFile(token, patched);
       return res.status(200).json({ ok: true, updated: rows.length, rows });
     } catch (e) {
-      console.error("planilla POST error:", e.message);
+      console.error("planilla POST:", e.message);
       return res.status(500).json({ error: e.message });
     }
   }
 
-  // ── GET: descargar planilla xlsx ───────────────────────────────────────────
+  // ── GET: descargar planilla ───────────────────────────────────────────────
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
-
   try {
     const token = await getAccessToken(sa);
-    const buffer = await downloadXlsx(token);
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Cache-Control", "no-store");
-    res.setHeader("Content-Length", String(buffer.length));
-    return res.status(200).send(buffer);
+    const buf   = await downloadFile(token);
+    res.setHeader("Content-Type","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Cache-Control","no-store");
+    res.setHeader("Content-Length", String(buf.length));
+    return res.status(200).send(buf);
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
