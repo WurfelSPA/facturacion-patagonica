@@ -45,6 +45,11 @@ export default async function handler(req, res) {
   if (!saJson) return res.status(500).json({ error: "GOOGLE_SERVICE_ACCOUNT no configurada" });
   const sa = JSON.parse(saJson);
 
+  // ── GET ?diag: diagnóstico SA (solo email y project_id) ─────────────────
+  if (req.method === "GET" && req.query.diag === "1") {
+    return res.status(200).json({ client_email: sa.client_email, project_id: sa.project_id });
+  }
+
   // ── POST: marcar "Enviado" en columna HC del Sheets ──────────────────────
   if (req.method === "POST") {
     const { sheetRow } = req.body || {};
