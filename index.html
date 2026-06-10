@@ -750,6 +750,7 @@ async function procesarHabilitacionesDrive(periodo,clientes,addLog){
   const anioNum=parseInt(parts[1]);
   if(!mesNum||!anioNum)return[];
   const resultado=[];
+  const vistosNro=new Set();
   try{
     const r=await fetch(`/api/historial?ls=${HAB_FOLDER}`);
     if(!r.ok)return[];
@@ -763,39 +764,52 @@ async function procesarHabilitacionesDrive(periodo,clientes,addLog){
         const pdfBuf=await pdfR.arrayBuffer();
         const texto=await extraerTextoPDF(pdfBuf);
         const flat=texto.replace(/\s+/g," ");
-        /* Dividir en bloques por documento (Factura o Nota de Crédito) */
-        const bloques=flat.split(/(?=FACTURA ELECTRONICA|NOTA DE CREDITO)/);
-        for(const bloque of bloques){
-          if(!bloque.includes("FACTURA ELECTRONICA"))continue;
-          /* Fecha de emisión — verificar que coincida con el periodo actual */
-          const fechaM=bloque.match(/Fecha\s*Emisi[oó]n\s+(\d+)\s+de\s+(\w+)\s+de\s+(\d+)/i);
+
+        /*  Estrategia: encontrar todos los Nº de documento en el texto,
+            para cada uno tomar el contexto hasta el siguiente Nº,
+            verificar: 1) no es Nota de Crédito, 2) descripción dice "Habilitaci",
+            3) fecha de emisión coincide con el periodo */
+        const nroRe=/N[º°]\s*(\d{4,6})/g;
+        const nros=[...flat.matchAll(nroRe)];
+        for(let ni=0;ni<nros.length;ni++){
+          const posStart=Math.max(0,nros[ni].index-300); /* incluir cabecera */
+          const posEnd=ni+1<nros.length?nros[ni+1].index:flat.length;
+          const ctx=flat.slice(posStart,posEnd);
+          /* Saltar Notas de Crédito */
+          if(/NOTA\s+DE\s+CR[EÉ]DITO/i.test(ctx))continue;
+          /* Solo facturas de habilitación — la descripción lo confirma */
+          if(!/Habilitaci/i.test(ctx))continue;
+          /* N° de factura de este bloque */
+          const nroM=ctx.match(/N[º°]\s*(\d{4,6})/);
+          if(!nroM)continue;
+          const nroFact="F-"+nroM[1];
+          if(vistosNro.has(nroFact))continue;
+          /* Fecha de emisión: "5 de junio de 2026" */
+          const fechaM=ctx.match(/(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+de\s+(\d{4})/i);
           if(!fechaM)continue;
           const mesFact=MESES_ES[fechaM[2].toLowerCase()];
           const anioFact=parseInt(fechaM[3]);
           if(mesFact!==mesNum||anioFact!==anioNum)continue;
-          /* N° de factura */
-          const nroM=bloque.match(/Nº\s*(\d+)/);
-          if(!nroM)continue;
-          const nroFact="F-"+nroM[1];
           /* Cliente y RUT */
-          const cliM=bloque.match(/Se[nñ]or\(es\)\s+(.+?)\s+RUT\s+([\d.]+-[\dkK])/i);
+          const cliM=ctx.match(/Se[nñ]or\(es\)\s+(.+?)\s+RUT\s+([\d.]+-[\dkK])/i);
           const clienteNombre=cliM?cliM[1].trim():"";
           const rut=cliM?cliM[2].trim():"";
           /* UF desde Cant/Unidad: "157,14 UF" */
           let ufPdf=null;
-          const ufM=bloque.match(/([\d]+[,.][\d]+)\s*UF/);
+          const ufM=ctx.match(/([\d]+[,.][\d]+)\s*UF/);
           if(ufM)ufPdf=parseFloat(ufM[1].replace(",","."));
           /* Monto Total CLP */
           let montoTotal=null;
-          const mtM=bloque.match(/Monto\s*Total\s*([\d.]+)/i);
+          const mtM=ctx.match(/Monto\s*Total\s*([\d.]+)/i);
           if(mtM)montoTotal=parseInt(mtM[1].replace(/\./g,""),10)||null;
-          /* Buscar cliente en planilla por RUT para obtener correo y datos */
+          /* Email desde planilla por RUT */
           const rutNorm=rut.replace(/[.\-]/g,"").toLowerCase();
           const cPlan=clientes.find(c=>c.rut&&c.rut.replace(/[.\-]/g,"").toLowerCase()===rutNorm);
-          addLog(`  ✓ Hab ${nroFact} | ${clienteNombre.slice(0,30)} | UF ${ufPdf} | $${montoTotal?montoTotal.toLocaleString("es-CL"):"?"}`,"ok");
+          vistosNro.add(nroFact);
+          addLog(`  ✓ Hab ${nroFact} | ${(clienteNombre||rut).slice(0,30)} | UF ${ufPdf} | $${montoTotal?montoTotal.toLocaleString("es-CL"):"?"}`,"ok");
           resultado.push({
             sitio:cPlan?.sitio||"",edificio:cPlan?.edificio||"",
-            clienteNombre,rut,
+            clienteNombre:clienteNombre||cPlan?.cliente||rut,rut,
             correo:cPlan?.email||"",
             nroFact,tipo:"habilitacion",
             ufPdf,montoTotal,ivaAmount:null,
