@@ -136,7 +136,7 @@ const SEND_PWD="patagonica2026";
 const DRIVE_PLANILLA_ID="1yIKK0ZgU5C1ARsD6NIryRlHnom2Qilml";
 const DRIVE_FACTURACION_FOLDER_ID="1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u"; /* Carpeta Facturacion Mensual */
 const DRIVE_PDF_FACTURAS_ID="1Pl7s4FNyjVQOMcEBtgCcvCGD4FlzRg2W"; /* PDF Facturas del mes — actualizar cada mes */
-const GOOGLE_SCOPES="https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.file";
+const GOOGLE_SCOPES="https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets";
 const TG_BOT=window.__TG_BOT__||"";
 const TG_CHAT=window.__TG_CHAT__||"";
 const PRESET_KEY=window.__PAT_KEY__||"";
@@ -2042,7 +2042,7 @@ function App(){
       const key=`${periodo}|${row.cliente}|${row.concepto}`;
       marcarEnviado(idx,key);
       /* Marcar en planilla Google Sheets */
-      if(row.sheetRow&&!MODO_PRUEBA){fetch("/api/planilla",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sheetRow:row.sheetRow})}).catch(e=>console.warn("mark-sent:",e.message));}
+      if(row.sheetRow&&!MODO_PRUEBA){getToken().then(ut=>fetch("/api/planilla",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sheetRow:row.sheetRow,userToken:ut})})).catch(e=>console.warn("mark-sent:",e.message));}
       notify("✓ Correo enviado"+(MODO_PRUEBA?" (PRUEBA)":"")+" → "+dest+(pdfB64?" · con PDF":""));
     }catch(e){if(e.message.includes("invalid_grant")||e.message.includes("Token"))setGmailToken(null);notify("Error: "+e.message,"err");}
     setSendingIdx(null);
@@ -2117,7 +2117,7 @@ function App(){
         const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura,ufSII);
         const pdf=pdfMap[row.factura];let pdfB64=null;
         if(pdf?.zipPath&&files.zip){try{pdfB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}}
-        try{await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(row.i,key);if(row.sheetRow&&!MODO_PRUEBA){fetch("/api/planilla",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sheetRow:row.sheetRow})}).catch(e=>console.warn("mark-sent:",e.message));}enviados++;await new Promise(r=>setTimeout(r,400));}
+        try{await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(row.i,key);if(row.sheetRow&&!MODO_PRUEBA){getToken().then(ut=>fetch("/api/planilla",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sheetRow:row.sheetRow,userToken:ut})})).catch(e=>console.warn("mark-sent:",e.message));}enviados++;await new Promise(r=>setTimeout(r,400));}
         catch(e){notify("Error en "+row.cliente+": "+e.message,"err");}
       }
       if(enviados>0){try{const resumenRows=pend.slice(0,enviados);const resumenHtml=buildResumenHtml(resumenRows,periodo);const resSubject="Resumen Facturación "+periodo+" — "+enviados+" correos enviados";await sendGmail(token,"amelendez@patagonica.cl","","amelendez@patagonica.cl",resSubject,resumenHtml,null,null);await sendGmail(token,"mmunoz@patagonica.cl","","amelendez@patagonica.cl",resSubject,resumenHtml,null,null);}catch(e){console.warn("Error enviando resumen:",e.message);}}
@@ -2131,11 +2131,13 @@ function App(){
     if(!enviadas.length)return notify("No hay enviados con fila de planilla para sincronizar","warn");
     let ok=0,err=0,lastError="";
     setSyncStatus({done:0,total:enviadas.length,error:""});
+    let userToken=null;
+    try{userToken=await getToken();}catch(e){notify("Error obteniendo token Google: "+e.message,"err");setSyncStatus(null);return;}
     for(let j=0;j<enviadas.length;j++){
       const row=enviadas[j];
       setSyncStatus({done:j,total:enviadas.length,error:""});
       try{
-        const r=await fetch("/api/planilla",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sheetRow:row.sheetRow})});
+        const r=await fetch("/api/planilla",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sheetRow:row.sheetRow,userToken})});
         const rj=await r.json().catch(()=>({}));
         if(r.ok) ok++;
         else{ err++; lastError=rj.error||`HTTP ${r.status}`; console.warn(`sync fila ${row.sheetRow}:`,lastError); }

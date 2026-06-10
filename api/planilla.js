@@ -52,11 +52,12 @@ export default async function handler(req, res) {
 
   // ── POST: marcar "Enviado" en columna HC del Sheets ──────────────────────
   if (req.method === "POST") {
-    const { sheetRow } = req.body || {};
+    const { sheetRow, userToken } = req.body || {};
     if (!sheetRow || typeof sheetRow !== "number")
       return res.status(400).json({ error: "Se requiere sheetRow" });
     try {
-      const token = await getAccessToken(sa, "https://www.googleapis.com/auth/spreadsheets");
+      // Preferir token OAuth del usuario (evita dependencia de SA para Sheets API)
+      const token = userToken || await getAccessToken(sa, "https://www.googleapis.com/auth/spreadsheets");
       const range = encodeURIComponent(`Flujo!HC${sheetRow}`);
       const r = await fetch(
         `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}?valueInputOption=RAW`,
