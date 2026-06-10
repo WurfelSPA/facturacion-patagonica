@@ -88,9 +88,9 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 .month-val{font-size:9px;color:var(--txm);font-family:'DM Mono',monospace;text-align:center}
 .month-col:hover .month-seg-arr{background:#185fa5}
 .month-col:hover .month-val{color:var(--tx)}
-.dash-client-hdr{display:grid;grid-template-columns:58px minmax(140px,1fr) 100px 100px 100px 60px 95px 80px 65px 80px 60px 60px 55px 28px;border-bottom:2px solid var(--bdr);background:var(--surf)}
+.dash-client-hdr{display:grid;grid-template-columns:58px minmax(140px,1fr) 100px 100px 100px 60px 95px 80px 65px 80px 60px 60px 55px 70px 28px;border-bottom:2px solid var(--bdr);background:var(--surf)}
 .dash-client-hdr>div{padding:7px 8px;font-size:9px;font-weight:700;color:var(--txd);letter-spacing:.06em;text-transform:uppercase}
-.dash-client-row{display:grid;grid-template-columns:58px minmax(140px,1fr) 100px 100px 100px 60px 95px 80px 65px 80px 60px 60px 55px;border-bottom:1px solid var(--bdr);transition:background .1s;cursor:default}
+.dash-client-row{display:grid;grid-template-columns:58px minmax(140px,1fr) 100px 100px 100px 60px 95px 80px 65px 80px 60px 60px 55px 70px;border-bottom:1px solid var(--bdr);transition:background .1s;cursor:default}
 .dash-client-row:hover>div{background:var(--surf2)}
 .dash-client-row>div{padding:8px 8px;font-size:11px;display:flex;align-items:center}
 .nav-btn{background:transparent;border:1px solid var(--bdr);color:var(--txm);border-radius:8px;padding:5px 14px;font-size:11px;font-weight:500;display:flex;align-items:center;gap:5px}
@@ -449,7 +449,8 @@ async function parsePlanillaParaDashboard(file){
       fechaReajuste:serialToDate(row[52]),  /* Col BA: Fecha Reajuste */
       pctReaj:row[53]!=null?String(row[53]):"",            /* Col BB: % Reajuste */
       cadaAnios:row[54]!=null?String(row[54]).trim():"",   /* Col BC: Cada cuántos años */
-      m2:row[26]!=null&&row[26]!==""?Number(row[26]):null,  /* Col AA: Metros cuadrados */
+      m2:row[26]!=null&&row[26]!==""?Number(row[26]):null,   /* Col AA: Metros cuadrados */
+      ufM2:row[47]!=null&&row[47]!==""?Number(row[47]):null, /* Col AV: UF x m2 */
       hist:(()=>{
         /* BN=65, cada mes ocupa 4 cols: UF planilla, Facturado, Diferencia, Comentarios */
         /* Desde Abr-2023 hasta el presente */
@@ -2690,7 +2691,7 @@ function App(){
           h("input",{value:dashSearch,onChange:e=>setDashSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:180,marginLeft:"auto"}})
         ),
         h("div",{className:"dash-client-hdr"},
-          ["Sitio","Cliente / RUT","Arriendo CLP","Serv.Adm. CLP","Total CLP","IVA","Término","Antelac.","Aviso","F.Reajuste","% Reaj.","Cada","m²",""].map(col=>h("div",{key:col},col))
+          ["Sitio","Cliente / RUT","Arriendo CLP","Serv.Adm. CLP","Total CLP","IVA","Término","Antelac.","Aviso","F.Reajuste","% Reaj.","Cada","m²","UF×m²",""].map(col=>h("div",{key:col},col))
         ),
         h("div",{key:"rows-"+curSitio+"-"+tblClients.length,style:{maxHeight:420,overflowY:"auto",overflowX:"auto"}},
           tblClients.length===0?
@@ -2728,6 +2729,7 @@ function App(){
                 h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.pctReaj||"—"),
                 h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.cadaAnios?c.cadaAnios+" años":"—"),
                 h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},c.m2!=null?c.m2.toLocaleString("es-CL"):"—"),
+                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)",fontWeight:600}},c.ufM2!=null?c.ufM2.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2}):"—"),
                 h("div",{style:{fontSize:10,color:isSelected?"var(--acc)":"var(--txd)",textAlign:"right"}},isSelected?"▲":"📋")
               ),
               isSelected&&h(HistPanel,{client:c,anio:histAnio,setAnio:setHistAnio,onClose:()=>setHistClient(null)})
