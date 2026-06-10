@@ -58,7 +58,7 @@ export default async function handler(req, res) {
         { method: "PUT", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
           body: JSON.stringify({ values: [["Enviado"]] }) }
       );
-      if (!r.ok) { const e = await r.text(); return res.status(502).json({ error: `Sheets ${r.status}: ${e.slice(0,200)}` }); }
+      if (!r.ok) { const e = await r.text(); return res.status(502).json({ error: `Sheets ${r.status}: ${e.slice(0,500)}` }); }
       return res.status(200).json({ ok: true });
     } catch (e) {
       return res.status(500).json({ error: e.message });
