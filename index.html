@@ -3206,7 +3206,11 @@ function App(){
                       style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:"var(--blue)",background:"none",border:"none",cursor:"pointer",padding:0,textDecoration:"underline",fontWeight:600},
                       onClick:async()=>{
                         try{
-                          const b64=await getPdfBase64FromZip(files.zip,pdfMap[row.factura].zipPath);
+                          const pdf=pdfMap[row.factura];
+                          let b64=null;
+                          if(pdf?.zipPath&&files.zip){b64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}
+                          else if(pdf?.driveFileId){b64=await getPdfBase64FromDrive(pdf.driveFileId);}
+                          if(!b64)throw new Error("PDF no disponible");
                           const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
                           const url=URL.createObjectURL(new Blob([bytes],{type:"application/pdf"}));
                           window.open(url,"_blank");
