@@ -2729,7 +2729,7 @@ function App(){
                 h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.pctReaj||"—"),
                 h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.cadaAnios?c.cadaAnios+" años":"—"),
                 h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},c.m2!=null?c.m2.toLocaleString("es-CL"):"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)",fontWeight:600}},c.ufM2!=null?c.ufM2.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2}):"—"),
+                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)",fontWeight:600}},(c.ufM2!=null&&c.m2>0)?(c.ufM2/c.m2).toLocaleString("es-CL",{minimumFractionDigits:3,maximumFractionDigits:3}):"—"),
                 h("div",{style:{fontSize:10,color:isSelected?"var(--acc)":"var(--txd)",textAlign:"right"}},isSelected?"▲":"📋")
               ),
               isSelected&&h(HistPanel,{client:c,anio:histAnio,setAnio:setHistAnio,onClose:()=>setHistClient(null)})
