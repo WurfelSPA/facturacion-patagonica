@@ -616,8 +616,10 @@ async function guardarHistorialPeriodo(anio,periodo,filas){
   for(const f of filas){
     if(!f.factura)continue;
     if(!data[f.cliente])data[f.cliente]={};
-    if(f.concepto==="arriendo")data[f.cliente].arriendo=f.factura;
-    else if(f.concepto==="serv_adm")data[f.cliente].servAdm=f.factura;
+    const conc=(f.concepto||"").toLowerCase();
+    if(conc==="arriendo")data[f.cliente].arriendo=f.factura;
+    else if(conc==="serv. adm."||conc==="serv_adm")data[f.cliente].servAdm=f.factura;
+    else if(conc==="habilitación"||conc==="habilitacion")data[f.cliente].habilitacion=f.factura;
   }
   if(!Object.keys(data).length)return;
   try{
@@ -661,7 +663,7 @@ async function procesarPDFs(zipFile,addLog){
       const pdfBuf=await zip.files[path].async("arraybuffer");
       const texto=await extraerTextoPDF(pdfBuf);
       const textoJ=texto.replace(/\s+/g," ");
-      const tipo=textoJ.includes("Serv. Adm.")||textoJ.includes("Serv.Adm.")?"serv_adm":textoJ.includes("Arriendo")?"arriendo":nroFact.startsWith("FEE-")?"serv_adm":"arriendo";
+      const tipo=textoJ.includes("Serv. Adm.")||textoJ.includes("Serv.Adm.")?"serv_adm":textoJ.includes("Habilitaci")?"habilitacion":textoJ.includes("Arriendo")?"arriendo":nroFact.startsWith("FEE-")?"serv_adm":"arriendo";
 
     /* Extraer UF del texto del PDF — 3 patrones + fallback flat */
     let ufPdf=null;
@@ -1794,9 +1796,10 @@ function HistorialPanel({files,data,pdfMap,filesZip,periodo,getToken,notify,clie
           const zip=loadedZips[mes];
           const isLoadingThis=loadingMes===mes;
 
-          /* Habilitaciones: buscar archivos que contengan el nombre del cliente */
+          /* Habilitaciones: primero desde mapping del ZIP, luego fallback carpeta separada */
+          const habFactNum=mesMapping.habilitacion||null;
           const palabras=cliente.split(/\s+/).filter(p=>p.length>2);
-          const habMatch=(habList||[]).filter(f=>palabras.some(p=>f.name.toLowerCase().includes(p.toLowerCase())));
+          const habFallback=(habList||[]).filter(f=>palabras.some(p=>f.name.toLowerCase().includes(p.toLowerCase())));
 
           const FacturaCell=({facNum,uf,tipoLabel})=>{
             if(!uf)return h("span",{style:{color:"var(--txd)"}},"—");
@@ -1817,16 +1820,22 @@ function HistorialPanel({files,data,pdfMap,filesZip,periodo,getToken,notify,clie
             h("td",{style:tdS},h(FacturaCell,{facNum:mesMapping.arriendo,uf:mesData.ufArriendo,tipoLabel:"Arriendo"})),
             /* Serv. Admin */
             h("td",{style:tdS},h(FacturaCell,{facNum:mesMapping.servAdm,uf:mesData.ufServAdm,tipoLabel:"Serv. Adm."})),
-            /* Habilitaciones */
+            /* Habilitaciones — desde ZIP del mes (mapping) o carpeta separada (fallback) */
             h("td",{style:tdS},
-              habMatch.length===0?h("span",{style:{color:"var(--txd)"}},"—"):
-              h("div",{style:{display:"flex",flexDirection:"column",gap:4}},
-                habMatch.map(f=>h("button",{key:f.id,onClick:async()=>{
-                  try{const r=await fetch(`/api/historial?fileId=${f.id}`);const b=await r.blob();b.name=f.name;verPdf(null,mes,b);}catch(e){notify("Error abriendo PDF","err");}
-                },style:{background:"none",border:"none",color:"var(--acc)",cursor:"pointer",fontSize:11,textDecoration:"underline",textAlign:"left",padding:0}},
-                  "📄 "+f.name.slice(0,30)+(f.name.length>30?"…":""))
-                )
-              )
+              habFactNum
+                ? h("button",{
+                    onClick:()=>verPdf(habFactNum,mes),
+                    style:{background:"none",border:"none",color:"var(--acc)",cursor:"pointer",fontWeight:700,fontSize:12,textDecoration:"underline",padding:0}
+                  },habFactNum+" 👁")
+                : habFallback.length>0
+                  ? h("div",{style:{display:"flex",flexDirection:"column",gap:4}},
+                      habFallback.map(f=>h("button",{key:f.id,onClick:async()=>{
+                        try{const r=await fetch(`/api/historial?fileId=${f.id}`);const b=await r.blob();b.name=f.name;verPdf(null,mes,b);}catch(e){notify("Error abriendo PDF","err");}
+                      },style:{background:"none",border:"none",color:"var(--acc)",cursor:"pointer",fontSize:11,textDecoration:"underline",textAlign:"left",padding:0}},
+                        "📄 "+f.name.slice(0,30)+(f.name.length>30?"…":""))
+                      )
+                    )
+                  : h("span",{style:{color:"var(--txd)"}},"—")
             ),
             /* Reenviar */
             h("td",{style:{...tdS,textAlign:"center"}},
@@ -2211,7 +2220,7 @@ function App(){
        */
       for(const c of clientes){
         const correo=c.email||"";
-        const concepto=c.tipo==="arriendo"?"Arriendo":"Serv. Adm.";
+        const concepto=c.tipo==="arriendo"?"Arriendo":c.tipo==="habilitacion"?"Habilitación":"Serv. Adm.";
         const colRef=c.tipo==="arriendo"?"GS":"GT";
         const mk=`${c.sitio}|${c.cliente}|${c.uf}|${c.tipo}`;
         let factura="",ufPdf=null,montoTotal=null,ivaAmount=null,matchScore=0;
@@ -2261,7 +2270,7 @@ function App(){
         for(const p of pdfs){
           filas.push({
             sitio:p.sitio,cliente:p.nombreEnArchivo||p.nroFact,rut:"",correo:"",
-            concepto:p.tipo==="arriendo"?"Arriendo":"Serv. Adm.",colRef:"",
+            concepto:p.tipo==="arriendo"?"Arriendo":p.tipo==="habilitacion"?"Habilitación":"Serv. Adm.",colRef:"",
             factura:p.nroFact,matchScore:0,ufSII:null,ufPlan:p.ufPdf||0,ufPdf:p.ufPdf,montoTotal:p.montoTotal||null,enviado:false
           });
         }
