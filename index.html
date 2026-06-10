@@ -730,6 +730,86 @@ async function getPdfBase64FromZip(zipFile,zipPath){
   return btoa(binary);
 }
 
+async function getPdfBase64FromDrive(fileId){
+  const r=await fetch(`/api/historial?fileId=${fileId}`);
+  if(!r.ok)throw new Error("HTTP "+r.status);
+  const buf=await r.arrayBuffer();
+  const arr=new Uint8Array(buf);
+  let binary="";const chunk=8192;
+  for(let i=0;i<arr.length;i+=chunk)binary+=String.fromCharCode(...arr.slice(i,i+chunk));
+  return btoa(binary);
+}
+
+async function procesarHabilitacionesDrive(periodo,clientes,addLog){
+  const HAB_FOLDER="1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u";
+  const MESES_ES={enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8,septiembre:9,octubre:10,noviembre:11,diciembre:12};
+  const parts=periodo.split(" ");
+  if(parts.length<2)return[];
+  const mesNum=MESES_ES[parts[0].toLowerCase()];
+  const anioNum=parseInt(parts[1]);
+  if(!mesNum||!anioNum)return[];
+  const resultado=[];
+  try{
+    const r=await fetch(`/api/historial?ls=${HAB_FOLDER}`);
+    if(!r.ok)return[];
+    const {files}=await r.json();
+    if(!files?.length){addLog("ℹ Carpeta Habilitaciones vacía","info");return[];}
+    addLog(`📁 Habilitaciones Drive: ${files.length} archivo(s)`,"info");
+    for(const file of files.filter(f=>f.name.toLowerCase().endsWith(".pdf"))){
+      try{
+        const pdfR=await fetch(`/api/historial?fileId=${file.id}`);
+        if(!pdfR.ok)continue;
+        const pdfBuf=await pdfR.arrayBuffer();
+        const texto=await extraerTextoPDF(pdfBuf);
+        const flat=texto.replace(/\s+/g," ");
+        /* Dividir en bloques por documento (Factura o Nota de Crédito) */
+        const bloques=flat.split(/(?=FACTURA ELECTRONICA|NOTA DE CREDITO)/);
+        for(const bloque of bloques){
+          if(!bloque.includes("FACTURA ELECTRONICA"))continue;
+          /* Fecha de emisión — verificar que coincida con el periodo actual */
+          const fechaM=bloque.match(/Fecha\s*Emisi[oó]n\s+(\d+)\s+de\s+(\w+)\s+de\s+(\d+)/i);
+          if(!fechaM)continue;
+          const mesFact=MESES_ES[fechaM[2].toLowerCase()];
+          const anioFact=parseInt(fechaM[3]);
+          if(mesFact!==mesNum||anioFact!==anioNum)continue;
+          /* N° de factura */
+          const nroM=bloque.match(/Nº\s*(\d+)/);
+          if(!nroM)continue;
+          const nroFact="F-"+nroM[1];
+          /* Cliente y RUT */
+          const cliM=bloque.match(/Se[nñ]or\(es\)\s+(.+?)\s+RUT\s+([\d.]+-[\dkK])/i);
+          const clienteNombre=cliM?cliM[1].trim():"";
+          const rut=cliM?cliM[2].trim():"";
+          /* UF desde Cant/Unidad: "157,14 UF" */
+          let ufPdf=null;
+          const ufM=bloque.match(/([\d]+[,.][\d]+)\s*UF/);
+          if(ufM)ufPdf=parseFloat(ufM[1].replace(",","."));
+          /* Monto Total CLP */
+          let montoTotal=null;
+          const mtM=bloque.match(/Monto\s*Total\s*([\d.]+)/i);
+          if(mtM)montoTotal=parseInt(mtM[1].replace(/\./g,""),10)||null;
+          /* Buscar cliente en planilla por RUT para obtener correo y datos */
+          const rutNorm=rut.replace(/[.\-]/g,"").toLowerCase();
+          const cPlan=clientes.find(c=>c.rut&&c.rut.replace(/[.\-]/g,"").toLowerCase()===rutNorm);
+          addLog(`  ✓ Hab ${nroFact} | ${clienteNombre.slice(0,30)} | UF ${ufPdf} | $${montoTotal?montoTotal.toLocaleString("es-CL"):"?"}`,"ok");
+          resultado.push({
+            sitio:cPlan?.sitio||"",edificio:cPlan?.edificio||"",
+            clienteNombre,rut,
+            correo:cPlan?.email||"",
+            nroFact,tipo:"habilitacion",
+            ufPdf,montoTotal,ivaAmount:null,
+            yaEnviado:false,
+            sheetRow:cPlan?.sheetRow||null,
+            sentColLetter:cPlan?.sentColLetter||"HC",
+            driveFileId:file.id,pdfNombre:file.name,
+          });
+        }
+      }catch(eFile){addLog(`  ⚠ ${file.name}: ${eFile.message}`,"warn");}
+    }
+  }catch(e){addLog("⚠ Error habilitaciones Drive: "+e.message,"warn");}
+  return resultado;
+}
+
 const NOMBRE_KEY={
   "A 3 D Chile S. A.":"A3D","Gallyas Telecom S.A.":"GALLYAS","Sociedad de Alimentos Leefood SpA":"LEEFOOD",
   "Weidmuller SpA":"WEIDMULLER","Comercial Sna-e (Chile) Limitada":"SNA-E","Ingersoll Rand":"INGERSOLL-RAM",
@@ -1780,29 +1860,50 @@ function HistorialPanel({files,data,pdfMap,filesZip,periodo,getToken,notify,clie
       h("span",{style:{fontWeight:700,color:"var(--tx)"}},"✉ "+cliData.correo),
       cliData.rut&&h("span",{style:{color:"var(--txm)"}},"RUT: "+cliData.rut)
     ),
+    /* Habilitaciones desde carpeta Drive — calculado una vez por cliente */
+    ...(()=>{
+      if(!cliente||!cliData)return[];
+      const palabras=cliente.split(/\s+/).filter(p=>p.length>2);
+      const siglas=cliente.split(/\s+/).filter(w=>/^[A-ZÁÉÍÓÚÑÜ]/.test(w)&&w.length>1).map(w=>w[0].toUpperCase()).join('');
+      const habDrive=(habList||[]).filter(f=>{
+        const fwords=f.name.replace(/\.[^.]+$/,'').split(/[\s._\-]+/).filter(w=>w.length>2);
+        return palabras.some(p=>f.name.toLowerCase().includes(p.toLowerCase()))
+          ||fwords.some(fw=>siglas.includes(fw.toUpperCase())&&fw.length>=3);
+      });
+      if(habDrive.length===0)return[];
+      return[h("div",{style:{marginTop:16,background:"var(--surf2)",borderRadius:10,border:"1px solid var(--bdr)",padding:"14px 16px"}},
+        h("div",{style:{fontSize:11,fontWeight:700,color:"var(--txm)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:10}},"🔧 Habilitaciones en Drive"),
+        h("div",{style:{display:"flex",flexWrap:"wrap",gap:8}},
+          habDrive.map(f=>h("button",{key:f.id,
+            onClick:async()=>{
+              try{const r=await fetch(`/api/historial?fileId=${f.id}`);const b=await r.blob();b.name=f.name;verPdf(null,null,b);}
+              catch(e){notify("Error abriendo PDF","err");}
+            },
+            style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:7,padding:"7px 12px",cursor:"pointer",fontSize:12,color:"var(--acc)",fontWeight:600,display:"flex",alignItems:"center",gap:5}
+          },"📄 "+f.name.replace(/\.[^.]+$/,''))
+          )
+        )
+      )];
+    })(),
     /* Tabla */
     cliente&&cliData&&h("div",{style:{overflowX:"auto",borderRadius:10,border:"1px solid var(--bdr)"}},
       h("table",{style:{width:"100%",borderCollapse:"collapse"}},
         h("thead",null,h("tr",null,
           h("th",{style:{...thS,width:100}},"Mes"),
           h("th",{style:{...thS,width:160}},"Arriendo"),
-          h("th",{style:{style:"160px",...thS,width:160}},"Serv. Administrativo"),
-          h("th",{style:{...thS,width:160}},"Habilitaciones"),
+          h("th",{style:{...thS,width:160}},"Serv. Administrativo"),
+          h("th",{style:{...thS,width:130}},"N° Hab."),
           h("th",{style:{...thS,width:100,textAlign:"center"}},"Reenviar"),
         )),
         h("tbody",null,mesesOrden.map(mes=>{
           const mesData=cliData.meses[mes];
           if(!mesData)return null;
           const mesMapping=mapping[`${mes} ${anio}`]?.[cliente]||{};
-          const zip=loadedZips[mes];
-          const isLoadingThis=loadingMes===mes;
 
-          /* Habilitaciones: primero desde mapping del ZIP, luego fallback carpeta separada */
+          /* Habilitacion desde ZIP del mes (si fue procesada en procesar()) */
           const habFactNum=mesMapping.habilitacion||null;
-          const palabras=cliente.split(/\s+/).filter(p=>p.length>2);
-          const habFallback=(habList||[]).filter(f=>palabras.some(p=>f.name.toLowerCase().includes(p.toLowerCase())));
 
-          const FacturaCell=({facNum,uf,tipoLabel})=>{
+          const FacturaCell=({facNum,uf})=>{
             if(!uf)return h("span",{style:{color:"var(--txd)"}},"—");
             if(mesData.yaEnviado||mesData.enviado){
               if(facNum)return h("button",{
@@ -1815,30 +1916,18 @@ function HistorialPanel({files,data,pdfMap,filesZip,periodo,getToken,notify,clie
           };
 
           return h("tr",{key:mes,style:{background:mesData.yaEnviado?"rgba(22,163,74,.04)":"transparent"}},
-            /* Mes */
             h("td",{style:{...tdS,fontWeight:600,color:"var(--tx)"}},mes),
-            /* Arriendo */
-            h("td",{style:tdS},h(FacturaCell,{facNum:mesMapping.arriendo,uf:mesData.ufArriendo,tipoLabel:"Arriendo"})),
-            /* Serv. Admin */
-            h("td",{style:tdS},h(FacturaCell,{facNum:mesMapping.servAdm,uf:mesData.ufServAdm,tipoLabel:"Serv. Adm."})),
-            /* Habilitaciones — desde ZIP del mes (mapping) o carpeta separada (fallback) */
+            h("td",{style:tdS},h(FacturaCell,{facNum:mesMapping.arriendo,uf:mesData.ufArriendo})),
+            h("td",{style:tdS},h(FacturaCell,{facNum:mesMapping.servAdm,uf:mesData.ufServAdm})),
+            /* N° Habilitación — solo si quedó registrada en el ZIP del mes */
             h("td",{style:tdS},
               habFactNum
                 ? h("button",{
                     onClick:()=>verPdf(habFactNum,mes),
                     style:{background:"none",border:"none",color:"var(--acc)",cursor:"pointer",fontWeight:700,fontSize:12,textDecoration:"underline",padding:0}
                   },habFactNum+" 👁")
-                : habFallback.length>0
-                  ? h("div",{style:{display:"flex",flexDirection:"column",gap:4}},
-                      habFallback.map(f=>h("button",{key:f.id,onClick:async()=>{
-                        try{const r=await fetch(`/api/historial?fileId=${f.id}`);const b=await r.blob();b.name=f.name;verPdf(null,mes,b);}catch(e){notify("Error abriendo PDF","err");}
-                      },style:{background:"none",border:"none",color:"var(--acc)",cursor:"pointer",fontSize:11,textDecoration:"underline",textAlign:"left",padding:0}},
-                        "📄 "+f.name.slice(0,30)+(f.name.length>30?"…":""))
-                      )
-                    )
-                  : h("span",{style:{color:"var(--txd)"}},"—")
+                : h("span",{style:{color:"var(--txd)",fontSize:11}},"—")
             ),
-            /* Reenviar */
             h("td",{style:{...tdS,textAlign:"center"}},
               mesData.yaEnviado&&h("button",{
                 onClick:sending===mes?null:()=>reenviar(mes),
@@ -2176,7 +2265,12 @@ function App(){
 
       /* ── PASO 2: PDFs (siempre) ── */
       addLog("▶ Procesando PDFs del ZIP...","info");
-      const pdfs=await procesarPDFs(files.zip,addLog);setProcProgress(65);
+      const pdfs=await procesarPDFs(files.zip,addLog);setProcProgress(60);
+      /* ── Habilitaciones desde carpeta Drive (paralelo a ZIP) ── */
+      addLog("▶ Buscando habilitaciones en Drive...","info");
+      const habDrive=await procesarHabilitacionesDrive(periodo,clientes,addLog);
+      if(habDrive.length>0)addLog(`✓ ${habDrive.length} habilitacion(es) encontrada(s) para ${periodo}`,"ok");
+      setProcProgress(65);
       /* Obtener montos UF del servidor (extracción server-side) */
       addLog("▶ Extrayendo montos UF de PDFs...","info");
       try{
@@ -2279,8 +2373,23 @@ function App(){
         addLog("  Agrega el período a la planilla para cruzar datos y enviar correos","warn");
       }
 
+      /* ── Agregar habilitaciones Drive directamente a filas (sin cruce planilla) ── */
+      for(const h of habDrive){
+        filas.push({
+          sitio:h.sitio,edificio:h.edificio,cliente:h.clienteNombre,rut:h.rut,
+          correo:h.correo,concepto:"Habilitación",colRef:"",
+          factura:h.nroFact,matchScore:999,
+          ufSII:null,ufPlan:null,ufPdf:h.ufPdf,
+          montoTotal:h.montoTotal,ivaAmount:null,
+          enviado:false,yaEnviado:false,
+          sheetRow:h.sheetRow,sentColLetter:h.sentColLetter,
+        });
+      }
+
       const nuevoMapa={};
       for(const p of pdfs){if(p.nroFact&&p.zipPath)nuevoMapa[p.nroFact]={zipPath:p.zipPath,nombre:p.pdfNombre};}
+      /* Habilitaciones desde Drive */
+      for(const h of habDrive){nuevoMapa[h.nroFact]={driveFileId:h.driveFileId,nombre:h.pdfNombre};}
       setPdfMap(nuevoMapa);
       const sinPdf=filas.filter(f=>!f.factura);
       const revisar=filas.filter(f=>f.factura&&f.matchScore===1);
@@ -2357,6 +2466,7 @@ function App(){
       const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura,ufSII);
       const pdf=pdfMap[row.factura];let pdfB64=null;
       if(pdf?.zipPath&&files.zip){try{pdfB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}}
+      else if(pdf?.driveFileId){try{pdfB64=await getPdfBase64FromDrive(pdf.driveFileId);}catch(e){console.warn("Drive PDF:",e.message);}}
       await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);
       const key=`${periodo}|${row.cliente}|${row.concepto}`;
       marcarEnviado(idx,key);
@@ -2436,6 +2546,7 @@ function App(){
         const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura,ufSII);
         const pdf=pdfMap[row.factura];let pdfB64=null;
         if(pdf?.zipPath&&files.zip){try{pdfB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}}
+      else if(pdf?.driveFileId){try{pdfB64=await getPdfBase64FromDrive(pdf.driveFileId);}catch(e){console.warn("Drive PDF:",e.message);}}
         try{await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(row.i,key);if(row.sheetRow&&!MODO_PRUEBA){marcarEnviadoSheet(row.sheetRow,row.sentColLetter).catch(e=>console.warn("mark-sent:",e.message));}enviados++;await new Promise(r=>setTimeout(r,400));}
         catch(e){notify("Error en "+row.cliente+": "+e.message,"err");}
       }
