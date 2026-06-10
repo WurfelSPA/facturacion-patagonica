@@ -226,9 +226,10 @@ function formatCLPCompact(pesos){
 /* ── Google OAuth (Gmail + Drive) ── */
 function loadGisScript(){return new Promise(res=>{if(window.google?.accounts){res();return;}const s=document.createElement("script");s.src="https://accounts.google.com/gsi/client";s.onload=res;document.head.appendChild(s);});}
 let _gToken=null,_gTokenExp=0;
-async function getGoogleToken(clientId){
+async function getGoogleToken(clientId,forceConsent){
   await loadGisScript();
-  if(_gToken&&Date.now()<_gTokenExp-60000)return _gToken;
+  if(!forceConsent&&_gToken&&Date.now()<_gTokenExp-60000)return _gToken;
+  if(forceConsent){_gToken=null;_gTokenExp=0;}
   return new Promise((res,rej)=>{
     const client=google.accounts.oauth2.initTokenClient({
       client_id:clientId,scope:GOOGLE_SCOPES,
@@ -238,7 +239,7 @@ async function getGoogleToken(clientId){
         else{_gToken=resp.access_token;_gTokenExp=Date.now()+(resp.expires_in||3600)*1000;res(_gToken);}
       }
     });
-    client.requestAccessToken({prompt:""});
+    client.requestAccessToken({prompt:forceConsent?"consent":""});
   });
 }
 async function descargarPlanillaDrive(token){
@@ -1831,7 +1832,7 @@ function App(){
       .catch(e=>{console.error(e);setDashLoading(false);notify("Error leyendo planilla: "+e.message,"err");});
   },[files.planilla]);
 
-  const getToken=useCallback(async()=>{if(gmailToken)return gmailToken;const token=await getGoogleToken(clientId);setGmailToken(token);return token;},[gmailToken,clientId]);
+  const getToken=useCallback(async(forceConsent)=>{if(!forceConsent&&gmailToken)return gmailToken;const token=await getGoogleToken(clientId,forceConsent);setGmailToken(token);return token;},[gmailToken,clientId,setGmailToken]);
   const todosSubidos=files.zip&&zipStatus==="ready"; /* planilla es opcional */
 
   /* ── PROCESAR ── */
@@ -2041,8 +2042,8 @@ function App(){
       await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);
       const key=`${periodo}|${row.cliente}|${row.concepto}`;
       marcarEnviado(idx,key);
-      /* Marcar en planilla Google Sheets */
-      if(row.sheetRow&&!MODO_PRUEBA){getToken().then(ut=>fetch("/api/planilla",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sheetRow:row.sheetRow,userToken:ut})})).catch(e=>console.warn("mark-sent:",e.message));}
+      /* Marcar en planilla Google Sheets — llamada directa desde frontend */
+      if(row.sheetRow&&!MODO_PRUEBA){getToken().then(ut=>marcarEnviadoSheet(row.sheetRow,ut)).catch(e=>console.warn("mark-sent:",e.message));}
       notify("✓ Correo enviado"+(MODO_PRUEBA?" (PRUEBA)":"")+" → "+dest+(pdfB64?" · con PDF":""));
     }catch(e){if(e.message.includes("invalid_grant")||e.message.includes("Token"))setGmailToken(null);notify("Error: "+e.message,"err");}
     setSendingIdx(null);
@@ -2117,7 +2118,7 @@ function App(){
         const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura,ufSII);
         const pdf=pdfMap[row.factura];let pdfB64=null;
         if(pdf?.zipPath&&files.zip){try{pdfB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}}
-        try{await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(row.i,key);if(row.sheetRow&&!MODO_PRUEBA){getToken().then(ut=>fetch("/api/planilla",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sheetRow:row.sheetRow,userToken:ut})})).catch(e=>console.warn("mark-sent:",e.message));}enviados++;await new Promise(r=>setTimeout(r,400));}
+        try{await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(row.i,key);if(row.sheetRow&&!MODO_PRUEBA){getToken().then(ut=>marcarEnviadoSheet(row.sheetRow,ut)).catch(e=>console.warn("mark-sent:",e.message));}enviados++;await new Promise(r=>setTimeout(r,400));}
         catch(e){notify("Error en "+row.cliente+": "+e.message,"err");}
       }
       if(enviados>0){try{const resumenRows=pend.slice(0,enviados);const resumenHtml=buildResumenHtml(resumenRows,periodo);const resSubject="Resumen Facturación "+periodo+" — "+enviados+" correos enviados";await sendGmail(token,"amelendez@patagonica.cl","","amelendez@patagonica.cl",resSubject,resumenHtml,null,null);await sendGmail(token,"mmunoz@patagonica.cl","","amelendez@patagonica.cl",resSubject,resumenHtml,null,null);}catch(e){console.warn("Error enviando resumen:",e.message);}}
@@ -2126,6 +2127,25 @@ function App(){
   };
 
   /* ── Sincronizar planilla: escribe "Enviado" en HC para todos los ya enviados ── */
+  const marcarEnviadoSheet=useCallback(async(sheetRow,token)=>{
+    const range=encodeURIComponent(`Flujo!HC${sheetRow}`);
+    const r=await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${DRIVE_PLANILLA_ID}/values/${range}?valueInputOption=RAW`,
+      {method:"PUT",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},
+       body:JSON.stringify({values:[["Enviado"]]})}
+    );
+    if(!r.ok){
+      const e=await r.json().catch(()=>({}));
+      const msg=(e?.error?.message||"").slice(0,200);
+      /* 403 por scopes insuficientes → marcar error especial para re-auth */
+      if(r.status===403&&(msg.includes("insufficientPermissions")||msg.includes("Request had insufficient authentication scopes")||msg.toLowerCase().includes("scope"))){
+        throw new Error("SCOPE_ERROR: "+msg);
+      }
+      throw new Error(`Sheets ${r.status}: ${msg}`);
+    }
+    return true;
+  },[]);
+
   const sincronizarPlanilla=useCallback(async()=>{
     const enviadas=data.filter((r,i)=>sentSet.has(i)&&r.sheetRow);
     if(!enviadas.length)return notify("No hay enviados con fila de planilla para sincronizar","warn");
@@ -2135,18 +2155,29 @@ function App(){
     try{userToken=await getToken();}catch(e){notify("Error obteniendo token Google: "+e.message,"err");setSyncStatus(null);return;}
     for(let j=0;j<enviadas.length;j++){
       const row=enviadas[j];
-      setSyncStatus({done:j,total:enviadas.length,error:""});
+      setSyncStatus({done:j+1,total:enviadas.length,error:""});
       try{
-        const r=await fetch("/api/planilla",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sheetRow:row.sheetRow,userToken})});
-        const rj=await r.json().catch(()=>({}));
-        if(r.ok) ok++;
-        else{ err++; lastError=rj.error||`HTTP ${r.status}`; console.warn(`sync fila ${row.sheetRow}:`,lastError); }
-      }catch(e){err++;lastError=e.message;console.warn("sync planilla:",e.message);}
+        await marcarEnviadoSheet(row.sheetRow,userToken);
+        ok++;
+      }catch(e){
+        /* Si el token no tiene scope de Sheets, forzar re-autorización y reintentar */
+        if(e.message.startsWith("SCOPE_ERROR")){
+          setSyncStatus(null);
+          notify("Se necesita re-autorizar Google para acceso a Planilla. Aceptando permisos...","warn");
+          try{
+            userToken=await getToken(true);/* forceConsent=true */
+          }catch(re){notify("Error en re-autorización: "+re.message,"err");return;}
+          /* Reiniciar bucle desde el principio con nuevo token */
+          ok=0;err=0;lastError="";j=-1;setSyncStatus({done:0,total:enviadas.length,error:""});
+          continue;
+        }
+        err++;lastError=e.message;console.warn(`sync fila ${row.sheetRow}:`,e.message);
+      }
     }
     setSyncStatus(null);
     if(err===0) notify(`✓ ${ok} filas sincronizadas en planilla`,"ok");
-    else notify(`${ok} OK · ${err} errores — ${lastError.slice(0,80)}`,"err");
-  },[data,sentSet]);
+    else notify(`${ok} OK · ${err} errores — ${lastError.slice(0,100)}`,"err");
+  },[data,sentSet,getToken,marcarEnviadoSheet,clientId,setGmailToken]);
 
   /* Sin SetupPanel — siempre va al dashboard */
 
