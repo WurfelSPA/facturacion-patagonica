@@ -16,7 +16,7 @@ export const config = { api: { bodyParser: true } };
 
 const SPREADSHEET_ID = process.env.DRIVE_PLANILLA_ID || "1yIKK0ZgU5C1ARsD6NIryRlHnom2Qilml";
 const SHEET_NAME     = "Flujo";
-const HC_COL         = "HC";   // columna 211 (1-indexed), 210 (0-indexed)
+const HC_COL_DEFAULT = "HC";   // fallback: Junio 2026
 
 // ── JWT / SA ──────────────────────────────────────────────────────────────────
 async function signJWT(payload, privateKey) {
@@ -102,8 +102,8 @@ async function getSheetPath(zip) {
  * Modifica el XML de la hoja para escribir `value` en la celda HC{rowNum}.
  * Solo toca el nodo <c> concreto — el resto del XML queda idéntico.
  */
-function patchCellXml(xml, rowNum, value) {
-  const cellRef  = `${HC_COL}${rowNum}`;
+function patchCellXml(xml, rowNum, value, col) {
+  const cellRef  = `${col}${rowNum}`;
   const newCell  = `<c r="${cellRef}" t="inlineStr"><is><t>${escXml(value)}</t></is></c>`;
 
   // ── 1. Reemplazar celda existente ─────────────────────────────────────────
@@ -152,13 +152,14 @@ function patchCellXml(xml, rowNum, value) {
  * Abre el .xlsx como ZIP, modifica celdas HC y devuelve el ZIP corregido.
  * El resto de archivos del ZIP (estilos, imágenes, etc.) se preservan intactos.
  */
-async function patchXlsx(buffer, rows, value) {
+async function patchXlsx(buffer, rows, value, col) {
+  col = col || HC_COL_DEFAULT;
   const zip = await JSZip.loadAsync(buffer);
   const sheetPath = await getSheetPath(zip);
   let sheetXml = await zip.file(sheetPath).async("string");
 
   for (const row of rows) {
-    sheetXml = patchCellXml(sheetXml, row, value);
+    sheetXml = patchCellXml(sheetXml, row, value, col);
   }
 
   zip.file(sheetPath, sheetXml);
@@ -191,13 +192,15 @@ export default async function handler(req, res) {
     if (Array.isArray(body.sheetRows))            rows = body.sheetRows.filter(n=>typeof n==="number"&&n>0);
     else if (typeof body.sheetRow==="number"&&body.sheetRow>0) rows = [body.sheetRow];
     if (!rows.length) return res.status(400).json({ error: "Se requiere sheetRow o sheetRows" });
+    const sentCol = (typeof body.sentCol==="string"&&/^[A-Z]{1,3}$/.test(body.sentCol))
+      ? body.sentCol : HC_COL_DEFAULT;
 
     try {
       const token  = await getAccessToken(sa);
       const buf    = await downloadFile(token);
-      const patched = await patchXlsx(buf, rows, "Enviado");
+      const patched = await patchXlsx(buf, rows, "Enviado", sentCol);
       await uploadFile(token, patched);
-      return res.status(200).json({ ok: true, updated: rows.length, rows });
+      return res.status(200).json({ ok: true, updated: rows.length, rows, sentCol });
     } catch (e) {
       console.error("planilla POST:", e.message);
       return res.status(500).json({ error: e.message });

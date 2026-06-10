@@ -370,6 +370,8 @@ const ANIOS_VENTAS=[2022,2023,2024,2025,2026];
 const PERIODOS=(()=>{const p=[];for(let y=2022;y<=2026;y++)for(const m of MESES_NOMBRES)p.push(`${m} ${y}`);return p;})();
 const SITIO_C={"5-A":"#7c3aed","4-A":"#0d9488","A-2":"#ea580c","A-1":"#2563eb","D-2":"#db2777","B":"#64748b","J":"#b45309","D-3":"#0891b2","24.0":"#6d28d9"};
 const MES_NUM={"Enero":1,"Febrero":2,"Marzo":3,"Abril":4,"Mayo":5,"Junio":6,"Julio":7,"Agosto":8,"Septiembre":9,"Octubre":10,"Noviembre":11,"Diciembre":12};
+/* Convierte índice 0-based de columna a letra Excel: 0→A, 25→Z, 26→AA, 210→HC */
+function colIndexToLetter(idx){let r='',n=idx+1;while(n>0){const rem=(n-1)%26;r=String.fromCharCode(65+rem)+r;n=Math.floor((n-1)/26);}return r;}
 const SITIO_MAP={"5A":"5-A","4A":"4-A","A1":"A-1","A2":"A-2","B":"B","D2":"D-2"};
 
 async function callClaude(prompt){
@@ -514,7 +516,7 @@ async function procesarPlanillaFacturacion(file,periodo){
   const dataRaw=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
   const mesNum=MES_NUM[periodo.split(" ")[0]];
   const anio=parseInt(periodo.split(" ")[1]);
-  let colGS=-1,colGT=-1;
+  let colGS=-1,colGT=-1,colEnviado=-1;
 
   function esTargetMes(val){
     if(val===null||val===undefined)return false;
@@ -529,7 +531,7 @@ async function procesarPlanillaFacturacion(file,periodo){
   /* Fechas en fila 3 (índice 2) */
   const fila3=dataRaw[2]||[];
   for(let i=64;i<fila3.length;i++){
-    if(esTargetMes(fila3[i])){colGS=i;colGT=i+1;break;}
+    if(esTargetMes(fila3[i])){colGS=i;colGT=i+1;colEnviado=i+3;break;}
   }
   if(colGS===-1)throw new Error(`No se encontró columna para ${periodo}. Verifica que la planilla tenga ese mes.`);
 
@@ -547,10 +549,11 @@ async function procesarPlanillaFacturacion(file,periodo){
     const edif=row[8]?String(row[8]).trim():""; /* Col I: nro local / bodega / edif */
     const emailBilling=row[12]?String(row[12]).trim():"";
     const rutBilling=row[9]?String(row[9]).replace(/\./g,"").trim().toLowerCase():""; /* Col J: RUT normalizado */
-    const yaEnviado=row[210]&&String(row[210]).trim().toLowerCase()==="enviado"; /* Col HC: Correo Enviado */
+    const yaEnviado=colEnviado>0&&row[colEnviado]&&String(row[colEnviado]).trim().toLowerCase()==="enviado";
     const sheetRow=i+1; /* fila 1-indexed en el Sheets (dataRaw[i] = fila i+1) */
-    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,sheetRow});
-    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,sheetRow});
+    const sentColLetter=colIndexToLetter(colEnviado); /* columna dinámica: HC para Junio, HG para Julio, etc. */
+    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,sheetRow,sentColLetter});
+    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,sheetRow,sentColLetter});
   }
   return clientes;
 }
@@ -1961,7 +1964,7 @@ function App(){
             }
           }
         }
-        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,montoTotal,ivaAmount,enviado:false,yaEnviado:c.yaEnviado||false,sheetRow:c.sheetRow||null});
+        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,montoTotal,ivaAmount,enviado:false,yaEnviado:c.yaEnviado||false,sheetRow:c.sheetRow||null,sentColLetter:c.sentColLetter||"HC"});
       }
 
       /* ── Si no hay datos de planilla, mostrar igual los PDFs detectados ── */
@@ -2057,7 +2060,7 @@ function App(){
       const key=`${periodo}|${row.cliente}|${row.concepto}`;
       marcarEnviado(idx,key);
       /* Marcar en planilla Google Sheets — llamada directa desde frontend */
-      if(row.sheetRow&&!MODO_PRUEBA){marcarEnviadoSheet(row.sheetRow).catch(e=>console.warn("mark-sent:",e.message));}
+      if(row.sheetRow&&!MODO_PRUEBA){marcarEnviadoSheet(row.sheetRow,row.sentColLetter).catch(e=>console.warn("mark-sent:",e.message));}
       notify("✓ Correo enviado"+(MODO_PRUEBA?" (PRUEBA)":"")+" → "+dest+(pdfB64?" · con PDF":""));
     }catch(e){if(e.message.includes("invalid_grant")||e.message.includes("Token"))setGmailToken(null);notify("Error: "+e.message,"err");}
     setSendingIdx(null);
@@ -2132,7 +2135,7 @@ function App(){
         const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura,ufSII);
         const pdf=pdfMap[row.factura];let pdfB64=null;
         if(pdf?.zipPath&&files.zip){try{pdfB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}}
-        try{await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(row.i,key);if(row.sheetRow&&!MODO_PRUEBA){marcarEnviadoSheet(row.sheetRow).catch(e=>console.warn("mark-sent:",e.message));}enviados++;await new Promise(r=>setTimeout(r,400));}
+        try{await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(row.i,key);if(row.sheetRow&&!MODO_PRUEBA){marcarEnviadoSheet(row.sheetRow,row.sentColLetter).catch(e=>console.warn("mark-sent:",e.message));}enviados++;await new Promise(r=>setTimeout(r,400));}
         catch(e){notify("Error en "+row.cliente+": "+e.message,"err");}
       }
       if(enviados>0){try{const resumenRows=pend.slice(0,enviados);const resumenHtml=buildResumenHtml(resumenRows,periodo);const resSubject="Resumen Facturación "+periodo+" — "+enviados+" correos enviados";await sendGmail(token,"amelendez@patagonica.cl","","amelendez@patagonica.cl",resSubject,resumenHtml,null,null);await sendGmail(token,"mmunoz@patagonica.cl","","amelendez@patagonica.cl",resSubject,resumenHtml,null,null);}catch(e){console.warn("Error enviando resumen:",e.message);}}
@@ -2141,10 +2144,11 @@ function App(){
   };
 
   /* ── Sincronizar planilla: escribe "Enviado" en HC para todos los ya enviados ── */
-  /* Escribe "Enviado" en columna HC — servidor descarga XLSX, modifica y re-sube */
-  const marcarEnviadoSheet=useCallback(async(sheetRowOrRows)=>{
+  /* Escribe "Enviado" en columna dinámica — servidor descarga XLSX, modifica y re-sube */
+  const marcarEnviadoSheet=useCallback(async(sheetRowOrRows,sentCol)=>{
+    sentCol=sentCol||"HC";
     const isArray=Array.isArray(sheetRowOrRows);
-    const body=isArray?{sheetRows:sheetRowOrRows}:{sheetRow:sheetRowOrRows};
+    const body=isArray?{sheetRows:sheetRowOrRows,sentCol}:{sheetRow:sheetRowOrRows,sentCol};
     const r=await fetch("/api/planilla",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     const rj=await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(rj.error||`HTTP ${r.status}`);
@@ -2155,10 +2159,11 @@ function App(){
     const enviadas=data.filter((r,i)=>sentSet.has(i)&&r.sheetRow);
     if(!enviadas.length)return notify("No hay enviados con fila de planilla para sincronizar","warn");
     const sheetRows=enviadas.map(r=>r.sheetRow);
+    const sentCol=enviadas[0]?.sentColLetter||"HC";
     setSyncStatus({done:0,total:sheetRows.length,error:""});
     try{
       setSyncStatus({done:sheetRows.length,total:sheetRows.length,error:""});
-      await marcarEnviadoSheet(sheetRows);
+      await marcarEnviadoSheet(sheetRows,sentCol);
       setSyncStatus(null);
       notify(`✓ ${sheetRows.length} filas sincronizadas en planilla`,"ok");
     }catch(e){
