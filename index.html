@@ -557,6 +557,75 @@ async function procesarPlanillaFacturacion(file,periodo){
   }
   return clientes;
 }
+/* ── Lee la planilla para TODOS los meses del año dado ─────────────────────── */
+async function leerHistorialAnio(xlsxFile, anio){
+  const MESES_N=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  const buf=await readFileAsBuffer(xlsxFile);
+  const wb=XLSX.read(buf,{cellStyles:true,raw:true});
+  const ws=wb.Sheets["Flujo"];
+  if(!ws)throw new Error('Hoja "Flujo" no encontrada');
+  const dataRaw=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
+  const fila3=dataRaw[2]||[];
+
+  /* Detectar columnas de cada mes */
+  const mesesMap={};
+  for(let i=0;i<fila3.length;i++){
+    const val=fila3[i];if(!val)continue;
+    let d=null;
+    if(typeof val==="number"&&val>40000&&val<60000)
+      d=new Date(new Date(Date.UTC(1899,11,30)).getTime()+Math.round(val)*86400000);
+    else if(typeof val==="string"){try{const p=new Date(val);if(!isNaN(p))d=p;}catch(e){}}
+    if(!d||d.getUTCFullYear()!==anio)continue;
+    const mesIdx=d.getUTCMonth();
+    const mesNombre=MESES_N[mesIdx];
+    const mesNum=mesIdx+1;
+    if(mesesMap[mesNombre])continue; /* solo primer hit por mes */
+    const hasEnviado=(anio>2026)||(anio===2026&&mesNum>=6);
+    mesesMap[mesNombre]={colGS:i,colGT:i+1,colEnviado:hasEnviado?i+3:-1,mesNum};
+  }
+
+  const excl=["","VACANTE","Nombre Cliente","Areas Comunes Edificio","Areas comunes Edificio (Subterraneos)","Area Comun"];
+  const historial={};
+
+  for(let i=4;i<dataRaw.length;i++){
+    const row=dataRaw[i];if(!row)continue;
+    const cli=row[11];if(!cli||excl.includes(String(cli).trim()))continue;
+    const nombre=String(cli).trim();
+    const correo=row[12]?String(row[12]).trim():"";
+    const rut=row[9]?String(row[9]).trim():"";
+    if(!historial[nombre])historial[nombre]={correo,rut,meses:{}};
+    for(const[mes,cols]of Object.entries(mesesMap)){
+      const ufArr=typeof row[cols.colGS]==="number"&&row[cols.colGS]>0?row[cols.colGS]:null;
+      const ufAdm=typeof row[cols.colGT]==="number"&&row[cols.colGT]>0&&row[cols.colGT]<999999?row[cols.colGT]:null;
+      if(!ufArr&&!ufAdm)continue;
+      const yaEnviado=cols.colEnviado>0&&row[cols.colEnviado]&&String(row[cols.colEnviado]).trim().toLowerCase()==="enviado";
+      if(!historial[nombre].meses[mes])
+        historial[nombre].meses[mes]={ufArriendo:ufArr,ufServAdm:ufAdm,yaEnviado:!!yaEnviado,sheetRow:i+1,sentColLetter:cols.colEnviado>0?colIndexToLetter(cols.colEnviado):"HC",mesNum:cols.mesNum};
+      else{
+        const ex=historial[nombre].meses[mes];
+        if(ufArr)ex.ufArriendo=ufArr;if(ufAdm)ex.ufServAdm=ufAdm;if(yaEnviado)ex.yaEnviado=true;
+      }
+    }
+  }
+  return{historial,mesesOrden:MESES_N.filter(m=>mesesMap[m])};
+}
+
+/* ── Guarda el mapping factura→cliente en Drive tras procesar() ─────────────── */
+async function guardarHistorialPeriodo(anio,periodo,filas){
+  const data={};
+  for(const f of filas){
+    if(!f.factura)continue;
+    if(!data[f.cliente])data[f.cliente]={};
+    if(f.concepto==="arriendo")data[f.cliente].arriendo=f.factura;
+    else if(f.concepto==="serv_adm")data[f.cliente].servAdm=f.factura;
+  }
+  if(!Object.keys(data).length)return;
+  try{
+    await fetch("/api/historial",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({anio:String(anio),periodo,data})});
+  }catch(e){console.warn("guardarHistorial:",e.message);}
+}
+
 async function extraerTextoPDF(arrayBuffer){
   try{
     pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js";
@@ -1566,12 +1635,232 @@ function ContratosView({dashData,driveLoading}){
    APP PRINCIPAL
 ═══════════════════════════════════ */
 
+/* ═══════════════════════════════════
+   HISTORIAL DE FACTURAS
+═══════════════════════════════════ */
+function HistorialPanel({files,data,pdfMap,filesZip,periodo,getToken,notify,clientId}){
+  const MESES_N=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  const anio=new Date().getFullYear();
+  const[loading,setLoading]=useState(false);
+  const[historial,setHistorial]=useState(null);      /* {historial,mesesOrden} */
+  const[mapping,setMapping]=useState({});            /* periodo→{cliente→{arriendo,servAdm}} */
+  const[cliente,setCliente]=useState("");
+  const[zipList,setZipList]=useState(null);          /* archivos en DRIVE_PDF_FACTURAS_ID */
+  const[habList,setHabList]=useState(null);          /* archivos en carpeta habilitaciones */
+  const[loadingMes,setLoadingMes]=useState(null);
+  const[loadedZips,setLoadedZips]=useState({});      /* mes→JSZip object */
+  const[preview,setPreview]=useState(null);          /* {url,nombre} */
+  const[sending,setSending]=useState(null);
+
+  const HAB_FOLDER="1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u";
+
+  /* Cargar planilla y mapping al montar / cambiar planilla */
+  useEffect(()=>{
+    if(!files?.planilla)return;
+    setLoading(true);
+    Promise.all([
+      leerHistorialAnio(files.planilla,anio),
+      fetch(`/api/historial?anio=${anio}`).then(r=>r.json()).catch(()=>({})),
+    ]).then(([hist,map])=>{setHistorial(hist);setMapping(map);setLoading(false);})
+    .catch(e=>{notify("Error cargando historial: "+e.message,"err");setLoading(false);});
+  },[files?.planilla]);
+
+  /* Listar ZIPs de Drive y habilitaciones */
+  useEffect(()=>{
+    fetch(`/api/historial?ls=${DRIVE_PDF_FACTURAS_ID}`).then(r=>r.json()).then(d=>setZipList(d.files||[])).catch(()=>setZipList([]));
+    fetch(`/api/historial?ls=${HAB_FOLDER}`).then(r=>r.json()).then(d=>setHabList(d.files||[])).catch(()=>setHabList([]));
+  },[]);
+
+  /* Descargar ZIP de un mes y cachearlo */
+  const cargarZipMes=useCallback(async(mes)=>{
+    if(loadedZips[mes])return loadedZips[mes];
+    if(!zipList)return null;
+    const zipFile=zipList.find(f=>f.name.toLowerCase().includes(mes.toLowerCase())&&f.name.includes(String(anio)));
+    if(!zipFile){notify(`No se encontró ZIP para ${mes} ${anio}`,"warn");return null;}
+    setLoadingMes(mes);
+    try{
+      const r=await fetch(`/api/historial?fileId=${zipFile.id}`);
+      if(!r.ok)throw new Error("HTTP "+r.status);
+      const buf=await r.arrayBuffer();
+      const zip=await JSZip.loadAsync(buf);
+      setLoadedZips(p=>({...p,[mes]:zip}));
+      setLoadingMes(null);
+      return zip;
+    }catch(e){notify("Error descargando ZIP: "+e.message,"err");setLoadingMes(null);return null;}
+  },[zipList,loadedZips,anio]);
+
+  /* Abrir preview de un PDF */
+  const verPdf=useCallback(async(facturaNum,mes,blob)=>{
+    if(blob){/* habilitacion: ya tiene blob */
+      const url=URL.createObjectURL(blob);
+      setPreview({url,nombre:blob.name||facturaNum});return;
+    }
+    /* Primero buscar en sesión actual */
+    if(pdfMap[facturaNum]&&filesZip){
+      try{
+        const z=await JSZip.loadAsync(await filesZip.arrayBuffer());
+        const entry=Object.values(z.files).find(f=>f.name.includes(facturaNum)&&!f.dir);
+        if(entry){const d=await entry.async("uint8array");const b=new Blob([d],{type:"application/pdf"});setPreview({url:URL.createObjectURL(b),nombre:`${facturaNum}.pdf`});return;}
+      }catch(e){}
+    }
+    /* Cargar desde Drive */
+    const zip=await cargarZipMes(mes);if(!zip)return;
+    const entry=Object.values(zip.files).find(f=>f.name.includes(facturaNum)&&f.name.endsWith(".pdf")&&!f.dir);
+    if(!entry){notify(`PDF ${facturaNum} no encontrado en ZIP de ${mes}`,"warn");return;}
+    const d=await entry.async("uint8array");
+    setPreview({url:URL.createObjectURL(new Blob([d],{type:"application/pdf"})),nombre:`${facturaNum}.pdf`});
+  },[pdfMap,filesZip,cargarZipMes]);
+
+  /* Reenviar email de un mes */
+  const reenviar=useCallback(async(mes)=>{
+    if(!historial||!cliente)return;
+    const mesData=historial.historial[cliente]?.meses[mes];if(!mesData)return;
+    const correo=historial.historial[cliente].correo;if(!correo){notify("Sin correo para este cliente","warn");return;}
+    setSending(mes);
+    try{
+      const token=await getToken();
+      const mesMapping=mapping[`${mes} ${anio}`]?.[cliente]||{};
+      const concepto=mesData.ufArriendo?"Arriendo":"Serv. Administrativo";
+      const subject=`Reenvío Factura(s) ${mes} ${anio} — ${cliente} — Patagónica Inmobiliaria SpA`;
+      const htmlBody=buildEmailHtml(cliente,concepto,`${mes} ${anio}`,mesData.ufArriendo||mesData.ufServAdm,mesMapping.arriendo||mesMapping.servAdm,null);
+      /* Intentar adjuntar PDF si hay número de factura */
+      let pdfB64=null,pdfNombre=null;
+      const facNum=mesMapping.arriendo||mesMapping.servAdm;
+      if(facNum){
+        try{
+          let zip=loadedZips[mes]||(filesZip&&periodo===`${mes} ${anio}`?await JSZip.loadAsync(await filesZip.arrayBuffer()):null);
+          if(!zip)zip=await cargarZipMes(mes);
+          if(zip){
+            const entry=Object.values(zip.files).find(f=>f.name.includes(facNum)&&!f.dir);
+            if(entry){const d=await entry.async("uint8array");pdfB64=btoa(String.fromCharCode(...d));pdfNombre=`${facNum}.pdf`;}
+          }
+        }catch(e){console.warn("adjuntar PDF:",e.message);}
+      }
+      await sendGmail(token,correo,CCO,REMITENTE,subject,htmlBody,pdfB64,pdfNombre);
+      notify(`✓ Correo reenviado a ${correo}`+(pdfNombre?` con ${pdfNombre}`:""),"ok");
+    }catch(e){notify("Error reenvío: "+e.message,"err");}
+    setSending(null);
+  },[historial,cliente,mapping,getToken,filesZip,loadedZips,periodo,cargarZipMes,anio]);
+
+  /* ── Render ── */
+  if(!files?.planilla)return h("div",{style:{padding:32,textAlign:"center",color:"var(--txm)"}},
+    h("div",{style:{fontSize:32,marginBottom:8}},"📂"),
+    h("div",null,"Carga la Planilla primero desde el menú Facturación."));
+
+  if(loading)return h("div",{style:{padding:32,textAlign:"center",color:"var(--txm)"}},"Cargando historial...");
+
+  const clientesList=historial?Object.keys(historial.historial).filter(c=>Object.keys(historial.historial[c].meses).length>0).sort():[];
+  const cliData=historial&&cliente?historial.historial[cliente]:null;
+  const mesesOrden=historial?.mesesOrden||MESES_N;
+
+  const tdS={padding:"7px 10px",borderBottom:"1px solid var(--bdr)",fontSize:12,verticalAlign:"middle"};
+  const thS={...tdS,background:"var(--surf2)",fontWeight:700,color:"var(--txm)",fontSize:11,letterSpacing:".04em",textTransform:"uppercase"};
+
+  return h("div",{style:{maxWidth:900,margin:"0 auto",padding:"24px 20px"}},
+    /* Título */
+    h("div",{style:{display:"flex",alignItems:"center",gap:10,marginBottom:20}},
+      h("span",{style:{fontSize:20}},"📂"),
+      h("h2",{style:{margin:0,fontSize:16,fontWeight:700}},"Historial de Facturas"),
+      h("span",{style:{marginLeft:"auto",fontSize:11,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},anio)
+    ),
+    /* Dropdown cliente */
+    h("div",{style:{marginBottom:20}},
+      h("label",{style:{fontSize:11,fontWeight:700,color:"var(--txm)",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:".05em"}},"Seleccionar cliente"),
+      h("select",{value:cliente,onChange:e=>setCliente(e.target.value),
+        style:{width:"100%",maxWidth:480,padding:"9px 12px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf)",fontSize:13,color:"var(--tx)",cursor:"pointer"}},
+        h("option",{value:""},"— Selecciona un cliente —"),
+        clientesList.map(c=>h("option",{key:c,value:c},c))
+      )
+    ),
+    /* Info cliente */
+    cliData&&h("div",{style:{background:"var(--surf2)",borderRadius:8,padding:"10px 14px",marginBottom:16,display:"flex",gap:16,flexWrap:"wrap",fontSize:12}},
+      h("span",{style:{fontWeight:700,color:"var(--tx)"}},"✉ "+cliData.correo),
+      cliData.rut&&h("span",{style:{color:"var(--txm)"}},"RUT: "+cliData.rut)
+    ),
+    /* Tabla */
+    cliente&&cliData&&h("div",{style:{overflowX:"auto",borderRadius:10,border:"1px solid var(--bdr)"}},
+      h("table",{style:{width:"100%",borderCollapse:"collapse"}},
+        h("thead",null,h("tr",null,
+          h("th",{style:{...thS,width:100}},"Mes"),
+          h("th",{style:{...thS,width:160}},"Arriendo"),
+          h("th",{style:{style:"160px",...thS,width:160}},"Serv. Administrativo"),
+          h("th",{style:{...thS,width:160}},"Habilitaciones"),
+          h("th",{style:{...thS,width:100,textAlign:"center"}},"Reenviar"),
+        )),
+        h("tbody",null,mesesOrden.map(mes=>{
+          const mesData=cliData.meses[mes];
+          if(!mesData)return null;
+          const mesMapping=mapping[`${mes} ${anio}`]?.[cliente]||{};
+          const zip=loadedZips[mes];
+          const isLoadingThis=loadingMes===mes;
+
+          /* Habilitaciones: buscar archivos que contengan el nombre del cliente */
+          const palabras=cliente.split(/\s+/).filter(p=>p.length>2);
+          const habMatch=(habList||[]).filter(f=>palabras.some(p=>f.name.toLowerCase().includes(p.toLowerCase())));
+
+          const FacturaCell=({facNum,uf,tipoLabel})=>{
+            if(!uf)return h("span",{style:{color:"var(--txd)"}},"—");
+            if(mesData.yaEnviado||mesData.enviado){
+              if(facNum)return h("button",{
+                onClick:()=>verPdf(facNum,mes),
+                style:{background:"none",border:"none",color:"var(--acc)",cursor:"pointer",fontWeight:700,fontSize:12,textDecoration:"underline",padding:0}
+              },facNum+" 👁");
+              return h("span",{style:{color:"var(--green)",fontSize:12}},"✓ Enviado");
+            }
+            return h("span",{style:{color:"var(--txm)",fontSize:11}},"Sin envío");
+          };
+
+          return h("tr",{key:mes,style:{background:mesData.yaEnviado?"rgba(22,163,74,.04)":"transparent"}},
+            /* Mes */
+            h("td",{style:{...tdS,fontWeight:600,color:"var(--tx)"}},mes),
+            /* Arriendo */
+            h("td",{style:tdS},h(FacturaCell,{facNum:mesMapping.arriendo,uf:mesData.ufArriendo,tipoLabel:"Arriendo"})),
+            /* Serv. Admin */
+            h("td",{style:tdS},h(FacturaCell,{facNum:mesMapping.servAdm,uf:mesData.ufServAdm,tipoLabel:"Serv. Adm."})),
+            /* Habilitaciones */
+            h("td",{style:tdS},
+              habMatch.length===0?h("span",{style:{color:"var(--txd)"}},"—"):
+              h("div",{style:{display:"flex",flexDirection:"column",gap:4}},
+                habMatch.map(f=>h("button",{key:f.id,onClick:async()=>{
+                  try{const r=await fetch(`/api/historial?fileId=${f.id}`);const b=await r.blob();b.name=f.name;verPdf(null,mes,b);}catch(e){notify("Error abriendo PDF","err");}
+                },style:{background:"none",border:"none",color:"var(--acc)",cursor:"pointer",fontSize:11,textDecoration:"underline",textAlign:"left",padding:0}},
+                  "📄 "+f.name.slice(0,30)+(f.name.length>30?"…":""))
+                )
+              )
+            ),
+            /* Reenviar */
+            h("td",{style:{...tdS,textAlign:"center"}},
+              mesData.yaEnviado&&h("button",{
+                onClick:sending===mes?null:()=>reenviar(mes),
+                disabled:!!sending,
+                style:{background:"var(--acc)",color:"#fff",border:"none",borderRadius:6,padding:"5px 10px",fontSize:11,fontWeight:700,cursor:sending?"default":"pointer",opacity:sending===mes?0.6:1}
+              },sending===mes?"Enviando...":"✉ Reenviar"),
+              !mesData.yaEnviado&&h("span",{style:{color:"var(--txd)",fontSize:11}},"—")
+            )
+          );
+        }).filter(Boolean))
+      )
+    ),
+    /* Nota ZIPs */
+    cliente&&cliData&&!zipList&&h("div",{style:{marginTop:8,fontSize:11,color:"var(--txm)"}},"Cargando lista de ZIPs..."),
+    /* Modal preview PDF */
+    preview&&h("div",{style:{position:"fixed",inset:0,background:"rgba(0,0,0,.7)",zIndex:2000,display:"flex",flexDirection:"column"}},
+      h("div",{style:{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",background:"#1a1a2e"}},
+        h("span",{style:{color:"#fff",fontSize:13,fontWeight:600,flex:1}},"👁 "+preview.nombre),
+        h("button",{onClick:()=>{URL.revokeObjectURL(preview.url);setPreview(null);},style:{background:"rgba(255,255,255,.15)",border:"none",color:"#fff",borderRadius:6,padding:"4px 12px",cursor:"pointer",fontSize:12}},"✕ Cerrar")
+      ),
+      h("iframe",{src:preview.url,style:{flex:1,border:"none",background:"#fff"}})
+    )
+  );
+}
+
 function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlocked,setShowPwdModal,sendAll,setUnlocked,stats,sentSet}){
   const pendFact = stats ? Math.max(0, stats.ok - (sentSet?.size||0)) : 0;
   const items = [
     {id:"dashboard", icon:"📊", label:"Dashboard"},
     {id:"ventas",    icon:"📈", label:"Detalles Ventas"},
     {id:"factura",   icon:"📋", label:"Facturación"},
+    {id:"historial", icon:"📂", label:"Historial de Facturas"},
     {id:"contratos", icon:"📄", label:"Contratos"},
   ];
   const isActive = id => id==="factura" ? (view==="table"||view==="upload") : view===id;
@@ -2008,6 +2297,8 @@ function App(){
         await sendGmail(gmailTok,"amelendez@patagonica.cl","",REMITENTE,`📋 Facturas PISA ${periodo} listas en Drive`,notifHtml,null,null);
         addLog("✓ Email de notificación enviado","ok");
       }catch(e){console.warn("Email notif error:",e.message);}
+      /* Guardar mapping factura→cliente para Historial de Facturas */
+      guardarHistorialPeriodo(new Date().getFullYear(),periodo,filas);
     }catch(e){addLog("✗ Error: "+e.message,"err");setProcDone(true);notify("Error: "+e.message,"err");}
   },[files,periodo]);
 
@@ -2531,7 +2822,7 @@ function App(){
     h("header",{style:{background:view==="table"?"#1e3a5f":"var(--surf)",borderBottom:view==="table"?"1px solid #152d4a":"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:49,gap:10}},
       h("div",{style:{display:"flex",alignItems:"center",gap:10}},
         h("div",{style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px",color:view==="table"?"#fff":"var(--tx)"}},
-          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":"📋 Facturación"
+          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="historial"?"📂 Historial de Facturas":"📋 Facturación"
         ),
         view==="table"&&h("span",{style:{fontSize:9,fontFamily:"'DM Mono',monospace",color:"#93b5d4",marginLeft:4}},periodo)
       ),
@@ -2837,6 +3128,7 @@ function App(){
     )
     ,view==="ventas"&&h(VentasView,{periodo})
     ,view==="contratos"&&h(ContratosView,{dashData,driveLoading})
+    ,view==="historial"&&h(HistorialPanel,{files,data,pdfMap,filesZip:files.zip,periodo,getToken,notify,clientId})
   ));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(h(App));
