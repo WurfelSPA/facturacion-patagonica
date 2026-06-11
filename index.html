@@ -1735,10 +1735,8 @@ function ContratosView({dashData,driveLoading}){
    APP PRINCIPAL
 ═══════════════════════════════════ */
 
-/* ═══════════════════════════════════
-   HISTORIAL DE FACTURAS
-═══════════════════════════════════ */
-function HistorialPanel({files,data,pdfMap,filesZip,periodo,getToken,notify,clientId}){
+function HistorialPanel(){return null;}
+function _HistorialPanel_REMOVED({
   const MESES_N=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
   const anio=new Date().getFullYear();
   const[loading,setLoading]=useState(false);
@@ -1976,7 +1974,6 @@ function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlo
     {id:"dashboard", icon:"📊", label:"Dashboard"},
     {id:"ventas",    icon:"📈", label:"Detalles Ventas"},
     {id:"factura",   icon:"📋", label:"Facturación"},
-    {id:"historial", icon:"📂", label:"Historial de Facturas"},
     {id:"contratos", icon:"📄", label:"Contratos"},
   ];
   const isActive = id => id==="factura" ? (view==="table"||view==="upload") : view===id;
@@ -2977,7 +2974,7 @@ function App(){
     h("header",{style:{background:view==="table"?"#1e3a5f":"var(--surf)",borderBottom:view==="table"?"1px solid #152d4a":"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:49,gap:10}},
       h("div",{style:{display:"flex",alignItems:"center",gap:10}},
         h("div",{style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px",color:view==="table"?"#fff":"var(--tx)"}},
-          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="historial"?"📂 Historial de Facturas":"📋 Facturación"
+          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":"📋 Facturación"
         ),
         view==="table"&&h("span",{style:{fontSize:9,fontFamily:"'DM Mono',monospace",color:"#93b5d4",marginLeft:4}},periodo)
       ),
@@ -3298,7 +3295,6 @@ function App(){
     )
     ,view==="ventas"&&h(VentasView,{periodo})
     ,view==="contratos"&&h(ContratosView,{dashData,driveLoading})
-    ,view==="historial"&&h(HistorialPanel,{files,data,pdfMap,filesZip:files.zip,periodo,getToken,notify,clientId})
   ));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(h(App));
