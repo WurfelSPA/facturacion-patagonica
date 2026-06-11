@@ -3253,6 +3253,7 @@ function App(){
                   })()
                 )),
                 h("td",{style:{padding:"8px 11px",background:bg}},
+                  row.estado==="missing"?h(Badge,{e:"missing",row}):
                   row.yaEnviado&&!sent?h(Badge,{e:"sent_sheet",row}):
                   sent?h("span",{style:{color:"var(--green)",fontSize:11,fontWeight:600}},"✓ Enviado"):
                   sending?h("span",{style:{color:"var(--blue)",fontSize:11,display:"inline-flex",alignItems:"center",gap:4}},h("span",{className:"spin"},"⟳")," Enviando..."):
