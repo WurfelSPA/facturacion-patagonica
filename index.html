@@ -1736,7 +1736,7 @@ function ContratosView({dashData,driveLoading}){
 ═══════════════════════════════════ */
 
 function HistorialPanel(){return null;}
-function _HistorialPanel_REMOVED({
+function _HistorialPanel_REMOVED({files,data,pdfMap,filesZip,periodo,getToken,notify,clientId}){
   const MESES_N=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
   const anio=new Date().getFullYear();
   const[loading,setLoading]=useState(false);
