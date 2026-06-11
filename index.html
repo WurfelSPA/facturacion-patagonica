@@ -2715,6 +2715,79 @@ function App(){
         )
       ),
 
+      /* ── TABLA CLIENTES: filtros sitio + mes + columnas contrato ── */
+      dashData&&h("div",{key:"tbl-"+curSitio+"-"+curMes,style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
+        /* Barra de controles */
+        h("div",{style:{padding:"10px 14px",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",background:"var(--surf)"}},
+          h("span",{style:{fontWeight:700,fontSize:12,color:"var(--tx)"}},"Clientes"),
+          h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},tblClients.length+" / "+dashData.clients.length),
+          h("div",{style:{display:"flex",gap:4,flexWrap:"wrap",marginLeft:4}},
+            h("button",{onClick:()=>setDashSitio("all"),className:`pill${curSitio==="all"?" active":""}`,style:{fontSize:10,padding:"3px 10px"}},"Ver todos"),
+            ...Object.keys(dashData.siteMap).filter(s=>s&&!/^\d+$/.test(s)).sort().map(s=>
+              h("button",{key:s,onClick:()=>setDashSitio(curSitio===s?"all":s),
+                style:{padding:"3px 9px",borderRadius:10,fontSize:10,fontWeight:700,
+                  background:curSitio===s?(SITIO_C[s]||"#888"):`${SITIO_C[s]||"#888"}18`,
+                  color:curSitio===s?"#fff":(SITIO_C[s]||"#888"),
+                  border:`1px solid ${SITIO_C[s]||"#888"}${curSitio===s?"":"40"}`,
+                  cursor:"pointer",transition:"all .15s"}
+              },s)
+            )
+          ),
+          h("select",{value:curMes,onChange:e=>{setDashMes(e.target.value);},
+            style:{fontSize:11,padding:"4px 8px",borderRadius:7,border:"1px solid var(--bdr)",background:"var(--surf)",color:"var(--tx)",fontFamily:"'DM Mono',monospace",marginLeft:4}},
+            tblMesOpts.map(m=>h("option",{key:m.k,value:m.k},m.l))
+          ),
+          h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},tblUfLabel),
+          h("input",{value:dashSearch,onChange:e=>setDashSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:180,marginLeft:"auto"}})
+        ),
+        h("div",{className:"dash-client-hdr"},
+          ["Sitio","Cliente / RUT","Arriendo CLP","Serv.Adm. CLP","Total CLP","IVA","Término","Antelac.","Aviso","F.Reajuste","% Reaj.","Cada","m²","UF×m²",""].map(col=>h("div",{key:col},col))
+        ),
+        h("div",{key:"rows-"+curSitio+"-"+tblClients.length,style:{maxHeight:420,overflowY:"auto",overflowX:"auto"}},
+          tblClients.length===0?
+            h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados"):
+            tblClients.map(c=>{
+              const color=SITIO_C[c.sitio]||"#888";
+              const clpArr=c.ufArr>0?Math.round(c.ufArr*tblUf):null;
+              const clpSrv=c.ufSrv>0?Math.round(c.ufSrv*tblUf):null;
+              const clpTotal=c.ufTotal>0?Math.round(c.ufTotal*tblUf):null;
+              const isSelected=histClient&&histClient.rut===c.rut&&histClient.sitio===c.sitio;
+              return h("div",{key:c.rut+c.nombre+c.sitio+"_wrap",style:{borderBottom:"1px solid var(--bdr)",background:isSelected?"#f0f6ff":"transparent"}},
+              h("div",{
+                className:"dash-client-row",
+                style:{cursor:"pointer",borderBottom:"none",background:isSelected?"#e8f2ff":"transparent"},
+                onClick:()=>{setHistClient(isSelected?null:c);setHistAnio(2026);},
+                title:isSelected?"Cerrar historial":"Ver historial del cliente"
+              },
+                h("div",{style:{display:"flex",flexDirection:"column",gap:2}},
+                  h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${color}18`,color,border:`1px solid ${color}40`,alignSelf:"flex-start"}},c.sitio||"—"),
+                  c.edificio&&h("span",{style:{fontSize:8,color:"var(--txd)",fontFamily:"'DM Mono',monospace",paddingLeft:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:52}},c.edificio)
+                ),
+                h("div",{style:{flexDirection:"column",alignItems:"flex-start",gap:2}},
+                  h("div",{style:{fontWeight:600,fontSize:11,lineHeight:1.3}},c.nombre),
+                  h("div",{style:{fontSize:9,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},c.rut),
+                  c.email&&h("a",{href:"mailto:"+c.email,style:{fontSize:9,color:"var(--accl)",fontFamily:"'DM Mono',monospace",textDecoration:"none",userSelect:"text"},title:c.email},c.email)
+                ),
+                h("div",{style:{fontFamily:"'DM Mono',monospace",color:"var(--blue)",fontWeight:600,fontSize:10}},clpArr?formatCLP(clpArr):"—"),
+                h("div",{style:{fontFamily:"'DM Mono',monospace",color:"var(--amber)",fontSize:10}},clpSrv?formatCLP(clpSrv):"—"),
+                h("div",{style:{fontFamily:"'DM Mono',monospace",fontWeight:700,fontSize:10}},clpTotal?formatCLP(clpTotal):"—"),
+                h("div",null,c.afecto?h("span",{style:{padding:"2px 6px",borderRadius:6,fontSize:9,fontWeight:600,background:c.afecto==="Afecto"?"var(--abg)":"var(--bbg)",color:c.afecto==="Afecto"?"var(--amber)":"var(--blue)",border:`1px solid ${c.afecto==="Afecto"?"var(--adim)":"#b5d0f0"}`}},c.afecto):h("span",{style:{color:"var(--txd)"}},"—")),
+                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:c.termContrato?"var(--tx)":"var(--txd)"}},c.termContrato||"—"),
+                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.renovacion||"—"),
+                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.aviso||"—"),
+                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:c.fechaReajuste?"var(--tx)":"var(--txd)"}},c.fechaReajuste||"—"),
+                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.pctReaj||"—"),
+                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.cadaAnios?c.cadaAnios+" años":"—"),
+                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},c.m2!=null?c.m2.toLocaleString("es-CL"):"—"),
+                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)",fontWeight:600}},(c.ufM2!=null&&c.m2>0)?(c.ufM2/c.m2).toLocaleString("es-CL",{minimumFractionDigits:3,maximumFractionDigits:3}):"—"),
+                h("div",{style:{fontSize:10,color:isSelected?"var(--acc)":"var(--txd)",textAlign:"right"}},isSelected?"▲":"📋")
+              ),
+              isSelected&&h(HistPanel,{client:c,anio:histAnio,setAnio:setHistAnio,onClose:()=>setHistClient(null)})
+            );
+            })
+        )
+      ),
+
       /* ── Sitios + Gráfico ── */
       h("div",{style:{display:"grid",gridTemplateColumns:"300px 1fr",gap:16}},
 
@@ -2806,90 +2879,6 @@ function App(){
         h("span",{className:"spin",style:{fontSize:18,marginRight:8}},"⟳"),"Procesando planilla..."
       ),
 
-      /* ── TABLA CLIENTES: filtros sitio + mes + columnas contrato ── */
-      dashData&&h("div",{key:"tbl-"+curSitio+"-"+curMes,style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
-        /* Barra de controles */
-        h("div",{style:{padding:"10px 14px",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",background:"var(--surf)"}},
-          h("span",{style:{fontWeight:700,fontSize:12,color:"var(--tx)"}},"Clientes"),
-          h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},tblClients.length+" / "+dashData.clients.length),
-          h("div",{style:{display:"flex",gap:4,flexWrap:"wrap",marginLeft:4}},
-            h("button",{onClick:()=>setDashSitio("all"),className:`pill${curSitio==="all"?" active":""}`,style:{fontSize:10,padding:"3px 10px"}},"Ver todos"),
-            ...Object.keys(dashData.siteMap).filter(s=>s&&!/^\d+$/.test(s)).sort().map(s=>
-              h("button",{key:s,onClick:()=>setDashSitio(curSitio===s?"all":s),
-                style:{padding:"3px 9px",borderRadius:10,fontSize:10,fontWeight:700,
-                  background:curSitio===s?(SITIO_C[s]||"#888"):`${SITIO_C[s]||"#888"}18`,
-                  color:curSitio===s?"#fff":(SITIO_C[s]||"#888"),
-                  border:`1px solid ${SITIO_C[s]||"#888"}${curSitio===s?"":"40"}`,
-                  cursor:"pointer",transition:"all .15s"}
-              },s)
-            )
-          ),
-          h("select",{value:curMes,onChange:e=>{setDashMes(e.target.value);},
-            style:{fontSize:11,padding:"4px 8px",borderRadius:7,border:"1px solid var(--bdr)",background:"var(--surf)",color:"var(--tx)",fontFamily:"'DM Mono',monospace",marginLeft:4}},
-            tblMesOpts.map(m=>h("option",{key:m.k,value:m.k},m.l))
-          ),
-          h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},tblUfLabel),
-          h("input",{value:dashSearch,onChange:e=>setDashSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:180,marginLeft:"auto"}})
-        ),
-        h("div",{className:"dash-client-hdr"},
-          ["Sitio","Cliente / RUT","Arriendo CLP","Serv.Adm. CLP","Total CLP","IVA","Término","Antelac.","Aviso","F.Reajuste","% Reaj.","Cada","m²","UF×m²",""].map(col=>h("div",{key:col},col))
-        ),
-        h("div",{key:"rows-"+curSitio+"-"+tblClients.length,style:{maxHeight:420,overflowY:"auto",overflowX:"auto"}},
-          tblClients.length===0?
-            h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados"):
-            tblClients.map(c=>{
-              const color=SITIO_C[c.sitio]||"#888";
-              const clpArr=c.ufArr>0?Math.round(c.ufArr*tblUf):null;
-              const clpSrv=c.ufSrv>0?Math.round(c.ufSrv*tblUf):null;
-              const clpTotal=c.ufTotal>0?Math.round(c.ufTotal*tblUf):null;
-              const isSelected=histClient&&histClient.rut===c.rut&&histClient.sitio===c.sitio;
-              return h("div",{key:c.rut+c.nombre+c.sitio+"_wrap",style:{borderBottom:"1px solid var(--bdr)",background:isSelected?"#f0f6ff":"transparent"}},
-              h("div",{
-                className:"dash-client-row",
-                style:{cursor:"pointer",borderBottom:"none",background:isSelected?"#e8f2ff":"transparent"},
-                onClick:()=>{setHistClient(isSelected?null:c);setHistAnio(2026);},
-                title:isSelected?"Cerrar historial":"Ver historial del cliente"
-              },
-                h("div",{style:{display:"flex",flexDirection:"column",gap:2}},
-                  h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${color}18`,color,border:`1px solid ${color}40`,alignSelf:"flex-start"}},c.sitio||"—"),
-                  c.edificio&&h("span",{style:{fontSize:8,color:"var(--txd)",fontFamily:"'DM Mono',monospace",paddingLeft:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:52}},c.edificio)
-                ),
-                h("div",{style:{flexDirection:"column",alignItems:"flex-start",gap:2}},
-                  h("div",{style:{fontWeight:600,fontSize:11,lineHeight:1.3}},c.nombre),
-                  h("div",{style:{fontSize:9,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},c.rut),
-                  c.email&&h("a",{href:"mailto:"+c.email,style:{fontSize:9,color:"var(--accl)",fontFamily:"'DM Mono',monospace",textDecoration:"none",userSelect:"text"},title:c.email},c.email)
-                ),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",color:"var(--blue)",fontWeight:600,fontSize:10}},clpArr?formatCLP(clpArr):"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",color:"var(--amber)",fontSize:10}},clpSrv?formatCLP(clpSrv):"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontWeight:700,fontSize:10}},clpTotal?formatCLP(clpTotal):"—"),
-                h("div",null,c.afecto?h("span",{style:{padding:"2px 6px",borderRadius:6,fontSize:9,fontWeight:600,background:c.afecto==="Afecto"?"var(--abg)":"var(--bbg)",color:c.afecto==="Afecto"?"var(--amber)":"var(--blue)",border:`1px solid ${c.afecto==="Afecto"?"var(--adim)":"#b5d0f0"}`}},c.afecto):h("span",{style:{color:"var(--txd)"}},"—")),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:c.termContrato?"var(--tx)":"var(--txd)"}},c.termContrato||"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.renovacion||"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.aviso||"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:c.fechaReajuste?"var(--tx)":"var(--txd)"}},c.fechaReajuste||"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.pctReaj||"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.cadaAnios?c.cadaAnios+" años":"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},c.m2!=null?c.m2.toLocaleString("es-CL"):"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)",fontWeight:600}},(c.ufM2!=null&&c.m2>0)?(c.ufM2/c.m2).toLocaleString("es-CL",{minimumFractionDigits:3,maximumFractionDigits:3}):"—"),
-                h("div",{style:{fontSize:10,color:isSelected?"var(--acc)":"var(--txd)",textAlign:"right"}},isSelected?"▲":"📋")
-              ),
-              isSelected&&h(HistPanel,{client:c,anio:histAnio,setAnio:setHistAnio,onClose:()=>setHistClient(null)})
-            );
-            })
-        )
-      ),
-
-      /* Botón ir a Facturación */
-      h("div",{style:{display:"flex",justifyContent:"center",paddingTop:4,paddingBottom:8}},
-        h("button",{
-          onClick:()=>setView("upload"),
-          style:{background:"linear-gradient(135deg,var(--acc),var(--acc2))",color:"#fff",border:"none",borderRadius:12,padding:"14px 44px",fontSize:14,fontWeight:700,boxShadow:"0 4px 20px rgba(91,76,219,0.2)",display:"flex",alignItems:"center",gap:10,letterSpacing:"-0.2px"}
-        },
-          h("span",{style:{fontSize:18}},"📋"),
-          "Ir al Módulo de Facturación Mensual",
-          h("span",{style:{opacity:.7}},"→")
-        )
-      )
     );
   };
 
