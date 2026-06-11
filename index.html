@@ -518,7 +518,7 @@ async function procesarPlanillaFacturacion(file,periodo){
   const dataRaw=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
   const mesNum=MES_NUM[periodo.split(" ")[0]];
   const anio=parseInt(periodo.split(" ")[1]);
-  let colGS=-1,colGT=-1,colEnviado=-1;
+  let colGS=-1,colGT=-1,colEnviado=-1,colPagado=-1;
 
   function esTargetMes(val){
     if(val===null||val===undefined)return false;
@@ -533,7 +533,7 @@ async function procesarPlanillaFacturacion(file,periodo){
   /* Fechas en fila 3 (índice 2) */
   const fila3=dataRaw[2]||[];
   for(let i=64;i<fila3.length;i++){
-    if(esTargetMes(fila3[i])){colGS=i;colGT=i+1;colEnviado=i+3;break;}
+    if(esTargetMes(fila3[i])){colGS=i;colGT=i+1;colEnviado=i+3;colPagado=i+4;break;}
   }
   if(colGS===-1)throw new Error(`No se encontró columna para ${periodo}. Verifica que la planilla tenga ese mes.`);
 
@@ -552,10 +552,12 @@ async function procesarPlanillaFacturacion(file,periodo){
     const emailBilling=row[12]?String(row[12]).trim():"";
     const rutBilling=row[9]?String(row[9]).replace(/\./g,"").trim().toLowerCase():""; /* Col J: RUT normalizado */
     const yaEnviado=colEnviado>0&&row[colEnviado]&&String(row[colEnviado]).trim().toLowerCase()==="enviado";
+    const yaPagado=colPagado>0&&row[colPagado]&&String(row[colPagado]).trim().toLowerCase()==="pagado";
     const sheetRow=i+1; /* fila 1-indexed en el Sheets (dataRaw[i] = fila i+1) */
     const sentColLetter=colIndexToLetter(colEnviado); /* columna dinámica: HC para Junio, HG para Julio, etc. */
-    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,sheetRow,sentColLetter});
-    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,sheetRow,sentColLetter});
+    const pagadoColLetter=colPagado>0?colIndexToLetter(colPagado):"";
+    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado,sheetRow,sentColLetter,pagadoColLetter});
+    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado,sheetRow,sentColLetter,pagadoColLetter});
   }
   return clientes;
 }
@@ -2372,7 +2374,7 @@ function App(){
             }
           }
         }
-        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,montoTotal,ivaAmount,enviado:false,yaEnviado:c.yaEnviado||false,sheetRow:c.sheetRow||null,sentColLetter:c.sentColLetter||"HC"});
+        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,montoTotal,ivaAmount,enviado:false,yaEnviado:c.yaEnviado||false,yaPagado:c.yaPagado||false,sheetRow:c.sheetRow||null,sentColLetter:c.sentColLetter||"HC",pagadoColLetter:c.pagadoColLetter||""});
       }
 
       /* ── Si no hay datos de planilla, mostrar igual los PDFs detectados ── */
@@ -2397,8 +2399,8 @@ function App(){
           ufSII:null,ufPlan:h.ufPdf||0,   /* ufPlan = UF del PDF (evita null en toFixed) */
           ufPdf:h.ufPdf,
           montoTotal:h.montoTotal,ivaAmount:null,
-          enviado:false,yaEnviado:false,
-          sheetRow:h.sheetRow,sentColLetter:h.sentColLetter,
+          enviado:false,yaEnviado:false,yaPagado:false,
+          sheetRow:h.sheetRow,sentColLetter:h.sentColLetter,pagadoColLetter:h.pagadoColLetter||"",
         });
       }
 
@@ -2582,6 +2584,21 @@ function App(){
     if(!r.ok) throw new Error(rj.error||`HTTP ${r.status}`);
     return rj;
   },[]);
+
+  const marcarPagadoSheet=useCallback(async(sheetRow,pagadoCol,paid)=>{
+    const body={sheetRow,sentCol:pagadoCol,value:paid?"Pagado":""};
+    const r=await fetch("/api/planilla",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const rj=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(rj.error||`HTTP ${r.status}`);
+  },[]);
+
+  const togglePagado=useCallback((rowI,sheetRow,pagadoColLetter,currentPaid)=>{
+    const newPaid=!currentPaid;
+    setData(d=>{const nd=[...d];nd[rowI]={...nd[rowI],yaPagado:newPaid};return nd;});
+    if(sheetRow&&pagadoColLetter){
+      marcarPagadoSheet(sheetRow,pagadoColLetter,newPaid).catch(e=>notify("Error al marcar pagado: "+e.message,"err"));
+    }
+  },[marcarPagadoSheet]);
 
   const sincronizarPlanilla=useCallback(async()=>{
     const enviadas=data.filter((r,i)=>sentSet.has(i)&&r.sheetRow);
@@ -3173,15 +3190,15 @@ function App(){
         h("input",{value:searchFactura,onChange:e=>setSearchFactura(e.target.value),placeholder:"N° Factura...",style:{width:130,fontFamily:"'DM Mono',monospace"}})
       ),
       h("div",{style:{flex:1,overflowX:"auto"}},
-        h("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:880}},
-          h("colgroup",null,h("col",{style:{width:58}}),h("col",{style:{width:"15%"}}),h("col",{style:{width:"17%"}}),h("col",{style:{width:88}}),h("col",{style:{width:88}}),h("col",{style:{width:72}}),h("col",{style:{width:72}}),h("col",{style:{width:96}}),h("col",{style:{width:110}})),
+        h("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:940}},
+          h("colgroup",null,h("col",{style:{width:58}}),h("col",{style:{width:"15%"}}),h("col",{style:{width:"17%"}}),h("col",{style:{width:88}}),h("col",{style:{width:88}}),h("col",{style:{width:72}}),h("col",{style:{width:72}}),h("col",{style:{width:96}}),h("col",{style:{width:110}}),h("col",{style:{width:60}})),
           h("thead",null,h("tr",{style:{background:"#ddeaf8"}},
-            ["Sitio","Cliente","Correo","Concepto","Factura","UF planilla","UF PDF","Monto+IVA","Estado/Acción"].map(hd=>
-              h("th",{key:hd,style:{padding:"8px 11px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:"0.07em",borderBottom:"1px solid var(--bdr)"}},hd.toUpperCase())
+            ["Sitio","Cliente","Correo","Concepto","Factura","UF planilla","UF PDF","Monto+IVA","Estado/Acción","Pagado"].map((hd,hi)=>
+              h("th",{key:hd,style:{padding:"8px 11px",textAlign:hi===9?"center":"left",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:"0.07em",borderBottom:"1px solid var(--bdr)"}},hd.toUpperCase())
             )
           )),
           h("tbody",null,filtered.length===0?
-            h("tr",null,h("td",{colSpan:9,style:{padding:"48px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados")):
+            h("tr",null,h("td",{colSpan:10,style:{padding:"48px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados")):
             filtered.map(row=>{
               const i=row.i,sent=sentSet.has(i),sending=sendingIdx===i,noEmail=!row.correo;
               const diffPdf=row.ufPdf!==null&&row.ufPdf!==undefined&&(row.ufPdf>5000?Math.abs(row.ufPdf-row.ufPlan)>500:Math.abs(row.ufPdf-row.ufPlan)>0.5);
@@ -3246,6 +3263,16 @@ function App(){
                     style:{opacity:unlocked?1:0.55,cursor:unlocked?"pointer":"pointer"}
                   },"✉ "+(unlocked?"Enviar":"🔒")):
                   h(Badge,{e:row.estado,row})
+                ),
+                h("td",{style:{padding:"8px 11px",background:bg,textAlign:"center"}},
+                  h("input",{
+                    type:"checkbox",
+                    checked:!!row.yaPagado,
+                    disabled:!row.sheetRow||!row.pagadoColLetter,
+                    title:!row.sheetRow?"Sin fila en planilla":row.yaPagado?"Pagado — clic para desmarcar":"Marcar como pagado",
+                    onChange:()=>{if(row.sheetRow&&row.pagadoColLetter)togglePagado(row.i,row.sheetRow,row.pagadoColLetter,row.yaPagado);},
+                    style:{width:16,height:16,cursor:row.sheetRow&&row.pagadoColLetter?"pointer":"default",accentColor:"var(--green)"}
+                  })
                 )
               );
             })

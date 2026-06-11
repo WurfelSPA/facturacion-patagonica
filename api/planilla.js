@@ -194,11 +194,12 @@ export default async function handler(req, res) {
     if (!rows.length) return res.status(400).json({ error: "Se requiere sheetRow o sheetRows" });
     const sentCol = (typeof body.sentCol==="string"&&/^[A-Z]{1,3}$/.test(body.sentCol))
       ? body.sentCol : HC_COL_DEFAULT;
+    const writeValue = typeof body.value==="string" ? body.value : "Enviado";
 
     try {
       const token  = await getAccessToken(sa);
       const buf    = await downloadFile(token);
-      const patched = await patchXlsx(buf, rows, "Enviado", sentCol);
+      const patched = await patchXlsx(buf, rows, writeValue, sentCol);
       await uploadFile(token, patched);
       return res.status(200).json({ ok: true, updated: rows.length, rows, sentCol });
     } catch (e) {
