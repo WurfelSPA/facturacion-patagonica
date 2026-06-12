@@ -2730,7 +2730,7 @@ function App(){
     const [mesNombre,anio]=periodo.split(" ");
     const mesNum=MES_STR[mesNombre];
     const mesCode=`${anio}-${mesNum}`;
-    const periodoCode=`${mesCode} prueba`;
+    const periodoCode=mesCode;
     const pdfNombre=`Facturas_PISA_${mesCode}.pdf`;
     try{
       // 1. Buscar PDF en Drive (via servidor con Service Account)
