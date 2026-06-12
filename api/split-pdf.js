@@ -204,12 +204,16 @@ function parseCMap(t) {
   return mapping;
 }
 
-function getDecodedStreams(pdfBuf) {
+/* maxRawBytes: salta streams grandes (programas de fuente >100KB) que no son texto */
+function getDecodedStreams(pdfBuf, maxRawBytes = Infinity) {
   const str = pdfBuf.toString("latin1");
   const streams = [];
   const re = /stream\r?\n([\s\S]*?)endstream/g;
   let m;
-  while ((m = re.exec(str)) !== null) streams.push(Buffer.from(m[1], "latin1"));
+  while ((m = re.exec(str)) !== null) {
+    const raw = Buffer.from(m[1], "latin1");
+    if (raw.length <= maxRawBytes) streams.push(raw);
+  }
   const decoded = [];
   for (const s of streams) {
     try { decoded.push(require("zlib").inflateSync(s).toString("latin1")); } catch {
@@ -220,9 +224,9 @@ function getDecodedStreams(pdfBuf) {
   return decoded;
 }
 
-/* Construye CMap a partir del PDF completo (los CMaps son recursos compartidos) */
+/* CMap: los streams de CMap son pequeños (1-10 KB) — salta programas de fuente grandes */
 function buildCMap(pdfBuf) {
-  const decoded = getDecodedStreams(pdfBuf);
+  const decoded = getDecodedStreams(pdfBuf, 15000);
   const mapping = {};
   for (const d of decoded) {
     if (d.includes("beginbfchar") || d.includes("beginbfrange")) Object.assign(mapping, parseCMap(d));
@@ -230,9 +234,10 @@ function buildCMap(pdfBuf) {
   return mapping;
 }
 
-/* Extrae texto de un pageBuf usando un CMap ya construido */
+/* Extrae texto de un pageBuf usando un CMap ya construido.
+   Los content streams de una página de factura son típicamente < 80 KB comprimidos. */
 function extractTextWithCMap(pdfBuf, mapping) {
-  const decoded = getDecodedStreams(pdfBuf);
+  const decoded = getDecodedStreams(pdfBuf, 80000);
   let text = "";
   for (const d of decoded) {
     for (const [, h] of d.matchAll(/<([0-9a-fA-F]+)>\s*Tj/g)) {
@@ -337,11 +342,7 @@ export default async function handler(req, res) {
     const pdfBuf = await driveDownload(token, pdfFileId);
     console.log(`PDF: ${pdfBuf.length} bytes`);
 
-    // 2. Construir CMap global desde el PDF completo (recursos compartidos entre páginas)
-    const globalCMap = buildCMap(pdfBuf);
-    console.log(`CMap global: ${Object.keys(globalCMap).length} entradas`);
-
-    // Separar páginas con pdf-lib (preserva fuentes y recursos compartidos)
+    // 2. Separar páginas con pdf-lib
     const srcDoc = await PDFDocument.load(pdfBuf, { ignoreEncryption: true });
     const totalPages = srcDoc.getPageCount();
     console.log(`Páginas a separar: ${totalPages}`);
@@ -354,6 +355,11 @@ export default async function handler(req, res) {
     }
     if (pageBufs.length === 0) throw new Error("No se pudieron separar las páginas del PDF");
     console.log(`Páginas separadas: ${pageBufs.length}`);
+
+    // Construir CMap desde la primera página (fuentes compartidas en todos los documentos PISA)
+    // Es mucho más rápido que procesar el PDF completo de 100+ páginas
+    const globalCMap = buildCMap(pageBufs[0]);
+    console.log(`CMap global: ${Object.keys(globalCMap).length} entradas`);
 
     // 3. Extraer texto de cada página individual usando el CMap global
     //    Esto garantiza que texto y PDF de cada página estén siempre alineados
