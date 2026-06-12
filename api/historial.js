@@ -157,8 +157,14 @@ function norm(s){
 function clienteMatch(fromFile, query) {
   const a=norm(fromFile), b=norm(query);
   if(!a||!b) return false;
-  if(a===b||a.includes(b)||b.includes(a)) return true;
-  return b.split(" ").filter(w=>w.length>3).some(w=>a.includes(w));
+  if(a===b) return true;
+  // Substring: solo si la cadena contenida tiene ≥4 chars (evita falsos positivos por "spa", "cia", etc.)
+  if(b.length>=4&&a.includes(b)) return true;
+  if(a.length>=4&&b.includes(a)) return true;
+  // Primer palabra significativa (≥4 chars) debe coincidir — es el identificador único de la empresa
+  const sigA=a.split(" ").find(w=>w.length>=4);
+  const sigB=b.split(" ").find(w=>w.length>=4);
+  return !!(sigA&&sigB&&sigA===sigB);
 }
 function detectTipo(text) {
   /* Primera aparición de cada keyword — evita falsos positivos de pie de página.
