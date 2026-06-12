@@ -161,11 +161,18 @@ function clienteMatch(fromFile, query) {
   return b.split(" ").filter(w=>w.length>3).some(w=>a.includes(w));
 }
 function detectTipo(text) {
-  const t=(text||"").replace(/\s+/g," ");
-  if(/Habilitaci/i.test(t)) return "habilitacion";
-  if(/Serv\.?\s*Adm\./i.test(t)) return "servAdm";
-  if(/Arriendo/i.test(t)) return "arriendo";
-  return null;
+  /* Usa la primera aparición de cada keyword — evita falsos positivos
+     cuando una factura de Arriendo menciona "Serv. Adm." en algún pie. */
+  const t = (text||"").replace(/\s+/g," ");
+  const hits = [];
+  const add = (tipo, needle) => { const i=t.indexOf(needle); if(i>=0) hits.push({tipo,i}); };
+  add("habilitacion","Habilitaci");
+  add("servAdm","Serv. Adm.");
+  add("servAdm","Serv.Adm.");
+  add("arriendo","Arriendo");
+  if(!hits.length) return null;
+  hits.sort((a,b)=>a.i-b.i);
+  return hits[0].tipo;
 }
 function extractClienteFromText(text) {
   const m=text.match(/Se[ñn]or\(es\)\s*(.+?)\s*RUT\s*[\d]/);

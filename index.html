@@ -1802,7 +1802,12 @@ function HistorialFactView({dashData,driveLoading,notify}){
         zip=await JSZip.loadAsync(await r.arrayBuffer());
         setZipCache(p=>({...p,[periodo]:zip}));
       }
-      const path=Object.keys(zip.files).find(p=>p.includes(fNum)&&!zip.files[p].dir);
+      /* Exact match: F-14686.pdf or "F-14686 ClientName.pdf" — evita matchear F-146860 */
+      const path=Object.keys(zip.files).find(p=>{
+        if(zip.files[p].dir)return false;
+        const fn=p.split("/").pop();
+        return fn===fNum+".pdf"||fn.startsWith(fNum+" ")||fn.startsWith(fNum+".");
+      });
       if(!path)throw new Error(`${fNum} no encontrado en ZIP de ${periodo}`);
       const blob=new Blob([await zip.files[path].async("uint8array")],{type:"application/pdf"});
       if(pdfPrev)URL.revokeObjectURL(pdfPrev.url);
