@@ -204,32 +204,37 @@ function parseCMap(t) {
   return mapping;
 }
 
-function extractText(pdfBuf) {
+function getDecodedStreams(pdfBuf) {
   const str = pdfBuf.toString("latin1");
   const streams = [];
   const re = /stream\r?\n([\s\S]*?)endstream/g;
   let m;
   while ((m = re.exec(str)) !== null) streams.push(Buffer.from(m[1], "latin1"));
-
-  // Descomprimir streams (zlib) y recolectar también los no comprimidos
   const decoded = [];
   for (const s of streams) {
     try { decoded.push(require("zlib").inflateSync(s).toString("latin1")); } catch {
-      // stream sin compresión — intentar directo
       const raw = s.toString("latin1");
       if (raw.includes("Tj") || raw.includes("TJ")) decoded.push(raw);
     }
   }
+  return decoded;
+}
 
-  // CMap para fuentes con codificación propia
+/* Construye CMap a partir del PDF completo (los CMaps son recursos compartidos) */
+function buildCMap(pdfBuf) {
+  const decoded = getDecodedStreams(pdfBuf);
   const mapping = {};
   for (const d of decoded) {
     if (d.includes("beginbfchar") || d.includes("beginbfrange")) Object.assign(mapping, parseCMap(d));
   }
+  return mapping;
+}
 
+/* Extrae texto de un pageBuf usando un CMap ya construido */
+function extractTextWithCMap(pdfBuf, mapping) {
+  const decoded = getDecodedStreams(pdfBuf);
   let text = "";
   for (const d of decoded) {
-    // Formato 1: hex  →  <0041> Tj  o  [<0041><0042>] TJ
     for (const [, h] of d.matchAll(/<([0-9a-fA-F]+)>\s*Tj/g)) {
       const code = parseInt(h, 16);
       text += mapping[code] !== undefined ? mapping[code] : (code >= 32 && code < 127 ? String.fromCharCode(code) : " ");
@@ -240,7 +245,6 @@ function extractText(pdfBuf) {
         text += mapping[code] !== undefined ? mapping[code] : (code >= 32 && code < 127 ? String.fromCharCode(code) : " ");
       }
     }
-    // Formato 2: literal  →  (texto) Tj  o  [(texto)] TJ
     for (const [, s] of d.matchAll(/\(([^)]*)\)\s*Tj/g)) {
       text += s.replace(/\\n/g, " ").replace(/\\r/g, " ") + " ";
     }
@@ -252,6 +256,11 @@ function extractText(pdfBuf) {
     }
   }
   return text.replace(/\s+/g, " ").trim();
+}
+
+function extractText(pdfBuf) {
+  const mapping = buildCMap(pdfBuf);
+  return extractTextWithCMap(pdfBuf, mapping);
 }
 
 // ── Dividir texto completo en bloques por página ────────────────────────────
@@ -328,15 +337,9 @@ export default async function handler(req, res) {
     const pdfBuf = await driveDownload(token, pdfFileId);
     console.log(`PDF: ${pdfBuf.length} bytes`);
 
-    // 2. Extraer metadata de TODAS las páginas desde el PDF completo
-    //    (los CMaps funcionan correctamente sobre el PDF completo)
-    //    Dividir por form feed \f que separa páginas en el texto plano
-    const fullText = extractText(pdfBuf);
-    
-    // Separar en páginas: cada página del PDF produce un bloque de texto
-    // Usamos los marcadores Nº XXXXX para delimitar páginas
-    const pageTexts = splitByPages(fullText);
-    console.log(`Texto extraído: ${fullText.length} chars, páginas detectadas: ${pageTexts.length}`);
+    // 2. Construir CMap global desde el PDF completo (recursos compartidos entre páginas)
+    const globalCMap = buildCMap(pdfBuf);
+    console.log(`CMap global: ${Object.keys(globalCMap).length} entradas`);
 
     // Separar páginas con pdf-lib (preserva fuentes y recursos compartidos)
     const srcDoc = await PDFDocument.load(pdfBuf, { ignoreEncryption: true });
@@ -352,14 +355,15 @@ export default async function handler(req, res) {
     if (pageBufs.length === 0) throw new Error("No se pudieron separar las páginas del PDF");
     console.log(`Páginas separadas: ${pageBufs.length}`);
 
-    // 3. Usar el texto del PDF completo para nombrar cada página
+    // 3. Extraer texto de cada página individual usando el CMap global
+    //    Esto garantiza que texto y PDF de cada página estén siempre alineados
     const zip = new JSZip();
     const sinCod = [];
     const breakdown = {};
 
     for (let i = 0; i < pageBufs.length; i++) {
-      // Usar texto extraído del PDF completo para esta posición de página
-      const text = pageTexts[i] || "";
+      // Extraer texto directamente de esta página (alineado con su PDF)
+      const text = extractTextWithCMap(pageBufs[i], globalCMap);
       const cod = detectCod(text);
       const nro = detectNro(text);
 
