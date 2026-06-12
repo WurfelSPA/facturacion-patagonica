@@ -3348,10 +3348,11 @@ function App(){
                   if(!fileId)throw new Error("Drive no devolvió fileId");
                   notify("✓ PDF subido — separando facturas...","ok");
                   setZipStatus("splitting");
-                  const splitRes=await fetch("/api/split-pdf",{
-                    method:"POST",headers:{"Content-Type":"application/json"},
-                    body:JSON.stringify({pdfFileId:fileId,periodo:mesCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID,userToken:gToken}),
-                  });
+                  const splitCtrl=new AbortController();
+                  const splitTimeout=setTimeout(()=>splitCtrl.abort(),90000);
+                  let splitRes;
+                  try{splitRes=await fetch("/api/split-pdf",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pdfFileId:fileId,periodo:mesCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID,userToken:gToken}),signal:splitCtrl.signal});}
+                  finally{clearTimeout(splitTimeout);}
                   const splitData=await splitRes.json();
                   if(!splitRes.ok)throw new Error(splitData.error||"Error al separar PDF");
                   notify("✓ "+splitData.totalFacturas+" facturas de "+periodo+" listas en Drive — procesando...","ok");

@@ -1,5 +1,5 @@
 import JSZip from "jszip";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, PDFName, PDFArray } from "pdf-lib";
 
 export const config = { api: { bodyParser: true, responseLimit: '60mb' } };
 
@@ -204,16 +204,84 @@ function parseCMap(t) {
   return mapping;
 }
 
-/* maxRawBytes: salta streams grandes (programas de fuente >100KB) que no son texto */
-function getDecodedStreams(pdfBuf, maxRawBytes = Infinity) {
+/* ── Extracción de texto usando el PDF ya parseado por pdf-lib ──────────────
+   En vez de regex sobre bytes crudos, usamos los objetos ya parseados en
+   srcDoc.context. Esto es O(streams de la página), no O(tamaño del PDF).
+   Garantiza alineación: misma página lógica que pageBufs[i].
+*/
+
+function decodeStreamContent(rawBytes) {
+  try {
+    return require("zlib").inflateSync(Buffer.from(rawBytes)).toString("latin1");
+  } catch {
+    return Buffer.from(rawBytes).toString("latin1");
+  }
+}
+
+function applyTextOps(decoded, mapping) {
+  let text = "";
+  for (const [, h] of decoded.matchAll(/<([0-9a-fA-F]+)>\s*Tj/g)) {
+    const code = parseInt(h, 16);
+    text += mapping[code] !== undefined ? mapping[code] : (code >= 32 && code < 127 ? String.fromCharCode(code) : " ");
+  }
+  for (const [, arr] of decoded.matchAll(/\[([^\]]+)\]\s*TJ/g)) {
+    for (const [, h] of arr.matchAll(/<([0-9a-fA-F]+)>/g)) {
+      const code = parseInt(h, 16);
+      text += mapping[code] !== undefined ? mapping[code] : (code >= 32 && code < 127 ? String.fromCharCode(code) : " ");
+    }
+  }
+  for (const [, s] of decoded.matchAll(/\(([^)]*)\)\s*Tj/g)) {
+    text += s.replace(/\\n/g, " ").replace(/\\r/g, " ") + " ";
+  }
+  for (const [, arr] of decoded.matchAll(/\[([^\]]*)\]\s*TJ/g)) {
+    for (const [, s] of arr.matchAll(/\(([^)]*)\)/g)) {
+      text += s.replace(/\\n/g, " ").replace(/\\r/g, " ");
+    }
+    text += " ";
+  }
+  return text;
+}
+
+/* Construye CMap iterando objetos ya parseados — sin regex sobre bytes crudos */
+function buildCMapFromDoc(srcDoc) {
+  const mapping = {};
+  for (const [, obj] of srcDoc.context.indirectObjects) {
+    if (!obj || !obj.contents) continue;
+    try {
+      const decoded = decodeStreamContent(obj.contents);
+      if (decoded.includes("beginbfchar") || decoded.includes("beginbfrange")) {
+        Object.assign(mapping, parseCMap(decoded));
+      }
+    } catch { /* ignorar streams no procesables */ }
+  }
+  return mapping;
+}
+
+/* Extrae texto de la página pageIndex usando content streams del PDF ya parseado.
+   Es O(streams de esa página) — rápido, y garantiza alineación con pageBufs[i]. */
+function extractPageText(srcDoc, pageIndex, mapping) {
+  try {
+    const page = srcDoc.getPage(pageIndex);
+    const contentsVal = page.node.get(PDFName.of("Contents"));
+    if (!contentsVal) return "";
+    const refs = (contentsVal instanceof PDFArray) ? contentsVal.asArray() : [contentsVal];
+    let text = "";
+    for (const ref of refs) {
+      const streamObj = srcDoc.context.lookup(ref);
+      if (!streamObj || !streamObj.contents) continue;
+      text += applyTextOps(decodeStreamContent(streamObj.contents), mapping);
+    }
+    return text.replace(/\s+/g, " ").trim();
+  } catch { return ""; }
+}
+
+/* Compatibilidad: mantener extractText para código que aún lo use */
+function getDecodedStreams(pdfBuf) {
   const str = pdfBuf.toString("latin1");
   const streams = [];
   const re = /stream\r?\n([\s\S]*?)endstream/g;
   let m;
-  while ((m = re.exec(str)) !== null) {
-    const raw = Buffer.from(m[1], "latin1");
-    if (raw.length <= maxRawBytes) streams.push(raw);
-  }
+  while ((m = re.exec(str)) !== null) streams.push(Buffer.from(m[1], "latin1"));
   const decoded = [];
   for (const s of streams) {
     try { decoded.push(require("zlib").inflateSync(s).toString("latin1")); } catch {
@@ -223,49 +291,18 @@ function getDecodedStreams(pdfBuf, maxRawBytes = Infinity) {
   }
   return decoded;
 }
-
-/* CMap: los streams de CMap son pequeños (1-10 KB) — salta programas de fuente grandes */
 function buildCMap(pdfBuf) {
-  const decoded = getDecodedStreams(pdfBuf, 15000);
   const mapping = {};
-  for (const d of decoded) {
+  for (const d of getDecodedStreams(pdfBuf)) {
     if (d.includes("beginbfchar") || d.includes("beginbfrange")) Object.assign(mapping, parseCMap(d));
   }
   return mapping;
 }
-
-/* Extrae texto de un pageBuf usando un CMap ya construido.
-   Los content streams de una página de factura son típicamente < 80 KB comprimidos. */
-function extractTextWithCMap(pdfBuf, mapping) {
-  const decoded = getDecodedStreams(pdfBuf, 80000);
-  let text = "";
-  for (const d of decoded) {
-    for (const [, h] of d.matchAll(/<([0-9a-fA-F]+)>\s*Tj/g)) {
-      const code = parseInt(h, 16);
-      text += mapping[code] !== undefined ? mapping[code] : (code >= 32 && code < 127 ? String.fromCharCode(code) : " ");
-    }
-    for (const [, arr] of d.matchAll(/\[([^\]]+)\]\s*TJ/g)) {
-      for (const [, h] of arr.matchAll(/<([0-9a-fA-F]+)>/g)) {
-        const code = parseInt(h, 16);
-        text += mapping[code] !== undefined ? mapping[code] : (code >= 32 && code < 127 ? String.fromCharCode(code) : " ");
-      }
-    }
-    for (const [, s] of d.matchAll(/\(([^)]*)\)\s*Tj/g)) {
-      text += s.replace(/\\n/g, " ").replace(/\\r/g, " ") + " ";
-    }
-    for (const [, arr] of d.matchAll(/\[([^\]]*)\]\s*TJ/g)) {
-      for (const [, s] of arr.matchAll(/\(([^)]*)\)/g)) {
-        text += s.replace(/\\n/g, " ").replace(/\\r/g, " ");
-      }
-      text += " ";
-    }
-  }
-  return text.replace(/\s+/g, " ").trim();
-}
-
 function extractText(pdfBuf) {
   const mapping = buildCMap(pdfBuf);
-  return extractTextWithCMap(pdfBuf, mapping);
+  let text = "";
+  for (const d of getDecodedStreams(pdfBuf)) text += applyTextOps(d, mapping);
+  return text.replace(/\s+/g, " ").trim();
 }
 
 // ── Dividir texto completo en bloques por página ────────────────────────────
@@ -356,20 +393,17 @@ export default async function handler(req, res) {
     if (pageBufs.length === 0) throw new Error("No se pudieron separar las páginas del PDF");
     console.log(`Páginas separadas: ${pageBufs.length}`);
 
-    // Construir CMap desde la primera página (fuentes compartidas en todos los documentos PISA)
-    // Es mucho más rápido que procesar el PDF completo de 100+ páginas
-    const globalCMap = buildCMap(pageBufs[0]);
+    // 3. CMap desde el PDF ya parseado (sin regex sobre bytes crudos — rápido)
+    const globalCMap = buildCMapFromDoc(srcDoc);
     console.log(`CMap global: ${Object.keys(globalCMap).length} entradas`);
 
-    // 3. Extraer texto de cada página individual usando el CMap global
-    //    Esto garantiza que texto y PDF de cada página estén siempre alineados
+    // Extraer texto vía content streams del srcDoc (O(streams/página), garantiza alineación)
     const zip = new JSZip();
     const sinCod = [];
     const breakdown = {};
 
     for (let i = 0; i < pageBufs.length; i++) {
-      // Extraer texto directamente de esta página (alineado con su PDF)
-      const text = extractTextWithCMap(pageBufs[i], globalCMap);
+      const text = extractPageText(srcDoc, i, globalCMap);
       const cod = detectCod(text);
       const nro = detectNro(text);
 
