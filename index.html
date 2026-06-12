@@ -2557,11 +2557,23 @@ function App(){
           let bestIdx=-1,bestScore=0;
           const rutNorm=c.rut||"";
 
+          /* Normaliza nombre para matching: minúsculas, sin tildes, solo alfanumérico */
+          const normNombre=s=>(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9 ]/g,"").trim();
+          const ncli=normNombre(c.cliente);
+
           for(let idx=0;idx<pdfs.length;idx++){
             if(pdfUsado.has(idx))continue;
             const p=pdfs[idx];
             if(p.sitio!==c.sitio||p.tipo!==c.tipo)continue;
             let score=0;
+            /* Nombre en archivo — identificador más directo (el archivo ya lleva el nombre del cliente) */
+            if(p.nombreEnArchivo&&ncli){
+              const na=p.nombreEnArchivo; /* ya está en lowercase desde procesarPDFs */
+              const matches=ncli===na||ncli.includes(na)||(na.length>=4&&ncli.includes(na))||(ncli.length>=4&&na.includes(ncli));
+              const fwN=na.split(" ").find(w=>w.length>=4)||"";
+              const fwC=ncli.split(" ").find(w=>w.length>=4)||"";
+              if(matches||(fwN&&fwC&&fwN===fwC)) score+=300;
+            }
             /* RUT exacto — identificador inequívoco */
             if(rutNorm&&p.rutPdf&&p.rutPdf===rutNorm) score+=200;
             /* UF */
@@ -2574,10 +2586,11 @@ function App(){
             if(score>bestScore){bestScore=score;bestIdx=idx;}
           }
 
+          const UMBRAL_NOMBRE=300;
           const UMBRAL_RUT=200;
           const UMBRAL_UF=50;
 
-          if(bestScore>=UMBRAL_RUT||bestScore>=UMBRAL_UF){
+          if(bestScore>=UMBRAL_NOMBRE||bestScore>=UMBRAL_RUT||bestScore>=UMBRAL_UF){
             pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;montoTotal=pdfs[bestIdx].montoTotal||null;ivaAmount=pdfs[bestIdx].ivaAmount||null;matchScore=bestScore;
           } else {
             const candidatos=pdfs.reduce((acc,p,idx)=>{
