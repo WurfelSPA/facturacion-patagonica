@@ -1,19 +1,31 @@
 /**
  * /api/historial
  *
- * GET  ?anio=2026          → devuelve historial-facturas.json del año
- * GET  ?ls=FOLDER_ID       → lista archivos en carpeta Drive (SA)
- * GET  ?fileId=FILE_ID     → proxy descarga de archivo Drive (SA)
- * POST                     → guarda/fusiona datos de un período en el JSON
+ * GET  ?anio=2026                       → devuelve historial-facturas.json del año
+ * GET  ?ls=FOLDER_ID                    → lista archivos en carpeta Drive (SA)
+ * GET  ?fileId=FILE_ID                  → proxy descarga de archivo Drive (SA)
+ * GET  ?listPeriodos=1                  → lista períodos con ZIP en carpeta facturación
+ * GET  ?cliente=X&periodo=Y             → facturas de un cliente en el ZIP del período
+ * POST                                  → guarda/fusiona datos de un período en el JSON
  *   Body: { anio, periodo, data: { "CLIENTE": { arriendo:"12345", servAdm:"12346" } } }
- *
- * El archivo historial-facturas.json vive en DRIVE_PDF_FACTURAS_ID.
  */
 
-export const config = { api: { bodyParser: true } };
+import JSZip from "jszip";
 
-const PDF_FOLDER = process.env.DRIVE_PDF_FACTURAS_ID || "";
-const HIST_NAME  = "historial-facturas.json";
+export const config = { api: { bodyParser: true, responseLimit: "15mb" } };
+
+const PDF_FOLDER       = process.env.DRIVE_PDF_FACTURAS_ID || "";
+const HIST_NAME        = "historial-facturas.json";
+const FACT_FOLDER_ID   = "1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u";
+
+const MES_NOM = {
+  "01":"Enero","02":"Febrero","03":"Marzo","04":"Abril","05":"Mayo","06":"Junio",
+  "07":"Julio","08":"Agosto","09":"Septiembre","10":"Octubre","11":"Noviembre","12":"Diciembre",
+};
+const MES_NUM = {
+  "Enero":"01","Febrero":"02","Marzo":"03","Abril":"04","Mayo":"05","Junio":"06",
+  "Julio":"07","Agosto":"08","Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12",
+};
 
 // ── JWT / SA ──────────────────────────────────────────────────────────────────
 async function signJWT(payload, privateKey) {
@@ -52,9 +64,7 @@ async function findFile(token, name, folderId) {
   const d = await r.json();
   return d.files?.[0]?.id || null;
 }
-
 async function createJsonFile(token, name, folderId, content) {
-  // Multipart: metadata + content
   const boundary = "PAT_HIST_" + Date.now();
   const meta = JSON.stringify({ name, parents:[folderId], mimeType:"application/json" });
   const body = `--${boundary}\r\nContent-Type: application/json\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${content}\r\n--${boundary}--`;
@@ -66,7 +76,6 @@ async function createJsonFile(token, name, folderId, content) {
   if (!d.id) throw new Error("Create file error: "+JSON.stringify(d));
   return d.id;
 }
-
 async function updateJsonFile(token, fileId, content) {
   const r = await fetch(
     `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
@@ -74,14 +83,12 @@ async function updateJsonFile(token, fileId, content) {
   );
   if (!r.ok) throw new Error(`Update file ${r.status}`);
 }
-
 async function downloadFile(token, fileId) {
   const r = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
     { headers:{ Authorization:`Bearer ${token}` } });
   if (!r.ok) return null;
   return r.text();
 }
-
 async function listFolder(token, folderId) {
   const q = encodeURIComponent(`'${folderId}' in parents and trashed=false`);
   const r = await fetch(
@@ -90,6 +97,79 @@ async function listFolder(token, folderId) {
   );
   if (!r.ok) throw new Error(`List folder ${r.status}`);
   return r.json();
+}
+async function driveFiles(token, folderId) {
+  const q = encodeURIComponent(`'${folderId}' in parents and trashed=false`);
+  const r = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&pageSize=100`,
+    { headers:{ Authorization:`Bearer ${token}` } }
+  );
+  const d = await r.json();
+  return d.files || [];
+}
+
+// ── PDF text extraction ───────────────────────────────────────────────────────
+function parseCMap(t) {
+  const m = {};
+  for (const sec of (t.match(/beginbfrange([\s\S]*?)endbfrange/g)||[])) {
+    for (const [,s,e,d] of sec.matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g)) {
+      const si=parseInt(s,16),ei=parseInt(e,16),di=parseInt(d,16);
+      for(let i=0;i<=ei-si;i++) m[si+i]=String.fromCodePoint(di+i);
+    }
+  }
+  for (const sec of (t.match(/beginbfchar([\s\S]*?)endbfchar/g)||[])) {
+    for (const [,src,dst] of sec.matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g)) {
+      try {
+        const code=parseInt(src,16), bytes=Buffer.from(dst,"hex");
+        m[code]="";
+        for(let i=0;i<bytes.length;i+=2) m[code]+=String.fromCodePoint(bytes.readUInt16BE(i));
+      } catch {}
+    }
+  }
+  return m;
+}
+function extractText(pdfBuf) {
+  const str = pdfBuf.toString("latin1");
+  const streams=[];
+  const re=/stream\r?\n([\s\S]*?)endstream/g; let match;
+  while((match=re.exec(str))!==null) streams.push(Buffer.from(match[1],"latin1"));
+  const decoded=[];
+  for(const s of streams){
+    try{ decoded.push(require("zlib").inflateSync(s).toString("latin1")); }
+    catch{ const raw=s.toString("latin1"); if(raw.includes("Tj")||raw.includes("TJ")) decoded.push(raw); }
+  }
+  const mapping={};
+  for(const d of decoded) if(d.includes("beginbfchar")||d.includes("beginbfrange")) Object.assign(mapping,parseCMap(d));
+  let text="";
+  for(const d of decoded){
+    for(const [,h] of d.matchAll(/<([0-9a-fA-F]+)>\s*Tj/g)){const c=parseInt(h,16);text+=mapping[c]!==undefined?mapping[c]:(c>=32&&c<127?String.fromCharCode(c):" ");}
+    for(const [,arr] of d.matchAll(/\[([^\]]+)\]\s*TJ/g)) for(const [,h] of arr.matchAll(/<([0-9a-fA-F]+)>/g)){const c=parseInt(h,16);text+=mapping[c]!==undefined?mapping[c]:(c>=32&&c<127?String.fromCharCode(c):" ");}
+    for(const [,s] of d.matchAll(/\(([^)]*)\)\s*Tj/g)) text+=s.replace(/\\n/g," ")+" ";
+    for(const [,arr] of d.matchAll(/\[([^\]]*)\]\s*TJ/g)){for(const [,s] of arr.matchAll(/\(([^)]*)\)/g)) text+=s.replace(/\\n/g," ");text+=" ";}
+  }
+  return text.replace(/\s+/g," ").trim();
+}
+
+// ── Historial-cliente helpers ─────────────────────────────────────────────────
+function norm(s){
+  return (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9 ]/g,"").trim();
+}
+function clienteMatch(fromFile, query) {
+  const a=norm(fromFile), b=norm(query);
+  if(!a||!b) return false;
+  if(a===b||a.includes(b)||b.includes(a)) return true;
+  return b.split(" ").filter(w=>w.length>3).some(w=>a.includes(w));
+}
+function detectTipo(text) {
+  const t=(text||"").replace(/\s+/g," ");
+  if(/Habilitaci/i.test(t)) return "habilitacion";
+  if(/Serv\.?\s*Adm\./i.test(t)) return "servAdm";
+  if(/Arriendo/i.test(t)) return "arriendo";
+  return null;
+}
+function extractClienteFromText(text) {
+  const m=text.match(/Se[ñn]or\(es\)\s*(.+?)\s*RUT\s*[\d]/);
+  return m?m[1].trim().replace(/\s+/g," ").slice(0,40):null;
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -128,6 +208,66 @@ export default async function handler(req, res) {
       return res.status(200).send(buf);
     }
 
+    // ── GET ?listPeriodos=1 ── períodos disponibles en carpeta facturación ─
+    if (req.method === "GET" && req.query.listPeriodos === "1") {
+      const files = await driveFiles(token, FACT_FOLDER_ID);
+      const periodos = files
+        .filter(f => /^\d{4}-\d{2}\.zip$/i.test(f.name))
+        .sort((a,b) => b.name.localeCompare(a.name))
+        .map(f => {
+          const [anio, mesNum] = f.name.replace(/\.zip$/i,"").split("-");
+          return MES_NOM[mesNum] ? `${MES_NOM[mesNum]} ${anio}` : null;
+        })
+        .filter(Boolean);
+      return res.status(200).json({ periodos });
+    }
+
+    // ── GET ?cliente=X&periodo=Y ── facturas del cliente en el ZIP ─────────
+    if (req.method === "GET" && req.query.cliente && req.query.periodo) {
+      const { cliente, periodo } = req.query;
+      const [mesNom, anioStr] = periodo.split(" ");
+      const mesNum = MES_NUM[mesNom];
+      if (!mesNum) return res.status(400).json({ error:"Periodo inválido" });
+
+      const zipName = `${anioStr}-${mesNum}.zip`;
+      const files = await driveFiles(token, FACT_FOLDER_ID);
+      const zipFile = files.find(f => f.name.toLowerCase() === zipName.toLowerCase());
+      if (!zipFile) return res.status(200).json({ facturas: null });
+
+      const zipRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${zipFile.id}?alt=media`,
+        { headers:{ Authorization:`Bearer ${token}` } }
+      );
+      if (!zipRes.ok) return res.status(200).json({ facturas: null });
+
+      const zip = await JSZip.loadAsync(Buffer.from(await zipRes.arrayBuffer()));
+      const facturas = {};
+
+      for (const [path, entry] of Object.entries(zip.files)) {
+        if (entry.dir || !path.toLowerCase().endsWith(".pdf")) continue;
+        const fname = path.split("/").pop();
+        const nroMatch = fname.match(/^F-(\d+)(?:\s+(.+))?\.pdf$/i);
+        if (!nroMatch) continue;
+        const [, nro, fileCliente] = nroMatch;
+
+        if (fileCliente && !clienteMatch(fileCliente, cliente)) continue;
+
+        const pdfBuf = Buffer.from(await entry.async("arraybuffer"));
+        const text = extractText(pdfBuf);
+
+        if (!fileCliente) {
+          const pdfCliente = extractClienteFromText(text);
+          if (!pdfCliente || !clienteMatch(pdfCliente, cliente)) continue;
+        }
+
+        const tipo = detectTipo(text);
+        if (tipo && !facturas[tipo]) facturas[tipo] = `F-${nro}`;
+      }
+
+      const tiene = Object.keys(facturas).length > 0;
+      return res.status(200).json({ facturas: tiene ? facturas : null });
+    }
+
     // ── GET ?anio=YYYY ── devuelve historial JSON ─────────────────────────
     if (req.method === "GET") {
       if (!PDF_FOLDER) return res.status(200).json({});
@@ -147,7 +287,6 @@ export default async function handler(req, res) {
       if (!PDF_FOLDER)
         return res.status(500).json({ error:"DRIVE_PDF_FACTURAS_ID no configurada" });
 
-      // Leer JSON existente
       let historial = {};
       const fileId = await findFile(token, HIST_NAME, PDF_FOLDER);
       if (fileId) {
@@ -155,7 +294,6 @@ export default async function handler(req, res) {
         if (text) historial = JSON.parse(text);
       }
 
-      // Fusionar datos del período
       if (!historial[anio]) historial[anio] = {};
       historial[anio][periodo] = { ...(historial[anio][periodo] || {}), ...periodoData };
 

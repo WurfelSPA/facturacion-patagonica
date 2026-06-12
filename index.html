@@ -1752,7 +1752,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
   useEffect(()=>{
     if(!selClient){setPeriodsAvail([]);setInvoicesMap({});setLoadingSet(new Set());return;}
     setPeriodsAvail([]);setInvoicesMap({});
-    fetch("/api/historial-cliente?listPeriodos=1")
+    fetch("/api/historial?listPeriodos=1")
       .then(r=>r.json())
       .then(({periodos=[]})=>{
         setPeriodsAvail(periodos);
@@ -1760,7 +1760,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
         setLoadingSet(ls);
         /* Fetch paralelo por período, máx 10 más recientes */
         periodos.slice(0,10).forEach(p=>{
-          fetch(`/api/historial-cliente?cliente=${encodeURIComponent(selClient.nombre)}&periodo=${encodeURIComponent(p)}`)
+          fetch(`/api/historial?cliente=${encodeURIComponent(selClient.nombre)}&periodo=${encodeURIComponent(p)}`)
             .then(r=>r.json())
             .then(({facturas})=>{
               if(facturas) setInvoicesMap(prev=>({...prev,[p]:facturas}));
