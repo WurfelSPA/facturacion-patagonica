@@ -1773,7 +1773,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
   },[selClient]);
 
   const clients=dashData
-    ?[...new Map(dashData.clients.map(c=>[c.nombre+"|"+c.sitio,c])).values()]
+    ?(()=>{const seen=new Set();return [...dashData.clients].sort((a,b)=>(a.ri||0)-(b.ri||0)).filter(c=>{const k=c.nombre+"|"+c.sitio;if(seen.has(k))return false;seen.add(k);return true;});})()
     :[];
 
   /* Búsqueda por nombre, correo y RUT */

@@ -16,7 +16,7 @@ export const config = { api: { bodyParser: true } };
 
 const SPREADSHEET_ID = process.env.DRIVE_PLANILLA_ID || "1yIKK0ZgU5C1ARsD6NIryRlHnom2Qilml";
 const SHEET_NAME     = "Flujo";
-const HC_COL_DEFAULT = "HC";   // fallback: Junio 2026
+const HC_COL_DEFAULT = "HC";   // fallback estático (nunca debería usarse — el frontend siempre envía sentCol dinámico)
 
 // ── JWT / SA ──────────────────────────────────────────────────────────────────
 async function signJWT(payload, privateKey) {
