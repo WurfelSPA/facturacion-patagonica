@@ -161,15 +161,22 @@ function clienteMatch(fromFile, query) {
   return b.split(" ").filter(w=>w.length>3).some(w=>a.includes(w));
 }
 function detectTipo(text) {
-  /* Usa la primera aparición de cada keyword — evita falsos positivos
-     cuando una factura de Arriendo menciona "Serv. Adm." en algún pie. */
+  /* Primera aparición de cada keyword — evita falsos positivos de pie de página.
+     Múltiples variantes para cubrir diferentes encodings de PDF. */
   const t = (text||"").replace(/\s+/g," ");
   const hits = [];
   const add = (tipo, needle) => { const i=t.indexOf(needle); if(i>=0) hits.push({tipo,i}); };
+  // Habilitación
   add("habilitacion","Habilitaci");
+  // Serv. Admin — variantes con/sin punto, con/sin espacio, COD de descripción
   add("servAdm","Serv. Adm.");
   add("servAdm","Serv.Adm.");
+  add("servAdm","Serv. Adm ");   // sin punto final
+  add("servAdm","COD: S-A");     // código de concepto en facturas PISA
+  add("servAdm","COD:S-A");
+  // Arriendo — variantes
   add("arriendo","Arriendo");
+  add("arriendo","ARRIENDO");
   if(!hits.length) return null;
   hits.sort((a,b)=>a.i-b.i);
   return hits[0].tipo;
@@ -229,23 +236,44 @@ export default async function handler(req, res) {
       return res.status(200).json({ periodos });
     }
 
-    // ── GET ?cliente=X&periodo=Y ── facturas del cliente en el ZIP ─────────
+    // ── GET ?cliente=X&periodo=Y ── facturas del cliente en el período ──────
     if (req.method === "GET" && req.query.cliente && req.query.periodo) {
       const { cliente, periodo } = req.query;
       const [mesNom, anioStr] = periodo.split(" ");
       const mesNum = MES_NUM[mesNom];
       if (!mesNum) return res.status(400).json({ error:"Periodo inválido" });
 
+      /* ── FUENTE 1: historial JSON (instantáneo, confiable) ── */
+      if (PDF_FOLDER) {
+        try {
+          const histFileId = await findFile(token, HIST_NAME, PDF_FOLDER);
+          if (histFileId) {
+            const histText = await downloadFile(token, histFileId);
+            if (histText) {
+              const histData = JSON.parse(histText);
+              const periodoData = histData[anioStr]?.[periodo];
+              if (periodoData) {
+                const key = Object.keys(periodoData).find(k => clienteMatch(k, cliente));
+                if (key && Object.keys(periodoData[key]).length > 0) {
+                  return res.status(200).json({ facturas: periodoData[key], source:"json" });
+                }
+              }
+            }
+          }
+        } catch {}  // si falla el JSON, continuar con ZIP fallback
+      }
+
+      /* ── FUENTE 2: ZIP fallback (parseo PDF) ── */
       const zipName = `${anioStr}-${mesNum}.zip`;
       const files = await driveFiles(token, FACT_FOLDER_ID);
       const zipFile = files.find(f => f.name.toLowerCase() === zipName.toLowerCase());
-      if (!zipFile) return res.status(200).json({ facturas: null });
+      if (!zipFile) return res.status(200).json({ facturas: null, source:"zip_missing" });
 
       const zipRes = await fetch(
         `https://www.googleapis.com/drive/v3/files/${zipFile.id}?alt=media`,
         { headers:{ Authorization:`Bearer ${token}` } }
       );
-      if (!zipRes.ok) return res.status(200).json({ facturas: null });
+      if (!zipRes.ok) return res.status(200).json({ facturas: null, source:"zip_error" });
 
       const zip = await JSZip.loadAsync(Buffer.from(await zipRes.arrayBuffer()));
       const facturas = {};
@@ -272,7 +300,7 @@ export default async function handler(req, res) {
       }
 
       const tiene = Object.keys(facturas).length > 0;
-      return res.status(200).json({ facturas: tiene ? facturas : null });
+      return res.status(200).json({ facturas: tiene ? facturas : null, source:"zip" });
     }
 
     // ── GET ?anio=YYYY ── devuelve historial JSON ─────────────────────────
