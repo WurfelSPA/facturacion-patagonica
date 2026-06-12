@@ -1735,6 +1735,192 @@ function ContratosView({dashData,driveLoading}){
    APP PRINCIPAL
 ═══════════════════════════════════ */
 
+/* ══════════════════════════════════════════════════════════
+   HISTORIAL FACTURACIÓN
+══════════════════════════════════════════════════════════ */
+function HistorialFactView({dashData,driveLoading,notify}){
+  const [histData,setHistData]=useState(null);
+  const [histLoading,setHistLoading]=useState(false);
+  const [selClient,setSelClient]=useState(null);
+  const [zipCache,setZipCache]=useState({});
+  const [pdfPrev,setPdfPrev]=useState(null); /* {url,factNum,periodo,nombre} */
+  const [pdfLoading,setPdfLoading]=useState(false);
+  const [search,setSearch]=useState("");
+
+  useEffect(()=>{
+    const anio=new Date().getFullYear();
+    setHistLoading(true);
+    fetch(`/api/historial?anio=${anio}`)
+      .then(r=>r.ok?r.json():null)
+      .then(d=>{setHistData(d||{});setHistLoading(false);})
+      .catch(()=>{setHistData({});setHistLoading(false);});
+  },[]);
+
+  const MES_ORD={Enero:1,Febrero:2,Marzo:3,Abril:4,Mayo:5,Junio:6,Julio:7,Agosto:8,Septiembre:9,Octubre:10,Noviembre:11,Diciembre:12};
+  const sortPeriodos=ps=>[...ps].sort((a,b)=>{
+    const[ma,ya]=a.split(" "),[mb,yb]=b.split(" ");
+    return +ya!==+yb?+ya-+yb:(MES_ORD[ma]||0)-(MES_ORD[mb]||0);
+  });
+
+  const clients=dashData
+    ?[...new Map(dashData.clients.map(c=>[c.nombre+"|"+c.sitio,c])).values()]
+    :[];
+  const filtered=clients.filter(c=>!search||
+    c.nombre.toLowerCase().includes(search.toLowerCase())||
+    (c.email||"").toLowerCase().includes(search.toLowerCase())
+  );
+
+  const invoices=React.useMemo(()=>{
+    if(!selClient||!histData)return{};
+    const res={};
+    Object.entries(histData).forEach(([per,map])=>{
+      const found=Object.entries(map).find(([k])=>k.trim().toLowerCase()===selClient.nombre.trim().toLowerCase());
+      if(found)res[per]=found[1];
+    });
+    return res;
+  },[selClient,histData]);
+  const periodos=sortPeriodos(Object.keys(invoices));
+
+  const previewFact=async(fNum,periodo)=>{
+    if(pdfLoading)return;
+    setPdfLoading(true);
+    try{
+      let zip=zipCache[periodo];
+      if(!zip){
+        const r=await fetch(`/api/zip?periodo=${encodeURIComponent(periodo)}`);
+        if(!r.ok)throw new Error(`ZIP de ${periodo} no disponible`);
+        const ct=r.headers.get("content-type")||"";
+        if(!ct.includes("zip")&&!ct.includes("octet"))throw new Error("Respuesta no es ZIP");
+        zip=await JSZip.loadAsync(await r.arrayBuffer());
+        setZipCache(p=>({...p,[periodo]:zip}));
+      }
+      const path=Object.keys(zip.files).find(p=>p.includes(fNum)&&!zip.files[p].dir);
+      if(!path)throw new Error(`${fNum} no encontrado en ZIP de ${periodo}`);
+      const blob=new Blob([await zip.files[path].async("uint8array")],{type:"application/pdf"});
+      if(pdfPrev)URL.revokeObjectURL(pdfPrev.url);
+      setPdfPrev({url:URL.createObjectURL(blob),factNum:fNum,periodo,nombre:path.split("/").pop()});
+    }catch(e){notify("Error: "+e.message,"err");}
+    setPdfLoading(false);
+  };
+  const closePrev=()=>{if(pdfPrev)URL.revokeObjectURL(pdfPrev.url);setPdfPrev(null);};
+
+  const conceptos=["arriendo","servAdm","habilitacion"];
+  const cLabel={arriendo:"Arriendo",servAdm:"Serv. Admin.",habilitacion:"Habilitación"};
+  const cColor={arriendo:"var(--blue)",servAdm:"var(--amber)",habilitacion:"var(--green)"};
+
+  return h("main",{style:{flex:1,overflowY:"auto",padding:"18px 22px",display:"flex",flexDirection:"column",gap:16},className:"fade-up"},
+
+    h("div",{style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
+      selClient&&h("button",{onClick:()=>setSelClient(null),
+        style:{fontSize:11,padding:"4px 12px",borderRadius:7,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--txm)",cursor:"pointer"}
+      },"◀ Todos"),
+      h("div",{style:{fontSize:15,fontWeight:700,color:"var(--tx)"}},
+        selClient?"📂 "+selClient.nombre:"📂 Historial Facturación"
+      ),
+      !selClient&&h("input",{value:search,onChange:e=>setSearch(e.target.value),
+        placeholder:"Buscar cliente o correo...",style:{marginLeft:"auto",width:220}})
+    ),
+
+    !selClient&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
+      h("div",{style:{display:"grid",gridTemplateColumns:"90px 1fr 220px",padding:"8px 14px",
+        borderBottom:"1px solid var(--bdr)",background:"var(--surf2)",fontSize:10,fontWeight:700,color:"var(--txm)",letterSpacing:".06em"}},
+        h("div",null,"SITIO"),h("div",null,"CLIENTE"),h("div",null,"CORREO")
+      ),
+      driveLoading||histLoading?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txm)",fontSize:13}},
+        h("span",{className:"spin",style:{fontSize:18,marginRight:8}},"⟳"),"Cargando..."
+      ):
+      !dashData?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:13}},
+        "Carga la planilla en el Dashboard para ver los clientes"
+      ):
+      filtered.length===0?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados"):
+      h("div",{style:{maxHeight:"calc(100vh - 200px)",overflowY:"auto"}},
+        filtered.map(c=>{
+          const color=SITIO_C[c.sitio]||"#888";
+          return h("div",{key:c.nombre+c.sitio,onClick:()=>setSelClient(c),
+            style:{display:"grid",gridTemplateColumns:"90px 1fr 220px",padding:"10px 14px",
+              borderBottom:"1px solid var(--bdr)",cursor:"pointer",transition:"background .1s"}
+          },
+            h("div",{style:{display:"flex",alignItems:"center",gap:5}},
+              h("span",{style:{padding:"2px 7px",borderRadius:6,fontSize:9,fontWeight:700,
+                background:`${color}18`,color,border:`1px solid ${color}40`}},c.sitio||"—"),
+              c.edificio&&h("span",{style:{fontSize:9,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},c.edificio)
+            ),
+            h("div",null,
+              h("div",{style:{fontWeight:600,fontSize:12,lineHeight:1.4}},c.nombre),
+              c.rut&&h("div",{style:{fontSize:9,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},c.rut)
+            ),
+            h("div",{style:{fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace",
+              alignSelf:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},c.email||"—")
+          );
+        })
+      )
+    ),
+
+    selClient&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
+      h("div",{style:{padding:"12px 16px",background:"var(--surf2)",borderBottom:"1px solid var(--bdr)",
+        display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
+        h("span",{style:{padding:"3px 9px",borderRadius:8,fontSize:10,fontWeight:700,
+          background:`${(SITIO_C[selClient.sitio]||"#888")}18`,color:SITIO_C[selClient.sitio]||"#888",
+          border:`1px solid ${(SITIO_C[selClient.sitio]||"#888")}40`}},selClient.sitio),
+        selClient.edificio&&h("span",{style:{fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},selClient.edificio),
+        h("span",{style:{fontWeight:700,fontSize:13}},selClient.nombre),
+        selClient.rut&&h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},selClient.rut),
+        selClient.email&&h("span",{style:{fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace",marginLeft:"auto"}},selClient.email)
+      ),
+      histLoading?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txm)"}},"Cargando historial..."):
+      periodos.length===0?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:13}},
+        "Sin facturas registradas para este cliente.",
+        h("br"),h("span",{style:{fontSize:11}},"Procesa un período en Facturación para registrar las facturas.")
+      ):
+      h("div",{style:{overflowX:"auto"}},
+        h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
+          h("thead",null,
+            h("tr",{style:{background:"var(--surf2)"}},
+              h("th",{style:{padding:"9px 16px",textAlign:"left",fontWeight:700,color:"var(--txm)",
+                letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",fontSize:10,whiteSpace:"nowrap",minWidth:120}},"CONCEPTO"),
+              ...periodos.map(p=>h("th",{key:p,style:{padding:"9px 14px",textAlign:"center",fontWeight:600,
+                color:"var(--tx)",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap",minWidth:115}},p))
+            )
+          ),
+          h("tbody",null,
+            conceptos.map((conc,ci)=>h("tr",{key:conc,style:{borderBottom:ci<2?"1px solid var(--bdr)":"none"}},
+              h("td",{style:{padding:"11px 16px",fontWeight:700,color:cColor[conc],fontSize:11,whiteSpace:"nowrap"}},cLabel[conc]),
+              ...periodos.map(p=>{
+                const fNum=invoices[p]?.[conc];
+                return h("td",{key:p,style:{padding:"11px 14px",textAlign:"center"}},
+                  fNum?h("button",{
+                    onClick:()=>previewFact(fNum,p),
+                    disabled:pdfLoading,
+                    title:`Ver PDF — ${fNum} · ${p}`,
+                    style:{background:"var(--bbg)",border:"1px solid #b5d0f0",color:"var(--blue)",
+                      padding:"3px 11px",borderRadius:6,fontSize:10,fontWeight:600,
+                      cursor:pdfLoading?"wait":"pointer",fontFamily:"'DM Mono',monospace"}
+                  },pdfLoading?"⟳":fNum):
+                  h("span",{style:{color:"var(--txd)",fontSize:11}},"—")
+                );
+              })
+            ))
+          )
+        )
+      )
+    ),
+
+    pdfPrev&&h("div",{className:"overlay",onClick:e=>{if(e.target===e.currentTarget)closePrev();}},
+      h("div",{style:{background:"var(--surf)",borderRadius:14,width:"88vw",height:"92vh",display:"flex",flexDirection:"column",overflow:"hidden"}},
+        h("div",{style:{padding:"12px 18px",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",
+          gap:10,background:"var(--surf2)",flexShrink:0}},
+          h("span",{style:{fontWeight:700,fontSize:13,fontFamily:"'DM Mono',monospace",color:"var(--blue)"}},pdfPrev.factNum),
+          h("span",{style:{fontSize:12,color:"var(--txm)"}},"· "+pdfPrev.periodo),
+          h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},pdfPrev.nombre),
+          h("button",{onClick:closePrev,style:{marginLeft:"auto",background:"none",border:"1px solid var(--bdr)",
+            borderRadius:7,padding:"4px 14px",cursor:"pointer",fontSize:12,color:"var(--txm)"}},"✕ Cerrar")
+        ),
+        h("iframe",{src:pdfPrev.url,style:{flex:1,border:"none",width:"100%"},title:pdfPrev.factNum})
+      )
+    )
+  );
+}
+
 function HistorialPanel(){return null;}
 function _HistorialPanel_REMOVED({files,data,pdfMap,filesZip,periodo,getToken,notify,clientId}){
   const MESES_N=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -1974,6 +2160,7 @@ function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlo
     {id:"dashboard", icon:"📊", label:"Dashboard"},
     {id:"ventas",    icon:"📈", label:"Detalles Ventas"},
     {id:"factura",   icon:"📋", label:"Facturación"},
+    {id:"historial-fact", icon:"📂", label:"Historial Facturación"},
     {id:"contratos", icon:"📄", label:"Contratos"},
   ];
   const isActive = id => id==="factura" ? (view==="table"||view==="upload") : view===id;
@@ -3284,6 +3471,7 @@ function App(){
     )
     ,view==="ventas"&&h(VentasView,{periodo})
     ,view==="contratos"&&h(ContratosView,{dashData,driveLoading})
+    ,view==="historial-fact"&&h(HistorialFactView,{dashData,driveLoading,notify})
   ));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(h(App));
