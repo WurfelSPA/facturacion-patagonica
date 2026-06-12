@@ -3354,14 +3354,16 @@ function App(){
                   });
                   const splitData=await splitRes.json();
                   if(!splitRes.ok)throw new Error(splitData.error||"Error al separar PDF");
-                  notify("✓ "+splitData.totalFacturas+" facturas de "+periodo+" listas en Drive","ok");
-                  setZipStatus("idle");
+                  notify("✓ "+splitData.totalFacturas+" facturas de "+periodo+" listas en Drive — procesando...","ok");
                   /* ── Notificación Telegram al subir ── */
                   try{
                     const tgBot=window.__TG_BOT__;
                     const tgChat=window.__TG_CHAT__;
-                    if(tgBot&&tgChat) await sendTelegram(tgBot,tgChat,`✅ Facturas PISA ${periodo} listas\n${splitData.totalFacturas} PDFs subidos a Drive.\nPresiona Procesar para continuar.`);
+                    if(tgBot&&tgChat) await sendTelegram(tgBot,tgChat,`✅ Facturas PISA ${periodo} listas\n${splitData.totalFacturas} PDFs subidos a Drive.`);
                   }catch(e){console.warn("Telegram notif error:",e.message);}
+                  /* ── Continuar automáticamente al reporte ── */
+                  periodoActivado.current=true;autoProcesado.current=false;
+                  buscarZip(periodo);
                 }catch(e){setZipStatus("error");setZipError(e.message);notify("Error: "+e.message,"err");}
                 ev.target.value="";
               }
