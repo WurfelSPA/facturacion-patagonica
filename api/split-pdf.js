@@ -408,25 +408,50 @@ export default async function handler(req, res) {
     if (destFolderId) {
       // Usar token del usuario para subir a su Drive (SA no tiene cuota de almacenamiento)
       const uploadToken = userToken || token;
-      const meta = JSON.stringify({ name: zipName, mimeType: "application/zip", parents: [destFolderId] });
       const boundary = "split_zip_boundary";
-      const metaPart = Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/zip\r\n\r\n`);
       const endPart = Buffer.from(`\r\n--${boundary}--`);
-      const multipart = Buffer.concat([metaPart, zipBuf, endPart]);
 
-      const uploadRes = await fetch(
-        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${uploadToken}`, "Content-Type": `multipart/related; boundary=${boundary}` },
-          body: multipart,
-        }
+      // Buscar si ya existe un ZIP con ese nombre en la carpeta para actualizarlo en vez de duplicar
+      const searchRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=name='${zipName}'+and+'${destFolderId}'+in+parents+and+trashed=false&fields=files(id)&pageSize=5`,
+        { headers: { Authorization: `Bearer ${uploadToken}` } }
       );
-      if (!uploadRes.ok) {
-        const err = await uploadRes.text();
-        return res.status(502).json({ error: `ZIP upload Drive ${uploadRes.status}: ${err.slice(0,200)}` });
+      const searchJson = searchRes.ok ? await searchRes.json() : { files: [] };
+      const existingIds = (searchJson.files || []).map(f => f.id);
+
+      let uploadJson;
+      if (existingIds.length > 0) {
+        // Actualizar el primero y eliminar duplicados
+        const [keepId, ...dupeIds] = existingIds;
+        const updateRes = await fetch(
+          `https://www.googleapis.com/upload/drive/v3/files/${keepId}?uploadType=media`,
+          { method: "PATCH", headers: { Authorization: `Bearer ${uploadToken}`, "Content-Type": "application/zip" }, body: zipBuf }
+        );
+        if (!updateRes.ok) {
+          const err = await updateRes.text();
+          return res.status(502).json({ error: `ZIP update Drive ${updateRes.status}: ${err.slice(0,200)}` });
+        }
+        uploadJson = await updateRes.json();
+        // Eliminar duplicados silenciosamente
+        for (const dupeId of dupeIds) {
+          fetch(`https://www.googleapis.com/drive/v3/files/${dupeId}`, { method: "DELETE", headers: { Authorization: `Bearer ${uploadToken}` } }).catch(() => {});
+        }
+      } else {
+        // Crear nuevo archivo
+        const meta = JSON.stringify({ name: zipName, mimeType: "application/zip", parents: [destFolderId] });
+        const metaPart = Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/zip\r\n\r\n`);
+        const multipart = Buffer.concat([metaPart, zipBuf, endPart]);
+        const createRes = await fetch(
+          "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+          { method: "POST", headers: { Authorization: `Bearer ${uploadToken}`, "Content-Type": `multipart/related; boundary=${boundary}` }, body: multipart }
+        );
+        if (!createRes.ok) {
+          const err = await createRes.text();
+          return res.status(502).json({ error: `ZIP upload Drive ${createRes.status}: ${err.slice(0,200)}` });
+        }
+        uploadJson = await createRes.json();
       }
-      const uploadJson = await uploadRes.json();
+
       return res.status(200).json({
         ok: true, zipName, zipFileId: uploadJson.id, totalFacturas, sinCod,
         breakdown: Object.entries(breakdown).sort(([a],[b])=>a.localeCompare(b)),
