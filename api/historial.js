@@ -191,6 +191,12 @@ function extractClienteFromText(text) {
   const m=text.match(/Se[ñn]or\(es\)\s*(.+?)\s*RUT\s*[\d]/);
   return m?m[1].trim().replace(/\s+/g," ").slice(0,40):null;
 }
+function normRut(r){ return (r||"").replace(/\./g,"").replace(/\s/g,"").toLowerCase(); }
+function extractRutFromText(text) {
+  /* Busca todos los RUTs en el texto, devuelve el primero que NO sea el de Patagónica */
+  const ruts=[...(text||"").matchAll(/\d{1,2}[.\s]\d{3}[.\s]\d{3}-[\dkK]/g)].map(m=>m[0]);
+  return ruts.find(r=>normRut(r)!=="966732504")||null;
+}
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
@@ -244,7 +250,7 @@ export default async function handler(req, res) {
 
     // ── GET ?cliente=X&periodo=Y ── facturas del cliente en el período ──────
     if (req.method === "GET" && req.query.cliente && req.query.periodo) {
-      const { cliente, periodo } = req.query;
+      const { cliente, periodo, rut: rutQuery } = req.query;
       const [mesNom, anioStr] = periodo.split(" ");
       const mesNum = MES_NUM[mesNom];
       if (!mesNum) return res.status(400).json({ error:"Periodo inválido" });
@@ -297,8 +303,15 @@ export default async function handler(req, res) {
         const text = extractText(pdfBuf);
 
         if (!fileCliente) {
-          const pdfCliente = extractClienteFromText(text);
-          if (!pdfCliente || !clienteMatch(pdfCliente, cliente)) continue;
+          /* Sin nombre en el archivo — identificar por RUT (inequívoco) o por nombre extraído del PDF */
+          const rutNorm = normRut(rutQuery);
+          if (rutNorm) {
+            const pdfRut = extractRutFromText(text);
+            if (!pdfRut || normRut(pdfRut) !== rutNorm) continue;
+          } else {
+            const pdfCliente = extractClienteFromText(text);
+            if (!pdfCliente || !clienteMatch(pdfCliente, cliente)) continue;
+          }
         }
 
         const tipo = detectTipo(text);

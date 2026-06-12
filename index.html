@@ -1760,7 +1760,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
         setLoadingSet(ls);
         /* Fetch paralelo por período, máx 10 más recientes */
         periodos.slice(0,10).forEach(p=>{
-          fetch(`/api/historial?cliente=${encodeURIComponent(selClient.nombre)}&periodo=${encodeURIComponent(p)}`)
+          fetch(`/api/historial?cliente=${encodeURIComponent(selClient.nombre)}&rut=${encodeURIComponent(selClient.rut||"")}&periodo=${encodeURIComponent(p)}`)
             .then(r=>r.json())
             .then(({facturas})=>{
               if(facturas) setInvoicesMap(prev=>({...prev,[p]:facturas}));
