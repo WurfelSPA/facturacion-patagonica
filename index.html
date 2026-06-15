@@ -1360,7 +1360,7 @@ function EmailModal({row,periodo,onClose,onConfirm,sending}){
           h("div",null,h("span",{style:{color:"var(--txd)"}},"De:      "),h("span",{style:{color:"var(--accl)"}},REMITENTE)),
           h("div",null,h("span",{style:{color:"var(--txd)"}},"Para:    "),h("span",{style:{color:MODO_PRUEBA?"var(--amber)":"var(--tx)"}},dest)),
           h("div",null,h("span",{style:{color:"var(--txd)"}},"CCO:     "),h("span",{style:{color:"var(--txm)"}},CCO)),
-          h("div",null,h("span",{style:{color:"var(--txd)"}},"Asunto:  "),`Factura ${row.factura} — ${row.concepto} ${mes.charAt(0).toUpperCase()+mes.slice(1)} — Patagónica Inmobiliaria SpA`),
+          h("div",null,h("span",{style:{color:"var(--txd)"}},"Asunto:  "),`${row.cliente} ${row.factura} — ${row.concepto} ${mes.charAt(0).toUpperCase()+mes.slice(1)} — Patagónica Inmobiliaria SpA`),
           h("div",null,h("span",{style:{color:"var(--txd)"}},"Adjunto: "),h("span",{style:{color:"var(--green)"}},`${row.factura}.pdf`))
         ),
         h("div",{style:{color:"var(--tx)",lineHeight:2}},
@@ -2709,7 +2709,7 @@ function App(){
     const dest=MODO_PRUEBA?TEST_DEST:row.correo;
     try{
       const token=await getToken();
-      const subject="Factura "+row.factura+" — "+row.concepto+" "+periodo+" — Patagónica Inmobiliaria SpA";
+      const subject=row.cliente+" "+row.factura+" — "+row.concepto+" "+periodo+" — Patagónica Inmobiliaria SpA";
       const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura,ufSII);
       const pdf=pdfMap[row.factura];let pdfB64=null;
       if(pdf?.zipPath&&files.zip){try{pdfB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}}
@@ -2789,7 +2789,7 @@ function App(){
       let enviados=0;
       for(const row of pend){
         const dest=MODO_PRUEBA?TEST_DEST:row.correo;
-        const subject="Factura "+row.factura+" — "+row.concepto+" "+periodo+" — Patagónica Inmobiliaria SpA";
+        const subject=row.cliente+" "+row.factura+" — "+row.concepto+" "+periodo+" — Patagónica Inmobiliaria SpA";
         const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura,ufSII);
         const pdf=pdfMap[row.factura];let pdfB64=null;
         if(pdf?.zipPath&&files.zip){try{pdfB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}}
