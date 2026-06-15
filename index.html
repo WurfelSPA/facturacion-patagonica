@@ -1593,6 +1593,156 @@ async function generarBorradorDenominacion(c){
 }
 
 /* ═══════════════════════════════════
+   GENERAR BORRADOR NUEVA DENOMINACIÓN
+   (Contrato completo — datos desde Certificado de Estatuto Actualizado)
+═══════════════════════════════════ */
+async function generarBorradorNuevaDenominacion(c, pdfTexto){
+  function xe(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+  function pd(v){if(!v||v==="—"||v==="-"||v==="")return null;if(typeof v==="string"&&v.includes("/")){const[d,mm,y]=v.split("/").map(Number);if(!d||!mm||!y)return null;return new Date(y,mm-1,d);}return null;}
+  const MES_ES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  function fmtL(d){return`${String(d.getDate()).padStart(2,"0")} de ${MES_ES[d.getMonth()]} de ${d.getFullYear()}`;}
+  const hoy=new Date();
+  const flat=pdfTexto.replace(/\s+/g," ").trim();
+
+  /* ── Extraer datos del Certificado de Estatuto Actualizado ── */
+  // RUT de la empresa
+  const rutM=flat.match(/R\.?U\.?T\.?\s*[:\s]\s*(\d{1,2}\.\d{3}\.\d{3}-[\dkK])/i)
+    ||flat.match(/(\d{2}\.\d{3}\.\d{3}-[\dkK])/);
+  const rutEmpresa=rutM?rutM[1]:"[RUT ARRENDATARIA]";
+
+  // Razón social — buscar patrón "RAZÓN SOCIAL:" o primera línea en mayúsculas que no sea título
+  const rsM=flat.match(/[Rr]az[oó]n\s+[Ss]ocial\s*[:\-]\s*([A-ZÁÉÍÓÚÑÜ][A-ZÁÉÍÓÚÑÜ\s\.\,]+?)(?=\s+[A-Z]{3,}:|RUT|Tipo|$)/i)
+    ||flat.match(/Nombre\s+o\s+[Rr]az[oó]n\s+[Ss]ocial\s*[:\-]\s*([A-ZÁÉÍÓÚÑÜ][^\n\r]+)/i);
+  const nombreEmpresa=rsM?rsM[1].trim():"[RAZÓN SOCIAL ARRENDATARIA]";
+
+  // Tipo de empresa
+  const tipoM=flat.match(/[Tt]ipo\s+(?:de\s+)?[Ss]ociedad\s*[:\-]?\s*([A-Za-záéíóúñü\s]+?)(?=\s{2,}|RUT|$)/i)
+    ||flat.match(/sociedad\s+de\s+responsabilidad\s+limitada|SpA|S\.A\.|Ltda/i);
+  const tipoEmpresa=tipoM?(tipoM[1]||tipoM[0]).trim().toLowerCase():"sociedad";
+
+  // Código de verificación electrónico
+  const codM=flat.match(/[Cc][oó]digo\s+(?:de\s+)?[Vv]erificaci[oó]n\s+(?:[Ee]lectr[oó]nico\s+)?([A-Za-z0-9]{8,})/i)
+    ||flat.match(/CVE[:\s]+([A-Za-z0-9]{8,})/i)
+    ||flat.match(/\b([A-Za-z0-9]{10,16})\b/);
+  const certCodigo=codM?codM[1]:"[CÓDIGO VERIFICACIÓN]";
+
+  // Fecha del certificado
+  const fechaM=flat.match(/(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+(?:de[l]?\s+)?(\d{4})/i)
+    ||flat.match(/[Ff]echa\s+(?:de\s+)?[Ee]misi[oó]n\s*[:\-]\s*(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/i);
+  const certFecha=fechaM?(fechaM[2]?`${fechaM[1]} de ${fechaM[2]} de ${fechaM[3]}`:`${fechaM[1]}/${fechaM[2]}/${fechaM[3]}`):"[FECHA CERTIFICADO]";
+
+  // Representantes legales — buscar nombres y RUTs de personas naturales
+  const repsRaw=[...flat.matchAll(/(?:Representante|Administrador|Gerente|Director|Socio)[^\n]*?([A-ZÁÉÍÓÚÑÜ][a-záéíóúñü]+(?:\s+[A-ZÁÉÍÓÚÑÜ][a-záéíóúñü]+){2,})[^\n]*?(\d{1,2}\.\d{3}\.\d{3}-[\dkK])/gi)];
+  const reps=repsRaw.slice(0,3).map(m=>({nombre:m[1].trim(),rut:m[2].trim()}));
+  const rep1=reps[0]||{nombre:"[NOMBRE REPRESENTANTE 1]",rut:"[RUT REPRESENTANTE 1]"};
+  const rep2=reps[1]||{nombre:"[NOMBRE REPRESENTANTE 2]",rut:"[RUT REPRESENTANTE 2]"};
+
+  /* ── Datos de la planilla ── */
+  const sitio=c.sitio||"[LOCAL]";
+  const edificio=c.edificio||"";
+  const ufRenta=c.ufArr>0?c.ufArr.toFixed(2):"[UF RENTA]";
+  const termDate=pd(c.termTermino);
+  const termStr=termDate?fmtL(termDate):"[FECHA TÉRMINO]";
+
+  function wp(text,opts){
+    opts=opts||{};
+    const sz=opts.sz||22;const bold=opts.bold||false;const center=opts.center||false;
+    const sb=opts.sb||0;const sa=opts.sa!==undefined?opts.sa:120;
+    const jc=center?'<w:jc w:val="center"/>':"";
+    const b=bold?"<w:b/>":"";
+    return`<w:p><w:pPr>${jc}<w:spacing w:before="${sb}" w:after="${sa}"/><w:rPr>${b}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr></w:pPr><w:r><w:rPr>${b}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr><w:t xml:space="preserve">${xe(text)}</w:t></w:r></w:p>`;
+  }
+
+  const body=[
+    wp("BORRADOR — USO INTERNO — REVISAR ANTES DE ENVIAR AL NOTARIO",{center:true,sz:18,sa:60}),
+    wp("Repertorio N° ___________",{sa:60}),
+    wp("CONTRATO DE ARRENDAMIENTO",{bold:true,center:true,sz:28,sb:60,sa:60}),
+    wp("INVERSIONES DE LA PATAGONIA SpA",{bold:true,center:true,sz:22,sa:40}),
+    wp("A",{center:true,sa:40}),
+    wp(nombreEmpresa,{bold:true,center:true,sz:22,sa:200}),
+    wp(`En Santiago, República de Chile, a [día] días del mes de [mes] del año ${hoy.getFullYear()}, ante mí, [NOMBRE NOTARIO], Abogado, Notario Público de Santiago, con oficio en [dirección notaría], comparecen: Don ALEJANDRO ENRIQUE SÁNCHEZ DOBERTI, chileno, casado, ingeniero comercial, cédula de identidad número siete millones un mil quinientos sesenta y nueve guión dos, y don JORGE ANDRÉS BIZACA SÁNCHEZ, chileno, soltero, ingeniero comercial, cédula de identidad número quince millones novecientos cinco mil ciento sesenta y nueve guión dos, ambos con domicilio en Avenida Américo Vespucio número dos mil seiscientos ochenta, piso doce, comuna de Conchalí, Región Metropolitana, en representación, según se acreditará, de INVERSIONES DE LA PATAGONIA SpA, persona jurídica de derecho privado, Rol Único Tributario número setenta y seis millones doscientos once mil quinientos veintinueve guión ocho, del mismo domicilio anterior, en adelante también "La Arrendadora"; y actuando también en representación de PATAGÓNICA INMOBILIARIA S.A., Rol Único Tributario número noventa y seis millones seiscientos setenta y tres mil doscientos cincuenta guión cuatro, del mismo domicilio anterior; por una parte, y por la otra, don ${rep1.nombre}, [NACIONALIDAD], [PROFESIÓN], cédula de identidad número [RUT EN LETRAS REP 1], ${reps.length>1?`y don ${rep2.nombre}, [NACIONALIDAD], cédula de identidad número [RUT EN LETRAS REP 2], `:""}con domicilio en [DOMICILIO ARRENDATARIA], en representación, según se acreditará, de ${nombreEmpresa}, ${tipoEmpresa}, debidamente constituida y vigente en conformidad a las leyes chilenas, según consta en el Certificado de Estatuto Actualizado de fecha ${certFecha} del Registro de Empresas y Sociedades del Ministerio de Economía, Fomento y Turismo, Código de Verificación Electrónico ${certCodigo}, Rol Único Tributario número [RUT EN LETRAS EMPRESA], con domicilio en la comuna de [COMUNA ARRENDATARIA], Región Metropolitana, en adelante también "La Arrendataria"; los comparecientes personas naturales, mayores de edad, quienes me acreditaron sus identidades con las cédulas referidas y exponen:`,{sa:160}),
+    wp("PRIMERO: DECLARACIONES.",{bold:true,sb:120,sa:80}),
+    wp(`Uno. Uno. Declaraciones de "La Arrendadora". "La Arrendadora", actuando a través de sus representantes legales declara: (a) Que es una sociedad por acciones, debidamente constituida y vigente en conformidad a las leyes Chilenas. (b) Que en virtud del contrato de arrendamiento que Patagónica Inmobiliaria S.A. celebró con Inversiones de La Patagonia S.A., hoy Inversiones de La Patagonia SpA, Rol Único Tributario número setenta y seis millones doscientos once mil quinientos veintinueve guión ocho, por escritura pública con Repertorio número siete mil ciento veintitrés guión dos mil trece, de fecha catorce de junio del dos mil trece, otorgada en la Notaría Pública de Santiago de don Cosme Fernando Gomila Gatica, "La Arrendadora" es tenedora del Lote ${sitio} ubicado en la comuna de Conchalí, Región Metropolitana. (c) Que Inversiones De La Patagonia S.A. adquirió el referido inmueble por asignación en dominio en el acto de la disolución de la sociedad Patagónica Inmobiliaria Uno S.A. (d) Que "La Arrendadora" cuenta con las facultades de subarrendamiento necesarias para celebrar el presente Contrato, y que su objeto social permite dar en arrendamiento el inmueble. (e) Que los representantes legales de "La Arrendadora" cuentan con las facultades para actuar en representación de la sociedad en la celebración del presente contrato de arrendamiento.`,{sa:120}),
+    wp(`Uno. Dos. Declaraciones de "La Arrendataria". "La Arrendataria", actuando a través de sus representantes legales declara: (a) Que es una ${tipoEmpresa}, debidamente constituida y vigente en conformidad a las leyes chilenas, según consta en el Certificado de Estatuto Actualizado de fecha ${certFecha}. (b) Que "La Arrendataria" cuenta con todas y cada una de las autorizaciones necesarias para la celebración del presente Contrato y que su objeto social permite tomar en arrendamiento el inmueble. (c) Que los representantes legales de "La Arrendataria" cuentan con las facultades para actuar en representación de la sociedad en la celebración del presente contrato de arrendamiento.`,{sa:120}),
+    wp("SEGUNDO: ARRENDAMIENTO.",{bold:true,sb:120,sa:80}),
+    wp(`Por el presente instrumento INVERSIONES DE LA PATAGONIA SpA debidamente representada, da en arrendamiento a ${nombreEmpresa}, una sección del Lote ${sitio}, que corresponde al local ubicado en ${edificio||"Avenida Américo Vespucio [NÚMERO]"}, de una superficie aproximada de [SUPERFICIE] metros cuadrados, amoblada y con instalaciones suficientes para desarrollar una actividad comercial, que es condición esencial del presente contrato, incluyendo baños, circuitos eléctricos especiales, mallas a tierra, equipos de iluminación, y sistemas de climatización. Se deja expresa constancia que cada vez que en el contrato se mencione la "Propiedad Arrendada" se está haciendo referencia a la totalidad de instalaciones que se incluyen en el arriendo.`,{sa:120}),
+    wp("TERCERO: RENTA.",{bold:true,sb:120,sa:80}),
+    wp(`Tres. Uno. Renta. La Renta mensual de arrendamiento ("Renta") será la suma equivalente en pesos, moneda corriente de curso legal, a ${ufRenta} Unidades de Fomento, según el valor de dicha unidad al día de pago efectivo de cada mes. Se deja constancia que la presente Renta no incluye Impuesto al Valor Agregado, por ser "La Arrendataria" contribuyente exento de dicho impuesto. Sin embargo, durante los tres primeros meses de vigencia del contrato, "La Arrendataria" estará exenta del pago de la renta de arrendamiento, a modo de período de gracia.`,{sa:120}),
+    wp("Tres. Dos. Pago de la Renta. La Renta mensual de arrendamiento pactada se pagará anticipadamente, dentro de los cinco primeros días de cada mes, en el domicilio de \"La Arrendadora\" señalado en la comparecencia, mediante dinero efectivo, transferencia bancaria o cheque al día, nominativo, cruzado a favor de \"La Arrendadora\" y girado para la plaza de Santiago, de acuerdo al valor de la Unidad de Fomento vigente el día de pago efectivo informado por el Banco Central de Chile. Las obligaciones de pago a cargo del Arrendatario se comenzarán a devengar desde la fecha de entrega del Inmueble. Las demás obligaciones de pago deberán depositarse en la cuenta corriente número [CUENTA] del Banco [BANCO] a nombre de Patagónica Inmobiliaria SpA, RUT número noventa y seis millones seiscientos setenta y tres mil doscientos cincuenta guión cuatro.",{sa:120}),
+    wp("Tres. Tres. Reajuste automático de Renta. La Renta de arrendamiento aumentará a razón de un cinco por ciento cada tres años, contados desde la fecha de entrega del Inmueble, calculado sobre las Unidades de Fomento del canon de arriendo vigente.",{sa:120}),
+    wp("Tres. Cuatro. Retardo en el Pago de la Renta. En caso de mora o simple retardo en el pago, \"La Arrendataria\" pagará una multa de dos Unidades de Fomento por cada día de atraso.",{sa:120}),
+    wp("Tres. Cinco. Pago de Servicios. A partir de la fecha de entrega de la Propiedad Arrendada corresponderá a \"La Arrendataria\" el pago de los consumos por servicios de electricidad, agua potable, extracción de basura y demás consumos análogos.",{sa:120}),
+    wp("Tres. Seis. Impuesto Territorial. Corresponderá a \"La Propietaria\" Inversiones de La Patagonia SpA el pago del impuesto territorial que grava a la Propiedad Arrendada.",{sa:120}),
+    wp("CUARTO: PLAZO DEL CONTRATO.",{bold:true,sb:120,sa:80}),
+    wp(`Cuatro. Uno. Plazo. El presente contrato de arrendamiento será de [___] años, a contar del día [__] de [_______] del año ${hoy.getFullYear()}, fecha de entrega del Inmueble al Arrendatario.`,{sa:120}),
+    wp(`Cuatro. Dos. Renovación. El contrato de arrendamiento se renovará automáticamente, por períodos iguales y sucesivos de tres años, salvo que una cualquiera de las partes manifestare con una anticipación mínima de ciento veinte días al término del plazo o prórroga respectiva, su intención de ponerle término, mediante aviso enviado por carta certificada.`,{sa:120}),
+    wp("QUINTO: ENTREGA MATERIAL Y RESTITUCIÓN DEL INMUEBLE.",{bold:true,sb:120,sa:80}),
+    wp(`Cinco. Uno. Condiciones de Entrega. La entrega material de la Propiedad Arrendada se realizará el día [__] de [_______] del año ${hoy.getFullYear()}. La Propiedad Arrendada se entrega con todas sus construcciones, edificaciones e instalaciones en estado de ser utilizadas para los fines estipulados en el presente contrato.`,{sa:120}),
+    wp("Cinco. Dos. Restitución. La restitución de la Propiedad Arrendada deberá efectuarse poniendo la Propiedad Arrendada a disposición de \"La Arrendadora\", libre de todo ocupante y bienes, en perfecto estado de aseo, y entregándole las llaves conjuntamente con sus cuentas al día.",{sa:120}),
+    wp("SEXTO: MANTENCIÓN Y MEJORAS.",{bold:true,sb:120,sa:80}),
+    wp("Queda expresamente prohibido a \"La Arrendataria\" realizar modificaciones estructurales en la Propiedad Arrendada sin que cuente con el consentimiento previo de \"La Arrendadora\" otorgado por escrito. Las partes acuerdan que \"La Arrendataria\" podrá, a su exclusivo costo, introducir mejoras en la Propiedad Arrendada, siempre que no contravenga lo establecido. Al término del contrato, dichas mejoras quedarán a beneficio de la Propiedad Arrendada, sin derecho de compensación alguna.",{sa:120}),
+    wp("SÉPTIMO: OBLIGACIONES DE \"LA ARRENDATARIA\".",{bold:true,sb:120,sa:80}),
+    wp("Siete. Uno. Pago de las Rentas. Pagar en tiempo y forma la totalidad de las Rentas de arrendamiento.",{sa:80}),
+    wp("Siete. Dos. Uso del Inmueble. \"La Arrendataria\" destinará la Propiedad Arrendada a [DESTINO/GIRO], no pudiendo darle otro destino sin autorización previa y por escrito de \"La Arrendadora\".",{sa:80}),
+    wp("Siete. Tres. Restitución del Inmueble. \"La Arrendataria\" deberá restituir la Propiedad Arrendada en tiempo y forma, en condiciones similares a las que actualmente recibe, considerando el desgaste natural por el uso legítimo y el transcurso del tiempo.",{sa:80}),
+    wp("Siete. Cuatro. Reglamento de Administración, Uso y Funcionamiento. \"La Arrendataria\" se obliga a respetar las condiciones, términos y obligaciones establecidas en el Reglamento de Administración, Uso y Funcionamiento del Centro Empresas El Cortijo Torre Vespucio.",{sa:120}),
+    wp("OCTAVO: GARANTÍA.",{bold:true,sb:120,sa:80}),
+    wp("Para garantizar daños o perjuicios que pudiera producirse en la Propiedad Arrendada, \"La Arrendataria\" entrega en este acto a modo de garantía a \"La Arrendadora\" la suma de [_____________] Unidades de Fomento, en su equivalente en pesos moneda nacional a la fecha del presente contrato. \"La Arrendadora\" se obliga a restituir la garantía dentro de los treinta días posteriores a la restitución de la Propiedad Arrendada.",{sa:120}),
+    wp("NOVENO: DERECHO DE LLAVES.",{bold:true,sb:120,sa:80}),
+    wp("Se deja constancia que \"La Arrendadora\" no ha cobrado derecho de llaves a \"La Arrendataria\" ni se los cobrará en el futuro.",{sa:120}),
+    wp("DÉCIMO: SEGUROS.",{bold:true,sb:120,sa:80}),
+    wp("\"La Arrendadora\" tomará a su favor, durante la vigencia de este contrato de arrendamiento, un seguro de incendio y demás riesgos que puedan deteriorar a la Propiedad Arrendada. Por su parte, \"La Arrendataria\" se hace responsable de los riesgos que puedan afectar a los bienes muebles de su dominio que se mantengan en la Propiedad Arrendada.",{sa:120}),
+    wp("UNDÉCIMO: MORA.",{bold:true,sb:120,sa:80}),
+    wp("En caso de mora o simple retardo en el pago de la Renta, sin perjuicio de la facultad de \"La Arrendadora\" para ejercitar todos los derechos que, en tal caso, le concede la ley o el presente contrato, se devengará en favor de \"La Arrendadora\" la multa pactada en el número Tres. Cuatro de la cláusula Tercera.",{sa:120}),
+    wp("DUODÉCIMO: AUTORIZACIÓN.",{bold:true,sb:120,sa:80}),
+    wp("En cumplimiento de lo dispuesto en la cláusula Séptima numeral 7.2 del Contrato de Arrendamiento citado, comparece a este acto INVERSIONES DE LA PATAGONIA SpA, representada por don Alejandro Enrique Sánchez Doberti y por don Jorge Andrés Bizaca Sánchez, y expone: Que en su calidad de Propietaria de la Propiedad Arrendada, autoriza expresamente la celebración del presente contrato de arrendamiento.",{sa:120}),
+    wp("DÉCIMO TERCERO: JURISDICCIÓN.",{bold:true,sb:120,sa:80}),
+    wp("Cualquier duda o diferencia que se suscite entre las partes con motivo del presente contrato se resolverá por los Tribunales Ordinarios de Justicia de la comuna y ciudad de Santiago.",{sa:120}),
+    wp("DÉCIMO CUARTO: DOMICILIO.",{bold:true,sb:120,sa:80}),
+    wp("Para todos los efectos derivados del presente contrato las partes fijan su domicilio en la ciudad de Santiago.",{sa:120}),
+    wp("DÉCIMO QUINTO: GASTOS.",{bold:true,sb:120,sa:80}),
+    wp("Los gastos que origina el otorgamiento de este contrato se pagarán en partes iguales por \"La Arrendadora\" y \"La Arrendataria\".",{sa:120}),
+    wp("DÉCIMO SEXTO: SE FACULTA AL PORTADOR.",{bold:true,sb:120,sa:80}),
+    wp("Se faculta al portador de la copia autorizada de la presente escritura para requerir y firmar las inscripciones, subinscripciones, cancelaciones y anotaciones que procedan en los Registros competentes.",{sa:200}),
+    wp("PERSONERÍAS.",{bold:true,center:true,sz:24,sb:160,sa:120}),
+    wp("La personería de don Alejandro Enrique Sánchez Doberti y de don Jorge Andrés Bizaca Sánchez para actuar en representación de Patagónica Inmobiliaria S.A. e Inversiones de La Patagonia SpA consta en escritura pública de fecha [_____________].",{sa:120}),
+    wp(`La personería de don ${rep1.nombre}${reps.length>1?` y de don ${rep2.nombre}`:""}  para representar a ${nombreEmpresa} consta en el Certificado de Estatuto Actualizado de fecha ${certFecha} del Registro de Empresas y Sociedades, Código de Verificación Electrónico ${certCodigo}. Documentos que no se insertan a petición de los comparecientes por ser conocidos de ellos y del Notario que autoriza. Minuta presentada por los comparecientes.`,{sa:200}),
+    wp("En comprobante y previa lectura, la otorgan y firman. Se da copia. Doy fe.-",{sa:200}),
+    wp("___________________________________",{center:true,sa:40}),
+    wp("p. PATAGÓNICA INMOBILIARIA S.A. y",{center:true,sa:20}),
+    wp("p. INVERSIONES DE LA PATAGONIA SpA",{center:true,sa:20}),
+    wp("Alejandro Enrique Sánchez Doberti",{center:true,sa:200}),
+    wp("___________________________________",{center:true,sa:40}),
+    wp("p. PATAGÓNICA INMOBILIARIA S.A. y",{center:true,sa:20}),
+    wp("p. INVERSIONES DE LA PATAGONIA SpA",{center:true,sa:20}),
+    wp("Jorge Andrés Bizaca Sánchez",{center:true,sa:200}),
+    wp("___________________________________",{center:true,sa:40}),
+    wp(`p. ${nombreEmpresa}`,{center:true,sa:20}),
+    wp(rep1.nombre,{center:true,sa:200}),
+    reps.length>1&&wp("___________________________________",{center:true,sa:40}),
+    reps.length>1&&wp(`p. ${nombreEmpresa}`,{center:true,sa:20}),
+    reps.length>1&&wp(rep2.nombre,{center:true,sa:20}),
+  ].filter(Boolean).join("");
+
+  const docXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="709" w:footer="709" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const ct=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/></Types>`;
+  const rels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+  const drels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/></Relationships>`;
+  const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:rPrDefault></w:docDefaults></w:styles>`;
+  const sets=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:defaultTabStop w:val="708"/></w:settings>`;
+  const zip=new JSZip();
+  zip.file("[Content_Types].xml",ct);zip.file("_rels/.rels",rels);
+  zip.file("word/document.xml",docXml);zip.file("word/_rels/document.xml.rels",drels);
+  zip.file("word/styles.xml",styles);zip.file("word/settings.xml",sets);
+  const blob=await zip.generateAsync({type:"blob",mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=url;
+  a.download=`Borrador_Ctto_${(nombreEmpresa||"nueva_empresa").replace(/[^a-zA-Z0-9]/g,"_").slice(0,40)}.docx`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+}
+
+/* ═══════════════════════════════════
    VISTA CONTRATOS
 ═══════════════════════════════════ */
 function ContratosView({dashData,driveLoading}){
@@ -1601,6 +1751,8 @@ function ContratosView({dashData,driveLoading}){
   const [borradorLoading,setBorradorLoading]=useState({});
   const [borradorCliente,setBorradorCliente]=useState("");
   const [borradorTipo,setBorradorTipo]=useState("contrato");
+  const [certPdf,setCertPdf]=useState(null);
+  const [certNombre,setCertNombre]=useState("");
   const now=new Date();
   const currentYear=now.getFullYear();
   function avisoDias(str){if(!str||str==="-"||str==="")return null;const s=str.toLowerCase();const m=s.match(/(\d+)/);if(!m)return null;const n=parseInt(m[1]);if(s.includes("año")||s.includes("ano"))return n*365;if(s.includes("mes"))return n*30;return n;}
@@ -1636,24 +1788,45 @@ function ContratosView({dashData,driveLoading}){
         style:{width:220,fontSize:12,padding:"6px 10px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)",fontFamily:"'DM Sans',sans-serif"}
       },
         h("option",{value:"contrato"},"Contrato de Arrendamiento"),
-        h("option",{value:"denominacion"},"Cambio de Denominación Legal")
+        h("option",{value:"denominacion"},"Cambio de Denominación Legal"),
+        h("option",{value:"nueva-denominacion"},"Contrato de Arrendamiento Nueva Denominación")
       ),
       h("button",{
-        disabled:!clienteSeleccionado||!!borradorLoading["panel"],
+        disabled:!clienteSeleccionado||(borradorTipo==="nueva-denominacion"&&!certPdf)||!!borradorLoading["panel"],
         onClick:async()=>{
           if(!clienteSeleccionado)return;
           setBorradorLoading(p=>({...p,panel:true}));
           try{
             if(borradorTipo==="contrato") await generarBorrador(clienteSeleccionado);
-            else await generarBorradorDenominacion(clienteSeleccionado);
+            else if(borradorTipo==="denominacion") await generarBorradorDenominacion(clienteSeleccionado);
+            else if(borradorTipo==="nueva-denominacion"&&certPdf){
+              const buf=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsArrayBuffer(certPdf);});
+              const texto=await extraerTextoPDF(buf);
+              await generarBorradorNuevaDenominacion(clienteSeleccionado,texto);
+            }
           }catch(e){console.error(e);}
           setBorradorLoading(p=>({...p,panel:false}));
         },
-        style:{padding:"7px 18px",borderRadius:8,border:"none",fontWeight:700,fontSize:12,cursor:clienteSeleccionado?"pointer":"not-allowed",
-          background:borradorLoading["panel"]||!clienteSeleccionado?"var(--surf3)":"linear-gradient(135deg,var(--acc),var(--acc2))",
-          color:borradorLoading["panel"]||!clienteSeleccionado?"var(--txm)":"#fff",
+        style:{padding:"7px 18px",borderRadius:8,border:"none",fontWeight:700,fontSize:12,
+          cursor:(clienteSeleccionado&&(borradorTipo!=="nueva-denominacion"||certPdf))?"pointer":"not-allowed",
+          background:borradorLoading["panel"]||!clienteSeleccionado||(borradorTipo==="nueva-denominacion"&&!certPdf)?"var(--surf3)":"linear-gradient(135deg,var(--acc),var(--acc2))",
+          color:borradorLoading["panel"]||!clienteSeleccionado||(borradorTipo==="nueva-denominacion"&&!certPdf)?"var(--txm)":"#fff",
           display:"inline-flex",alignItems:"center",gap:6,whiteSpace:"nowrap"}
       },borradorLoading["panel"]?h("span",{className:"spin"},"⟳"):"⬇","  Descargar Borrador")
+    ),
+    /* ── Panel subida certificado (solo para nueva-denominacion) ── */
+    borradorTipo==="nueva-denominacion"&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--adim)",borderRadius:10,padding:"12px 18px",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}},
+      h("span",{style:{fontSize:11,fontWeight:700,color:"var(--amber)",letterSpacing:".06em",whiteSpace:"nowrap"}},"📎 CERTIFICADO DE ESTATUTO ACTUALIZADO"),
+      h("label",{style:{display:"flex",alignItems:"center",gap:10,cursor:"pointer",flex:1}},
+        h("input",{
+          type:"file",accept:".pdf",style:{display:"none"},
+          onChange:e=>{const f=e.target.files[0];if(f){setCertPdf(f);setCertNombre(f.name);}else{setCertPdf(null);setCertNombre("");}}
+        }),
+        h("span",{style:{padding:"6px 14px",borderRadius:7,border:"1px dashed var(--adim)",background:"var(--abg)",color:"var(--amber)",fontSize:12,fontWeight:600}},
+          certNombre||"Seleccionar PDF del certificado..."
+        )
+      ),
+      certPdf&&h("span",{style:{fontSize:11,color:"var(--green)",fontWeight:600}},"✓ Listo")
     ),
     h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}},
       h("div",{style:{display:"flex",gap:6,flexWrap:"wrap"}},
