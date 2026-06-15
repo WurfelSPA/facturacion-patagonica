@@ -124,7 +124,7 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 </head>
 <body>
 <div id="root"></div>
-<script src="/api/config"></script>
+<script src="/api/claude"></script>
 <script>
 const {useState,useRef,useCallback,useEffect,createElement:h}=React;
 const REMITENTE="amelendez@patagonica.cl";
@@ -347,7 +347,7 @@ async function sendTelegram(botToken,chatId,mensaje){
 }
 async function uploadZipToDrive(_token,zipName,zipBase64,folderId){
   // Usa el Service Account en el servidor — no necesita token OAuth del usuario
-  const res=await fetch("/api/drive",{
+  const res=await fetch("/api/storage",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({action:"upload",base64:zipBase64,filename:zipName,mimeType:"application/zip",folderId})
@@ -1968,7 +1968,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
     try{
       let zip=zipCache[periodo];
       if(!zip){
-        const r=await fetch(`/api/zip?periodo=${encodeURIComponent(periodo)}`);
+        const r=await fetch(`/api/storage?periodo=${encodeURIComponent(periodo)}`);
         if(!r.ok)throw new Error(`ZIP de ${periodo} no disponible`);
         const ct=r.headers.get("content-type")||"";
         if(!ct.includes("zip")&&!ct.includes("octet"))throw new Error("Respuesta no es ZIP");
@@ -2511,7 +2511,7 @@ function App(){
     setPdfMaestroId(null);
     setCanGenerate(false);
     setFiles(prev=>({...prev,zip:null}));
-    fetch("/api/zip?periodo="+encodeURIComponent(p))
+    fetch("/api/storage?periodo="+encodeURIComponent(p))
       .then(async r=>{
         if(zipPeriodoRef.current!==p)return;
         if(r.status===404){
@@ -2908,7 +2908,7 @@ function App(){
     try{
       // 1. Buscar PDF en Drive (via servidor con Service Account)
       notify(`Buscando ${pdfNombre} en Drive...`,"info");
-      const qRes=await fetch(`/api/zip?buscarPdf=${encodeURIComponent(pdfNombre)}&folderId=${DRIVE_FACTURACION_FOLDER_ID}`);
+      const qRes=await fetch(`/api/storage?buscarPdf=${encodeURIComponent(pdfNombre)}&folderId=${DRIVE_FACTURACION_FOLDER_ID}`);
       const qData=await qRes.json();
       let pdfFileId=qData.pdfFileId||null;
       // 2. Si no existe, descargar de Nubox automáticamente

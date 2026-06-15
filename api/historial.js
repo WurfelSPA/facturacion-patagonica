@@ -161,10 +161,16 @@ function clienteMatch(fromFile, query) {
   // Substring: solo si la cadena contenida tiene ≥4 chars (evita falsos positivos por "spa", "cia", etc.)
   if(b.length>=4&&a.includes(b)) return true;
   if(a.length>=4&&b.includes(a)) return true;
-  // Primer palabra significativa (≥4 chars) debe coincidir — es el identificador único de la empresa
-  const sigA=a.split(" ").find(w=>w.length>=4);
-  const sigB=b.split(" ").find(w=>w.length>=4);
-  return !!(sigA&&sigB&&sigA===sigB);
+  // Palabras distintivas: ignorar prefijos genéricos para evitar confundir "Comercial Granja" con "Comercial Industrial"
+  const GENERIC=new Set(["comercial","sociedad","empresa","servicios","industria","distribuidora",
+    "corporacion","consultora","inversiones","laboratorio","importadora","exportadora","agencia","compania"]);
+  const sigWords=s=>s.split(" ").filter(w=>w.length>=4&&!GENERIC.has(w));
+  const wA=sigWords(a); const wB=sigWords(b);
+  if(!wA.length||!wB.length) return false;
+  // Al menos 1 palabra distintiva en común (si solo hay 1 en cada uno) o 2 (si hay varias)
+  const setA=new Set(wA);
+  const common=wB.filter(w=>setA.has(w));
+  return common.length>=Math.min(2,wA.length,wB.length);
 }
 function detectTipo(text) {
   /* Primera aparición de cada keyword — evita falsos positivos de pie de página.
