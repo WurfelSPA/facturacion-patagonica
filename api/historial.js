@@ -182,9 +182,22 @@ function extractFacturasForRut(text, rutNorm) {
     const section = t.slice(prevNro.pos, nextNro ? nextNro.pos : t.length);
     const tipo = detectTipo(section);
     if (!tipo || facturas[tipo]) continue;
-    facturas[tipo] = `${tipo === "servAdm" ? "FEE" : "F"}-${prevNro.nro}`;
+    const nro = `${tipo === "servAdm" ? "FEE" : "F"}-${prevNro.nro}`;
+    facturas[tipo] = { nro, uf: _extractUF(section), total: _extractTotal(section) };
   }
   return facturas;
+}
+function _extractUF(s) {
+  const m = s.match(/\b(\d{1,3}[.,]\d{2,4})\s*UF\b/i) || s.match(/\bUF\s+(\d{1,3}[.,]\d{2,4})/i);
+  if (!m) return null;
+  const v = parseFloat(m[1].replace(",", "."));
+  return isNaN(v) ? null : Math.round(v * 10000) / 10000;
+}
+function _extractTotal(s) {
+  const m = s.match(/[Mm]onto\s*[Tt]otal\s+([\d.]+)/i) || s.match(/[Tt]otal\s+([\d.]+(?:\.\d{3})+)/i);
+  if (!m) return null;
+  const v = parseInt(m[1].replace(/\./g, ""), 10);
+  return isNaN(v) || v < 100 ? null : v;
 }
 
 // ── Historial-cliente helpers ─────────────────────────────────────────────────
@@ -318,7 +331,12 @@ export default async function handler(req, res) {
                 const key = Object.keys(periodoData).find(k => clienteMatch(k, cliente));
                 if (dbg) dbgInfo.jsonMatchedKey = key || null;
                 if (key && Object.keys(periodoData[key]).length > 0) {
-                  return res.status(200).json({ facturas: periodoData[key], source:"json", ...(dbg?{dbg:dbgInfo}:{}) });
+                  // Normalizar formato antiguo {tipo:"F-XXXXX"} → {tipo:{nro,uf,total}}
+                  const raw = periodoData[key];
+                  const facturas = Object.fromEntries(Object.entries(raw).map(([k,v])=>
+                    [k, typeof v==="string" ? {nro:v,uf:null,total:null} : v]
+                  ));
+                  return res.status(200).json({ facturas, source:"json", ...(dbg?{dbg:dbgInfo}:{}) });
                 }
               } else if (dbg) {
                 dbgInfo.jsonKeys = null;
@@ -394,7 +412,7 @@ export default async function handler(req, res) {
         }
 
         const tipo = detectTipo(text);
-        if (tipo && !facturas[tipo]) facturas[tipo] = nroFull;
+        if (tipo && !facturas[tipo]) facturas[tipo] = { nro:nroFull, uf:_extractUF(text), total:_extractTotal(text) };
       }
 
       const tiene = Object.keys(facturas).length > 0;
