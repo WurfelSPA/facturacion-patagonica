@@ -1928,7 +1928,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
   const [pdfLoading,setPdfLoading]=useState(false);
   const [search,setSearch]=useState("");
 
-  /* Al seleccionar cliente: descubrir períodos y cargar en paralelo */
+  /* Al seleccionar cliente: descubrir períodos y cargar en paralelo por sitio */
   useEffect(()=>{
     if(!selClient){setPeriodsAvail([]);setInvoicesMap({});setLoadingSet(new Set([]));return;}
     setPeriodsAvail([]);setInvoicesMap({});
@@ -1936,17 +1936,21 @@ function HistorialFactView({dashData,driveLoading,notify}){
       .then(r=>r.json())
       .then(({periodos=[]})=>{
         setPeriodsAvail(periodos);
-        const ls=new Set(periodos);
+        /* loadingSet: claves "sitio|periodo" para rastrear cada fetch */
+        const ls=new Set();
+        selGroup.forEach(sc=>periodos.slice(0,10).forEach(p=>ls.add(sc.sitio+'|'+p)));
         setLoadingSet(ls);
-        /* Fetch paralelo por período, máx 10 más recientes */
-        periodos.slice(0,10).forEach(p=>{
-          fetch(`/api/historial?cliente=${encodeURIComponent(selClient.nombre)}&rut=${encodeURIComponent(selClient.rut||"")}&periodo=${encodeURIComponent(p)}`)
-            .then(r=>r.json())
-            .then(({facturas})=>{
-              if(facturas) setInvoicesMap(prev=>({...prev,[p]:facturas}));
-              setLoadingSet(prev=>{const s=new Set(prev);s.delete(p);return s;});
-            })
-            .catch(()=>{setLoadingSet(prev=>{const s=new Set(prev);s.delete(p);return s;});});
+        /* Fetch paralelo por sitio × período, máx 10 períodos más recientes */
+        selGroup.forEach(sc=>{
+          periodos.slice(0,10).forEach(p=>{
+            fetch(`/api/historial?cliente=${encodeURIComponent(sc.nombre)}&rut=${encodeURIComponent(sc.rut||"")}&sitio=${encodeURIComponent(sc.sitio)}&periodo=${encodeURIComponent(p)}`)
+              .then(r=>r.json())
+              .then(({facturas})=>{
+                if(facturas) setInvoicesMap(prev=>({...prev,[sc.sitio]:{...(prev[sc.sitio]||{}),[p]:facturas}}));
+                setLoadingSet(prev=>{const s=new Set(prev);s.delete(sc.sitio+'|'+p);return s;});
+              })
+              .catch(()=>{setLoadingSet(prev=>{const s=new Set(prev);s.delete(sc.sitio+'|'+p);return s;});});
+          });
         });
       })
       .catch(()=>{setPeriodsAvail([]);setLoadingSet(new Set());});
@@ -2005,11 +2009,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
   const cColor={arriendo:"var(--blue)",servAdm:"var(--amber)",habilitacion:"var(--green)"};
 
   const totalLoading=loadingSet.size;
-  const totalPeriods=periodsAvail.length;
-
-  const granTotal=Object.values(invoicesMap).reduce((sum,pd)=>
-    sum+conceptos.reduce((s,conc)=>s+(pd[conc]?.total||0),0),0);
-  const granTotalStr=granTotal>0?"$"+granTotal.toLocaleString("es-CL"):null;
+  const totalPeriods=periodsAvail.length*selGroup.length;
 
   return h("main",{style:{flex:1,overflowY:"auto",padding:"18px 22px",display:"flex",flexDirection:"column",gap:16},className:"fade-up"},
 
@@ -2068,116 +2068,180 @@ function HistorialFactView({dashData,driveLoading,notify}){
       )
     ),
 
-    ...selGroup.map(sc=>h("div",{key:sc.sitio,style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
-      h("div",{style:{padding:"12px 16px",background:"var(--surf2)",borderBottom:"1px solid var(--bdr)",
-        display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
-        h("span",{style:{padding:"3px 9px",borderRadius:8,fontSize:10,fontWeight:700,
-          background:`${(SITIO_C[sc.sitio]||"#888")}18`,color:SITIO_C[sc.sitio]||"#888",
-          border:`1px solid ${(SITIO_C[sc.sitio]||"#888")}40`}},sc.sitio),
-        sc.edificio&&h("span",{style:{fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},sc.edificio),
-        h("span",{style:{fontWeight:700,fontSize:13}},sc.nombre),
-        sc.rut&&h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},sc.rut),
-        granTotalStr&&h("div",{style:{display:"flex",flexDirection:"column",alignItems:"flex-start",marginLeft:18,paddingLeft:18,borderLeft:"1px solid var(--bdr)"}},
-          h("span",{style:{fontSize:9,fontWeight:600,color:"var(--txm)",letterSpacing:".06em",textTransform:"uppercase"}},
-            totalLoading>0?"Total parcial":"Total acumulado"),
-          h("span",{style:{fontSize:13,fontWeight:700,fontFamily:"'DM Mono',monospace",color:"var(--tx)"}},
-            granTotalStr)
+    ...selGroup.map(sc=>{
+      const siteInv=invoicesMap[sc.sitio]||{};
+      const siteLd=new Set([...loadingSet].filter(k=>k.startsWith(sc.sitio+'|')));
+      const sitePerds=periodsAvail.filter(p=>siteLd.has(sc.sitio+'|'+p)||siteInv[p]);
+      const siteGT=Object.values(siteInv).reduce((s,pd)=>s+conceptos.reduce((s2,c)=>s2+(pd[c]?.total||0),0),0);
+      const siteGTStr=siteGT>0?"$"+siteGT.toLocaleString("es-CL"):null;
+      return h("div",{key:sc.sitio,style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
+        h("div",{style:{padding:"12px 16px",background:"var(--surf2)",borderBottom:"1px solid var(--bdr)",
+          display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
+          h("span",{style:{padding:"3px 9px",borderRadius:8,fontSize:10,fontWeight:700,
+            background:`${(SITIO_C[sc.sitio]||"#888")}18`,color:SITIO_C[sc.sitio]||"#888",
+            border:`1px solid ${(SITIO_C[sc.sitio]||"#888")}40`}},sc.sitio),
+          sc.edificio&&h("span",{style:{fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},sc.edificio),
+          h("span",{style:{fontWeight:700,fontSize:13}},sc.nombre),
+          sc.rut&&h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},sc.rut),
+          siteGTStr&&h("div",{style:{display:"flex",flexDirection:"column",alignItems:"flex-start",marginLeft:18,paddingLeft:18,borderLeft:"1px solid var(--bdr)"}},
+            h("span",{style:{fontSize:9,fontWeight:600,color:"var(--txm)",letterSpacing:".06em",textTransform:"uppercase"}},
+              siteLd.size>0?"Total parcial":"Total acumulado"),
+            h("span",{style:{fontSize:13,fontWeight:700,fontFamily:"'DM Mono',monospace",color:"var(--tx)"}},
+              siteGTStr)
+          ),
+          sc.email&&h("span",{style:{marginLeft:"auto",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},sc.email)
         ),
-        sc.email&&h("span",{style:{marginLeft:"auto",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},sc.email)
-      ),
-      /* Tabla: período como columna, concepto como fila */
-      totalLoading===totalPeriods&&periodos.length===0
-        ?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txm)",fontSize:13}},
-            h("span",{className:"spin",style:{marginRight:8}},"⟳"),"Buscando períodos disponibles..."
+        /* Tabla: período como columna, concepto como fila */
+        siteLd.size>0&&sitePerds.length===0
+          ?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txm)",fontSize:13}},
+              h("span",{className:"spin",style:{marginRight:8}},"⟳"),"Buscando períodos disponibles..."
+            )
+        :sitePerds.length===0&&siteLd.size===0
+          ?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:13}},
+              "No se encontraron facturas para este cliente en Drive.",
+              h("br"),h("span",{style:{fontSize:11}},"Verifica que existan ZIPs procesados en la carpeta de Drive.")
+            )
+        :h("div",{style:{overflowX:"auto"}},
+            h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
+              h("thead",null,
+                h("tr",{style:{background:"var(--surf2)"}},
+                  h("th",{rowSpan:2,style:{padding:"9px 16px",textAlign:"left",fontWeight:700,color:"var(--txm)",
+                    letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",fontSize:10,whiteSpace:"nowrap",minWidth:100,verticalAlign:"middle"}},"CONCEPTO"),
+                  ...sitePerds.map(p=>h("th",{key:p,colSpan:3,style:{padding:"7px 10px",textAlign:"center",fontWeight:600,
+                    color:"var(--tx)",borderBottom:"1px solid #e0e8f0",borderLeft:"1px solid var(--bdr)",
+                    whiteSpace:"nowrap",minWidth:260,position:"relative"}},
+                    p,
+                    siteLd.has(sc.sitio+'|'+p)&&h("span",{style:{display:"inline-block",fontSize:9,color:"var(--txm)",fontWeight:400,marginLeft:6}},
+                      h("span",{className:"spin",style:{fontSize:9}},"⟳"))
+                  ))
+                ),
+                h("tr",{style:{background:"var(--surf2)"}},
+                  ...sitePerds.flatMap(p=>[
+                    h("th",{key:p+"-n",style:{padding:"4px 10px",textAlign:"center",fontSize:9,fontWeight:600,
+                      color:"var(--txm)",borderBottom:"1px solid var(--bdr)",borderLeft:"1px solid var(--bdr)",minWidth:90}},"N° Factura"),
+                    h("th",{key:p+"-u",style:{padding:"4px 8px",textAlign:"center",fontSize:9,fontWeight:600,
+                      color:"var(--txm)",borderBottom:"1px solid var(--bdr)",minWidth:70}},"UF"),
+                    h("th",{key:p+"-t",style:{padding:"4px 10px",textAlign:"center",fontSize:9,fontWeight:600,
+                      color:"var(--txm)",borderBottom:"1px solid var(--bdr)",minWidth:100}},"Total CLP"),
+                  ])
+                )
+              ),
+              h("tbody",null,
+                conceptos.map((conc,ci)=>h("tr",{key:conc,style:{borderBottom:ci<2?"1px solid var(--bdr)":"none"}},
+                  h("td",{style:{padding:"11px 16px",fontWeight:700,color:cColor[conc],fontSize:11,whiteSpace:"nowrap"}},cLabel[conc]),
+                  ...sitePerds.flatMap(p=>{
+                    const inv=siteInv[p]?.[conc];
+                    const nro=inv?(inv.nro||inv):null;
+                    const uf=inv?.uf??null;
+                    const total=inv?.total??null;
+                    const isLoading=siteLd.has(sc.sitio+'|'+p);
+                    const dash=h("span",{style:{color:"var(--txd)",fontSize:11}},"—");
+                    const loading=h("span",{style:{color:"var(--txd)",fontSize:10}},"…");
+                    const tdL={style:{padding:"9px 10px",textAlign:"center",borderLeft:"1px solid var(--bdr)"}};
+                    const tdC={style:{padding:"9px 8px",textAlign:"center"}};
+                    return [
+                      h("td",{key:p+"-n",...tdL},
+                        isLoading&&!nro?loading
+                        :nro?h("button",{onClick:()=>previewFact(nro,p),disabled:pdfLoading,
+                            title:`Ver PDF — ${nro} · ${p}`,
+                            style:{background:"var(--bbg)",border:"1px solid #b5d0f0",color:"var(--blue)",
+                              padding:"3px 10px",borderRadius:6,fontSize:10,fontWeight:600,
+                              cursor:pdfLoading?"wait":"pointer",fontFamily:"'DM Mono',monospace"}},
+                            pdfLoading?"⟳":nro)
+                        :dash),
+                      h("td",{key:p+"-u",...tdC},
+                        isLoading&&uf==null?loading
+                        :uf!=null?h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},uf.toFixed(2))
+                        :dash),
+                      h("td",{key:p+"-t",...tdC},
+                        isLoading&&total==null?loading
+                        :total?h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},
+                            "$"+total.toLocaleString("es-CL"))
+                        :dash),
+                    ];
+                  })
+                )),
+                h("tr",{key:"total-row",style:{borderTop:"2px solid var(--bdr)",background:"var(--surf2)"}},
+                  h("td",{style:{padding:"9px 16px",fontWeight:700,fontSize:11,whiteSpace:"nowrap",color:"var(--tx)"}},"TOTAL"),
+                  ...sitePerds.flatMap(p=>{
+                    const isLoading=siteLd.has(sc.sitio+'|'+p);
+                    const sumTotal=conceptos.reduce((s,conc)=>s+(siteInv[p]?.[conc]?.total||0),0);
+                    return [
+                      h("td",{key:p+"-tot-n",style:{borderLeft:"1px solid var(--bdr)"}}),
+                      h("td",{key:p+"-tot-u"}),
+                      h("td",{key:p+"-tot-t",style:{padding:"9px 10px",textAlign:"center"}},
+                        isLoading&&sumTotal===0
+                          ?h("span",{style:{color:"var(--txd)",fontSize:10}},"…")
+                          :sumTotal>0
+                            ?h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:700,color:"var(--tx)"}},
+                                "$"+sumTotal.toLocaleString("es-CL"))
+                            :h("span",{style:{color:"var(--txd)",fontSize:11}},"—")
+                      ),
+                    ];
+                  })
+                )
+              )
+            )
           )
-      :periodos.length===0&&totalLoading===0
-        ?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:13}},
-            "No se encontraron facturas para este cliente en Drive.",
-            h("br"),h("span",{style:{fontSize:11}},"Verifica que existan ZIPs procesados en la carpeta de Drive.")
-          )
-      :h("div",{style:{overflowX:"auto"}},
+      );
+    }),
+    /* TOTAL CONSOLIDADO — sólo cuando hay más de un sitio */
+    selGroup.length>1&&(()=>{
+      const allPerds=periodsAvail.filter(p=>selGroup.some(sc=>(invoicesMap[sc.sitio]||{})[p]));
+      if(!allPerds.length)return null;
+      const consolidado=(p,conc)=>{
+        const seen=new Set();let sum=0;
+        selGroup.forEach(sc=>{
+          const inv=(invoicesMap[sc.sitio]||{})[p]?.[conc];
+          if(!inv?.total)return;
+          const key=inv.nro||(`${sc.sitio}|${conc}|${p}`);
+          if(!seen.has(key)){seen.add(key);sum+=inv.total;}
+        });
+        return sum;
+      };
+      return h("div",{style:{background:"var(--surf)",border:"2px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
+        h("div",{style:{padding:"10px 16px",background:"var(--surf2)",borderBottom:"1px solid var(--bdr)",
+          display:"flex",alignItems:"center",gap:10}},
+          h("span",{style:{fontSize:10,fontWeight:700,color:"var(--txm)",letterSpacing:".06em",textTransform:"uppercase"}},
+            "Total consolidado — "+selGroup.length+" sitios")
+        ),
+        h("div",{style:{overflowX:"auto"}},
           h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
             h("thead",null,
               h("tr",{style:{background:"var(--surf2)"}},
-                h("th",{rowSpan:2,style:{padding:"9px 16px",textAlign:"left",fontWeight:700,color:"var(--txm)",
-                  letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",fontSize:10,whiteSpace:"nowrap",minWidth:100,verticalAlign:"middle"}},"CONCEPTO"),
-                ...periodos.map(p=>h("th",{key:p,colSpan:3,style:{padding:"7px 10px",textAlign:"center",fontWeight:600,
-                  color:"var(--tx)",borderBottom:"1px solid #e0e8f0",borderLeft:"1px solid var(--bdr)",
-                  whiteSpace:"nowrap",minWidth:260,position:"relative"}},
-                  p,
-                  loadingSet.has(p)&&h("span",{style:{display:"inline-block",fontSize:9,color:"var(--txm)",fontWeight:400,marginLeft:6}},
-                    h("span",{className:"spin",style:{fontSize:9}},"⟳"))
-                ))
-              ),
-              h("tr",{style:{background:"var(--surf2)"}},
-                ...periodos.flatMap(p=>[
-                  h("th",{key:p+"-n",style:{padding:"4px 10px",textAlign:"center",fontSize:9,fontWeight:600,
-                    color:"var(--txm)",borderBottom:"1px solid var(--bdr)",borderLeft:"1px solid var(--bdr)",minWidth:90}},"N° Factura"),
-                  h("th",{key:p+"-u",style:{padding:"4px 8px",textAlign:"center",fontSize:9,fontWeight:600,
-                    color:"var(--txm)",borderBottom:"1px solid var(--bdr)",minWidth:70}},"UF"),
-                  h("th",{key:p+"-t",style:{padding:"4px 10px",textAlign:"center",fontSize:9,fontWeight:600,
-                    color:"var(--txm)",borderBottom:"1px solid var(--bdr)",minWidth:100}},"Total CLP"),
-                ])
+                h("th",{style:{padding:"8px 16px",textAlign:"left",fontWeight:700,color:"var(--txm)",
+                  fontSize:10,whiteSpace:"nowrap",minWidth:100,borderBottom:"1px solid var(--bdr)"}},"CONCEPTO"),
+                ...allPerds.map(p=>h("th",{key:p,style:{padding:"7px 10px",textAlign:"center",fontWeight:600,
+                  color:"var(--tx)",borderBottom:"1px solid var(--bdr)",borderLeft:"1px solid var(--bdr)",
+                  whiteSpace:"nowrap",minWidth:120}},p))
               )
             ),
             h("tbody",null,
               conceptos.map((conc,ci)=>h("tr",{key:conc,style:{borderBottom:ci<2?"1px solid var(--bdr)":"none"}},
-                h("td",{style:{padding:"11px 16px",fontWeight:700,color:cColor[conc],fontSize:11,whiteSpace:"nowrap"}},cLabel[conc]),
-                ...periodos.flatMap(p=>{
-                  const inv=invoicesMap[p]?.[conc];
-                  const nro=inv?(inv.nro||inv):null;
-                  const uf=inv?.uf??null;
-                  const total=inv?.total??null;
-                  const isLoading=loadingSet.has(p);
-                  const dash=h("span",{style:{color:"var(--txd)",fontSize:11}},"—");
-                  const loading=h("span",{style:{color:"var(--txd)",fontSize:10}},"…");
-                  const tdL={style:{padding:"9px 10px",textAlign:"center",borderLeft:"1px solid var(--bdr)"}};
-                  const tdC={style:{padding:"9px 8px",textAlign:"center"}};
-                  return [
-                    h("td",{key:p+"-n",...tdL},
-                      isLoading&&!nro?loading
-                      :nro?h("button",{onClick:()=>previewFact(nro,p),disabled:pdfLoading,
-                          title:`Ver PDF — ${nro} · ${p}`,
-                          style:{background:"var(--bbg)",border:"1px solid #b5d0f0",color:"var(--blue)",
-                            padding:"3px 10px",borderRadius:6,fontSize:10,fontWeight:600,
-                            cursor:pdfLoading?"wait":"pointer",fontFamily:"'DM Mono',monospace"}},
-                          pdfLoading?"⟳":nro)
-                      :dash),
-                    h("td",{key:p+"-u",...tdC},
-                      isLoading&&uf==null?loading
-                      :uf!=null?h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},uf.toFixed(2))
-                      :dash),
-                    h("td",{key:p+"-t",...tdC},
-                      isLoading&&total==null?loading
-                      :total?h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},
-                          "$"+total.toLocaleString("es-CL"))
-                      :dash),
-                  ];
+                h("td",{style:{padding:"9px 16px",fontWeight:700,color:cColor[conc],fontSize:11,whiteSpace:"nowrap"}},cLabel[conc]),
+                ...allPerds.map(p=>{
+                  const sum=consolidado(p,conc);
+                  return h("td",{key:p,style:{padding:"9px 10px",textAlign:"center",borderLeft:"1px solid var(--bdr)"}},
+                    sum>0?h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},
+                        "$"+sum.toLocaleString("es-CL"))
+                      :h("span",{style:{color:"var(--txd)"}}, "—"));
                 })
               )),
-              h("tr",{key:"total-row",style:{borderTop:"2px solid var(--bdr)",background:"var(--surf2)"}},
+              h("tr",{key:"cons-total",style:{borderTop:"2px solid var(--bdr)",background:"var(--surf2)"}},
                 h("td",{style:{padding:"9px 16px",fontWeight:700,fontSize:11,whiteSpace:"nowrap",color:"var(--tx)"}},"TOTAL"),
-                ...periodos.flatMap(p=>{
-                  const isLoading=loadingSet.has(p);
-                  const sumTotal=conceptos.reduce((s,conc)=>s+(invoicesMap[p]?.[conc]?.total||0),0);
-                  return [
-                    h("td",{key:p+"-tot-n",style:{borderLeft:"1px solid var(--bdr)"}}),
-                    h("td",{key:p+"-tot-u"}),
-                    h("td",{key:p+"-tot-t",style:{padding:"9px 10px",textAlign:"center"}},
-                      isLoading&&sumTotal===0
-                        ?h("span",{style:{color:"var(--txd)",fontSize:10}},"…")
-                        :sumTotal>0
-                          ?h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:700,color:"var(--tx)"}},
-                              "$"+sumTotal.toLocaleString("es-CL"))
-                          :h("span",{style:{color:"var(--txd)",fontSize:11}},"—")
-                    ),
-                  ];
+                ...allPerds.map(p=>{
+                  const t=conceptos.reduce((s,conc)=>s+consolidado(p,conc),0);
+                  return h("td",{key:p,style:{padding:"9px 10px",textAlign:"center",borderLeft:"1px solid var(--bdr)"}},
+                    t>0?h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:700,color:"var(--tx)"}},
+                        "$"+t.toLocaleString("es-CL"))
+                      :h("span",{style:{color:"var(--txd)",fontSize:11}},"—"));
                 })
               )
             )
           )
         )
-    )),
+      );
+    })(),
 
     pdfPrev&&h("div",{className:"overlay",onClick:e=>{if(e.target===e.currentTarget)closePrev();}},
       h("div",{style:{background:"var(--surf)",borderRadius:14,width:"88vw",height:"92vh",display:"flex",flexDirection:"column",overflow:"hidden"}},
