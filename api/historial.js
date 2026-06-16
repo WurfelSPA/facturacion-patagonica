@@ -191,28 +191,33 @@ function extractFacturasForRut(text, rutNorm) {
   return facturas;
 }
 function _extractUF(s) {
-  // Cantidades UF: 1-2 decimales ("12,8", "106,64")
-  // Precios CLP: separador de miles da 3 dígitos → "40.695" rechazado por (?!\d)
-  // P1: número + UF adyacentes
-  const m1 = s.match(/(\d{1,3}[.,]\d{1,2})\s*U\s*F\b/i);
-  if (m1) { const v=parseFloat(m1[1].replace(",",".")); if(v>=0.1&&v<999) return Math.round(v*10000)/10000; }
-  // P2: UF + número adyacentes
-  const m2 = s.match(/\bUF\s*(\d{1,3}[.,]\d{1,2})(?!\d)/i);
-  if (m2) { const v=parseFloat(m2[1].replace(",",".")); if(v>=0.1&&v<999) return Math.round(v*10000)/10000; }
-  // P3: el extractor PDF separa "12,8" y "UF" — buscar el número más cercano a "UF" en ±500 chars
+  // Cantidades UF: 1-3 decimales ("12,8", "1,59", "106,64")
+  // Precios por UF tienen 5+ dígitos antes de la coma → excluidos por \d{1,3}
+  // P0: búsqueda directa del número antes de "UF" — busca el último número decimal
+  //     antes de cada "UF", limitado a valores pequeños (< 500 UF)
+  const allUF = [...s.matchAll(/(\d{1,3}[.,]\d{1,3})\s*U\s*F\b/gi)];
+  for (const m of allUF) {
+    const v = parseFloat(m[1].replace(",", "."));
+    if (v >= 0.1 && v < 500) return Math.round(v * 10000) / 10000;
+  }
+  // P1: UF + número adyacentes (ej. arriendo: "UF 13,21 x 40186")
+  const m1 = s.match(/\bUF\s*(\d{1,3}[.,]\d{1,3})(?!\d)/i);
+  if (m1) { const v=parseFloat(m1[1].replace(",",".")); if(v>=0.1&&v<500) return Math.round(v*10000)/10000; }
+  // P2: el extractor PDF puede separar "12,8" y "UF" — buscar el número MÁS CERCANO a "UF"
+  //     que sea un valor de UF plausible (< 500), buscando ANTES del "UF" primero
   const ufPos = s.search(/\bUF\b/i);
   if (ufPos >= 0) {
-    const start = Math.max(0, ufPos - 500);
-    const win   = s.slice(start, Math.min(s.length, ufPos + 500));
-    const relUF = ufPos - start;
-    let best = null, bestDist = Infinity;
-    for (const m of win.matchAll(/(\d{1,3}[.,]\d{1,2})(?!\d)/g)) {
+    // Primero buscar ANTES del UF (caso Serv.Admin: "12,8 UF")
+    const winBefore = s.slice(Math.max(0, ufPos - 200), ufPos);
+    const beforeMatches = [...winBefore.matchAll(/(\d{1,3}[.,]\d{1,3})(?!\d)/g)];
+    for (const m of beforeMatches.reverse()) { // más cercano primero
       const v = parseFloat(m[1].replace(",", "."));
-      if (isNaN(v) || v < 0.1 || v >= 999) continue;
-      const dist = Math.abs(m.index - relUF);
-      if (dist < bestDist) { bestDist = dist; best = v; }
+      if (v >= 0.1 && v < 500) return Math.round(v * 10000) / 10000;
     }
-    if (best !== null) return Math.round(best * 10000) / 10000;
+    // Luego buscar DESPUÉS del UF (caso Arriendo: "UF 13,21")
+    const winAfter = s.slice(ufPos + 2, Math.min(s.length, ufPos + 50));
+    const m2 = winAfter.match(/^\s*(\d{1,3}[.,]\d{1,3})(?!\d)/);
+    if (m2) { const v=parseFloat(m2[1].replace(",",".")); if(v>=0.1&&v<500) return Math.round(v*10000)/10000; }
   }
   return null;
 }
