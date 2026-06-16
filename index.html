@@ -2071,15 +2071,13 @@ function HistorialFactView({dashData,driveLoading,notify}){
         selClient.edificio&&h("span",{style:{fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},selClient.edificio),
         h("span",{style:{fontWeight:700,fontSize:13}},selClient.nombre),
         selClient.rut&&h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},selClient.rut),
-        h("div",{style:{marginLeft:"auto",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}},
-          selClient.email&&h("span",{style:{fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},selClient.email),
-          granTotalStr&&h("div",{style:{display:"flex",flexDirection:"column",alignItems:"flex-end"}},
-            h("span",{style:{fontSize:9,fontWeight:600,color:"var(--txm)",letterSpacing:".06em",textTransform:"uppercase"}},
-              totalLoading>0?"Total parcial":"Total acumulado"),
-            h("span",{style:{fontSize:13,fontWeight:700,fontFamily:"'DM Mono',monospace",color:"var(--tx)"}},
-              granTotalStr)
-          )
-        )
+        granTotalStr&&h("div",{style:{display:"flex",flexDirection:"column",alignItems:"flex-start",marginLeft:18,paddingLeft:18,borderLeft:"1px solid var(--bdr)"}},
+          h("span",{style:{fontSize:9,fontWeight:600,color:"var(--txm)",letterSpacing:".06em",textTransform:"uppercase"}},
+            totalLoading>0?"Total parcial":"Total acumulado"),
+          h("span",{style:{fontSize:13,fontWeight:700,fontFamily:"'DM Mono',monospace",color:"var(--tx)"}},
+            granTotalStr)
+        ),
+        selClient.email&&h("span",{style:{marginLeft:"auto",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},selClient.email)
       ),
       /* Tabla: período como columna, concepto como fila */
       totalLoading===totalPeriods&&periodos.length===0
