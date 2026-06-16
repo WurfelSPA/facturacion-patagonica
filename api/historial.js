@@ -192,26 +192,27 @@ function extractFacturasForRut(text, rutNorm) {
 }
 function _extractUF(s) {
   // Cantidades UF: 1-2 decimales ("12,8", "106,64")
-  // Precios CLP: 3 dígitos tras separador ("40.695" = miles → (?!\d) falla si sigue otro dígito)
-  const NUM = /(\d{1,3}[.,]\d{1,2})(?!\d)/;
-
-  // P1: número inmediatamente antes de UF
+  // Precios CLP: separador de miles da 3 dígitos → "40.695" rechazado por (?!\d)
+  // P1: número + UF adyacentes
   const m1 = s.match(/(\d{1,3}[.,]\d{1,2})\s*U\s*F\b/i);
   if (m1) { const v=parseFloat(m1[1].replace(",",".")); if(v>=0.1&&v<999) return Math.round(v*10000)/10000; }
-
-  // P2: UF inmediatamente antes del número
+  // P2: UF + número adyacentes
   const m2 = s.match(/\bUF\s*(\d{1,3}[.,]\d{1,2})(?!\d)/i);
   if (m2) { const v=parseFloat(m2[1].replace(",",".")); if(v>=0.1&&v<999) return Math.round(v*10000)/10000; }
-
-  // P3: número y "UF" separados → último número válido en los 300 chars ANTES de "UF"
+  // P3: el extractor PDF separa "12,8" y "UF" — buscar el número más cercano a "UF" en ±500 chars
   const ufPos = s.search(/\bUF\b/i);
-  if (ufPos > 2) {
-    const before = s.slice(Math.max(0, ufPos - 300), ufPos);
-    const all = [...before.matchAll(new RegExp(NUM.source, "g"))];
-    for (let i = all.length - 1; i >= 0; i--) {
-      const v = parseFloat(all[i][1].replace(",", "."));
-      if (!isNaN(v) && v >= 0.1 && v < 999) return Math.round(v * 10000) / 10000;
+  if (ufPos >= 0) {
+    const start = Math.max(0, ufPos - 500);
+    const win   = s.slice(start, Math.min(s.length, ufPos + 500));
+    const relUF = ufPos - start;
+    let best = null, bestDist = Infinity;
+    for (const m of win.matchAll(/(\d{1,3}[.,]\d{1,2})(?!\d)/g)) {
+      const v = parseFloat(m[1].replace(",", "."));
+      if (isNaN(v) || v < 0.1 || v >= 999) continue;
+      const dist = Math.abs(m.index - relUF);
+      if (dist < bestDist) { bestDist = dist; best = v; }
     }
+    if (best !== null) return Math.round(best * 10000) / 10000;
   }
   return null;
 }
