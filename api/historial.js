@@ -227,37 +227,29 @@ function _derivarUFdePrecio(s, total) {
   return null;
 }
 function _extractUF(s) {
-  // Cantidades UF en Chile usan COMA como decimal: "12,8 UF", "1,59 UF", "106,64 UF"
-  // Precio por UF ($40.695,38 o $40,695.38): siempre tiene más dígitos después → filtrado
+  // P0 (patrón PISA): "12,8 UF 40.695,38 AF" — número + UF + precio 5 dígitos
+  // Idéntico al patrón exitoso de pdftext.js. No usa \b para no romper con "UF40".
+  // Captura la CANTIDAD de UF (izquierda), no el precio (derecha).
+  const m0 = s.match(/([\d]{1,3}[,.][\d]{1,3})\s*U\s*F\s*\d{2}/i);
+  if (m0) { const v=parseFloat(m0[1].replace(",",".")); if(v>=0.1&&v<500) return Math.round(v*10000)/10000; }
 
-  // P0: número+coma+decimal ADYACENTE a "UF" (solo espacios de por medio)
-  // "40,695.38 UF" NO matchea: después de "695" viene "." ≠ espacio/U → `\s*UF` falla ✓
-  // "695,38 UF" matchea pero v=695.38 > 500 → filtrado ✓
-  // "12,8 UF" matchea → v=12.8 → retorna ✓
-  const m0 = [...s.matchAll(/(\d{1,3},\d{1,3})\s*U\s*F\b/gi)];
-  for (const m of m0) {
-    const v = parseFloat(m[1].replace(",", "."));
-    if (v >= 0.1 && v < 500) return Math.round(v * 10000) / 10000;
-  }
-
-  // P1: UF + número con COMA decimal — arriendo: "UF 106,64 x 40186"
-  const m1 = s.match(/\bU\s*F\s*(\d{1,3},\d{1,3})(?![.,\d])/i);
+  // P1: UF + número — arriendo: "UF 106,64 x 40186"
+  const m1 = s.match(/U\s*F\s*([\d]{1,3}[,.][\d]{1,3})(?![.,\d])/i);
   if (m1) { const v=parseFloat(m1[1].replace(",",".")); if(v>=0.1&&v<500) return Math.round(v*10000)/10000; }
 
-  // P2: proximidad — el PDF puede separar "12,8" de "UF" con texto de otra columna
-  // Busca SOLO coma-decimal con terminador no-numérico/no-punto-coma para evitar "40,695.38"
-  const ufPos = s.search(/\bUF\b/i);
+  // P2: búsqueda por proximidad — solo coma-decimal, terminador no-numérico
+  const ufPos = s.search(/U\s*F/i);
   if (ufPos >= 0) {
-    // ANTES del UF (Serv.Admin: "12,8 [precio] UF")
+    // ANTES del UF
     const winBefore = s.slice(Math.max(0, ufPos - 300), ufPos);
-    const bMatches = [...winBefore.matchAll(/(\d{1,3},\d{1,3})(?![.,\d])/g)];
-    for (const m of bMatches.reverse()) { // el más cercano al UF primero
+    const bMatches = [...winBefore.matchAll(/([\d]{1,3},[\d]{1,3})(?![.,\d])/g)];
+    for (const m of bMatches.reverse()) {
       const v = parseFloat(m[1].replace(",", "."));
       if (v >= 0.1 && v < 500) return Math.round(v * 10000) / 10000;
     }
-    // DESPUÉS del UF (arriendo: "UF 106,64")
+    // DESPUÉS del UF
     const winAfter = s.slice(ufPos + 2, Math.min(s.length, ufPos + 60));
-    const mA = winAfter.match(/^\s*(\d{1,3},\d{1,3})(?![.,\d])/);
+    const mA = winAfter.match(/^\s*([\d]{1,3},[\d]{1,3})(?![.,\d])/);
     if (mA) { const v=parseFloat(mA[1].replace(",",".")); if(v>=0.1&&v<500) return Math.round(v*10000)/10000; }
   }
   return null;

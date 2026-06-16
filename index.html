@@ -2738,8 +2738,11 @@ function App(){
           const ufData=await ufRes.json();
           let conUF=0,conRUT=0;
           for(const p of pdfs){
-            if(ufData.pdfs&&ufData.pdfs[p.nroFact]){
-              const d=ufData.pdfs[p.nroFact];
+            // pdftext puede guardar "F-14768" aunque sea FEE- → buscar ambas claves
+            const _pdfKey=p.nroFact||(p.nro||"");
+            const _pdfKeyAlt=_pdfKey.replace(/^FEE-/i,"F-");
+            if(ufData.pdfs&&(ufData.pdfs[_pdfKey]||ufData.pdfs[_pdfKeyAlt])){
+              const d=ufData.pdfs[_pdfKey]||ufData.pdfs[_pdfKeyAlt];
               if(d.uf!==null&&d.uf!==undefined) p.ufPdf=d.uf;  /* no sobreescribir si servidor devuelve null */
               if(d.rut) p.rutPdf=d.rut;
               p.montoTotal=d.montoTotal||p.montoTotal||null;
