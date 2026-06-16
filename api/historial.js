@@ -191,33 +191,38 @@ function extractFacturasForRut(text, rutNorm) {
   return facturas;
 }
 function _extractUF(s) {
-  // Cantidades UF: 1-3 decimales ("12,8", "1,59", "106,64")
-  // Precios por UF tienen 5+ dígitos antes de la coma → excluidos por \d{1,3}
-  // P0: búsqueda directa del número antes de "UF" — busca el último número decimal
-  //     antes de cada "UF", limitado a valores pequeños (< 500 UF)
-  const allUF = [...s.matchAll(/(\d{1,3}[.,]\d{1,3})\s*U\s*F\b/gi)];
-  for (const m of allUF) {
+  // Cantidades UF en Chile usan COMA como decimal: "12,8 UF", "1,59 UF", "106,64 UF"
+  // Precio por UF ($40.695,38 o $40,695.38): siempre tiene más dígitos después → filtrado
+
+  // P0: número+coma+decimal ADYACENTE a "UF" (solo espacios de por medio)
+  // "40,695.38 UF" NO matchea: después de "695" viene "." ≠ espacio/U → `\s*UF` falla ✓
+  // "695,38 UF" matchea pero v=695.38 > 500 → filtrado ✓
+  // "12,8 UF" matchea → v=12.8 → retorna ✓
+  const m0 = [...s.matchAll(/(\d{1,3},\d{1,3})\s*U\s*F\b/gi)];
+  for (const m of m0) {
     const v = parseFloat(m[1].replace(",", "."));
     if (v >= 0.1 && v < 500) return Math.round(v * 10000) / 10000;
   }
-  // P1: UF + número adyacentes (ej. arriendo: "UF 13,21 x 40186")
-  const m1 = s.match(/\bUF\s*(\d{1,3}[.,]\d{1,3})(?!\d)/i);
+
+  // P1: UF + número con COMA decimal — arriendo: "UF 106,64 x 40186"
+  const m1 = s.match(/\bU\s*F\s*(\d{1,3},\d{1,3})(?![.,\d])/i);
   if (m1) { const v=parseFloat(m1[1].replace(",",".")); if(v>=0.1&&v<500) return Math.round(v*10000)/10000; }
-  // P2: el extractor PDF puede separar "12,8" y "UF" — buscar el número MÁS CERCANO a "UF"
-  //     que sea un valor de UF plausible (< 500), buscando ANTES del "UF" primero
+
+  // P2: proximidad — el PDF puede separar "12,8" de "UF" con texto de otra columna
+  // Busca SOLO coma-decimal con terminador no-numérico/no-punto-coma para evitar "40,695.38"
   const ufPos = s.search(/\bUF\b/i);
   if (ufPos >= 0) {
-    // Primero buscar ANTES del UF (caso Serv.Admin: "12,8 UF")
-    const winBefore = s.slice(Math.max(0, ufPos - 200), ufPos);
-    const beforeMatches = [...winBefore.matchAll(/(\d{1,3}[.,]\d{1,3})(?!\d)/g)];
-    for (const m of beforeMatches.reverse()) { // más cercano primero
+    // ANTES del UF (Serv.Admin: "12,8 [precio] UF")
+    const winBefore = s.slice(Math.max(0, ufPos - 300), ufPos);
+    const bMatches = [...winBefore.matchAll(/(\d{1,3},\d{1,3})(?![.,\d])/g)];
+    for (const m of bMatches.reverse()) { // el más cercano al UF primero
       const v = parseFloat(m[1].replace(",", "."));
       if (v >= 0.1 && v < 500) return Math.round(v * 10000) / 10000;
     }
-    // Luego buscar DESPUÉS del UF (caso Arriendo: "UF 13,21")
-    const winAfter = s.slice(ufPos + 2, Math.min(s.length, ufPos + 50));
-    const m2 = winAfter.match(/^\s*(\d{1,3}[.,]\d{1,3})(?!\d)/);
-    if (m2) { const v=parseFloat(m2[1].replace(",",".")); if(v>=0.1&&v<500) return Math.round(v*10000)/10000; }
+    // DESPUÉS del UF (arriendo: "UF 106,64")
+    const winAfter = s.slice(ufPos + 2, Math.min(s.length, ufPos + 60));
+    const mA = winAfter.match(/^\s*(\d{1,3},\d{1,3})(?![.,\d])/);
+    if (mA) { const v=parseFloat(mA[1].replace(",",".")); if(v>=0.1&&v<500) return Math.round(v*10000)/10000; }
   }
   return null;
 }
