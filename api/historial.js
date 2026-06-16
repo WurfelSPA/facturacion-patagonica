@@ -158,13 +158,12 @@ function extractFacturasForRut(text, rutNorm) {
   const t = (text||"").replace(/\s+/g," ");
 
   const nros = [];
-  // Captura también si el match usó prefijo FEE- (grupo 1 = "EE" si es FEE-)
-  const nroRe = /(?:[Nn][ºo°]\s*|F(EE)?-\s*)(\d{4,6})/g;
+  const nroRe = /(?:[Nn][ºo°]\s*|(?:F(?:EE)?-))\s*(\d{4,6})/g;
   let m;
   while ((m = nroRe.exec(t)) !== null) {
-    const isFee = !!m[1], nro = m[2], pos = m.index;
+    const nro = m[1], pos = m.index;
     if (!nros.length || pos - nros[nros.length-1].pos > 20 || nros[nros.length-1].nro !== nro)
-      nros.push({ nro, pos, isFee });
+      nros.push({ nro, pos });
   }
   if (!nros.length) return facturas;
 
@@ -181,9 +180,7 @@ function extractFacturasForRut(text, rutNorm) {
     seenNros.add(prevNro.nro);
     const nextNro = nros.find(n => n.pos > rutPos);
     const section = t.slice(prevNro.pos, nextNro ? nextNro.pos : t.length);
-    // Si el número fue encontrado con prefijo FEE- → siempre es servAdm
-    // (más fiable que depender del texto de descripción)
-    const tipo = prevNro.isFee ? "servAdm" : detectTipo(section);
+    const tipo = detectTipo(section);
     if (!tipo) continue;
     const nro = `${tipo === "servAdm" ? "FEE" : "F"}-${prevNro.nro}`;
     const wideUF = t.slice(prevNro.pos, prevNro.pos + 3000);
@@ -326,14 +323,14 @@ function detectTipo(text) {
   const add = (tipo, needle) => { const i=t.indexOf(needle); if(i>=0) hits.push({tipo,i}); };
   // Habilitación
   add("habilitacion","Habilitaci");
-  // Serv. Admin — variantes con/sin "de", con/sin punto, COD de descripción
-  add("servAdm","Serv. de Adm");  // ← formato real PISA: "Serv. de Adm. Febrero 2026"
+  // Serv. Admin — variantes con/sin "de", con/sin punto, con/sin espacio, COD de descripción
+  add("servAdm","Serv. de Adm"); // formato real PISA: "Serv. de Adm. Febrero 2026"
   add("servAdm","Serv.de Adm");
   add("servAdm","Serv de Adm");
   add("servAdm","Serv. Adm.");
   add("servAdm","Serv.Adm.");
-  add("servAdm","Serv. Adm ");    // sin punto final
-  add("servAdm","COD: S-A");      // código de concepto en facturas PISA
+  add("servAdm","Serv. Adm ");   // sin punto final: "Serv. Adm Enero 2026"
+  add("servAdm","COD: S-A");     // código de concepto en facturas PISA
   add("servAdm","COD:S-A");
   add("servAdm","Gastos Comunes");
   add("servAdm","GASTOS COMUNES");
@@ -342,7 +339,6 @@ function detectTipo(text) {
   // Arriendo — variantes
   add("arriendo","Arriendo");
   add("arriendo","ARRIENDO");
-  add("arriendo","Arrendamiento");
   if(!hits.length) return null;
   hits.sort((a,b)=>a.i-b.i);
   return hits[0].tipo;
@@ -580,8 +576,7 @@ export default async function handler(req, res) {
                     if (fileCliente && !clienteMatch(fileCliente, cliente)) continue;
                     const nroFull = `${prefix.toUpperCase()}-${nro}`;
                     const pdfTxt26m = extractText(Buffer.from(await entry.async("arraybuffer")));
-                    // FEE- en el nombre del archivo → siempre servAdm (más fiable que detectTipo)
-                    const tipo26 = prefix.toUpperCase() === "FEE" ? "servAdm" : detectTipo(pdfTxt26m);
+                    const tipo26 = detectTipo(pdfTxt26m);
                     if (!tipo26 || !missingConceptos26.includes(tipo26)) continue;
                     const total26m = _extractTotal(pdfTxt26m);
                     const uf26m = _extractUF(pdfTxt26m) ?? _derivarUFdePrecio(pdfTxt26m, total26m);
@@ -641,8 +636,7 @@ export default async function handler(req, res) {
           }
         }
 
-        // FEE- en el nombre del archivo → siempre servAdm (más fiable que detectTipo)
-        const tipo = prefix.toUpperCase() === "FEE" ? "servAdm" : detectTipo(text);
+        const tipo = detectTipo(text);
         if (tipo && !facturas[tipo]) {
           const totalZ = _extractTotal(text);
           facturas[tipo] = { nro:nroFull, uf:_extractUF(text) ?? _derivarUFdePrecio(text, totalZ), total:totalZ };
@@ -670,4 +664,18 @@ export default async function handler(req, res) {
       if (!anio || !periodo || !periodoData)
         return res.status(400).json({ error:"Se requiere anio, periodo y data" });
       if (!PDF_FOLDER)
-        return res.status(                                                       
+        return res.status(500).json({ error:"DRIVE_PDF_FACTURAS_ID no configurada" });
+
+      let historial = {};
+      const fileId = await findFile(token, HIST_NAME, PDF_FOLDER);
+      if (fileId) {
+        const text = await downloadFile(token, fileId);
+        if (text) historial = JSON.parse(text);
+      }
+
+      if (!historial[anio]) historial[anio] = {};
+      historial[anio][periodo] = { ...(historial[anio][periodo] || {}), ...periodoData };
+
+      const content = JSON.stringify(historial, null, 2);
+      if (fileId) await updateJsonFile(token, fileId, content);
+      else await createJsonFile(token, HIST_NAME
