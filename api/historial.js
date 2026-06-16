@@ -191,14 +191,29 @@ function extractFacturasForRut(text, rutNorm) {
   return facturas;
 }
 function _extractUF(s) {
-  // Cantidades UF tienen 1-2 decimales ("12,8" o "106,64")
-  // Precios CLP usan separador de miles: "40.695" = 40.695 (3 dígitos tras el punto → rechazado)
-  const m = s.match(/(\d{1,3}[.,]\d{1,2})\s*U\s*F\b/i)   // "12,8 UF", "106,64 UF"
-          || s.match(/\bUF\s*(\d{1,3}[.,]\d{1,2})\b/i);   // "UF 12,8"
-  if (!m) return null;
-  const v = parseFloat(m[1].replace(",", "."));
-  if (isNaN(v) || v < 0.1 || v > 9999) return null;
-  return Math.round(v * 10000) / 10000;
+  // Cantidades UF: 1-2 decimales ("12,8", "106,64")
+  // Precios CLP: 3 dígitos tras separador ("40.695" = miles → (?!\d) falla si sigue otro dígito)
+  const NUM = /(\d{1,3}[.,]\d{1,2})(?!\d)/;
+
+  // P1: número inmediatamente antes de UF
+  const m1 = s.match(/(\d{1,3}[.,]\d{1,2})\s*U\s*F\b/i);
+  if (m1) { const v=parseFloat(m1[1].replace(",",".")); if(v>=0.1&&v<999) return Math.round(v*10000)/10000; }
+
+  // P2: UF inmediatamente antes del número
+  const m2 = s.match(/\bUF\s*(\d{1,3}[.,]\d{1,2})(?!\d)/i);
+  if (m2) { const v=parseFloat(m2[1].replace(",",".")); if(v>=0.1&&v<999) return Math.round(v*10000)/10000; }
+
+  // P3: número y "UF" separados → último número válido en los 300 chars ANTES de "UF"
+  const ufPos = s.search(/\bUF\b/i);
+  if (ufPos > 2) {
+    const before = s.slice(Math.max(0, ufPos - 300), ufPos);
+    const all = [...before.matchAll(new RegExp(NUM.source, "g"))];
+    for (let i = all.length - 1; i >= 0; i--) {
+      const v = parseFloat(all[i][1].replace(",", "."));
+      if (!isNaN(v) && v >= 0.1 && v < 999) return Math.round(v * 10000) / 10000;
+    }
+  }
+  return null;
 }
 function _extractTotal(s, fromPos = 0) {
   // Busca "Monto Total XXXXXXX" desde fromPos en adelante
