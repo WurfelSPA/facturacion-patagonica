@@ -150,6 +150,43 @@ function extractText(pdfBuf) {
   return text.replace(/\s+/g," ").trim();
 }
 
+// ── PDF consolidado: extrae facturas por RUT ─────────────────────────────────
+function extractFacturasForRut(text, rutNorm) {
+  const facturas = {};
+  const t = (text||"").replace(/\s+/g," ");
+
+  // Posiciones de números de factura: "Nº 14540", "N° 14540", "F-14540", "FEE-14540"
+  const nros = [];
+  const nroRe = /(?:[Nn][ºo°]\s*|(?:F(?:EE)?-))\s*(\d{4,6})/g;
+  let m;
+  while ((m = nroRe.exec(t)) !== null) {
+    const nro = m[1], pos = m.index;
+    if (!nros.length || pos - nros[nros.length-1].pos > 20 || nros[nros.length-1].nro !== nro)
+      nros.push({ nro, pos });
+  }
+  if (!nros.length) return facturas;
+
+  // Para cada RUT que coincide, encontrar la factura que lo contiene
+  const rutRe = /\d{1,2}[.\s]\d{3}[.\s]\d{3}-[\dkK]/g;
+  while ((m = rutRe.exec(t)) !== null) {
+    if (normRut(m[0]) !== rutNorm) continue;
+    const rutPos = m.index;
+    // Nro de factura más cercano ANTES del RUT
+    let prevNro = null;
+    for (let i = nros.length-1; i >= 0; i--) {
+      if (nros[i].pos <= rutPos) { prevNro = nros[i]; break; }
+    }
+    if (!prevNro) continue;
+    // Sección: desde ese nro hasta el siguiente (o fin de texto)
+    const nextNro = nros.find(n => n.pos > rutPos);
+    const section = t.slice(prevNro.pos, nextNro ? nextNro.pos : t.length);
+    const tipo = detectTipo(section);
+    if (!tipo || facturas[tipo]) continue;
+    facturas[tipo] = `${tipo === "servAdm" ? "FEE" : "F"}-${prevNro.nro}`;
+  }
+  return facturas;
+}
+
 // ── Historial-cliente helpers ─────────────────────────────────────────────────
 function norm(s){
   return (s||"").toLowerCase()
@@ -284,17 +321,42 @@ export default async function handler(req, res) {
                   return res.status(200).json({ facturas: periodoData[key], source:"json", ...(dbg?{dbg:dbgInfo}:{}) });
                 }
               } else if (dbg) {
-                dbgInfo.jsonKeys = null; // periodo no existe en JSON
+                dbgInfo.jsonKeys = null;
               }
             }
           }
         } catch(e) { if (dbg) dbgInfo.jsonError = e.message; }
       }
 
-      /* ── FUENTE 2: ZIP fallback (parseo PDF) ── */
+      /* ── FUENTE 2: PDF consolidado Facturas_PISA_YYYY-MM.pdf — búsqueda por RUT ── */
+      const rutNorm = normRut(rutQuery);
+      const driveFileList = await driveFiles(token, FACT_FOLDER_ID);
+
+      if (rutNorm) {
+        const pdfPattern = new RegExp(`facturas_pisa_${anioStr}-${mesNum}\\.pdf`, "i");
+        const pdfFile = driveFileList.find(f => pdfPattern.test(f.name));
+        if (dbg) dbgInfo.consolidadoPDF = pdfFile?.name || null;
+
+        if (pdfFile) {
+          const pdfRes = await fetch(
+            `https://www.googleapis.com/drive/v3/files/${pdfFile.id}?alt=media`,
+            { headers:{ Authorization:`Bearer ${token}` } }
+          );
+          if (pdfRes.ok) {
+            const pdfBuf = Buffer.from(await pdfRes.arrayBuffer());
+            const text = extractText(pdfBuf);
+            if (dbg) dbgInfo.textSample = text.slice(0, 500);
+            const facturas = extractFacturasForRut(text, rutNorm);
+            if (dbg) dbgInfo.facturasByRut = facturas;
+            if (Object.keys(facturas).length > 0)
+              return res.status(200).json({ facturas, source:"pdf_consolidado", ...(dbg?{dbg:dbgInfo}:{}) });
+          }
+        }
+      }
+
+      /* ── FUENTE 3: ZIP individual (legado) ── */
       const zipName = `${anioStr}-${mesNum}.zip`;
-      const files = await driveFiles(token, FACT_FOLDER_ID);
-      const zipFile = files.find(f => f.name.toLowerCase() === zipName.toLowerCase());
+      const zipFile = driveFileList.find(f => f.name.toLowerCase() === zipName.toLowerCase());
       if (!zipFile) return res.status(200).json({ facturas: null, source:"zip_missing", ...(dbg?{dbg:dbgInfo}:{}) });
 
       const zipRes = await fetch(
@@ -310,7 +372,6 @@ export default async function handler(req, res) {
       for (const [path, entry] of Object.entries(zip.files)) {
         if (entry.dir || !path.toLowerCase().endsWith(".pdf")) continue;
         const fname = path.split("/").pop();
-        // Acepta F-NNNNN y FEE-NNNNN
         const nroMatch = fname.match(/^(F(?:EE)?)-(\d+)(?:\s+(.+))?\.pdf$/i);
         if (!nroMatch) continue;
         const [, prefix, nro, fileCliente] = nroMatch;
@@ -323,8 +384,6 @@ export default async function handler(req, res) {
         const text = extractText(pdfBuf);
 
         if (!fileCliente) {
-          /* Sin nombre en el archivo — identificar por RUT (inequívoco) o por nombre extraído del PDF */
-          const rutNorm = normRut(rutQuery);
           if (rutNorm) {
             const pdfRut = extractRutFromText(text);
             if (!pdfRut || normRut(pdfRut) !== rutNorm) continue;
