@@ -1,0 +1,9 @@
+{
+  "functions": {
+    "api/split-pdf.js": { "maxDuration": 60 }
+  },
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
+}
