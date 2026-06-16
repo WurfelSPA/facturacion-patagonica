@@ -2133,7 +2133,26 @@ function HistorialFactView({dashData,driveLoading,notify}){
                       :dash),
                   ];
                 })
-              ))
+              )),
+              h("tr",{key:"total-row",style:{borderTop:"2px solid var(--bdr)",background:"var(--surf2)"}},
+                h("td",{style:{padding:"9px 16px",fontWeight:700,fontSize:11,whiteSpace:"nowrap",color:"var(--tx)"}},"TOTAL"),
+                ...periodos.flatMap(p=>{
+                  const isLoading=loadingSet.has(p);
+                  const sumTotal=conceptos.reduce((s,conc)=>s+(invoicesMap[p]?.[conc]?.total||0),0);
+                  return [
+                    h("td",{key:p+"-tot-n",style:{borderLeft:"1px solid var(--bdr)"}}),
+                    h("td",{key:p+"-tot-u"}),
+                    h("td",{key:p+"-tot-t",style:{padding:"9px 10px",textAlign:"center"}},
+                      isLoading&&sumTotal===0
+                        ?h("span",{style:{color:"var(--txd)",fontSize:10}},"…")
+                        :sumTotal>0
+                          ?h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:700,color:"var(--tx)"}},
+                              "$"+sumTotal.toLocaleString("es-CL"))
+                          :h("span",{style:{color:"var(--txd)",fontSize:11}},"—")
+                    ),
+                  ];
+                })
+              )
             )
           )
         )

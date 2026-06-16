@@ -190,7 +190,7 @@ function extractFacturasForRut(text, rutNorm) {
   return facturas;
 }
 function _extractUF(s) {
-  const m = s.match(/\b(\d{1,3}[.,]\d{2,4})\s*UF\b/i) || s.match(/\bUF\s+(\d{1,3}[.,]\d{2,4})/i);
+  const m = s.match(/\b(\d{1,3}[.,]\d{1,4})\s*UF\b/i) || s.match(/\bUF\s+(\d{1,3}[.,]\d{1,4})/i);
   if (!m) return null;
   const v = parseFloat(m[1].replace(",", "."));
   return isNaN(v) ? null : Math.round(v * 10000) / 10000;
