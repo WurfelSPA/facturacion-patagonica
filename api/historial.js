@@ -183,9 +183,10 @@ function extractFacturasForRut(text, rutNorm) {
     const tipo = detectTipo(section);
     if (!tipo || facturas[tipo]) continue;
     const nro = `${tipo === "servAdm" ? "FEE" : "F"}-${prevNro.nro}`;
-    // UF: en la sección acotada; Total: desde el inicio de la factura hacia adelante
-    // (Monto Total está al final de la página, puede quedar después del next nro)
-    facturas[tipo] = { nro, uf: _extractUF(section), total: _extractTotal(t, prevNro.pos) };
+    // UF: sección acotada primero; si no, ventana extendida (el orden de texto del PDF puede variar)
+    // Total: siempre buscar desde inicio de factura (Monto Total al final de página)
+    const wideUF = t.slice(prevNro.pos, prevNro.pos + 3000);
+    facturas[tipo] = { nro, uf: _extractUF(section) ?? _extractUF(wideUF), total: _extractTotal(t, prevNro.pos) };
   }
   return facturas;
 }

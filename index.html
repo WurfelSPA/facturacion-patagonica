@@ -691,6 +691,11 @@ async function procesarPDFs(zipFile,addLog){
             ||flat0.match(/1\s*UNID\s+([\d]{4,})/i);
           if(m){const raw=m[1].replace(/\./g,"").replace(",",".");ufPdf=parseFloat(raw)||null;}
         }
+        /* P5: Cant/Unidad "12,8 UF" — decimal con 1 solo dígito (Serv. Adm. con UF) */
+        if(!ufPdf){
+          m=flat0.match(/([\d]{1,3}[,.]\d)\s*UF\b/i);
+          if(m){const v=parseFloat(m[1].replace(",","."));if(v>=0.1&&v<9999)ufPdf=v;}
+        }
         if(ufPdf) ufPdf=Math.round(ufPdf*10000)/10000;
       }
     }catch(e){}
