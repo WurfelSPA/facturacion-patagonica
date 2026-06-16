@@ -160,7 +160,7 @@ function clienteMatch(fromFile, query) {
   if(a===b) return true;
   // Substring: solo si la cadena contenida tiene ≥4 chars (evita falsos positivos por "spa", "cia", etc.)
   if(b.length>=4&&a.includes(b)) return true;
-  if(a.length>=4&&b.includes(a)) return true;
+  if(a.length>=3&&b.includes(a)) return true;
   // Palabras distintivas: ignorar prefijos genéricos para evitar confundir "Comercial Granja" con "Comercial Industrial"
   const GENERIC=new Set(["comercial","sociedad","empresa","servicios","industria","distribuidora",
     "corporacion","consultora","inversiones","laboratorio","importadora","exportadora","agencia","compania"]);
