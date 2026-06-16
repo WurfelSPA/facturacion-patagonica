@@ -621,7 +621,7 @@ async function guardarHistorialPeriodo(anio,periodo,filas){
     if(!f.factura)continue;
     if(!data[f.cliente])data[f.cliente]={};
     const conc=(f.concepto||"").toLowerCase();
-    const obj={nro:f.factura,uf:f.ufPdf||null,total:f.montoTotal||null};
+    const obj={nro:f.factura,uf:f.ufPdf??f.uf??null,total:f.montoTotal||null};
     if(conc==="arriendo")data[f.cliente].arriendo=obj;
     else if(conc==="serv. adm."||conc==="serv_adm")data[f.cliente].servAdm=obj;
     else if(conc==="habilitación"||conc==="habilitacion")data[f.cliente].habilitacion=obj;

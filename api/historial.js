@@ -363,12 +363,12 @@ export default async function handler(req, res) {
                   const facturas = Object.fromEntries(Object.entries(raw).map(([k,v])=>
                     [k, typeof v==="string" ? {nro:v,uf:null,total:null} : v]
                   ));
-                  // Si todos los totales están presentes → retornar inmediato
-                  const allHaveTotal = Object.values(facturas).every(f => f.total != null);
-                  if (allHaveTotal) {
+                  // Si todos los totales Y UFs están presentes → retornar inmediato
+                  const allComplete = Object.values(facturas).every(f => f.total != null && f.uf != null);
+                  if (allComplete) {
                     return res.status(200).json({ facturas, source:"json", ...(dbg?{dbg:dbgInfo}:{}) });
                   }
-                  // Faltan totales → continuar a FUENTE 2 para enriquecer
+                  // Faltan totales o UFs → continuar a FUENTE 2 para enriquecer
                   savedFacturas = facturas;
                 }
               } else if (dbg) {
@@ -450,8 +450,36 @@ export default async function handler(req, res) {
         }
       }
 
-      // Si FUENTE 2 no dio resultado, usar datos del JSON aunque falten totales
+      // Si FUENTE 2 no dio resultado, intentar ZIP individual para UF faltantes (FUENTE 2.6)
       if (savedFacturas) {
+        const missingUF26 = Object.entries(savedFacturas).filter(([,f]) => f.nro && f.uf == null);
+        if (missingUF26.length > 0) {
+          const zipName26 = `${anioStr}-${mesNum}.zip`;
+          const zipFile26 = driveFileList.find(f => f.name.toLowerCase() === zipName26.toLowerCase());
+          if (zipFile26) {
+            try {
+              const zr26 = await fetch(
+                `https://www.googleapis.com/drive/v3/files/${zipFile26.id}?alt=media`,
+                { headers:{ Authorization:`Bearer ${token}` } }
+              );
+              if (zr26.ok) {
+                const zip26 = await JSZip.loadAsync(Buffer.from(await zr26.arrayBuffer()));
+                for (const [tipo, f] of missingUF26) {
+                  const numPart = f.nro.replace(/^F(?:EE)?-/i, "");
+                  for (const [path, entry] of Object.entries(zip26.files)) {
+                    if (entry.dir || !path.toLowerCase().endsWith(".pdf")) continue;
+                    const fname = path.split("/").pop();
+                    const nm = fname.match(/^(?:F(?:EE)?-)?(\d+)/i);
+                    if (!nm || nm[1] !== numPart) continue;
+                    const uf26 = _extractUF(extractText(Buffer.from(await entry.async("arraybuffer"))));
+                    if (uf26 != null) savedFacturas[tipo] = { ...savedFacturas[tipo], uf: uf26 };
+                    break;
+                  }
+                }
+              }
+            } catch(_) {}
+          }
+        }
         return res.status(200).json({ facturas: savedFacturas, source:"json", ...(dbg?{dbg:dbgInfo}:{}) });
       }
 
