@@ -3029,7 +3029,7 @@ function App(){
   const stats={total:enriched.length,ok:enriched.filter(r=>r.estado==="ok").length,diff:enriched.filter(r=>r.estado!=="ok").length,sent:sentSet.size,conPdf:enriched.filter(r=>r.factura&&r.ufPdf!==null).length,sinPdf:enriched.filter(r=>!r.factura||r.ufPdf===null).length};
   const filtered=enriched.filter(r=>{
     const mf=filter==="all"||(filter==="ok"&&r.estado==="ok"&&!sentSet.has(r.i))||(filter==="diff"&&r.estado!=="ok")||(filter==="sent"&&sentSet.has(r.i))||(filter==="difiere"&&r.estado==="diff"&&r.matchScore!==1)||(filter==="sinpdf"&&!r.factura);
-    const mc=concFilter==="all"||(concFilter==="arr"&&r.concepto==="Arriendo")||(concFilter==="srv"&&r.concepto==="Serv. Adm.")||(concFilter==="hab"&&r.concepto==="Habilitación");
+    const mc=concFilter==="all"||(concFilter==="arr"&&r.concepto==="Arriendo")||(concFilter==="srv"&&r.concepto==="Serv. Adm.")||(concFilter==="hab"&&r.concepto==="Habilitación")||(concFilter==="ppr"&&!r.yaPagado);
     const ms=!search||r.cliente.toLowerCase().includes(search.toLowerCase())||r.sitio.includes(search.toUpperCase())||(r.rut&&r.rut.replace(/\./g,"").includes(search.replace(/\./g,"")));
     const mfact=!searchFactura||( r.factura&&r.factura.toLowerCase().includes(searchFactura.toLowerCase()));
     return mf&&mc&&ms&&mfact;
@@ -3565,8 +3565,8 @@ function App(){
          {k:"sinpdf",l:`Sin PDF (${stats.sinPdf})`}]
         .map(f=>h("button",{key:f.k,className:`pill${filter===f.k?" active":""}`,onClick:()=>setFilter(f.k)},f.l)),
         h("span",{style:{color:"var(--txd)",fontSize:11,marginLeft:3}},"·"),
-        [{k:"all",l:`Todos (${enriched.length})`},{k:"arr",l:`Arriendo (${enriched.filter(r=>r.concepto==="Arriendo").length})`},{k:"srv",l:`Serv.Adm. (${enriched.filter(r=>r.concepto==="Serv. Adm.").length})`},{k:"hab",l:`Habilitación (${enriched.filter(r=>r.concepto==="Habilitación").length})`}]
-        .map(f=>h("button",{key:f.k,className:`pill${concFilter===f.k?" active":""}`,onClick:()=>setConcFilter(f.k),style:{fontSize:10}},f.l)),
+        [{k:"all",l:`Todos (${enriched.length})`},{k:"arr",l:`Arriendo (${enriched.filter(r=>r.concepto==="Arriendo").length})`},{k:"srv",l:`Serv.Adm. (${enriched.filter(r=>r.concepto==="Serv. Adm.").length})`},{k:"hab",l:`Habilitación (${enriched.filter(r=>r.concepto==="Habilitación").length})`},{k:"ppr",l:`Por Pagar (${enriched.filter(r=>!r.yaPagado).length})`}]
+        .map(f=>h("button",{key:f.k,className:`pill${concFilter===f.k?" active":""}`,onClick:()=>setConcFilter(f.k),style:{fontSize:10,...(f.k==="ppr"?{color:concFilter==="ppr"?"":"var(--red,#e03)"}:{})}},f.l)),
         h("div",{style:{marginLeft:"auto",display:"flex",alignItems:"center",gap:8}},
           ufSII&&h("span",{style:{fontSize:11,fontFamily:"'DM Mono',monospace",fontWeight:600,
             background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:6,padding:"4px 10px",
