@@ -191,8 +191,10 @@ function extractFacturasForRut(text, rutNorm) {
   return facturas;
 }
 function _extractUF(s) {
-  const m = s.match(/(\d{1,3}[.,]\d{1,4})\s*U\s*F\b/i)   // "12,8 UF" o "12,8UF" o "12,8 U F"
-          || s.match(/\bUF\s*(\d{1,3}[.,]\d{1,4})/i);     // "UF 12,8"
+  // Cantidades UF tienen 1-2 decimales ("12,8" o "106,64")
+  // Precios CLP usan separador de miles: "40.695" = 40.695 (3 dígitos tras el punto → rechazado)
+  const m = s.match(/(\d{1,3}[.,]\d{1,2})\s*U\s*F\b/i)   // "12,8 UF", "106,64 UF"
+          || s.match(/\bUF\s*(\d{1,3}[.,]\d{1,2})\b/i);   // "UF 12,8"
   if (!m) return null;
   const v = parseFloat(m[1].replace(",", "."));
   if (isNaN(v) || v < 0.1 || v > 9999) return null;

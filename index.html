@@ -675,8 +675,8 @@ async function procesarPDFs(zipFile,addLog){
     try{
       if(texto.length>10){
         const flat0=texto.replace(/\s+/g," ");
-        /* P1: Cant/Unidad "11,84 UF 40.695" — decimal obligatorio antes de UF (evita capturar nº de edificio) */
-        let m=flat0.match(/([\d]+[,.][\d]+)\s*UF\s*\d{2}[,.\d]/);
+        /* P1: Cant/Unidad "11,84 UF" o "12,8 UF" — máx 2 decimales (3 dígitos = separador de miles CLP, no decimal UF) */
+        let m=flat0.match(/([\d]{1,3}[,.][\d]{1,2})\s*UF\b/i);
         if(m) ufPdf=parseFloat(m[1].replace(",","."));
         /* P2: descripción "UF 85,37 x 40186" — número DESPUÉS de UF (Arriendo) */
         if(!ufPdf){m=flat0.match(/UF\s*([\d]+(?:[,.][\d]+)?)\s*x\s*\d{2}/);if(m) ufPdf=parseFloat(m[1].replace(",","."));}
