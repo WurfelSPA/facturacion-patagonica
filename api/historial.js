@@ -326,21 +326,19 @@ function detectTipo(text) {
   const add = (tipo, needle) => { const i=t.indexOf(needle); if(i>=0) hits.push({tipo,i}); };
   // Habilitación
   add("habilitacion","Habilitaci");
-  // Serv. Admin — variantes con/sin punto, con/sin espacio, COD de descripción
+  // Serv. Admin — variantes con/sin "de", con/sin punto, COD de descripción
+  add("servAdm","Serv. de Adm");  // ← formato real PISA: "Serv. de Adm. Febrero 2026"
+  add("servAdm","Serv.de Adm");
+  add("servAdm","Serv de Adm");
   add("servAdm","Serv. Adm.");
   add("servAdm","Serv.Adm.");
-  add("servAdm","Serv. Adm ");   // sin punto final
-  add("servAdm","COD: S-A");     // código de concepto en facturas PISA
+  add("servAdm","Serv. Adm ");    // sin punto final
+  add("servAdm","COD: S-A");      // código de concepto en facturas PISA
   add("servAdm","COD:S-A");
   add("servAdm","Gastos Comunes");
   add("servAdm","GASTOS COMUNES");
   add("servAdm","Gtos. Com");
-  add("servAdm","Gtos.Com");
-  add("servAdm","G. Comunes");
-  add("servAdm","Serv. Admin");
-  add("servAdm","SERV. ADM");
   add("servAdm","Adm. de Propiedad");
-  add("servAdm","Administraci");   // Administración — cubre "Administración de"
   // Arriendo — variantes
   add("arriendo","Arriendo");
   add("arriendo","ARRIENDO");
@@ -672,4 +670,4 @@ export default async function handler(req, res) {
       if (!anio || !periodo || !periodoData)
         return res.status(400).json({ error:"Se requiere anio, periodo y data" });
       if (!PDF_FOLDER)
-        return res.status(
+        return res.status(                                                       
