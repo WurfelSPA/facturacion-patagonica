@@ -183,7 +183,9 @@ function extractFacturasForRut(text, rutNorm) {
     const tipo = detectTipo(section);
     if (!tipo || facturas[tipo]) continue;
     const nro = `${tipo === "servAdm" ? "FEE" : "F"}-${prevNro.nro}`;
-    facturas[tipo] = { nro, uf: _extractUF(section), total: _extractTotal(section) };
+    // UF: en la sección acotada; Total: desde el inicio de la factura hacia adelante
+    // (Monto Total está al final de la página, puede quedar después del next nro)
+    facturas[tipo] = { nro, uf: _extractUF(section), total: _extractTotal(t, prevNro.pos) };
   }
   return facturas;
 }
@@ -193,11 +195,14 @@ function _extractUF(s) {
   const v = parseFloat(m[1].replace(",", "."));
   return isNaN(v) ? null : Math.round(v * 10000) / 10000;
 }
-function _extractTotal(s) {
-  const m = s.match(/[Mm]onto\s*[Tt]otal\s+([\d.]+)/i) || s.match(/[Tt]otal\s+([\d.]+(?:\.\d{3})+)/i);
+function _extractTotal(s, fromPos = 0) {
+  // Busca "Monto Total XXXXXXX" desde fromPos en adelante
+  const text = fromPos > 0 ? s.slice(fromPos) : s;
+  const m = text.match(/[Mm]onto\s*[Tt]otal[\s:]*([\d.]+)/i)
+          || text.match(/[Tt]otal[\s:]*([\d]+(?:\.\d{3})+)/i);
   if (!m) return null;
   const v = parseInt(m[1].replace(/\./g, ""), 10);
-  return isNaN(v) || v < 100 ? null : v;
+  return isNaN(v) || v < 10000 ? null : v;
 }
 
 // ── Historial-cliente helpers ─────────────────────────────────────────────────
@@ -318,6 +323,7 @@ export default async function handler(req, res) {
       const dbgInfo = {};
 
       /* ── FUENTE 1: historial JSON (instantáneo, confiable) ── */
+      let savedFacturas = null; // guardamos si faltan totales para enriquecer con FUENTE 2
       if (PDF_FOLDER) {
         try {
           const histFileId = await findFile(token, HIST_NAME, PDF_FOLDER);
@@ -336,7 +342,13 @@ export default async function handler(req, res) {
                   const facturas = Object.fromEntries(Object.entries(raw).map(([k,v])=>
                     [k, typeof v==="string" ? {nro:v,uf:null,total:null} : v]
                   ));
-                  return res.status(200).json({ facturas, source:"json", ...(dbg?{dbg:dbgInfo}:{}) });
+                  // Si todos los totales están presentes → retornar inmediato
+                  const allHaveTotal = Object.values(facturas).every(f => f.total != null);
+                  if (allHaveTotal) {
+                    return res.status(200).json({ facturas, source:"json", ...(dbg?{dbg:dbgInfo}:{}) });
+                  }
+                  // Faltan totales → continuar a FUENTE 2 para enriquecer
+                  savedFacturas = facturas;
                 }
               } else if (dbg) {
                 dbgInfo.jsonKeys = null;
@@ -364,12 +376,33 @@ export default async function handler(req, res) {
             const pdfBuf = Buffer.from(await pdfRes.arrayBuffer());
             const text = extractText(pdfBuf);
             if (dbg) dbgInfo.textSample = text.slice(0, 500);
-            const facturas = extractFacturasForRut(text, rutNorm);
-            if (dbg) dbgInfo.facturasByRut = facturas;
-            if (Object.keys(facturas).length > 0)
-              return res.status(200).json({ facturas, source:"pdf_consolidado", ...(dbg?{dbg:dbgInfo}:{}) });
+            const pdfFacturas = extractFacturasForRut(text, rutNorm);
+            if (dbg) dbgInfo.facturasByRut = pdfFacturas;
+            if (Object.keys(pdfFacturas).length > 0) {
+              let facturas;
+              if (savedFacturas) {
+                // Merge: nro del JSON (fiable), uf/total del PDF si faltan en JSON
+                facturas = {};
+                for (const [tipo, f] of Object.entries(savedFacturas)) {
+                  const pdfF = pdfFacturas[tipo];
+                  facturas[tipo] = { nro: f.nro, uf: f.uf ?? pdfF?.uf, total: f.total ?? pdfF?.total };
+                }
+                // Agregar tipos que el PDF encontró pero no están en el JSON
+                for (const [tipo, pdfF] of Object.entries(pdfFacturas)) {
+                  if (!facturas[tipo]) facturas[tipo] = pdfF;
+                }
+              } else {
+                facturas = pdfFacturas;
+              }
+              return res.status(200).json({ facturas, source: savedFacturas ? "json+pdf" : "pdf_consolidado", ...(dbg?{dbg:dbgInfo}:{}) });
+            }
           }
         }
+      }
+
+      // Si FUENTE 2 no dio resultado, usar datos del JSON aunque falten totales
+      if (savedFacturas) {
+        return res.status(200).json({ facturas: savedFacturas, source:"json", ...(dbg?{dbg:dbgInfo}:{}) });
       }
 
       /* ── FUENTE 3: ZIP individual (legado) ── */
