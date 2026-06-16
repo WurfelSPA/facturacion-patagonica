@@ -2014,11 +2014,16 @@ function HistorialFactView({dashData,driveLoading,notify}){
   return h("main",{style:{flex:1,overflowY:"auto",padding:"18px 22px",display:"flex",flexDirection:"column",gap:16},className:"fade-up"},
 
     h("div",{style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
+      h("div",{style:{fontSize:13,fontWeight:600,color:"var(--txm)",whiteSpace:"nowrap"}},
+        "Nubox",
+        h("span",{style:{color:"var(--bdr)",margin:"0 6px"}},"|"),
+        h("span",{style:{fontWeight:400}},"Factura Electrónica")
+      ),
       selClient&&h("button",{onClick:()=>setSelGroup([]),
         style:{fontSize:11,padding:"4px 12px",borderRadius:7,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--txm)",cursor:"pointer"}
       },"◀ Todos"),
-      h("div",{style:{fontSize:15,fontWeight:700,color:"var(--tx)"}},
-        selClient?"📂 "+selClient.nombre:"📂 Historial Facturación"
+      selClient&&h("div",{style:{fontSize:15,fontWeight:700,color:"var(--tx)"}},
+        "📂 "+selClient.nombre
       ),
       selClient&&totalLoading>0&&h("div",{style:{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--txm)"}},
         h("span",{className:"spin"},"⟳"),
