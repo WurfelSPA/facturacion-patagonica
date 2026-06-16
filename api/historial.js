@@ -428,12 +428,14 @@ export default async function handler(req, res) {
                   const facturas = Object.fromEntries(Object.entries(raw).map(([k,v])=>
                     [k, typeof v==="string" ? {nro:v,uf:null,total:null} : v]
                   ));
-                  // Si todos los totales Y UFs están presentes → retornar inmediato
-                  const allComplete = Object.values(facturas).every(f => f.total != null && f.uf != null);
+                  // Si todos los totales Y UFs están presentes, Y no falta ningún concepto esperado → retornar inmediato
+                  const allComplete = Object.values(facturas).every(f => f.total != null && f.uf != null)
+                    && !(ufArr > 0 && !facturas.arriendo)   // esperamos arriendo pero no está
+                    && !(ufSrv > 0 && !facturas.servAdm);  // esperamos servAdm pero no está
                   if (allComplete) {
                     return res.status(200).json({ facturas, source:"json", ...(dbg?{dbg:dbgInfo}:{}) });
                   }
-                  // Faltan totales o UFs → continuar a FUENTE 2 para enriquecer
+                  // Faltan totales, UFs, o conceptos esperados → continuar a FUENTE 2 para enriquecer
                   savedFacturas = facturas;
                 }
               } else if (dbg) {
@@ -519,10 +521,16 @@ export default async function handler(req, res) {
         }
       }
 
-      // Si FUENTE 2 no dio resultado, intentar ZIP individual para UF faltantes (FUENTE 2.6)
+      // Si FUENTE 2 no dio resultado, intentar ZIP individual para UF faltantes
+      // y también para conceptos esperados que no están en savedFacturas (FUENTE 2.6)
       if (savedFacturas) {
         const missingUF26 = Object.entries(savedFacturas).filter(([,f]) => f.nro && f.uf == null);
-        if (missingUF26.length > 0) {
+        // Conceptos que esperamos (por ufArr/ufSrv) pero ausentes en savedFacturas
+        const missingConceptos26 = [];
+        if (ufArr > 0 && !savedFacturas.arriendo) missingConceptos26.push("arriendo");
+        if (ufSrv > 0 && !savedFacturas.servAdm)  missingConceptos26.push("servAdm");
+
+        if (missingUF26.length > 0 || missingConceptos26.length > 0) {
           const zipName26 = `${anioStr}-${mesNum}.zip`;
           const zipFile26 = driveFileList.find(f => f.name.toLowerCase() === zipName26.toLowerCase());
           if (zipFile26) {
@@ -533,6 +541,8 @@ export default async function handler(req, res) {
               );
               if (zr26.ok) {
                 const zip26 = await JSZip.loadAsync(Buffer.from(await zr26.arrayBuffer()));
+
+                // Rellenar UFs faltantes para nros ya conocidos
                 for (const [tipo, f] of missingUF26) {
                   const numPart = f.nro.replace(/^F(?:EE)?-/i, "");
                   for (const [path, entry] of Object.entries(zip26.files)) {
@@ -544,6 +554,33 @@ export default async function handler(req, res) {
                     const uf26 = _extractUF(pdfText26) ?? _derivarUFdePrecio(pdfText26, f.total);
                     if (uf26 != null) savedFacturas[tipo] = { ...savedFacturas[tipo], uf: uf26 };
                     break;
+                  }
+                }
+
+                // Buscar conceptos faltantes por nombre de cliente + tipo
+                if (missingConceptos26.length > 0) {
+                  const candidates26 = {};  // tipo → [{nro, uf, total}]
+                  for (const [path, entry] of Object.entries(zip26.files)) {
+                    if (entry.dir || !path.toLowerCase().endsWith(".pdf")) continue;
+                    const fname = path.split("/").pop();
+                    const nroMatch = fname.match(/^(F(?:EE)?)-(\d+)(?:\s+(.+))?\.pdf$/i);
+                    if (!nroMatch) continue;
+                    const [, prefix, nro, fileCliente] = nroMatch;
+                    if (fileCliente && !clienteMatch(fileCliente, cliente)) continue;
+                    const nroFull = `${prefix.toUpperCase()}-${nro}`;
+                    const pdfTxt26m = extractText(Buffer.from(await entry.async("arraybuffer")));
+                    const tipo26 = detectTipo(pdfTxt26m);
+                    if (!tipo26 || !missingConceptos26.includes(tipo26)) continue;
+                    const total26m = _extractTotal(pdfTxt26m);
+                    const uf26m = _extractUF(pdfTxt26m) ?? _derivarUFdePrecio(pdfTxt26m, total26m);
+                    if (!candidates26[tipo26]) candidates26[tipo26] = [];
+                    candidates26[tipo26].push({ nro: nroFull, uf: uf26m, total: total26m });
+                  }
+                  // Seleccionar candidato más cercano por UF (clave para clientes multi-sitio)
+                  const UFExp26 = { arriendo: ufArr, servAdm: ufSrv };
+                  for (const tipo26 of missingConceptos26) {
+                    const picked26 = _pickByUF(candidates26[tipo26], UFExp26[tipo26]);
+                    if (picked26) savedFacturas[tipo26] = picked26;
                   }
                 }
               }
