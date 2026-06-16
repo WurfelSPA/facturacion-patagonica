@@ -2011,9 +2011,6 @@ function HistorialFactView({dashData,driveLoading,notify}){
     sum+conceptos.reduce((s,conc)=>s+(pd[conc]?.total||0),0),0);
   const granTotalStr=granTotal>0?"$"+granTotal.toLocaleString("es-CL"):null;
 
-  /* Períodos con al menos 1 factura encontrada O aún cargando */
-  const periodos=periodsAvail.filter(p=>loadingSet.has(p)||invoicesMap[p]);
-
   return h("main",{style:{flex:1,overflowY:"auto",padding:"18px 22px",display:"flex",flexDirection:"column",gap:16},className:"fade-up"},
 
     h("div",{style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
