@@ -330,6 +330,8 @@ function detectTipo(text) {
   add("servAdm","Serv. Adm.");
   add("servAdm","Serv.Adm.");
   add("servAdm","Serv. Adm ");   // sin punto final: "Serv. Adm Enero 2026"
+  add("servAdm","Serv Adm");      // sin punto en ningún lado (extracción PDF imperfecta)
+  add("servAdm","COD: ");         // PISA: "COD: A-2 - Serv. Adm" — aparece antes que cualquier keyword de arriendo
   add("servAdm","COD: S-A");     // código de concepto en facturas PISA
   add("servAdm","COD:S-A");
   add("servAdm","Gastos Comunes");
