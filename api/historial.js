@@ -191,10 +191,12 @@ function extractFacturasForRut(text, rutNorm) {
   return facturas;
 }
 function _extractUF(s) {
-  const m = s.match(/\b(\d{1,3}[.,]\d{1,4})\s*UF\b/i) || s.match(/\bUF\s+(\d{1,3}[.,]\d{1,4})/i);
+  const m = s.match(/(\d{1,3}[.,]\d{1,4})\s*U\s*F\b/i)   // "12,8 UF" o "12,8UF" o "12,8 U F"
+          || s.match(/\bUF\s*(\d{1,3}[.,]\d{1,4})/i);     // "UF 12,8"
   if (!m) return null;
   const v = parseFloat(m[1].replace(",", "."));
-  return isNaN(v) ? null : Math.round(v * 10000) / 10000;
+  if (isNaN(v) || v < 0.1 || v > 9999) return null;
+  return Math.round(v * 10000) / 10000;
 }
 function _extractTotal(s, fromPos = 0) {
   // Busca "Monto Total XXXXXXX" desde fromPos en adelante
@@ -394,6 +396,35 @@ export default async function handler(req, res) {
                 }
               } else {
                 facturas = pdfFacturas;
+              }
+              /* ── FUENTE 2.5: ZIP individual para UF faltantes ── */
+              const missingUF = Object.entries(facturas).filter(([,f]) => f.nro && f.uf == null);
+              if (missingUF.length > 0) {
+                const zipName25 = `${anioStr}-${mesNum}.zip`;
+                const zipFile25 = driveFileList.find(f => f.name.toLowerCase() === zipName25.toLowerCase());
+                if (zipFile25) {
+                  try {
+                    const zr = await fetch(
+                      `https://www.googleapis.com/drive/v3/files/${zipFile25.id}?alt=media`,
+                      { headers:{ Authorization:`Bearer ${token}` } }
+                    );
+                    if (zr.ok) {
+                      const zip25 = await JSZip.loadAsync(Buffer.from(await zr.arrayBuffer()));
+                      for (const [tipo, f] of missingUF) {
+                        const numPart = f.nro.replace(/^F(?:EE)?-/i, "");
+                        for (const [path, entry] of Object.entries(zip25.files)) {
+                          if (entry.dir || !path.toLowerCase().endsWith(".pdf")) continue;
+                          const fname = path.split("/").pop();
+                          const nm = fname.match(/^(?:F(?:EE)?-)?(\d+)/i);
+                          if (!nm || nm[1] !== numPart) continue;
+                          const uf = _extractUF(extractText(Buffer.from(await entry.async("arraybuffer"))));
+                          if (uf != null) facturas[tipo] = { ...facturas[tipo], uf };
+                          break;
+                        }
+                      }
+                    }
+                  } catch(_) {}
+                }
               }
               return res.status(200).json({ facturas, source: savedFacturas ? "json+pdf" : "pdf_consolidado", ...(dbg?{dbg:dbgInfo}:{}) });
             }
