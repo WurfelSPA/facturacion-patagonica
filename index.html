@@ -1928,7 +1928,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
   const [pdfLoading,setPdfLoading]=useState(false);
   const [search,setSearch]=useState("");
 
-  /* Al seleccionar cliente: descubrir períodos y cargar en paralelo */
+  /* Al seleccionar cliente: descubrir períodos y cargar en paralelo por sitio */
   useEffect(()=>{
     if(!selClient){setPeriodsAvail([]);setInvoicesMap({});setLoadingSet(new Set([]));return;}
     setPeriodsAvail([]);setInvoicesMap({});
@@ -1936,17 +1936,24 @@ function HistorialFactView({dashData,driveLoading,notify}){
       .then(r=>r.json())
       .then(({periodos=[]})=>{
         setPeriodsAvail(periodos);
-        const ls=new Set(periodos);
+        /* loadingSet: "sitio|periodo" para rastrear cada fetch independiente */
+        const ls=new Set();
+        selGroup.forEach(sc=>periodos.slice(0,10).forEach(p=>ls.add(sc.sitio+'|'+p)));
         setLoadingSet(ls);
-        /* Fetch paralelo por período, máx 10 más recientes (un solo fetch por período, datos compartidos entre sitios) */
-        periodos.slice(0,10).forEach(p=>{
-          fetch(`/api/historial?cliente=${encodeURIComponent(selClient.nombre)}&rut=${encodeURIComponent(selClient.rut||"")}&periodo=${encodeURIComponent(p)}`)
-            .then(r=>r.json())
-            .then(({facturas})=>{
-              if(facturas) setInvoicesMap(prev=>({...prev,[p]:facturas}));
-              setLoadingSet(prev=>{const s=new Set(prev);s.delete(p);return s;});
-            })
-            .catch(()=>{setLoadingSet(prev=>{const s=new Set(prev);s.delete(p);return s;});});
+        /* Fetch paralelo por sitio × período — pasa ufArr y ufSrv para que la API elija la factura correcta */
+        selGroup.forEach(sc=>{
+          periodos.slice(0,10).forEach(p=>{
+            const url=`/api/historial?cliente=${encodeURIComponent(sc.nombre)}&rut=${encodeURIComponent(sc.rut||"")}`
+              +`&ufArr=${encodeURIComponent(sc.ufArr||"")}&ufSrv=${encodeURIComponent(sc.ufSrv||"")}`
+              +`&periodo=${encodeURIComponent(p)}`;
+            fetch(url)
+              .then(r=>r.json())
+              .then(({facturas})=>{
+                if(facturas) setInvoicesMap(prev=>({...prev,[sc.sitio]:{...(prev[sc.sitio]||{}),[p]:facturas}}));
+                setLoadingSet(prev=>{const s=new Set(prev);s.delete(sc.sitio+'|'+p);return s;});
+              })
+              .catch(()=>{setLoadingSet(prev=>{const s=new Set(prev);s.delete(sc.sitio+'|'+p);return s;});});
+          });
         });
       })
       .catch(()=>{setPeriodsAvail([]);setLoadingSet(new Set());});
@@ -1965,9 +1972,6 @@ function HistorialFactView({dashData,driveLoading,notify}){
       (c.email||"").toLowerCase().includes(q)||
       rutNorm.includes(q.replace(/\./g,""));
   });
-
-  /* Períodos con al menos 1 factura encontrada O aún cargando */
-  const periodos=periodsAvail.filter(p=>loadingSet.has(p)||invoicesMap[p]);
 
   const previewFact=async(fNum,periodo)=>{
     if(pdfLoading)return;
@@ -2005,11 +2009,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
   const cColor={arriendo:"var(--blue)",servAdm:"var(--amber)",habilitacion:"var(--green)"};
 
   const totalLoading=loadingSet.size;
-  const totalPeriods=periodsAvail.length;
-
-  const granTotal=Object.values(invoicesMap).reduce((sum,pd)=>
-    sum+conceptos.reduce((s,conc)=>s+(pd[conc]?.total||0),0),0);
-  const granTotalStr=granTotal>0?"$"+granTotal.toLocaleString("es-CL"):null;
+  const totalPeriods=periodsAvail.length*selGroup.length;
 
   return h("main",{style:{flex:1,overflowY:"auto",padding:"18px 22px",display:"flex",flexDirection:"column",gap:16},className:"fade-up"},
 
@@ -2068,33 +2068,35 @@ function HistorialFactView({dashData,driveLoading,notify}){
       )
     ),
 
-    selClient&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
-      /* Header: todos los sitios del grupo en una sola fila */
-      h("div",{style:{padding:"12px 16px",background:"var(--surf2)",borderBottom:"1px solid var(--bdr)",
-        display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
-        ...selGroup.map(sc=>h("span",{key:sc.sitio,style:{display:"inline-flex",alignItems:"center",gap:4,
-          padding:"3px 9px",borderRadius:8,fontSize:10,fontWeight:700,
-          background:`${(SITIO_C[sc.sitio]||"#888")}18`,color:SITIO_C[sc.sitio]||"#888",
-          border:`1px solid ${(SITIO_C[sc.sitio]||"#888")}40`}},
-          sc.sitio,sc.edificio&&h("span",{style:{fontWeight:400,opacity:.8}},sc.edificio)
-        )),
-        h("span",{style:{fontWeight:700,fontSize:13,marginLeft:4}},selClient.nombre),
-        selClient.rut&&h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},selClient.rut),
-        granTotalStr&&h("div",{style:{display:"flex",flexDirection:"column",alignItems:"flex-start",marginLeft:18,paddingLeft:18,borderLeft:"1px solid var(--bdr)"}},
-          h("span",{style:{fontSize:9,fontWeight:600,color:"var(--txm)",letterSpacing:".06em",textTransform:"uppercase"}},
-            totalLoading>0?"Total parcial":"Total acumulado"),
-          h("span",{style:{fontSize:13,fontWeight:700,fontFamily:"'DM Mono',monospace",color:"var(--tx)"}},
-            granTotalStr)
+    ...selGroup.map(sc=>{
+      const siteInv=invoicesMap[sc.sitio]||{};
+      const siteLd=new Set([...loadingSet].filter(k=>k.startsWith(sc.sitio+'|')));
+      const periodos=periodsAvail.filter(p=>siteLd.has(sc.sitio+'|'+p)||siteInv[p]);
+      const granTotal=Object.values(siteInv).reduce((s,pd)=>s+conceptos.reduce((s2,c)=>s2+(pd[c]?.total||0),0),0);
+      const granTotalStr=granTotal>0?"$"+granTotal.toLocaleString("es-CL"):null;
+      return h("div",{key:sc.sitio,style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
+        h("div",{style:{padding:"12px 16px",background:"var(--surf2)",borderBottom:"1px solid var(--bdr)",
+          display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
+          h("span",{style:{padding:"3px 9px",borderRadius:8,fontSize:10,fontWeight:700,
+            background:`${(SITIO_C[sc.sitio]||"#888")}18`,color:SITIO_C[sc.sitio]||"#888",
+            border:`1px solid ${(SITIO_C[sc.sitio]||"#888")}40`}},sc.sitio),
+          sc.edificio&&h("span",{style:{fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},sc.edificio),
+          h("span",{style:{fontWeight:700,fontSize:13}},sc.nombre),
+          sc.rut&&h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},sc.rut),
+          granTotalStr&&h("div",{style:{display:"flex",flexDirection:"column",alignItems:"flex-start",marginLeft:18,paddingLeft:18,borderLeft:"1px solid var(--bdr)"}},
+            h("span",{style:{fontSize:9,fontWeight:600,color:"var(--txm)",letterSpacing:".06em",textTransform:"uppercase"}},
+              siteLd.size>0?"Total parcial":"Total acumulado"),
+            h("span",{style:{fontSize:13,fontWeight:700,fontFamily:"'DM Mono',monospace",color:"var(--tx)"}},
+              granTotalStr)
+          ),
+          sc.email&&h("span",{style:{marginLeft:"auto",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},sc.email)
         ),
-        h("span",{style:{marginLeft:"auto",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace",textAlign:"right"}},
-          [...new Set(selGroup.map(sc=>sc.email).filter(Boolean))].join(" · "))
-      ),
-      /* Tabla: período como columna, concepto como fila */
-      totalLoading===totalPeriods&&periodos.length===0
+        /* Tabla: período como columna, concepto como fila */
+        siteLd.size>0&&periodos.length===0
         ?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txm)",fontSize:13}},
             h("span",{className:"spin",style:{marginRight:8}},"⟳"),"Buscando períodos disponibles..."
           )
-      :periodos.length===0&&totalLoading===0
+      :periodos.length===0&&siteLd.size===0
         ?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:13}},
             "No se encontraron facturas para este cliente en Drive.",
             h("br"),h("span",{style:{fontSize:11}},"Verifica que existan ZIPs procesados en la carpeta de Drive.")
@@ -2109,7 +2111,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
                   color:"var(--tx)",borderBottom:"1px solid #e0e8f0",borderLeft:"1px solid var(--bdr)",
                   whiteSpace:"nowrap",minWidth:260,position:"relative"}},
                   p,
-                  loadingSet.has(p)&&h("span",{style:{display:"inline-block",fontSize:9,color:"var(--txm)",fontWeight:400,marginLeft:6}},
+                  siteLd.has(sc.sitio+'|'+p)&&h("span",{style:{display:"inline-block",fontSize:9,color:"var(--txm)",fontWeight:400,marginLeft:6}},
                     h("span",{className:"spin",style:{fontSize:9}},"⟳"))
                 ))
               ),
@@ -2128,11 +2130,11 @@ function HistorialFactView({dashData,driveLoading,notify}){
               conceptos.map((conc,ci)=>h("tr",{key:conc,style:{borderBottom:ci<2?"1px solid var(--bdr)":"none"}},
                 h("td",{style:{padding:"11px 16px",fontWeight:700,color:cColor[conc],fontSize:11,whiteSpace:"nowrap"}},cLabel[conc]),
                 ...periodos.flatMap(p=>{
-                  const inv=invoicesMap[p]?.[conc];
+                  const inv=siteInv[p]?.[conc];
                   const nro=inv?(inv.nro||inv):null;
                   const uf=inv?.uf??null;
                   const total=inv?.total??null;
-                  const isLoading=loadingSet.has(p);
+                  const isLoading=siteLd.has(sc.sitio+'|'+p);
                   const dash=h("span",{style:{color:"var(--txd)",fontSize:11}},"—");
                   const loading=h("span",{style:{color:"var(--txd)",fontSize:10}},"…");
                   const tdL={style:{padding:"9px 10px",textAlign:"center",borderLeft:"1px solid var(--bdr)"}};
@@ -2162,8 +2164,8 @@ function HistorialFactView({dashData,driveLoading,notify}){
               h("tr",{key:"total-row",style:{borderTop:"2px solid var(--bdr)",background:"var(--surf2)"}},
                 h("td",{style:{padding:"9px 16px",fontWeight:700,fontSize:11,whiteSpace:"nowrap",color:"var(--tx)"}},"TOTAL"),
                 ...periodos.flatMap(p=>{
-                  const isLoading=loadingSet.has(p);
-                  const sumTotal=conceptos.reduce((s,conc)=>s+(invoicesMap[p]?.[conc]?.total||0),0);
+                  const isLoading=siteLd.has(sc.sitio+'|'+p);
+                  const sumTotal=conceptos.reduce((s,conc)=>s+(siteInv[p]?.[conc]?.total||0),0);
                   return [
                     h("td",{key:p+"-tot-n",style:{borderLeft:"1px solid var(--bdr)"}}),
                     h("td",{key:p+"-tot-u"}),
@@ -2181,7 +2183,8 @@ function HistorialFactView({dashData,driveLoading,notify}){
             )
           )
         )
-    ),
+      );
+    }),
 
     pdfPrev&&h("div",{className:"overlay",onClick:e=>{if(e.target===e.currentTarget)closePrev();}},
       h("div",{style:{background:"var(--surf)",borderRadius:14,width:"88vw",height:"92vh",display:"flex",flexDirection:"column",overflow:"hidden"}},

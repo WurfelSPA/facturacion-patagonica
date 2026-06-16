@@ -151,11 +151,12 @@ function extractText(pdfBuf) {
 }
 
 // ── PDF consolidado: extrae facturas por RUT ─────────────────────────────────
+// Retorna { arriendo:[{nro,uf,total},...], servAdm:[...], habilitacion:[...] }
+// Puede haber múltiples facturas del mismo tipo cuando el cliente tiene varios sitios.
 function extractFacturasForRut(text, rutNorm) {
-  const facturas = {};
+  const facturas = {};  // tipo → [{nro,uf,total}]
   const t = (text||"").replace(/\s+/g," ");
 
-  // Posiciones de números de factura: "Nº 14540", "N° 14540", "F-14540", "FEE-14540"
   const nros = [];
   const nroRe = /(?:[Nn][ºo°]\s*|(?:F(?:EE)?-))\s*(\d{4,6})/g;
   let m;
@@ -166,31 +167,55 @@ function extractFacturasForRut(text, rutNorm) {
   }
   if (!nros.length) return facturas;
 
-  // Para cada RUT que coincide, encontrar la factura que lo contiene
+  const seenNros = new Set();
   const rutRe = /\d{1,2}[.\s]\d{3}[.\s]\d{3}-[\dkK]/g;
   while ((m = rutRe.exec(t)) !== null) {
     if (normRut(m[0]) !== rutNorm) continue;
     const rutPos = m.index;
-    // Nro de factura más cercano ANTES del RUT
     let prevNro = null;
     for (let i = nros.length-1; i >= 0; i--) {
       if (nros[i].pos <= rutPos) { prevNro = nros[i]; break; }
     }
-    if (!prevNro) continue;
-    // Sección: desde ese nro hasta el siguiente (o fin de texto)
+    if (!prevNro || seenNros.has(prevNro.nro)) continue;
+    seenNros.add(prevNro.nro);
     const nextNro = nros.find(n => n.pos > rutPos);
     const section = t.slice(prevNro.pos, nextNro ? nextNro.pos : t.length);
     const tipo = detectTipo(section);
-    if (!tipo || facturas[tipo]) continue;
+    if (!tipo) continue;
     const nro = `${tipo === "servAdm" ? "FEE" : "F"}-${prevNro.nro}`;
-    // UF: sección acotada primero; si no, ventana extendida (el orden de texto del PDF puede variar)
-    // Total: siempre buscar desde inicio de factura (Monto Total al final de página)
     const wideUF = t.slice(prevNro.pos, prevNro.pos + 3000);
     const total = _extractTotal(t, prevNro.pos);
     const uf = _extractUF(section) ?? _extractUF(wideUF) ?? _derivarUFdePrecio(wideUF, total);
-    facturas[tipo] = { nro, uf, total };
+    if (!facturas[tipo]) facturas[tipo] = [];
+    facturas[tipo].push({ nro, uf, total });
   }
   return facturas;
+}
+
+// Selecciona el candidato cuya UF sea más cercana al valor esperado.
+// Si no hay candidatos con UF o no se pasa expected, retorna el primero.
+function _pickByUF(candidates, expectedUF) {
+  if (!candidates || candidates.length === 0) return null;
+  if (candidates.length === 1 || !(expectedUF > 0)) return candidates[0];
+  let best = candidates[0], bestDiff = Infinity;
+  for (const c of candidates) {
+    if (c.uf == null) continue;
+    const diff = Math.abs(c.uf - expectedUF);
+    if (diff < bestDiff) { bestDiff = diff; best = c; }
+  }
+  return best;
+}
+
+// Convierte el resultado multi-candidato a objeto simple {tipo:{nro,uf,total}}
+// usando ufArr/ufSrv para seleccionar el correcto cuando hay múltiples.
+function _resolveFacturas(multiFacturas, ufArr, ufSrv) {
+  const UFExp = { arriendo: ufArr, servAdm: ufSrv, habilitacion: null };
+  const result = {};
+  for (const [tipo, candidates] of Object.entries(multiFacturas)) {
+    const picked = _pickByUF(candidates, UFExp[tipo]);
+    if (picked) result[tipo] = picked;
+  }
+  return result;
 }
 function _derivarUFdePrecio(s, total) {
   // Fallback matemático: cuando el texto no permite extraer la cantidad UF directamente,
@@ -374,7 +399,9 @@ export default async function handler(req, res) {
 
     // ── GET ?cliente=X&periodo=Y ── facturas del cliente en el período ──────
     if (req.method === "GET" && req.query.cliente && req.query.periodo) {
-      const { cliente, periodo, rut: rutQuery, debug } = req.query;
+      const { cliente, periodo, rut: rutQuery, debug, ufArr: ufArrQ, ufSrv: ufSrvQ } = req.query;
+      const ufArr = ufArrQ ? parseFloat(ufArrQ) : 0;
+      const ufSrv = ufSrvQ ? parseFloat(ufSrvQ) : 0;
       const [mesNom, anioStr] = periodo.split(" ");
       const mesNum = MES_NUM[mesNom];
       if (!mesNum) return res.status(400).json({ error:"Periodo inválido" });
@@ -435,7 +462,10 @@ export default async function handler(req, res) {
             const pdfBuf = Buffer.from(await pdfRes.arrayBuffer());
             const text = extractText(pdfBuf);
             if (dbg) dbgInfo.textSample = text.slice(0, 500);
-            const pdfFacturas = extractFacturasForRut(text, rutNorm);
+            // extractFacturasForRut ahora retorna arrays por tipo; _resolveFacturas selecciona
+            // el candidato cuya UF sea más cercana al valor esperado del sitio (ufArr/ufSrv).
+            const multiFacturas = extractFacturasForRut(text, rutNorm);
+            const pdfFacturas = _resolveFacturas(multiFacturas, ufArr, ufSrv);
             if (dbg) dbgInfo.facturasByRut = pdfFacturas;
             if (Object.keys(pdfFacturas).length > 0) {
               let facturas;
