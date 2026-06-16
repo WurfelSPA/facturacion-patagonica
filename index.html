@@ -2006,6 +2006,10 @@ function HistorialFactView({dashData,driveLoading,notify}){
   const totalLoading=loadingSet.size;
   const totalPeriods=periodsAvail.length;
 
+  const granTotal=Object.values(invoicesMap).reduce((sum,pd)=>
+    sum+conceptos.reduce((s,conc)=>s+(pd[conc]?.total||0),0),0);
+  const granTotalStr=granTotal>0?"$"+granTotal.toLocaleString("es-CL"):null;
+
   return h("main",{style:{flex:1,overflowY:"auto",padding:"18px 22px",display:"flex",flexDirection:"column",gap:16},className:"fade-up"},
 
     h("div",{style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
@@ -2058,11 +2062,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
       )
     ),
 
-    selClient&&(()=>{
-      const granTotal=Object.values(invoicesMap).reduce((sum,pd)=>
-        sum+conceptos.reduce((s,conc)=>s+(pd[conc]?.total||0),0),0);
-      const granTotalStr=granTotal>0?"$"+granTotal.toLocaleString("es-CL"):null;
-      return h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
+    selClient&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
       h("div",{style:{padding:"12px 16px",background:"var(--surf2)",borderBottom:"1px solid var(--bdr)",
         display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
         h("span",{style:{padding:"3px 9px",borderRadius:8,fontSize:10,fontWeight:700,
@@ -2173,8 +2173,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
             )
           )
         )
-    );}
-    )(),
+    ),
 
     pdfPrev&&h("div",{className:"overlay",onClick:e=>{if(e.target===e.currentTarget)closePrev();}},
       h("div",{style:{background:"var(--surf)",borderRadius:14,width:"88vw",height:"92vh",display:"flex",flexDirection:"column",overflow:"hidden"}},
