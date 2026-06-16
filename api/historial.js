@@ -678,4 +678,14 @@ export default async function handler(req, res) {
 
       const content = JSON.stringify(historial, null, 2);
       if (fileId) await updateJsonFile(token, fileId, content);
-      else await createJsonFile(token, HIST_NAME
+      else await createJsonFile(token, HIST_NAME, PDF_FOLDER, content);
+
+      return res.status(200).json({ ok:true, anio, periodo, clientes: Object.keys(periodoData).length });
+    }
+
+    return res.status(405).json({ error:"Method not allowed" });
+  } catch (e) {
+    console.error("historial:", e.message);
+    return res.status(500).json({ error: e.message });
+  }
+}
