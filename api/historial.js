@@ -186,9 +186,45 @@ function extractFacturasForRut(text, rutNorm) {
     // UF: sección acotada primero; si no, ventana extendida (el orden de texto del PDF puede variar)
     // Total: siempre buscar desde inicio de factura (Monto Total al final de página)
     const wideUF = t.slice(prevNro.pos, prevNro.pos + 3000);
-    facturas[tipo] = { nro, uf: _extractUF(section) ?? _extractUF(wideUF), total: _extractTotal(t, prevNro.pos) };
+    const total = _extractTotal(t, prevNro.pos);
+    const uf = _extractUF(section) ?? _extractUF(wideUF) ?? _derivarUFdePrecio(wideUF, total);
+    facturas[tipo] = { nro, uf, total };
   }
   return facturas;
+}
+function _derivarUFdePrecio(s, total) {
+  // Fallback matemático: cuando el texto no permite extraer la cantidad UF directamente,
+  // calculamos: uf_qty = Monto_Total / 1.19 / precio_por_UF
+  // El precio por UF aparece marcado como "AF" (Ajuste de Factor) en las facturas FEE-.
+  // Formatos posibles: "40.695,38 AF", "40695,38 AF", "40,695.38 AF", "40695 AF"
+  if (!total || total < 10000) return null;
+  const patterns = [
+    /(\d{2}[.,]\d{3}[.,]\d{1,2})\s*A\s*F\b/i,  // "40.695,38 AF" o "40,695.38 AF"
+    /(\d{5,6}(?:[.,]\d{1,2})?)\s*A\s*F\b/i,      // "40695,38 AF" o "40695 AF"
+    /\bA\s*F\b\s*(\d{2}[.,]\d{3}[.,]\d{1,2})/i,  // "AF 40.695,38"
+    /\bA\s*F\b\s*(\d{5,6}(?:[.,]\d{1,2})?)/i,    // "AF 40695,38"
+  ];
+  for (const pat of patterns) {
+    const m = s.match(pat);
+    if (!m) continue;
+    let raw = m[1];
+    // Normalizar a número: si tiene dos separadores, el último es el decimal
+    const commas = (raw.match(/,/g)||[]).length;
+    const dots   = (raw.match(/\./g)||[]).length;
+    if (commas === 1 && dots === 1) {
+      // Ambos presentes → el último es decimal
+      raw = raw.lastIndexOf(',') > raw.lastIndexOf('.')
+        ? raw.replace('.','').replace(',','.')   // "40.695,38" → "40695.38"
+        : raw.replace(',','');                   // "40,695.38" → "40695.38"
+    } else {
+      raw = raw.replace(/[.,](\d{1,2})$/, '.$1').replace(/[.,]/g,'');
+    }
+    const precio = parseFloat(raw);
+    if (!precio || precio < 20000 || precio > 150000) continue; // precio UF plausible
+    const uf = (total / 1.19) / precio;
+    if (uf >= 0.1 && uf < 500) return Math.round(uf * 100) / 100;
+  }
+  return null;
 }
 function _extractUF(s) {
   // Cantidades UF en Chile usan COMA como decimal: "12,8 UF", "1,59 UF", "106,64 UF"
@@ -445,7 +481,8 @@ export default async function handler(req, res) {
                           const fname = path.split("/").pop();
                           const nm = fname.match(/^(?:F(?:EE)?-)?(\d+)/i);
                           if (!nm || nm[1] !== numPart) continue;
-                          const uf = _extractUF(extractText(Buffer.from(await entry.async("arraybuffer"))));
+                          const pdfText25 = extractText(Buffer.from(await entry.async("arraybuffer")));
+                          const uf = _extractUF(pdfText25) ?? _derivarUFdePrecio(pdfText25, f.total);
                           if (uf != null) facturas[tipo] = { ...facturas[tipo], uf };
                           break;
                         }
@@ -481,7 +518,8 @@ export default async function handler(req, res) {
                     const fname = path.split("/").pop();
                     const nm = fname.match(/^(?:F(?:EE)?-)?(\d+)/i);
                     if (!nm || nm[1] !== numPart) continue;
-                    const uf26 = _extractUF(extractText(Buffer.from(await entry.async("arraybuffer"))));
+                    const pdfText26 = extractText(Buffer.from(await entry.async("arraybuffer")));
+                    const uf26 = _extractUF(pdfText26) ?? _derivarUFdePrecio(pdfText26, f.total);
                     if (uf26 != null) savedFacturas[tipo] = { ...savedFacturas[tipo], uf: uf26 };
                     break;
                   }
@@ -533,7 +571,10 @@ export default async function handler(req, res) {
         }
 
         const tipo = detectTipo(text);
-        if (tipo && !facturas[tipo]) facturas[tipo] = { nro:nroFull, uf:_extractUF(text), total:_extractTotal(text) };
+        if (tipo && !facturas[tipo]) {
+          const totalZ = _extractTotal(text);
+          facturas[tipo] = { nro:nroFull, uf:_extractUF(text) ?? _derivarUFdePrecio(text, totalZ), total:totalZ };
+        }
       }
 
       const tiene = Object.keys(facturas).length > 0;
