@@ -152,7 +152,11 @@ function extractText(pdfBuf) {
 
 // ── Historial-cliente helpers ─────────────────────────────────────────────────
 function norm(s){
-  return (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9 ]/g,"").trim();
+  return (s||"").toLowerCase()
+    .replace(/&/g," ")
+    .normalize("NFD").replace(/[̀-ͯ]/g,"")
+    .replace(/[^a-z0-9 ]/g,"")
+    .replace(/\s+/g," ").trim();
 }
 function clienteMatch(fromFile, query) {
   const a=norm(fromFile), b=norm(query);
@@ -256,10 +260,12 @@ export default async function handler(req, res) {
 
     // ── GET ?cliente=X&periodo=Y ── facturas del cliente en el período ──────
     if (req.method === "GET" && req.query.cliente && req.query.periodo) {
-      const { cliente, periodo, rut: rutQuery } = req.query;
+      const { cliente, periodo, rut: rutQuery, debug } = req.query;
       const [mesNom, anioStr] = periodo.split(" ");
       const mesNum = MES_NUM[mesNom];
       if (!mesNum) return res.status(400).json({ error:"Periodo inválido" });
+      const dbg = debug === "1";
+      const dbgInfo = {};
 
       /* ── FUENTE 1: historial JSON (instantáneo, confiable) ── */
       if (PDF_FOLDER) {
@@ -271,37 +277,45 @@ export default async function handler(req, res) {
               const histData = JSON.parse(histText);
               const periodoData = histData[anioStr]?.[periodo];
               if (periodoData) {
+                if (dbg) dbgInfo.jsonKeys = Object.keys(periodoData);
                 const key = Object.keys(periodoData).find(k => clienteMatch(k, cliente));
+                if (dbg) dbgInfo.jsonMatchedKey = key || null;
                 if (key && Object.keys(periodoData[key]).length > 0) {
-                  return res.status(200).json({ facturas: periodoData[key], source:"json" });
+                  return res.status(200).json({ facturas: periodoData[key], source:"json", ...(dbg?{dbg:dbgInfo}:{}) });
                 }
+              } else if (dbg) {
+                dbgInfo.jsonKeys = null; // periodo no existe en JSON
               }
             }
           }
-        } catch {}  // si falla el JSON, continuar con ZIP fallback
+        } catch(e) { if (dbg) dbgInfo.jsonError = e.message; }
       }
 
       /* ── FUENTE 2: ZIP fallback (parseo PDF) ── */
       const zipName = `${anioStr}-${mesNum}.zip`;
       const files = await driveFiles(token, FACT_FOLDER_ID);
       const zipFile = files.find(f => f.name.toLowerCase() === zipName.toLowerCase());
-      if (!zipFile) return res.status(200).json({ facturas: null, source:"zip_missing" });
+      if (!zipFile) return res.status(200).json({ facturas: null, source:"zip_missing", ...(dbg?{dbg:dbgInfo}:{}) });
 
       const zipRes = await fetch(
         `https://www.googleapis.com/drive/v3/files/${zipFile.id}?alt=media`,
         { headers:{ Authorization:`Bearer ${token}` } }
       );
-      if (!zipRes.ok) return res.status(200).json({ facturas: null, source:"zip_error" });
+      if (!zipRes.ok) return res.status(200).json({ facturas: null, source:"zip_error", ...(dbg?{dbg:dbgInfo}:{}) });
 
       const zip = await JSZip.loadAsync(Buffer.from(await zipRes.arrayBuffer()));
       const facturas = {};
+      if (dbg) dbgInfo.zipFiles = [];
 
       for (const [path, entry] of Object.entries(zip.files)) {
         if (entry.dir || !path.toLowerCase().endsWith(".pdf")) continue;
         const fname = path.split("/").pop();
-        const nroMatch = fname.match(/^F-(\d+)(?:\s+(.+))?\.pdf$/i);
+        // Acepta F-NNNNN y FEE-NNNNN
+        const nroMatch = fname.match(/^(F(?:EE)?)-(\d+)(?:\s+(.+))?\.pdf$/i);
         if (!nroMatch) continue;
-        const [, nro, fileCliente] = nroMatch;
+        const [, prefix, nro, fileCliente] = nroMatch;
+        const nroFull = `${prefix.toUpperCase()}-${nro}`;
+        if (dbg) dbgInfo.zipFiles.push({ fname, fileCliente: fileCliente||null });
 
         if (fileCliente && !clienteMatch(fileCliente, cliente)) continue;
 
@@ -321,11 +335,11 @@ export default async function handler(req, res) {
         }
 
         const tipo = detectTipo(text);
-        if (tipo && !facturas[tipo]) facturas[tipo] = `F-${nro}`;
+        if (tipo && !facturas[tipo]) facturas[tipo] = nroFull;
       }
 
       const tiene = Object.keys(facturas).length > 0;
-      return res.status(200).json({ facturas: tiene ? facturas : null, source:"zip" });
+      return res.status(200).json({ facturas: tiene ? facturas : null, source:"zip", ...(dbg?{dbg:dbgInfo}:{}) });
     }
 
     // ── GET ?anio=YYYY ── devuelve historial JSON ─────────────────────────
