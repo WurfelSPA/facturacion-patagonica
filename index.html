@@ -2105,7 +2105,15 @@ function HistorialFactView({dashData,driveLoading,notify}){
         filtered.map(c=>{
           const color=SITIO_C[c.sitio]||"#888";
           const cliTotal=clientTotals[c.nombre]||0;
-          return h("div",{key:c.nombre+c.sitio,onClick:()=>setSelGroup(dashData.clients.filter(cl=>cl.nombre===c.nombre)),
+          return h("div",{key:c.nombre+c.sitio,onClick:()=>{
+              const seen=new Set();
+              setSelGroup(dashData.clients.filter(cl=>{
+                if(cl.nombre!==c.nombre)return false;
+                const k=(cl.sitio||'')+'|'+(cl.edificio||'');
+                if(seen.has(k))return false;
+                seen.add(k);return true;
+              }));
+            },
             style:{display:"grid",gridTemplateColumns:"90px 1fr 180px 130px",padding:"10px 14px",
               borderBottom:"1px solid var(--bdr)",cursor:"pointer",transition:"background .1s"}
           },
