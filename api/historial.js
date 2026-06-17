@@ -295,6 +295,9 @@ function _pickByUF(candidates, expectedUF, siteIdx) {
     return parseInt((a.nro||"").replace(/\D/g,"")||"0") - parseInt((b.nro||"").replace(/\D/g,"")||"0");
   });
   const minDiff = sorted[0].uf != null ? Math.abs(sorted[0].uf - expectedUF) : Infinity;
+  // Umbral: si el candidato más cercano difiere > 0.5 UF del esperado, la factura
+  // probablemente pertenece a otro sitio del mismo cliente → no asignar.
+  if (expectedUF > 0 && isFinite(minDiff) && minDiff > 0.5) return null;
   // Entre candidatos empatados (misma distancia al UF esperado), elegir por siteIdx
   const tied = sorted.filter(c => c.uf != null && Math.abs(Math.abs(c.uf - expectedUF) - minDiff) < 0.001);
   if (siteIdx != null && tied.length > 1) return tied[siteIdx % tied.length];

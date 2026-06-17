@@ -2196,8 +2196,14 @@ function HistorialFactView({dashData,driveLoading,notify}){
                   const nro=inv?(inv.nro||inv):null;
                   const uf=inv?.uf??null;
                   const total=inv?.total??null;
-                  const isLoading=siteLd.has(sc.sitio+'|'+p);
-                  const dash=h("span",{style:{color:"var(--txd)",fontSize:11}},"—");
+                  const isLoading=siteLd.has(siteKey(sc)+'|'+p);
+                  /* ⚠ Esperado en planilla pero sin factura encontrada */
+                  const expectedButMissing=!isLoading&&!nro&&(
+                    (conc==='arriendo'&&sc.ufArr>0)||(conc==='servAdm'&&sc.ufSrv>0));
+                  const dash=expectedButMissing
+                    ?h("span",{title:"UF esperado en planilla pero sin factura coincidente",
+                        style:{color:"var(--amber)",fontSize:11,fontWeight:700,cursor:"default"}},"⚠")
+                    :h("span",{style:{color:"var(--txd)",fontSize:11}},"—");
                   const loading=h("span",{style:{color:"var(--txd)",fontSize:10}},"…");
                   const tdL={style:{padding:"9px 10px",textAlign:"center",borderLeft:"1px solid var(--bdr)"}};
                   const tdC={style:{padding:"9px 8px",textAlign:"center"}};
