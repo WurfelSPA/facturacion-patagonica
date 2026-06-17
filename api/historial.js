@@ -554,6 +554,10 @@ export default async function handler(req, res) {
         } catch(e) { if (dbg) dbgInfo.jsonError = e.message; }
       }
 
+      /* ── rutNorm y driveFileList: necesarios para FUENTE XML y FUENTE 2 ── */
+      const rutNorm = normRut(rutQuery);
+      const driveFileList = await driveFiles(token, FACT_FOLDER_ID);
+
       /* ── FUENTE XML: ZIP con DTEs individuales ("Facturas HTML_PISA_YYYY_MM.zip") ── */
       if (rutNorm) {
         const xmlZipRe = new RegExp(`PISA[_-]${anioStr}[_-]${mesNum}\.zip$`, "i");
@@ -589,9 +593,6 @@ export default async function handler(req, res) {
       }
 
       /* ── FUENTE 2: PDF consolidado Facturas_PISA_YYYY-MM.pdf — búsqueda por RUT ── */
-      const rutNorm = normRut(rutQuery);
-      const driveFileList = await driveFiles(token, FACT_FOLDER_ID);
-
       if (rutNorm) {
         const pdfPattern = new RegExp(`facturas_pisa_${anioStr}-${mesNum}\\.pdf`, "i");
         const pdfFile = driveFileList.find(f => pdfPattern.test(f.name));
