@@ -155,7 +155,7 @@ function extractText(pdfBuf) {
 // Puede haber múltiples facturas del mismo tipo cuando el cliente tiene varios sitios.
 function extractFacturasForRut(text, rutNorm) {
   const facturas = {};  // tipo → [{nro,uf,total}]
-  const t = (text||"").replace(/\s+/g," ");
+  const t = (text||"").replace(/\s+/g," ").slice(0, 800);  // descripción siempre en primeros ~800 chars
 
   const nros = [];
   const nroRe = /(?:[Nn][ºo°]\s*|(?:F(?:EE)?-))\s*(\d{4,6})/g;
@@ -318,7 +318,7 @@ function clienteMatch(fromFile, query) {
 function detectTipo(text) {
   /* Primera aparición de cada keyword — evita falsos positivos de pie de página.
      Múltiples variantes para cubrir diferentes encodings de PDF. */
-  const t = (text||"").replace(/\s+/g," ");
+  const t = (text||"").replace(/\s+/g," ").slice(0, 800);  // descripción siempre en primeros ~800 chars
   const hits = [];
   const add = (tipo, needle) => { const i=t.indexOf(needle); if(i>=0) hits.push({tipo,i}); };
   // Habilitación
@@ -331,7 +331,6 @@ function detectTipo(text) {
   add("servAdm","Serv.Adm.");
   add("servAdm","Serv. Adm ");   // sin punto final: "Serv. Adm Enero 2026"
   add("servAdm","Serv Adm");      // sin punto en ningún lado (extracción PDF imperfecta)
-  add("servAdm","COD: ");         // PISA: "COD: A-2 - Serv. Adm" — aparece antes que cualquier keyword de arriendo
   add("servAdm","COD: S-A");     // código de concepto en facturas PISA
   add("servAdm","COD:S-A");
   add("servAdm","Gastos Comunes");
