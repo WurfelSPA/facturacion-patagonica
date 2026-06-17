@@ -737,12 +737,19 @@ export default async function handler(req, res) {
                   } catch(_) {}
                 }
               }
-              // refresh=1: auto-corregir JSON contaminado en Drive (async, no bloquea)
               // Eliminar conceptos no esperados según planilla (evita contaminación de caché)
               if (!(ufSrv > 0) && facturas.servAdm) delete facturas.servAdm;
               if (!(ufArr > 0) && facturas.arriendo) delete facturas.arriendo;
-              if (refresh) _autoSaveHistorial(token, anioStr, periodo, sitioQ ? `${cliente}:${sitioQ}` : cliente, facturas, PDF_FOLDER).catch(()=>{});
-              return res.status(200).json({ facturas, source: refresh ? "pdf_refreshed" : (savedFacturas ? "json+pdf" : "pdf_consolidado"), ...(dbg?{dbg:dbgInfo}:{}) });
+              // Si todavía faltan conceptos esperados o UFs, intentar FUENTE 2.6 antes de retornar
+              const stillMissing2 = (ufArr > 0 && !facturas.arriendo)
+                                 || (ufSrv > 0 && !facturas.servAdm)
+                                 || (ufArr > 0 && facturas.arriendo?.uf == null)
+                                 || (ufSrv > 0 && facturas.servAdm?.uf  == null);
+              if (!stillMissing2) {
+                if (refresh) _autoSaveHistorial(token, anioStr, periodo, sitioQ ? `${cliente}:${sitioQ}` : cliente, facturas, PDF_FOLDER).catch(()=>{});
+                return res.status(200).json({ facturas, source: refresh ? "pdf_refreshed" : (savedFacturas ? "json+pdf" : "pdf_consolidado"), ...(dbg?{dbg:dbgInfo}:{}) });
+              }
+              savedFacturas = facturas; // incompleto → continuar a FUENTE 2.6
             }
           }
         }
