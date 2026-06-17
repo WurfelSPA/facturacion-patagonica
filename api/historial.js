@@ -327,6 +327,11 @@ function _resolveFacturas(multiFacturas, ufArr, ufSrv, siteIdx) {
   const UFExp = { arriendo: ufArr, servAdm: ufSrv, habilitacion: null, servMant: null };
   const result = {};
   for (const [tipo, candidates] of Object.entries(byTipo)) {
+    // Si el sitio no tiene este concepto (UF=0 en planilla), no asignar aunque haya candidatos.
+    // Ejemplo: Visibility S.A. tiene 1 arriendo (para Of.102) y 1 servAdm (para Edif.D);
+    // el sitio que no corresponde debe tener ufArr=0 o ufSrv=0 en la planilla.
+    if (tipo === 'arriendo' && !(ufArr > 0)) continue;
+    if (tipo === 'servAdm' && !(ufSrv > 0)) continue;
     const picked = _pickByUF(candidates, UFExp[tipo], siteIdx);
     if (picked) result[tipo] = picked;
   }
