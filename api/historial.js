@@ -158,7 +158,9 @@ function extractFacturasForRut(text, rutNorm) {
   const t = (text||"").replace(/\s+/g," ").slice(0, 3000); // descripción siempre en primeros 3000 chars
 
   const nros = [];
-  const nroRe = /(?:[Nn][ºo°]\s*|(?:F(?:EE)?-))\s*(\d{4,6})/g;
+    // Nota: se excluye "°" (símbolo de grados U+00B0) para no confundir "N°2680"
+  // de direcciones con números de factura. Las facturas reales usan "º" (ordinal).
+  const nroRe = /(?:[Nn][ºo]\s*|(?:F(?:EE)?-))\s*(\d{4,6})/g;
   let m;
   while ((m = nroRe.exec(t)) !== null) {
     const nro = m[1], pos = m.index;
