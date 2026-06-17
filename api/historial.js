@@ -345,7 +345,20 @@ function _resolveFacturas(multiFacturas, ufArr, ufSrv, siteIdx) {
     if (tipo === 'arriendo' && !(ufArr > 0)) continue;
     if (tipo === 'servAdm' && !(ufSrv > 0)) continue;
     const picked = _pickByUF(candidates, UFExp[tipo], siteIdx);
-    if (picked) result[tipo] = picked;
+    if (!picked) continue;
+    // Facturas adicionales del mismo concepto en el mismo período (ej: retroactiva de mes anterior).
+    // Solo se suman si su UF también pasa el umbral → pertenecen al mismo sitio.
+    const threshold = UFExp[tipo] > 0 ? 0.5 : Infinity;
+    const extras = candidates.filter(c =>
+      c.nro !== picked.nro && c.uf != null &&
+      (!(UFExp[tipo] > 0) || Math.abs(c.uf - UFExp[tipo]) <= threshold)
+    );
+    if (extras.length > 0) {
+      const extraTotal = extras.reduce((s, e) => s + (e.total || 0), 0);
+      result[tipo] = { ...picked, total: (picked.total || 0) + extraTotal, extras: extras.map(e => e.nro) };
+    } else {
+      result[tipo] = picked;
+    }
   }
   return result;
 }

@@ -2218,12 +2218,18 @@ function HistorialFactView({dashData,driveLoading,notify}){
                   return [
                     h("td",{key:p+"-n",...tdL},
                       isLoading&&!nro?loading
-                      :nro?h("button",{onClick:()=>previewFact(nro,p),disabled:pdfLoading,
-                          title:`Ver PDF — ${nro} · ${p}`,
-                          style:{background:"var(--bbg)",border:"1px solid #b5d0f0",color:"var(--blue)",
-                            padding:"3px 10px",borderRadius:6,fontSize:10,fontWeight:600,
-                            cursor:pdfLoading?"wait":"pointer",fontFamily:"'DM Mono',monospace"}},
-                          pdfLoading?"⟳":nro)
+                      :nro?h("span",{style:{display:"flex",alignItems:"center",gap:4,justifyContent:"center"}},
+                          h("button",{onClick:()=>previewFact(nro,p),disabled:pdfLoading,
+                            title:`Ver PDF — ${nro} · ${p}`,
+                            style:{background:"var(--bbg)",border:"1px solid #b5d0f0",color:"var(--blue)",
+                              padding:"3px 10px",borderRadius:6,fontSize:10,fontWeight:600,
+                              cursor:pdfLoading?"wait":"pointer",fontFamily:"'DM Mono',monospace"}},
+                            pdfLoading?"⟳":nro),
+                          inv?.extras?.length>0&&h("span",{
+                            title:"Facturas adicionales en este período:\n"+(inv.extras||[]).join("\n"),
+                            style:{fontSize:9,fontWeight:700,padding:"1px 5px",borderRadius:10,
+                              background:"var(--amber)",color:"#fff",cursor:"default",whiteSpace:"nowrap"}},
+                            "+"+inv.extras.length))
                       :dash),
                     h("td",{key:p+"-u",...tdC},
                       isLoading&&uf==null?loading
