@@ -285,7 +285,6 @@ function extractFacturasForRut(text, rutNorm) {
 // Si no hay candidatos con UF o no se pasa expected, retorna el primero.
 function _pickByUF(candidates, expectedUF, siteIdx) {
   if (!candidates || candidates.length === 0) return null;
-  if (candidates.length === 1) return candidates[0];
   if (!(expectedUF > 0)) return candidates[siteIdx != null ? siteIdx % candidates.length : 0];
   // Ordenar por distancia UF ascendente; desempate: folio numérico ascendente
   const sorted = [...candidates].sort((a, b) => {
