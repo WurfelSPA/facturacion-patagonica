@@ -2008,9 +2008,9 @@ function HistorialFactView({dashData,driveLoading,notify}){
   };
   const closePrev=()=>{if(pdfPrev)URL.revokeObjectURL(pdfPrev.url);setPdfPrev(null);};
 
-  const conceptos=["arriendo","servAdm","habilitacion"];
-  const cLabel={arriendo:"Arriendo",servAdm:"Serv. Admin.",habilitacion:"Habilitación"};
-  const cColor={arriendo:"var(--blue)",servAdm:"var(--amber)",habilitacion:"var(--green)"};
+  const conceptos=["arriendo","servAdm","habilitacion","servMant"];
+  const cLabel={arriendo:"Arriendo",servAdm:"Serv. Admin.",habilitacion:"Habilitación",servMant:"Serv. Mant."};
+  const cColor={arriendo:"var(--blue)",servAdm:"var(--amber)",habilitacion:"var(--green)",servMant:"var(--accl)"};
 
   const totalLoading=loadingSet.size;
   const totalPeriods=periodsAvail.length*selGroup.length;

@@ -155,7 +155,7 @@ function extractText(pdfBuf) {
 // Puede haber múltiples facturas del mismo tipo cuando el cliente tiene varios sitios.
 function extractFacturasForRut(text, rutNorm) {
   const facturas = {};  // tipo → [{nro,uf,total}]
-  const t = (text||"").replace(/\s+/g," ").slice(0, 800);  // descripción siempre en primeros ~800 chars
+  const t = (text||"").replace(/\s+/g," ").slice(0, 3000); // descripción siempre en primeros 3000 chars
 
   const nros = [];
   const nroRe = /(?:[Nn][ºo°]\s*|(?:F(?:EE)?-))\s*(\d{4,6})/g;
@@ -212,7 +212,7 @@ function _pickByUF(candidates, expectedUF) {
 // Convierte el resultado multi-candidato a objeto simple {tipo:{nro,uf,total}}
 // usando ufArr/ufSrv para seleccionar el correcto cuando hay múltiples.
 function _resolveFacturas(multiFacturas, ufArr, ufSrv) {
-  const UFExp = { arriendo: ufArr, servAdm: ufSrv, habilitacion: null };
+  const UFExp = { arriendo: ufArr, servAdm: ufSrv, habilitacion: null, servMant: null };
   const result = {};
   for (const [tipo, candidates] of Object.entries(multiFacturas)) {
     const picked = _pickByUF(candidates, UFExp[tipo]);
@@ -321,7 +321,7 @@ function clienteMatch(fromFile, query) {
 function detectTipo(text) {
   /* Primera aparición de cada keyword — evita falsos positivos de pie de página.
      Múltiples variantes para cubrir diferentes encodings de PDF. */
-  const t = (text||"").replace(/\s+/g," ").slice(0, 800);  // descripción siempre en primeros ~800 chars
+  const t = (text||"").replace(/\s+/g," ").slice(0, 3000); // descripción siempre en primeros 3000 chars
   const hits = [];
   const add = (tipo, needle) => { const i=t.indexOf(needle); if(i>=0) hits.push({tipo,i}); };
   // Habilitación
@@ -342,6 +342,12 @@ function detectTipo(text) {
   // Arriendo — variantes
   add("arriendo","Arriendo");
   add("arriendo","ARRIENDO");
+  // Serv. Mantención — variantes
+  add("servMant","Serv. Mant");
+  add("servMant","Serv.Mant");
+  add("servMant","Serv Mant");
+  add("servMant","Mantencion");
+  add("servMant","Mantención");
   if(!hits.length) return null;
   hits.sort((a,b)=>a.i-b.i);
   return hits[0].tipo;
