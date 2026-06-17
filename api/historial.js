@@ -304,9 +304,29 @@ function _pickByUF(candidates, expectedUF, siteIdx) {
 // Convierte el resultado multi-candidato a objeto simple {tipo:{nro,uf,total}}
 // usando ufArr/ufSrv para seleccionar el correcto cuando hay múltiples.
 function _resolveFacturas(multiFacturas, ufArr, ufSrv, siteIdx) {
+  // Copia superficial de candidatos para no mutar el original
+  const byTipo = {};
+  for (const [k, v] of Object.entries(multiFacturas)) byTipo[k] = [...v];
+
+  // ── Rescate: NmbItem incorrecto en Nubox (ej: "Arriendo" en vez de "Serv. Adm.") ──
+  // Si servAdm está vacío y ufSrv > 0, busca entre candidatos de arriendo uno cuyo UF
+  // esté más cerca de ufSrv que de ufArr → lo reclasifica como servAdm.
+  if (ufSrv > 0 && (!byTipo.servAdm || byTipo.servAdm.length === 0) && (byTipo.arriendo || []).length > 1) {
+    const withUF = (byTipo.arriendo || []).filter(c => c.uf != null);
+    for (const c of withUF) {
+      const distSrv = Math.abs(c.uf - ufSrv);
+      const distArr = ufArr > 0 ? Math.abs(c.uf - ufArr) : Infinity;
+      if (distSrv < distArr && distSrv < 5) {
+        byTipo.servAdm = [c];
+        byTipo.arriendo = byTipo.arriendo.filter(e => e.nro !== c.nro);
+        break;
+      }
+    }
+  }
+
   const UFExp = { arriendo: ufArr, servAdm: ufSrv, habilitacion: null, servMant: null };
   const result = {};
-  for (const [tipo, candidates] of Object.entries(multiFacturas)) {
+  for (const [tipo, candidates] of Object.entries(byTipo)) {
     const picked = _pickByUF(candidates, UFExp[tipo], siteIdx);
     if (picked) result[tipo] = picked;
   }
