@@ -151,6 +151,67 @@ function extractText(pdfBuf) {
 }
 
 
+
+// ── XML DTE parser ────────────────────────────────────────────────────────────
+/** Extrae campos clave de un DTE XML individual */
+function parseXmlDTE(xml) {
+  const g = tag => { const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`)); return m ? m[1].trim() : ""; };
+  const items = [];
+  const detRe = /<Detalle>([\s\S]*?)<\/Detalle>/g;
+  let dm;
+  while ((dm = detRe.exec(xml)) !== null) {
+    const d = dm[1];
+    const gi = t => { const m = d.match(new RegExp(`<${t}>([^<]*)</${t}>`)); return m ? m[1].trim() : ""; };
+    items.push({ nmb: gi("NmbItem"), dsc: gi("DscItem"), qty: gi("QtyItem"), umd: gi("UnmdItem") });
+  }
+  return { folio: g("Folio"), tipoDTE: g("TipoDTE"), rut: g("RUTRecep"), total: parseInt(g("MntTotal")) || null, items };
+}
+/** Extrae cantidad UF de un ítem: por QtyItem+UnmdItem='UF' o por texto en DscItem */
+function _ufFromXmlItem(item) {
+  if (item.umd === "UF") {
+    const v = parseFloat(item.qty);
+    if (v >= 0.1 && v < 500) return Math.round(v * 10000) / 10000;
+  }
+  // "UF  106,64 x 40186,79"  o  "UF 61,74 x"
+  const m = item.dsc.match(/UF\s+([\d]{1,3}[,.][ \d]{0,1}[\d]{1,3})(?:\s*x|\s*$|\s+\d)/i);
+  if (m) { const v = parseFloat(m[1].replace(",", ".")); if (v >= 0.1 && v < 500) return Math.round(v * 10000) / 10000; }
+  return null;
+}
+/** Clasifica tipo según NmbItem */
+function _detectTipoFromNmb(nmb) {
+  const n = (nmb || "").toLowerCase();
+  if (n.includes("habilitaci")) return "habilitacion";
+  if (n.includes("serv. adm") || n.includes("serv adm") || n.includes("serv.adm") ||
+      n.includes("gastos comun") || n.includes("gtos. com")) return "servAdm";
+  if (n.includes("serv. mant") || n.includes("serv mant") || n.includes("mantencion") ||
+      n.includes("mantenci\u00f3n")) return "servMant";
+  if (n.includes("arriendo")) return "arriendo";
+  return null;
+}
+/** Procesa array de XMLs, filtra por RUT, devuelve {tipo:[{nro,uf,total}]} */
+function _buildXmlFacturas(xmlFiles, rutNorm) {
+  const byTipo = {};
+  for (const { content } of xmlFiles) {
+    const dte = parseXmlDTE(content);
+    if (!dte.rut || normRut(dte.rut) !== rutNorm) continue;
+    if (dte.tipoDTE === "61") continue; // ignorar Notas de Crédito
+    const seenNros = new Set();
+    for (const item of dte.items) {
+      const tipo = _detectTipoFromNmb(item.nmb);
+      if (!tipo) continue;
+      const prefix = tipo === "servAdm" ? "FEE" : "F";
+      const nro = `${prefix}-${dte.folio}`;
+      if (seenNros.has(nro)) continue; // evitar duplicar línea exenta
+      seenNros.add(nro);
+      const uf = _ufFromXmlItem(item);
+      if (!byTipo[tipo]) byTipo[tipo] = [];
+      if (!byTipo[tipo].some(e => e.nro === nro))
+        byTipo[tipo].push({ nro, uf, total: dte.total });
+    }
+  }
+  return byTipo;
+}
+
 // Auto-corrección del JSON cuando se usa refresh=1: sobreescribe el dato contaminado
 async function _autoSaveHistorial(token, anio, periodo, clienteKey, facturas, pdfFolderId) {
   if (!pdfFolderId || !clienteKey) return;
@@ -423,14 +484,24 @@ export default async function handler(req, res) {
     // ── GET ?listPeriodos=1 ── períodos disponibles en carpeta facturación ─
     if (req.method === "GET" && req.query.listPeriodos === "1") {
       const files = await driveFiles(token, FACT_FOLDER_ID);
-      const periodos = files
-        .filter(f => /^\d{4}-\d{2}\.zip$/i.test(f.name))
-        .sort((a,b) => b.name.localeCompare(a.name))
-        .map(f => {
-          const [anio, mesNum] = f.name.replace(/\.zip$/i,"").split("-");
-          return MES_NOM[mesNum] ? `${MES_NOM[mesNum]} ${anio}` : null;
-        })
-        .filter(Boolean);
+      const periodoSet = new Set();
+      for (const f of files) {
+        let anio, mesNum;
+        // Formato 1: "2026-05.zip"
+        const m1 = f.name.match(/^(\d{4})-(\d{2})\.zip$/i);
+        if (m1) { anio = m1[1]; mesNum = m1[2]; }
+        else {
+          // Formato 2: "Facturas HTML_PISA_2026_05.zip" o "Facturas HTML_PISA_2026-05.zip"
+          const m2 = f.name.match(/PISA[_-](\d{4})[_-](\d{2})\.zip$/i);
+          if (m2) { anio = m2[1]; mesNum = m2[2]; }
+        }
+        if (anio && mesNum && MES_NOM[mesNum]) periodoSet.add(`${MES_NOM[mesNum]} ${anio}`);
+      }
+      const periodos = [...periodoSet].sort((a,b) => {
+        const [ma,ya] = [a.split(" ")[0], a.split(" ")[1]];
+        const [mb,yb] = [b.split(" ")[0], b.split(" ")[1]];
+        return yb !== ya ? yb.localeCompare(ya) : (MES_NUM[mb]||"00").localeCompare(MES_NUM[ma]||"00");
+      });
       return res.status(200).json({ periodos });
     }
 
@@ -481,6 +552,40 @@ export default async function handler(req, res) {
             }
           }
         } catch(e) { if (dbg) dbgInfo.jsonError = e.message; }
+      }
+
+      /* ── FUENTE XML: ZIP con DTEs individuales ("Facturas HTML_PISA_YYYY_MM.zip") ── */
+      if (rutNorm) {
+        const xmlZipRe = new RegExp(`PISA[_-]${anioStr}[_-]${mesNum}\.zip$`, "i");
+        const xmlZipFile = driveFileList.find(f => xmlZipRe.test(f.name));
+        if (dbg) dbgInfo.xmlZipFile = xmlZipFile?.name || null;
+        if (xmlZipFile) {
+          try {
+            const xzRes = await fetch(
+              `https://www.googleapis.com/drive/v3/files/${xmlZipFile.id}?alt=media`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            if (xzRes.ok) {
+              const xmlZip = await JSZip.loadAsync(Buffer.from(await xzRes.arrayBuffer()));
+              const xmlFiles = [];
+              for (const [, entry] of Object.entries(xmlZip.files)) {
+                if (entry.dir || !entry.name.toLowerCase().endsWith(".xml")) continue;
+                xmlFiles.push({ content: await entry.async("text") });
+              }
+              const byTipo = _buildXmlFacturas(xmlFiles, rutNorm);
+              const xmlFacturas = _resolveFacturas(byTipo, ufArr, ufSrv);
+              if (dbg) dbgInfo.xmlFacturas = xmlFacturas;
+              if (Object.keys(xmlFacturas).length > 0) {
+                if (refresh) _autoSaveHistorial(token, anioStr, periodo, cliente, xmlFacturas, PDF_FOLDER).catch(() => {});
+                return res.status(200).json({
+                  facturas: xmlFacturas,
+                  source: refresh ? "xml_refreshed" : "xml",
+                  ...(dbg ? { dbg: dbgInfo } : {})
+                });
+              }
+            }
+          } catch(e) { if (dbg) dbgInfo.xmlError = e.message; }
+        }
       }
 
       /* ── FUENTE 2: PDF consolidado Facturas_PISA_YYYY-MM.pdf — búsqueda por RUT ── */
