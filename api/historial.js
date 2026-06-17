@@ -585,7 +585,10 @@ export default async function handler(req, res) {
               const periodoData = histData[anioStr]?.[periodo];
               if (periodoData) {
                 if (dbg) dbgInfo.jsonKeys = Object.keys(periodoData);
-                const key = Object.keys(periodoData).find(k => clienteMatch(k, cliente));
+                // Buscar primero con sitio (ej: "Visibility S.A.:A-2"), luego sin él
+                const sitioSuffix = sitioQ ? `:${sitioQ}` : "";
+                const key = Object.keys(periodoData).find(k => clienteMatch(k, cliente + sitioSuffix))
+                         || (!sitioSuffix ? undefined : Object.keys(periodoData).find(k => clienteMatch(k, cliente)));
                 if (dbg) dbgInfo.jsonMatchedKey = key || null;
                 if (key && Object.keys(periodoData[key]).length > 0) {
                   // Normalizar formato antiguo {tipo:"F-XXXXX"} → {tipo:{nro,uf,total}}
@@ -593,10 +596,12 @@ export default async function handler(req, res) {
                   const facturas = Object.fromEntries(Object.entries(raw).map(([k,v])=>
                     [k, typeof v==="string" ? {nro:v,uf:null,total:null} : v]
                   ));
-                  // Si todos los totales Y UFs están presentes, Y no falta ningún concepto esperado → retornar inmediato
+                  // Si todos los totales Y UFs están presentes, Y no faltan NI SOBRAN conceptos esperados → retornar inmediato
                   const allComplete = Object.values(facturas).every(f => f.total != null && f.uf != null)
-                    && !(ufArr > 0 && !facturas.arriendo)   // esperamos arriendo pero no está
-                    && !(ufSrv > 0 && !facturas.servAdm);  // esperamos servAdm pero no está
+                    && !(ufArr > 0 && !facturas.arriendo)    // esperamos arriendo pero no está
+                    && !(ufSrv > 0 && !facturas.servAdm)    // esperamos servAdm pero no está
+                    && !(ufSrv === 0 && facturas.servAdm)   // servAdm inesperado → reprocess
+                    && !(ufArr === 0 && facturas.arriendo);  // arriendo inesperado → reprocess
                   if (allComplete) {
                     return res.status(200).json({ facturas, source:"json", ...(dbg?{dbg:dbgInfo}:{}) });
                   }
@@ -710,7 +715,10 @@ export default async function handler(req, res) {
                 }
               }
               // refresh=1: auto-corregir JSON contaminado en Drive (async, no bloquea)
-              if (refresh) _autoSaveHistorial(token, anioStr, periodo, cliente, facturas, PDF_FOLDER).catch(()=>{});
+              // Eliminar conceptos no esperados según planilla (evita contaminación de caché)
+              if (!(ufSrv > 0) && facturas.servAdm) delete facturas.servAdm;
+              if (!(ufArr > 0) && facturas.arriendo) delete facturas.arriendo;
+              if (refresh) _autoSaveHistorial(token, anioStr, periodo, sitioQ ? `${cliente}:${sitioQ}` : cliente, facturas, PDF_FOLDER).catch(()=>{});
               return res.status(200).json({ facturas, source: refresh ? "pdf_refreshed" : (savedFacturas ? "json+pdf" : "pdf_consolidado"), ...(dbg?{dbg:dbgInfo}:{}) });
             }
           }
