@@ -517,9 +517,18 @@ export default async function handler(req, res) {
       const dbg = debug === "1";
       const dbgInfo = {};
 
-      /* ── FUENTE 1: historial JSON (instantáneo, confiable) ── */
+      /* ── rutNorm y driveFileList: necesarios para FUENTE XML y FUENTE 2 ── */
+      const rutNorm = normRut(rutQuery);
+      const driveFileList = await driveFiles(token, FACT_FOLDER_ID);
+
+      /* ── Detectar ZIP XML para este período (tiene prioridad sobre FUENTE 1) ── */
+      const xmlZipRe = new RegExp(`PISA[_-]${anioStr}[_-]${mesNum}\.zip$`, "i");
+      const xmlZipFile = rutNorm ? driveFileList.find(f => xmlZipRe.test(f.name)) : null;
+      if (dbg) dbgInfo.xmlZipFile = xmlZipFile?.name || null;
+
+      /* ── FUENTE 1: historial JSON — solo si NO hay ZIP XML para este período ── */
       let savedFacturas = null; // guardamos si faltan totales para enriquecer con FUENTE 2
-      if (PDF_FOLDER && !refresh) {
+      if (PDF_FOLDER && !refresh && !xmlZipFile) {
         try {
           const histFileId = await findFile(token, HIST_NAME, PDF_FOLDER);
           if (histFileId) {
@@ -555,16 +564,9 @@ export default async function handler(req, res) {
         } catch(e) { if (dbg) dbgInfo.jsonError = e.message; }
       }
 
-      /* ── rutNorm y driveFileList: necesarios para FUENTE XML y FUENTE 2 ── */
-      const rutNorm = normRut(rutQuery);
-      const driveFileList = await driveFiles(token, FACT_FOLDER_ID);
-
-      /* ── FUENTE XML: ZIP con DTEs individuales ("Facturas HTML_PISA_YYYY_MM.zip") ── */
-      if (rutNorm) {
-        const xmlZipRe = new RegExp(`PISA[_-]${anioStr}[_-]${mesNum}\.zip$`, "i");
-        const xmlZipFile = driveFileList.find(f => xmlZipRe.test(f.name));
-        if (dbg) dbgInfo.xmlZipFile = xmlZipFile?.name || null;
-        if (xmlZipFile) {
+      /* ── FUENTE XML: ZIP con DTEs individuales — XML es siempre fresco, sin caché JSON ── */
+      if (xmlZipFile && rutNorm) {
+        {
           try {
             const xzRes = await fetch(
               `https://www.googleapis.com/drive/v3/files/${xmlZipFile.id}?alt=media`,
@@ -581,10 +583,11 @@ export default async function handler(req, res) {
               const xmlFacturas = _resolveFacturas(byTipo, ufArr, ufSrv);
               if (dbg) dbgInfo.xmlFacturas = xmlFacturas;
               if (Object.keys(xmlFacturas).length > 0) {
-                if (refresh) _autoSaveHistorial(token, anioStr, periodo, cliente, xmlFacturas, PDF_FOLDER).catch(() => {});
+                // Sin _autoSaveHistorial: XML siempre fresco — guardar al JSON causaría
+                // que un sitio sobreescriba datos del otro en clientes multi-sitio
                 return res.status(200).json({
                   facturas: xmlFacturas,
-                  source: refresh ? "xml_refreshed" : "xml",
+                  source: "xml",
                   ...(dbg ? { dbg: dbgInfo } : {})
                 });
               }
