@@ -1991,7 +1991,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
           periodos.slice(0,10).forEach(p=>{
             const url=`/api/historial?cliente=${encodeURIComponent(sc.nombre)}&rut=${encodeURIComponent(sc.rut||"")}`
               +`&ufArr=${encodeURIComponent(sc.ufArr||"")}&ufSrv=${encodeURIComponent(sc.ufSrv||"")}`
-              +`&siteIdx=${siteIdx}`
+              +`&siteIdx=${siteIdx}&sitio=${encodeURIComponent(sc.sitio||"")}`
               +`&periodo=${encodeURIComponent(p)}`
               +(doRefresh?"&refresh=1":"");
             fetch(url)

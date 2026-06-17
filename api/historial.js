@@ -162,7 +162,7 @@ function parseXmlDTE(xml) {
   while ((dm = detRe.exec(xml)) !== null) {
     const d = dm[1];
     const gi = t => { const m = d.match(new RegExp(`<${t}>([^<]*)</${t}>`)); return m ? m[1].trim() : ""; };
-    items.push({ nmb: gi("NmbItem"), dsc: gi("DscItem"), qty: gi("QtyItem"), umd: gi("UnmdItem") });
+    items.push({ nmb: gi("NmbItem"), dsc: gi("DscItem"), qty: gi("QtyItem"), umd: gi("UnmdItem"), cod: gi("VlrCodigo") });
   }
   return { folio: g("Folio"), tipoDTE: g("TipoDTE"), rut: g("RUTRecep"), total: parseInt(g("MntTotal")) || null, items };
 }
@@ -193,7 +193,14 @@ function _detectTipoFromNmb(nmb) {
   return null;
 }
 /** Procesa array de XMLs, filtra por RUT, devuelve {tipo:[{nro,uf,total}]} */
-function _buildXmlFacturas(xmlFiles, rutNorm) {
+// Normaliza código interno: "A2"→"A2", "A-2"→"A2", "B"→"B" (quita guiones, mayúscula)
+function _normCod(s) { return (s||"").toUpperCase().replace(/-/g,""); }
+
+/** Procesa array de XMLs, filtra por RUT, devuelve {tipo:[{nro,uf,total,cod}]}
+ *  sitioFilter (opcional): sc.sitio — si el XML tiene VlrCodigo, solo se incluyen
+ *  items cuyo código coincide con el sitio solicitado. */
+function _buildXmlFacturas(xmlFiles, rutNorm, sitioFilter = null) {
+  const sitioNorm = sitioFilter ? _normCod(sitioFilter) : null;
   const byTipo = {};
   for (const { content } of xmlFiles) {
     const dte = parseXmlDTE(content);
@@ -203,6 +210,9 @@ function _buildXmlFacturas(xmlFiles, rutNorm) {
     for (const item of dte.items) {
       const tipo = _detectTipoFromNmb(item.nmb);
       if (!tipo) continue;
+      // Filtro por VlrCodigo: si el item tiene código interno Y hay sitioFilter,
+      // descartar el item si el código no coincide con el sitio solicitado.
+      if (sitioNorm && item.cod && _normCod(item.cod) !== sitioNorm) continue;
       const prefix = tipo === "servAdm" ? "FEE" : "F";
       const nro = `${prefix}-${dte.folio}`;
       if (seenNros.has(nro)) continue; // evitar duplicar línea exenta
@@ -210,7 +220,7 @@ function _buildXmlFacturas(xmlFiles, rutNorm) {
       const uf = _ufFromXmlItem(item);
       if (!byTipo[tipo]) byTipo[tipo] = [];
       if (!byTipo[tipo].some(e => e.nro === nro))
-        byTipo[tipo].push({ nro, uf, total: dte.total });
+        byTipo[tipo].push({ nro, uf, total: dte.total, cod: item.cod || null });
     }
   }
   return byTipo;
@@ -544,7 +554,7 @@ export default async function handler(req, res) {
 
     // ── GET ?cliente=X&periodo=Y ── facturas del cliente en el período ──────
     if (req.method === "GET" && req.query.cliente && req.query.periodo) {
-      const { cliente, periodo, rut: rutQuery, debug, ufArr: ufArrQ, ufSrv: ufSrvQ, refresh, siteIdx: siteIdxQ } = req.query;
+      const { cliente, periodo, rut: rutQuery, debug, ufArr: ufArrQ, ufSrv: ufSrvQ, refresh, siteIdx: siteIdxQ, sitio: sitioQ } = req.query;
       const siteIdx = siteIdxQ != null ? parseInt(siteIdxQ) : null;
       const ufArr = ufArrQ ? parseFloat(ufArrQ) : 0;
       const ufSrv = ufSrvQ ? parseFloat(ufSrvQ) : 0;
@@ -616,7 +626,7 @@ export default async function handler(req, res) {
                 if (entry.dir || !entry.name.toLowerCase().endsWith(".xml")) continue;
                 xmlFiles.push({ content: await entry.async("text") });
               }
-              const byTipo = _buildXmlFacturas(xmlFiles, rutNorm);
+              const byTipo = _buildXmlFacturas(xmlFiles, rutNorm, sitioQ || null);
               const xmlFacturas = _resolveFacturas(byTipo, ufArr, ufSrv, siteIdx);
               if (dbg) dbgInfo.xmlFacturas = xmlFacturas;
               if (Object.keys(xmlFacturas).length > 0) {
