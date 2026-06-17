@@ -184,8 +184,11 @@ function extractFacturasForRut(text, rutNorm) {
     if (!tipo) continue;
     const nro = `${tipo === "servAdm" ? "FEE" : "F"}-${prevNro.nro}`;
     const wideUF = t.slice(prevNro.pos, prevNro.pos + 3000);
+    // Buscar UF también hacia atrás: en PDFs PISA la descripción "12,8 UF" puede
+    // aparecer antes del Nº de factura en el flujo de texto extraído
+    const wideBack = t.slice(Math.max(0, prevNro.pos - 800), prevNro.pos + 500);
     const total = _extractTotal(t, prevNro.pos);
-    const uf = _extractUF(section) ?? _extractUF(wideUF) ?? _derivarUFdePrecio(wideUF, total);
+    const uf = _extractUF(section) ?? _extractUF(wideUF) ?? _extractUF(wideBack) ?? _derivarUFdePrecio(wideUF, total);
     if (!facturas[tipo]) facturas[tipo] = [];
     facturas[tipo].push({ nro, uf, total });
   }
