@@ -172,9 +172,12 @@ function _ufFromXmlItem(item) {
     const v = parseFloat(item.qty);
     if (v >= 0.1 && v < 500) return Math.round(v * 10000) / 10000;
   }
-  // "UF  106,64 x 40186,79"  o  "UF 61,74 x"
+  // Patrón 1: "UF  106,64 x 40186,79"  o  "UF 61,74 x" (con prefijo UF)
   const m = item.dsc.match(/UF\s+([\d]{1,3}[,.][ \d]{0,1}[\d]{1,3})(?:\s*x|\s*$|\s+\d)/i);
   if (m) { const v = parseFloat(m[1].replace(",", ".")); if (v >= 0.1 && v < 500) return Math.round(v * 10000) / 10000; }
+  // Patrón 2: "41,92 x 39747,15" (qty_UF × precio_UF sin prefijo "UF")
+  const m2 = item.dsc.match(/\b(\d{1,3}[.,]\d{2})\s+x\s+\d{4,}/);
+  if (m2) { const v = parseFloat(m2[1].replace(",", ".")); if (v >= 0.1 && v < 500) return Math.round(v * 10000) / 10000; }
   return null;
 }
 /** Clasifica tipo según NmbItem — cubre variantes con y sin "de": "Serv. de Adm.", "Serv. Adm." */
