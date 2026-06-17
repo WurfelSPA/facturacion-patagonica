@@ -600,6 +600,9 @@ export default async function handler(req, res) {
                   // El JSON puede contener datos de varios sitios bajo la misma clave cliente.
                   if (!(ufArr > 0) && facturas.arriendo) delete facturas.arriendo;
                   if (!(ufSrv > 0) && facturas.servAdm)  delete facturas.servAdm;
+                  // Eliminar conceptos cuyo UF difiere >0.5 del esperado (probable contaminación de otro sitio).
+                  if (facturas.arriendo?.uf != null && ufArr > 0 && Math.abs(facturas.arriendo.uf - ufArr) > 0.5) delete facturas.arriendo;
+                  if (facturas.servAdm?.uf  != null && ufSrv > 0 && Math.abs(facturas.servAdm.uf  - ufSrv) > 0.5) delete facturas.servAdm;
                   // Si todos los totales Y UFs están presentes, Y no falta ningún concepto esperado → retornar inmediato
                   const allComplete = Object.values(facturas).every(f => f.total != null && f.uf != null)
                     && !(ufArr > 0 && !facturas.arriendo)    // esperamos arriendo pero no está
@@ -841,7 +844,11 @@ export default async function handler(req, res) {
         const tipo = detectTipo(text);
         if (tipo && !facturas[tipo]) {
           const totalZ = _extractTotal(text);
-          facturas[tipo] = { nro:nroFull, uf:_extractUF(text) ?? _derivarUFdePrecio(text, totalZ), total:totalZ };
+          const ufZ = _extractUF(text) ?? _derivarUFdePrecio(text, totalZ);
+          // Umbral UF: evitar cruce entre sitios del mismo cliente (igual que _pickByUF).
+          const expUFZ = tipo === 'arriendo' ? ufArr : tipo === 'servAdm' ? ufSrv : null;
+          if (expUFZ > 0 && ufZ != null && Math.abs(ufZ - expUFZ) > 0.5) continue;
+          facturas[tipo] = { nro:nroFull, uf:ufZ, total:totalZ };
         }
       }
 
