@@ -3719,4 +3719,129 @@ function App(){
             `UF día 5: ${ufSII.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`
           ),
           data.length>0&&h("button",{
-            onClick:descargarRep
+            onClick:descargarReporte,
+            title:"Descargar reporte CSV con el estado actual",
+            style:{fontSize:11,fontWeight:600,padding:"5px 12px",borderRadius:8,
+              border:"1px solid var(--bdr)",background:"var(--surf)",color:"var(--txm)",
+              cursor:"pointer",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap",
+              fontFamily:"'DM Sans',sans-serif"}
+          },"⬇ Reporte")
+        ),
+        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:190,fontFamily:"'DM Sans',sans-serif"}}),
+        h("input",{value:searchFactura,onChange:e=>setSearchFactura(e.target.value),placeholder:"N° Factura...",style:{width:130,fontFamily:"'DM Mono',monospace"}})
+      ),
+      h("div",{style:{flex:1,overflowX:"auto"}},
+        h("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:940}},
+          h("colgroup",null,h("col",{style:{width:58}}),h("col",{style:{width:"15%"}}),h("col",{style:{width:"17%"}}),h("col",{style:{width:88}}),h("col",{style:{width:88}}),h("col",{style:{width:72}}),h("col",{style:{width:72}}),h("col",{style:{width:96}}),h("col",{style:{width:110}}),h("col",{style:{width:60}})),
+          h("thead",null,h("tr",{style:{background:"#ddeaf8"}},
+            ["Sitio","Cliente","Correo","Concepto","Factura","UF planilla","UF PDF","Monto+IVA","Estado/Acción","Pagado"].map((hd,hi)=>
+              h("th",{key:hd,style:{padding:"8px 11px",textAlign:hi===9?"center":"left",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:"0.07em",borderBottom:"1px solid var(--bdr)"}},hd.toUpperCase())
+            )
+          )),
+          h("tbody",null,filtered.length===0?
+            h("tr",null,h("td",{colSpan:10,style:{padding:"48px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados")):
+            filtered.map(row=>{
+              const i=row.i,sent=sentSet.has(i),sending=sendingIdx===i,noEmail=!row.correo;
+              const diffPdf=row.ufPdf!==null&&row.ufPdf!==undefined&&(row.ufPdf>5000?Math.abs(row.ufPdf-row.ufPlan)>500:Math.abs(row.ufPdf-row.ufPlan)>0.5);
+              const diffSII=row.ufSII!=null&&row.ufPlan<=500&&Math.abs(row.ufPlan-row.ufSII)>0.5;
+              const diff=diffPdf||diffSII;
+              const esArr=row.concepto==="Arriendo";
+              const bg=sent?"#e6f7ef":esArr?"#ffffff":"#fffdf5";
+              return h("tr",{key:i,className:"row-tr"},
+                h("td",{style:{padding:"8px 11px",background:bg}},
+                  h("div",{style:{display:"flex",flexDirection:"column",gap:2}},
+                    h("span",{style:{display:"inline-block",padding:"2px 7px",borderRadius:5,fontSize:10,fontWeight:700,background:`${SITIO_C[row.sitio]||"#888"}18`,color:SITIO_C[row.sitio]||"#888",border:`1px solid ${SITIO_C[row.sitio]||"#888"}40`,alignSelf:"flex-start"}},row.sitio),
+                    row.edificio&&h("span",{style:{fontSize:9,color:"var(--txd)",fontFamily:"'DM Mono',monospace",paddingLeft:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:52}},row.edificio)
+                  )
+                ),
+                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontWeight:600}},row.cliente),row.rut&&h("div",{style:{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--txd)",marginTop:2}},formatRUT(row.rut))),
+                h("td",{style:{padding:"8px 11px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",background:bg}},h("span",{style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:row.correo?"var(--accl)":"var(--txd)"}},row.correo||"— sin correo")),
+                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{className:esArr?"tag-arr":"tag-srv"},row.concepto)),
+                h("td",{style:{padding:"8px 11px",background:bg}},
+                  row.factura&&pdfMap[row.factura]
+                  ?h("button",{
+                      title:"Ver PDF de "+row.factura,
+                      style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:"var(--blue)",background:"none",border:"none",cursor:"pointer",padding:0,textDecoration:"underline",fontWeight:600},
+                      onClick:async()=>{
+                        try{
+                          const pdf=pdfMap[row.factura];
+                          let b64=null;
+                          if(pdf?.zipPath&&files.zip){b64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}
+                          else if(pdf?.driveFileId){b64=await getPdfBase64FromDrive(pdf.driveFileId);}
+                          if(!b64)throw new Error("PDF no disponible");
+                          const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+                          const url=URL.createObjectURL(new Blob([bytes],{type:"application/pdf"}));
+                          window.open(url,"_blank");
+                          setTimeout(()=>URL.revokeObjectURL(url),30000);
+                        }catch(e){notify("Error abriendo PDF: "+e.message,"err");}
+                      }
+                    },row.factura)
+                  :h("span",{style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:"var(--txm)"}},row.factura||"—")
+                ),
+                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace"}},row.ufPlan>5000?"$"+Math.round(row.ufPlan).toLocaleString("es-CL"):row.ufPlan.toFixed(2))),
+                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",color:diffPdf?"var(--amber)":"var(--tx)"}},
+  row.ufPdf!==null&&row.ufPdf!==undefined
+    ?(row.ufPdf>5000?"$"+Math.round(row.ufPdf).toLocaleString("es-CL"):row.ufPdf.toFixed(2))
+    :"—"
+)),
+                h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",fontWeight:600,color:"var(--tx)"}},
+                  (()=>{
+                    if(row.montoTotal) return "$"+row.montoTotal.toLocaleString("es-CL");
+                    const sub=row.ufPdf!=null&&ufSII?Math.round(row.ufPdf*ufSII):row.ufPlan>500?Math.round(row.ufPlan):null;
+                    if(sub&&row.ivaAmount) return "$"+(sub+row.ivaAmount).toLocaleString("es-CL");
+                    if(sub) return "$"+sub.toLocaleString("es-CL");
+                    return "—";
+                  })()
+                )),
+                h("td",{style:{padding:"8px 11px",background:bg}},
+                  row.estado==="missing"?h(Badge,{e:"missing",row}):
+                  sent?h(Badge,{e:"sent_sheet",row}):
+                  sending?h("span",{style:{color:"var(--blue)",fontSize:11,display:"inline-flex",alignItems:"center",gap:4}},h("span",{className:"spin"},"⟳")," Enviando..."):
+                  row.estado==="ok"&&!noEmail?h("button",{
+                    className:"btn-send",
+                    onClick:unlocked?()=>setPreview({row,idx:i}):()=>setShowPwdModal(true),
+                    title:unlocked?"Enviar correo":"Clave requerida para enviar",
+                    style:{opacity:unlocked?1:0.55,cursor:unlocked?"pointer":"pointer"}
+                  },"✉ "+(unlocked?"Enviar":"🔒")):
+                  h(Badge,{e:row.estado,row})
+                ),
+                h("td",{style:{padding:"8px 11px",background:bg,textAlign:"center"}},
+                  h("input",{
+                    type:"checkbox",
+                    checked:!!row.yaPagado,
+                    disabled:!row.sheetRow||!row.pagadoColLetter,
+                    title:!row.sheetRow?"Sin fila en planilla":row.yaPagado?"Pagado — clic para desmarcar":"Marcar como pagado",
+                    onChange:()=>{if(row.sheetRow&&row.pagadoColLetter)togglePagado(row.i,row.sheetRow,row.pagadoColLetter,row.yaPagado);},
+                    style:{width:16,height:16,cursor:row.sheetRow&&row.pagadoColLetter?"pointer":"default",accentColor:"var(--green)"}
+                  })
+                )
+              );
+            })
+          )
+        )
+      ),
+      h("footer",{style:{background:"#ddeaf8",borderTop:"1px solid #b8d0ee",padding:"9px 18px",display:"flex",alignItems:"center",justifyContent:"space-between"}},
+        h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},`${filtered.length}/${stats.total} · ${stats.sent} enviados · ${periodo}`),
+        h("div",{style:{display:"flex",gap:8,alignItems:"center"}},
+          stats.sent>0&&h("button",{
+              onClick:syncStatus?null:sincronizarPlanilla,
+              disabled:!!syncStatus,
+              title:"Escribe 'Enviado' en columna HC de la planilla para todos los correos enviados esta sesión",
+              style:{background:"var(--surf2)",border:"1px solid var(--bdr)",color:syncStatus?"var(--accl)":"var(--txm)",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:syncStatus?"default":"pointer",display:"flex",alignItems:"center",gap:5,minWidth:180}
+            },syncStatus?`📋 Sincronizando... ${syncStatus.done}/${syncStatus.total}`:"📋 Sincronizar planilla"),
+          h("button",{
+              onClick:unlocked?sendAll:()=>setShowPwdModal(true),
+              style:{background:unlocked?"var(--gbg)":"var(--surf2)",border:unlocked?"1px solid var(--gdim)":"1px solid var(--bdr)",color:unlocked?"var(--green)":"var(--txm)",borderRadius:8,padding:"7px 16px",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:6,cursor:"pointer"}
+            },unlocked?`✉ Enviar todos (${Math.max(0,stats.ok-stats.sent)})`:`🔒 Enviar todos (${Math.max(0,stats.ok-stats.sent)})`)
+        )
+      )
+    )
+    ,view==="ventas"&&h(VentasView,{periodo})
+    ,view==="contratos"&&h(ContratosView,{dashData,driveLoading})
+    ,view==="historial-fact"&&h(HistorialFactView,{dashData,driveLoading,notify})
+  ));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(h(App));
+</script>
+</body>
+</html>
