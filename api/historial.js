@@ -194,7 +194,7 @@ function _detectTipoFromNmb(nmb) {
 }
 /** Procesa array de XMLs, filtra por RUT, devuelve {tipo:[{nro,uf,total}]} */
 // Normaliza código interno: "A2"→"A2", "A-2"→"A2", "B"→"B" (quita guiones, mayúscula)
-function _normCod(s) { return (s||"").toUpperCase().replace(/-/g,""); }
+function _normCod(s) { return (s||"").toUpperCase().replace(/[-\s_]/g,""); }
 
 /** Procesa array de XMLs, filtra por RUT, devuelve {tipo:[{nro,uf,total,cod}]}
  *  sitioFilter (opcional): sc.sitio — si el XML tiene VlrCodigo, solo se incluyen
@@ -653,13 +653,18 @@ export default async function handler(req, res) {
               const xmlFacturas = _resolveFacturas(byTipo, ufArr, ufSrv, siteIdx);
               if (dbg) dbgInfo.xmlFacturas = xmlFacturas;
               if (Object.keys(xmlFacturas).length > 0) {
-                // Sin _autoSaveHistorial: XML siempre fresco — guardar al JSON causaría
-                // que un sitio sobreescriba datos del otro en clientes multi-sitio
-                return res.status(200).json({
-                  facturas: xmlFacturas,
-                  source: "xml",
-                  ...(dbg ? { dbg: dbgInfo } : {})
-                });
+                // Verificar si faltan conceptos esperados según planilla
+                const xmlComplete = !(ufArr > 0 && !xmlFacturas.arriendo)
+                                 && !(ufSrv > 0 && !xmlFacturas.servAdm);
+                if (xmlComplete) {
+                  return res.status(200).json({
+                    facturas: xmlFacturas,
+                    source: "xml",
+                    ...(dbg ? { dbg: dbgInfo } : {})
+                  });
+                }
+                // Faltan conceptos → continuar a FUENTE 2.6 para completar con ZIP individual
+                savedFacturas = xmlFacturas;
               }
             }
           } catch(e) { if (dbg) dbgInfo.xmlError = e.message; }
