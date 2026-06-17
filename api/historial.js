@@ -210,9 +210,11 @@ function _buildXmlFacturas(xmlFiles, rutNorm, sitioFilter = null) {
     for (const item of dte.items) {
       const tipo = _detectTipoFromNmb(item.nmb);
       if (!tipo) continue;
-      // Filtro por VlrCodigo: si el item tiene código interno Y hay sitioFilter,
-      // descartar el item si el código no coincide con el sitio solicitado.
-      if (sitioNorm && item.cod && _normCod(item.cod) !== sitioNorm) continue;
+      // Filtro por VlrCodigo: solo para arriendo — el VlrCodigo de servAdm puede ser
+      // un código de concepto ("S-A") en vez de código de sitio ("A-2"), por lo que
+      // filtrarlo rechazaría facturas válidas. La selección por UF en _pickByUF
+      // desambigua sitios para servAdm cuando hay múltiples candidatos.
+      if (tipo !== 'servAdm' && sitioNorm && item.cod && _normCod(item.cod) !== sitioNorm) continue;
       const prefix = tipo === "servAdm" ? "FEE" : "F";
       const nro = `${prefix}-${dte.folio}`;
       if (seenNros.has(nro)) continue; // evitar duplicar línea exenta
@@ -650,6 +652,7 @@ export default async function handler(req, res) {
                 xmlFiles.push({ content: await entry.async("text") });
               }
               const byTipo = _buildXmlFacturas(xmlFiles, rutNorm, sitioQ || null);
+              if (dbg) dbgInfo.xmlByTipo = byTipo;
               const xmlFacturas = _resolveFacturas(byTipo, ufArr, ufSrv, siteIdx);
               if (dbg) dbgInfo.xmlFacturas = xmlFacturas;
               if (Object.keys(xmlFacturas).length > 0) {
@@ -764,9 +767,11 @@ export default async function handler(req, res) {
         if (ufArr > 0 && !savedFacturas.arriendo) missingConceptos26.push("arriendo");
         if (ufSrv > 0 && !savedFacturas.servAdm)  missingConceptos26.push("servAdm");
 
+        if (dbg) dbgInfo.missingConceptos26 = missingConceptos26;
         if (missingUF26.length > 0 || missingConceptos26.length > 0) {
           const zipName26 = `${anioStr}-${mesNum}.zip`;
           const zipFile26 = driveFileList.find(f => f.name.toLowerCase() === zipName26.toLowerCase());
+          if (dbg) dbgInfo.zip26File = zipFile26?.name || null;
           if (zipFile26) {
             try {
               const zr26 = await fetch(
@@ -811,6 +816,7 @@ export default async function handler(req, res) {
                     candidates26[tipo26].push({ nro: nroFull, uf: uf26m, total: total26m });
                   }
                   // Seleccionar candidato más cercano por UF (clave para clientes multi-sitio)
+                  if (dbg) dbgInfo.zip26Candidates = candidates26;
                   const UFExp26 = { arriendo: ufArr, servAdm: ufSrv };
                   for (const tipo26 of missingConceptos26) {
                     const picked26 = _pickByUF(candidates26[tipo26], UFExp26[tipo26], siteIdx);
