@@ -177,11 +177,12 @@ function _ufFromXmlItem(item) {
   if (m) { const v = parseFloat(m[1].replace(",", ".")); if (v >= 0.1 && v < 500) return Math.round(v * 10000) / 10000; }
   return null;
 }
-/** Clasifica tipo según NmbItem */
+/** Clasifica tipo según NmbItem — cubre variantes con y sin "de": "Serv. de Adm.", "Serv. Adm." */
 function _detectTipoFromNmb(nmb) {
   const n = (nmb || "").toLowerCase();
   if (n.includes("habilitaci")) return "habilitacion";
-  if (n.includes("serv. adm") || n.includes("serv adm") || n.includes("serv.adm") ||
+  if (n.includes("serv. de adm") || n.includes("serv.de adm") || n.includes("serv de adm") ||
+      n.includes("serv. adm") || n.includes("serv adm") || n.includes("serv.adm") ||
       n.includes("gastos comun") || n.includes("gtos. com")) return "servAdm";
   if (n.includes("serv. mant") || n.includes("serv mant") || n.includes("mantencion") ||
       n.includes("mantenci\u00f3n")) return "servMant";
