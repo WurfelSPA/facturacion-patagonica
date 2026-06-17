@@ -150,6 +150,25 @@ function extractText(pdfBuf) {
   return text.replace(/\s+/g," ").trim();
 }
 
+
+// Auto-corrección del JSON cuando se usa refresh=1: sobreescribe el dato contaminado
+async function _autoSaveHistorial(token, anio, periodo, clienteKey, facturas, pdfFolderId) {
+  if (!pdfFolderId || !clienteKey) return;
+  try {
+    let historial = {};
+    const fileId = await findFile(token, HIST_NAME, pdfFolderId);
+    if (fileId) {
+      const text = await downloadFile(token, fileId);
+      if (text) historial = JSON.parse(text);
+    }
+    if (!historial[anio]) historial[anio] = {};
+    if (!historial[anio][periodo]) historial[anio][periodo] = {};
+    historial[anio][periodo][clienteKey] = facturas;
+    const content = JSON.stringify(historial, null, 2);
+    if (fileId) await updateJsonFile(token, fileId, content);
+    else await createJsonFile(token, HIST_NAME, pdfFolderId, content);
+  } catch(_) { /* silencioso */ }
+}
 // ── PDF consolidado: extrae facturas por RUT ─────────────────────────────────
 // Retorna { arriendo:[{nro,uf,total},...], servAdm:[...], habilitacion:[...] }
 // Puede haber múltiples facturas del mismo tipo cuando el cliente tiene varios sitios.
@@ -417,7 +436,7 @@ export default async function handler(req, res) {
 
     // ── GET ?cliente=X&periodo=Y ── facturas del cliente en el período ──────
     if (req.method === "GET" && req.query.cliente && req.query.periodo) {
-      const { cliente, periodo, rut: rutQuery, debug, ufArr: ufArrQ, ufSrv: ufSrvQ } = req.query;
+      const { cliente, periodo, rut: rutQuery, debug, ufArr: ufArrQ, ufSrv: ufSrvQ, refresh } = req.query;
       const ufArr = ufArrQ ? parseFloat(ufArrQ) : 0;
       const ufSrv = ufSrvQ ? parseFloat(ufSrvQ) : 0;
       const [mesNom, anioStr] = periodo.split(" ");
@@ -428,7 +447,7 @@ export default async function handler(req, res) {
 
       /* ── FUENTE 1: historial JSON (instantáneo, confiable) ── */
       let savedFacturas = null; // guardamos si faltan totales para enriquecer con FUENTE 2
-      if (PDF_FOLDER) {
+      if (PDF_FOLDER && !refresh) {
         try {
           const histFileId = await findFile(token, HIST_NAME, PDF_FOLDER);
           if (histFileId) {
@@ -533,7 +552,9 @@ export default async function handler(req, res) {
                   } catch(_) {}
                 }
               }
-              return res.status(200).json({ facturas, source: savedFacturas ? "json+pdf" : "pdf_consolidado", ...(dbg?{dbg:dbgInfo}:{}) });
+              // refresh=1: auto-corregir JSON contaminado en Drive (async, no bloquea)
+              if (refresh) _autoSaveHistorial(token, anioStr, periodo, cliente, facturas, PDF_FOLDER).catch(()=>{});
+              return res.status(200).json({ facturas, source: refresh ? "pdf_refreshed" : (savedFacturas ? "json+pdf" : "pdf_consolidado"), ...(dbg?{dbg:dbgInfo}:{}) });
             }
           }
         }

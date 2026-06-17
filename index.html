@@ -1927,11 +1927,15 @@ function HistorialFactView({dashData,driveLoading,notify}){
   const [pdfPrev,setPdfPrev]=useState(null);
   const [pdfLoading,setPdfLoading]=useState(false);
   const [search,setSearch]=useState("");
+  const [refreshTrigger,setRefreshTrigger]=useState(0);
+  const refreshFlag=React.useRef(false);
 
   /* Al seleccionar cliente: descubrir períodos y cargar en paralelo por sitio */
   useEffect(()=>{
     if(!selClient){setPeriodsAvail([]);setInvoicesMap({});setLoadingSet(new Set([]));return;}
     setPeriodsAvail([]);setInvoicesMap({});
+    const doRefresh=refreshFlag.current;  // capturar antes de reset
+    refreshFlag.current=false;
     let cancelled=false; // evita que fetches de cliente anterior contaminen el nuevo
     fetch("/api/historial?listPeriodos=1")
       .then(r=>r.json())
@@ -1947,7 +1951,8 @@ function HistorialFactView({dashData,driveLoading,notify}){
           periodos.slice(0,10).forEach(p=>{
             const url=`/api/historial?cliente=${encodeURIComponent(sc.nombre)}&rut=${encodeURIComponent(sc.rut||"")}`
               +`&ufArr=${encodeURIComponent(sc.ufArr||"")}&ufSrv=${encodeURIComponent(sc.ufSrv||"")}`
-              +`&periodo=${encodeURIComponent(p)}`;
+              +`&periodo=${encodeURIComponent(p)}`
+              +(doRefresh?"&refresh=1":"");
             fetch(url)
               .then(r=>r.json())
               .then(({facturas})=>{
@@ -1961,7 +1966,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
       })
       .catch(()=>{if(!cancelled){setPeriodsAvail([]);setLoadingSet(new Set());}});
     return ()=>{cancelled=true;};
-  },[selClient]);
+  },[selClient,refreshTrigger]);
 
   const clients=dashData
     ?(()=>{const seen=new Set();return [...dashData.clients].sort((a,b)=>(a.ri||0)-(b.ri||0)).filter(c=>{const k=c.nombre+"|"+c.sitio;if(seen.has(k))return false;seen.add(k);return true;});})()
@@ -2033,6 +2038,12 @@ function HistorialFactView({dashData,driveLoading,notify}){
         h("span",{className:"spin"},"⟳"),
         `Consultando ${totalLoading}/${totalPeriods} períodos...`
       ),
+      selClient&&totalLoading===0&&h("button",{
+        onClick:()=>{refreshFlag.current=true;setRefreshTrigger(n=>n+1);},
+        title:"Volver a consultar desde PDF — corrige datos incorrectos",
+        style:{marginLeft:"auto",fontSize:11,padding:"4px 10px",borderRadius:7,border:"1px solid var(--bdr)",
+          background:"var(--surf2)",color:"var(--txm)",cursor:"pointer",display:"flex",alignItems:"center",gap:4}
+      },h("span",null,"⟳")," Refrescar"),
       !selClient&&h("input",{value:search,onChange:e=>setSearch(e.target.value),
         placeholder:"Buscar por cliente, RUT o correo...",style:{marginLeft:"auto",width:250}})
     ),
