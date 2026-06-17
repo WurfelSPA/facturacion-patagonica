@@ -791,6 +791,9 @@ export default async function handler(req, res) {
             } catch(_) {}
           }
         }
+        // Eliminar conceptos no esperados antes de devolver caché parcial
+        if (!(ufSrv > 0) && savedFacturas.servAdm) delete savedFacturas.servAdm;
+        if (!(ufArr > 0) && savedFacturas.arriendo) delete savedFacturas.arriendo;
         return res.status(200).json({ facturas: savedFacturas, source:"json", ...(dbg?{dbg:dbgInfo}:{}) });
       }
 
