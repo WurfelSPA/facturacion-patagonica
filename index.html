@@ -1929,6 +1929,42 @@ function HistorialFactView({dashData,driveLoading,notify}){
   const [search,setSearch]=useState("");
   const [refreshTrigger,setRefreshTrigger]=useState(0);
   const refreshFlag=React.useRef(false);
+  const [clientTotals,setClientTotals]=useState({});   /* {nombre: total_clp_acumulado_2026} */
+
+  /* Carga diferida: acumulado CLP real por cliente usando monthly de planilla como filtro */
+  React.useEffect(()=>{
+    if(!dashData)return;
+    let cancelled=false;
+    setClientTotals({});
+    const MES_NUM={Enero:"01",Febrero:"02",Marzo:"03",Abril:"04",Mayo:"05",Junio:"06",
+                   Julio:"07",Agosto:"08",Septiembre:"09",Octubre:"10",Noviembre:"11",Diciembre:"12"};
+    fetch("/api/historial?listPeriodos=1")
+      .then(r=>r.json())
+      .then(({periodos=[]})=>{
+        if(cancelled) return;
+        // Por cada sitio-cliente, fetch solo períodos donde monthly[key]>0
+        dashData.clients.forEach((sc,siteIdx)=>{
+          const sameNombre=dashData.clients.filter(c=>c.nombre===sc.nombre);
+          const idx=sameNombre.indexOf(sc);
+          periodos.forEach(p=>{
+            const [mes,anio]=p.split(" ");
+            const pKey=anio&&MES_NUM[mes]?`${anio}-${MES_NUM[mes]}`:null;
+            if(!pKey) return;
+            // Solo fetch si el cliente tiene UF activo en ese período según planilla
+            if(!(sc.monthly[pKey]>0) && !(sc.ufArr>0 && anio==="2026")) return;
+            const url=`/api/historial?cliente=${encodeURIComponent(sc.nombre)}&rut=${encodeURIComponent(sc.rut||"")}`
+              +`&ufArr=${encodeURIComponent(sc.ufArr||"")}&ufSrv=${encodeURIComponent(sc.ufSrv||"")}`
+              +`&siteIdx=${idx}&periodo=${encodeURIComponent(p)}`;
+            fetch(url).then(r=>r.json()).then(({facturas})=>{
+              if(cancelled||!facturas) return;
+              const t=Object.values(facturas).reduce((s,f)=>s+(f?.total||0),0);
+              if(t>0) setClientTotals(prev=>({...prev,[sc.nombre]:(prev[sc.nombre]||0)+t}));
+            }).catch(()=>{});
+          });
+        });
+      }).catch(()=>{});
+    return ()=>{cancelled=true;};
+  },[dashData]);
 
   /* Clave única por fila de planilla: sitio + edificio (ej: 'A-2|T. Of. 44') */
   const siteKey=sc=>`${sc.sitio}${sc.edificio?'|'+sc.edificio:''}`;
@@ -2054,9 +2090,9 @@ function HistorialFactView({dashData,driveLoading,notify}){
     ),
 
     !selClient&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
-      h("div",{style:{display:"grid",gridTemplateColumns:"90px 1fr 220px",padding:"8px 14px",
+      h("div",{style:{display:"grid",gridTemplateColumns:"90px 1fr 180px 130px",padding:"8px 14px",
         borderBottom:"1px solid var(--bdr)",background:"var(--surf2)",fontSize:10,fontWeight:700,color:"var(--txm)",letterSpacing:".06em"}},
-        h("div",null,"SITIO"),h("div",null,"CLIENTE"),h("div",null,"CORREO")
+        h("div",null,"SITIO"),h("div",null,"CLIENTE"),h("div",null,"CORREO"),h("div",{style:{textAlign:"right"}},"ACUMULADO 2026")
       ),
       driveLoading?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txm)",fontSize:13}},
         h("span",{className:"spin",style:{fontSize:18,marginRight:8}},"⟳"),"Cargando..."
@@ -2068,8 +2104,9 @@ function HistorialFactView({dashData,driveLoading,notify}){
       h("div",{style:{maxHeight:"calc(100vh - 200px)",overflowY:"auto"}},
         filtered.map(c=>{
           const color=SITIO_C[c.sitio]||"#888";
+          const cliTotal=clientTotals[c.nombre]||0;
           return h("div",{key:c.nombre+c.sitio,onClick:()=>setSelGroup(dashData.clients.filter(cl=>cl.nombre===c.nombre)),
-            style:{display:"grid",gridTemplateColumns:"90px 1fr 220px",padding:"10px 14px",
+            style:{display:"grid",gridTemplateColumns:"90px 1fr 180px 130px",padding:"10px 14px",
               borderBottom:"1px solid var(--bdr)",cursor:"pointer",transition:"background .1s"}
           },
             h("div",{style:{display:"flex",alignItems:"center",gap:5}},
@@ -2082,7 +2119,12 @@ function HistorialFactView({dashData,driveLoading,notify}){
               c.rut&&h("div",{style:{fontSize:9,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},c.rut)
             ),
             h("div",{style:{fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace",
-              alignSelf:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},c.email||"—")
+              alignSelf:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},c.email||"—"),
+            h("div",{style:{alignSelf:"center",textAlign:"right",fontFamily:"'DM Mono',monospace"}},
+              cliTotal>0
+                ?h("span",{style:{fontSize:11,fontWeight:700,color:"var(--blue)"}},"$"+cliTotal.toLocaleString("es-CL"))
+                :h("span",{style:{fontSize:10,color:"var(--txd)",opacity:.5}},"…")
+            )
           );
         })
       )
