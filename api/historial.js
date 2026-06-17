@@ -596,12 +596,14 @@ export default async function handler(req, res) {
                   const facturas = Object.fromEntries(Object.entries(raw).map(([k,v])=>
                     [k, typeof v==="string" ? {nro:v,uf:null,total:null} : v]
                   ));
-                  // Si todos los totales Y UFs están presentes, Y no faltan NI SOBRAN conceptos esperados → retornar inmediato
+                  // Eliminar conceptos que la planilla indica que este sitio NO tiene.
+                  // El JSON puede contener datos de varios sitios bajo la misma clave cliente.
+                  if (!(ufArr > 0) && facturas.arriendo) delete facturas.arriendo;
+                  if (!(ufSrv > 0) && facturas.servAdm)  delete facturas.servAdm;
+                  // Si todos los totales Y UFs están presentes, Y no falta ningún concepto esperado → retornar inmediato
                   const allComplete = Object.values(facturas).every(f => f.total != null && f.uf != null)
                     && !(ufArr > 0 && !facturas.arriendo)    // esperamos arriendo pero no está
-                    && !(ufSrv > 0 && !facturas.servAdm)    // esperamos servAdm pero no está
-                    && !(ufSrv === 0 && facturas.servAdm)   // servAdm inesperado → reprocess
-                    && !(ufArr === 0 && facturas.arriendo);  // arriendo inesperado → reprocess
+                    && !(ufSrv > 0 && !facturas.servAdm);   // esperamos servAdm pero no está
                   if (allComplete) {
                     return res.status(200).json({ facturas, source:"json", ...(dbg?{dbg:dbgInfo}:{}) });
                   }
