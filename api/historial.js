@@ -280,25 +280,31 @@ function extractFacturasForRut(text, rutNorm) {
 
 // Selecciona el candidato cuya UF sea más cercana al valor esperado.
 // Si no hay candidatos con UF o no se pasa expected, retorna el primero.
-function _pickByUF(candidates, expectedUF) {
+function _pickByUF(candidates, expectedUF, siteIdx) {
   if (!candidates || candidates.length === 0) return null;
-  if (candidates.length === 1 || !(expectedUF > 0)) return candidates[0];
-  let best = candidates[0], bestDiff = Infinity;
-  for (const c of candidates) {
-    if (c.uf == null) continue;
-    const diff = Math.abs(c.uf - expectedUF);
-    if (diff < bestDiff) { bestDiff = diff; best = c; }
-  }
-  return best;
+  if (candidates.length === 1) return candidates[0];
+  if (!(expectedUF > 0)) return candidates[siteIdx != null ? siteIdx % candidates.length : 0];
+  // Ordenar por distancia UF ascendente; desempate: folio numérico ascendente
+  const sorted = [...candidates].sort((a, b) => {
+    const da = a.uf != null ? Math.abs(a.uf - expectedUF) : Infinity;
+    const db = b.uf != null ? Math.abs(b.uf - expectedUF) : Infinity;
+    if (Math.abs(da - db) > 0.001) return da - db;
+    return parseInt((a.nro||"").replace(/\D/g,"")||"0") - parseInt((b.nro||"").replace(/\D/g,"")||"0");
+  });
+  const minDiff = sorted[0].uf != null ? Math.abs(sorted[0].uf - expectedUF) : Infinity;
+  // Entre candidatos empatados (misma distancia al UF esperado), elegir por siteIdx
+  const tied = sorted.filter(c => c.uf != null && Math.abs(Math.abs(c.uf - expectedUF) - minDiff) < 0.001);
+  if (siteIdx != null && tied.length > 1) return tied[siteIdx % tied.length];
+  return sorted[0];
 }
 
 // Convierte el resultado multi-candidato a objeto simple {tipo:{nro,uf,total}}
 // usando ufArr/ufSrv para seleccionar el correcto cuando hay múltiples.
-function _resolveFacturas(multiFacturas, ufArr, ufSrv) {
+function _resolveFacturas(multiFacturas, ufArr, ufSrv, siteIdx) {
   const UFExp = { arriendo: ufArr, servAdm: ufSrv, habilitacion: null, servMant: null };
   const result = {};
   for (const [tipo, candidates] of Object.entries(multiFacturas)) {
-    const picked = _pickByUF(candidates, UFExp[tipo]);
+    const picked = _pickByUF(candidates, UFExp[tipo], siteIdx);
     if (picked) result[tipo] = picked;
   }
   return result;
@@ -508,7 +514,8 @@ export default async function handler(req, res) {
 
     // ── GET ?cliente=X&periodo=Y ── facturas del cliente en el período ──────
     if (req.method === "GET" && req.query.cliente && req.query.periodo) {
-      const { cliente, periodo, rut: rutQuery, debug, ufArr: ufArrQ, ufSrv: ufSrvQ, refresh } = req.query;
+      const { cliente, periodo, rut: rutQuery, debug, ufArr: ufArrQ, ufSrv: ufSrvQ, refresh, siteIdx: siteIdxQ } = req.query;
+      const siteIdx = siteIdxQ != null ? parseInt(siteIdxQ) : null;
       const ufArr = ufArrQ ? parseFloat(ufArrQ) : 0;
       const ufSrv = ufSrvQ ? parseFloat(ufSrvQ) : 0;
       const [mesNom, anioStr] = periodo.split(" ");
@@ -580,7 +587,7 @@ export default async function handler(req, res) {
                 xmlFiles.push({ content: await entry.async("text") });
               }
               const byTipo = _buildXmlFacturas(xmlFiles, rutNorm);
-              const xmlFacturas = _resolveFacturas(byTipo, ufArr, ufSrv);
+              const xmlFacturas = _resolveFacturas(byTipo, ufArr, ufSrv, siteIdx);
               if (dbg) dbgInfo.xmlFacturas = xmlFacturas;
               if (Object.keys(xmlFacturas).length > 0) {
                 // Sin _autoSaveHistorial: XML siempre fresco — guardar al JSON causaría
@@ -614,7 +621,7 @@ export default async function handler(req, res) {
             // extractFacturasForRut ahora retorna arrays por tipo; _resolveFacturas selecciona
             // el candidato cuya UF sea más cercana al valor esperado del sitio (ufArr/ufSrv).
             const multiFacturas = extractFacturasForRut(text, rutNorm);
-            const pdfFacturas = _resolveFacturas(multiFacturas, ufArr, ufSrv);
+            const pdfFacturas = _resolveFacturas(multiFacturas, ufArr, ufSrv, siteIdx);
             if (dbg) dbgInfo.facturasByRut = pdfFacturas;
             if (Object.keys(pdfFacturas).length > 0) {
               let facturas;
@@ -728,7 +735,7 @@ export default async function handler(req, res) {
                   // Seleccionar candidato más cercano por UF (clave para clientes multi-sitio)
                   const UFExp26 = { arriendo: ufArr, servAdm: ufSrv };
                   for (const tipo26 of missingConceptos26) {
-                    const picked26 = _pickByUF(candidates26[tipo26], UFExp26[tipo26]);
+                    const picked26 = _pickByUF(candidates26[tipo26], UFExp26[tipo26], siteIdx);
                     if (picked26) savedFacturas[tipo26] = picked26;
                   }
                 }

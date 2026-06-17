@@ -1946,11 +1946,13 @@ function HistorialFactView({dashData,driveLoading,notify}){
         const ls=new Set();
         selGroup.forEach(sc=>periodos.slice(0,10).forEach(p=>ls.add(sc.sitio+'|'+p)));
         setLoadingSet(ls);
-        /* Fetch paralelo por sitio × período — pasa ufArr y ufSrv para que la API elija la factura correcta */
-        selGroup.forEach(sc=>{
+        /* Fetch paralelo por sitio × período — pasa ufArr, ufSrv y siteIdx para que la API elija la factura correcta.
+           siteIdx permite desempatar cuando varios sitios del mismo cliente tienen igual UF (ej: NCH Chile enero). */
+        selGroup.forEach((sc,siteIdx)=>{
           periodos.slice(0,10).forEach(p=>{
             const url=`/api/historial?cliente=${encodeURIComponent(sc.nombre)}&rut=${encodeURIComponent(sc.rut||"")}`
               +`&ufArr=${encodeURIComponent(sc.ufArr||"")}&ufSrv=${encodeURIComponent(sc.ufSrv||"")}`
+              +`&siteIdx=${siteIdx}`
               +`&periodo=${encodeURIComponent(p)}`
               +(doRefresh?"&refresh=1":"");
             fetch(url)
