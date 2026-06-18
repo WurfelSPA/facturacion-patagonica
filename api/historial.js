@@ -351,6 +351,10 @@ function _resolveFacturas(multiFacturas, ufArr, ufSrv, siteIdx) {
     // el sitio que no corresponde debe tener ufArr=0 o ufSrv=0 en la planilla.
     if (tipo === 'arriendo' && !(ufArr > 0)) continue;
     if (tipo === 'servAdm' && !(ufSrv > 0)) continue;
+    // Tipos sin UF esperada (servCont, asesoria): sin VlrCodigo que vincule al sitio,
+    // asignar solo al primer sitio del grupo (siteIdx=0) para no duplicar la misma
+    // factura en todos los sitios del mismo cliente.
+    if (UFExp[tipo] == null && siteIdx > 0) continue;
     const picked = _pickByUF(candidates, UFExp[tipo], siteIdx);
     if (!picked) continue;
     // Facturas adicionales del mismo concepto en el mismo período (ej: retroactiva de mes anterior).
