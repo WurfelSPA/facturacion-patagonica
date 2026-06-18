@@ -1938,6 +1938,10 @@ function HistorialFactView({dashData,driveLoading,notify}){
   const [batchLoading,setBatchLoading]=useState(false);
   const [batchCorrecting,setBatchCorrecting]=useState(null);
   const [batchCorrectForm,setBatchCorrectForm]=useState({});
+  const [multiView,setMultiView]=useState(false);
+  const [multiLoading,setMultiLoading]=useState(false);
+  const [multiProgress,setMultiProgress]=useState("");
+  const [batchVersion,setBatchVersion]=useState(0);
 
   /* Carga diferida: acumulado CLP real por cliente usando monthly de planilla como filtro */
   React.useEffect(()=>{
@@ -2127,35 +2131,76 @@ function HistorialFactView({dashData,driveLoading,notify}){
     if(stored)setBatchResult(stored);
   },[batchOpen,batchPeriodo]);
 
+  /* Núcleo reutilizable: procesa un período y guarda en localStorage */
+  async function procesarPeriodo(periodo){
+    const prevData=batchLSLoad(periodo);
+    const sitios=buildBatchSitios(periodo);
+    if(!sitios.length)return null;
+    const r=await fetch("/api/historial-batch",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({periodo,sitios})});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.error||"Error del servidor");
+    if(prevData?.sitios){
+      for(const s of d.sitios){
+        const prev=prevData.sitios.find(p=>p.rut===s.rut&&p.sitio===s.sitio&&p.edificio===s.edificio);
+        if(prev?.aprobadoLocal){s.facturas=prev.facturas;s.estado=prev.estado;s.aprobadoLocal=true;}
+        else if(prev?.estado==="corregido"){s.facturas=prev.facturas;s.estado="corregido";}
+      }
+      d.stats={total:d.sitios.length,ok:d.sitios.filter(s=>s.estado==="ok").length,
+        pendiente:d.sitios.filter(s=>s.estado==="pendiente").length,
+        corregido:d.sitios.filter(s=>s.estado==="corregido").length};
+    }
+    const stored={...d,aprobado:prevData?.aprobado||null};
+    batchLSSave(periodo,stored);
+    return stored;
+  }
+
   async function runBatch(){
     if(!batchPeriodo||!dashData)return;
     setBatchLoading(true);setBatchResult(null);setBatchCorrecting(null);
     try{
-      const prevData=batchLSLoad(batchPeriodo);
-      const sitios=buildBatchSitios(batchPeriodo);
-      const r=await fetch("/api/historial-batch",{method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({periodo:batchPeriodo,sitios})});
-      const d=await r.json();
-      if(!r.ok)throw new Error(d.error||"Error del servidor");
-      /* Preservar aprobados y correcciones manuales del batch previo */
-      if(prevData?.sitios){
-        for(const s of d.sitios){
-          const prev=prevData.sitios.find(p=>p.rut===s.rut&&p.sitio===s.sitio&&p.edificio===s.edificio);
-          if(prev?.aprobadoLocal){
-            s.facturas=prev.facturas;s.estado=prev.estado;s.aprobadoLocal=true;
-          }else if(prev?.estado==="corregido"){s.facturas=prev.facturas;s.estado="corregido";}
-        }
-        d.stats={total:d.sitios.length,ok:d.sitios.filter(s=>s.estado==="ok").length,
-          pendiente:d.sitios.filter(s=>s.estado==="pendiente").length,
-          corregido:d.sitios.filter(s=>s.estado==="corregido").length};
-      }
-      const stored={...d,aprobado:prevData?.aprobado||null};
-      batchLSSave(batchPeriodo,stored);
+      const stored=await procesarPeriodo(batchPeriodo);
       setBatchResult(stored);
-      notify(`Procesado: ${d.stats.ok} ✅  ${d.stats.pendiente} ⚠️  ${d.stats.corregido} ✏️`,"ok");
+      notify(`Procesado: ${stored.stats.ok} ✅  ${stored.stats.pendiente} ⚠️  ${stored.stats.corregido} ✏️`,"ok");
     }catch(e){notify("Error batch: "+e.message,"err");}
     setBatchLoading(false);
+  }
+
+  async function runAllBatch(){
+    if(!dashData||!batchPeriodos.length)return;
+    setMultiLoading(true);
+    let totalOk=0,totalPend=0;
+    for(let i=0;i<batchPeriodos.length;i++){
+      const periodo=batchPeriodos[i];
+      setMultiProgress(`${periodo} (${i+1}/${batchPeriodos.length})`);
+      try{
+        const stored=await procesarPeriodo(periodo);
+        if(stored){totalOk+=stored.stats.ok;totalPend+=stored.stats.pendiente;}
+      }catch(e){notify(`Error ${periodo}: ${e.message}`,"err");}
+    }
+    setMultiLoading(false);setMultiProgress("");setBatchVersion(v=>v+1);
+    notify(`Todos los períodos: ${totalOk} ok ✅, ${totalPend} pendientes ⚠️`,"ok");
+  }
+
+  function aprobarClienteGlobal(rut,sitio,edificio){
+    for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i);
+      if(!key.startsWith("histBatch:"))continue;
+      try{
+        const data=JSON.parse(localStorage.getItem(key));
+        if(!data?.sitios)continue;
+        let changed=false;
+        const sitios=data.sitios.map(s=>{
+          if(s.rut===rut&&s.sitio===sitio&&s.edificio===edificio&&s.estado!=="pendiente"){
+            changed=true;return{...s,aprobadoLocal:true};
+          }
+          return s;
+        });
+        if(changed)localStorage.setItem(key,JSON.stringify({...data,sitios}));
+      }catch(_){}
+    }
+    setBatchVersion(v=>v+1);
   }
 
   function aprobarPeriodo(){
@@ -2497,32 +2542,43 @@ function HistorialFactView({dashData,driveLoading,notify}){
         h("div",{style:{padding:"14px 20px",borderBottom:"1px solid var(--bdr)",background:"var(--surf2)",
           display:"flex",alignItems:"center",gap:10,flexShrink:0,flexWrap:"wrap"}},
           h("span",{style:{fontWeight:700,fontSize:14,color:"var(--tx)"}},"⚡ Historial verificado"),
-          h("select",{value:batchPeriodo,onChange:e=>setBatchPeriodo(e.target.value),
-            style:{padding:"5px 10px",borderRadius:7,border:"1px solid var(--bdr)",
-              background:"var(--surf)",fontSize:12,color:"var(--tx)",marginLeft:8}},
-            h("option",{value:""},"— Período —"),
-            batchPeriodos.map(p=>h("option",{key:p,value:p},p))
+          h("button",{onClick:()=>setMultiView(v=>!v),
+            style:{padding:"5px 12px",borderRadius:7,border:"1px solid var(--bdr)",fontSize:12,
+              fontWeight:600,cursor:"pointer",marginLeft:8,
+              background:multiView?"var(--blue)":"var(--surf)",color:multiView?"white":"var(--tx)"}},
+            "📊 Vista global"),
+          !multiView&&h(React.Fragment,null,
+            h("select",{value:batchPeriodo,onChange:e=>setBatchPeriodo(e.target.value),
+              style:{padding:"5px 10px",borderRadius:7,border:"1px solid var(--bdr)",
+                background:"var(--surf)",fontSize:12,color:"var(--tx)",marginLeft:8}},
+              h("option",{value:""},"— Período —"),
+              batchPeriodos.map(p=>h("option",{key:p,value:p},p))
+            ),
+            h("button",{onClick:runBatch,disabled:!batchPeriodo||batchLoading||!dashData,
+              style:{padding:"6px 16px",borderRadius:7,border:"none",fontSize:12,fontWeight:600,cursor:"pointer",
+                background:batchPeriodo&&!batchLoading&&dashData?"var(--blue)":"var(--bdr)",color:"white"}},
+              batchLoading?h(React.Fragment,null,h("span",{className:"spin"},"⟳")," Procesando..."):"⚡ Procesar"
+            ),
+            batchResult&&!batchResult.aprobado&&h("button",{
+              onClick:aprobarPeriodo,
+              disabled:!(batchResult.sitios.some(s=>s.aprobadoLocal)),
+              style:{padding:"6px 16px",borderRadius:7,border:"none",fontSize:12,fontWeight:600,cursor:"pointer",
+                background:batchResult.sitios.some(s=>s.aprobadoLocal)?"var(--green)":"var(--bdr)",color:"white"}},
+              `✅ Aprobar seleccionados (${batchResult.sitios.filter(s=>s.aprobadoLocal).length})`),
+            batchResult?.aprobado&&h("span",{style:{fontSize:11,color:"var(--green)",fontWeight:700}},"✅ Período aprobado")
           ),
-          h("button",{onClick:runBatch,disabled:!batchPeriodo||batchLoading||!dashData,
+          multiView&&h("button",{onClick:runAllBatch,disabled:multiLoading||!dashData,
             style:{padding:"6px 16px",borderRadius:7,border:"none",fontSize:12,fontWeight:600,cursor:"pointer",
-              background:batchPeriodo&&!batchLoading&&dashData?"var(--blue)":"var(--bdr)",color:"white"}},
-            batchLoading?h(React.Fragment,null,h("span",{className:"spin"},"⟳")," Procesando..."):"⚡ Procesar"
+              background:!multiLoading&&dashData?"var(--blue)":"var(--bdr)",color:"white",marginLeft:8}},
+            multiLoading?h(React.Fragment,null,h("span",{className:"spin"},"⟳")," ",multiProgress||"Procesando..."):"⚡ Procesar todos los meses"
           ),
-          batchResult&&!batchResult.aprobado&&h("button",{
-            onClick:aprobarPeriodo,
-            disabled:!(batchResult.sitios.some(s=>s.aprobadoLocal)),
-            title:batchResult.sitios.some(s=>s.aprobadoLocal)?"Confirmar todos los aprobados":"Aprueba al menos un cliente primero",
-            style:{padding:"6px 16px",borderRadius:7,border:"none",fontSize:12,fontWeight:600,cursor:"pointer",
-              background:batchResult.sitios.some(s=>s.aprobadoLocal)?"var(--green)":"var(--bdr)",color:"white"}},
-            `✅ Aprobar seleccionados (${batchResult.sitios.filter(s=>s.aprobadoLocal).length})`),
-          batchResult?.aprobado&&h("span",{style:{fontSize:11,color:"var(--green)",fontWeight:700}},"✅ Período aprobado"),
           h("button",{onClick:()=>setBatchOpen(false),
             style:{marginLeft:"auto",background:"none",border:"1px solid var(--bdr)",
               borderRadius:7,padding:"4px 14px",cursor:"pointer",fontSize:12,color:"var(--txm)"}},"✕ Cerrar")
         ),
 
-        /* stats */
-        batchResult&&h("div",{style:{padding:"8px 20px",background:"var(--surf2)",
+        /* stats — solo en vista single */
+        !multiView&&batchResult&&h("div",{style:{padding:"8px 20px",background:"var(--surf2)",
           borderBottom:"1px solid var(--bdr)",display:"flex",gap:24,fontSize:12,flexShrink:0}},
           h("span",{style:{color:"var(--green)",fontWeight:700}},`✅ ${batchResult.stats.ok} ok`),
           h("span",{style:{color:"var(--amber)",fontWeight:700}},`⚠️ ${batchResult.stats.pendiente} pendiente`),
@@ -2530,13 +2586,179 @@ function HistorialFactView({dashData,driveLoading,notify}){
         ),
 
         /* spinner */
-        batchLoading&&h("div",{style:{padding:"50px",textAlign:"center",color:"var(--txm)",fontSize:13}},
+        (batchLoading||multiLoading)&&h("div",{style:{padding:"50px",textAlign:"center",color:"var(--txm)",fontSize:13}},
           h("span",{className:"spin",style:{fontSize:22,display:"block",marginBottom:12}},"⟳"),
-          "Procesando — puede tardar hasta 2 min según cantidad de PDFs"
+          multiLoading?(multiProgress||"Procesando..."):"Procesando — puede tardar hasta 2 min según cantidad de PDFs"
         ),
 
-        /* tabla resultados */
-        batchResult&&!batchLoading&&h("div",{style:{overflowY:"auto",flex:1}},
+        /* ── VISTA GLOBAL MULTI-PERÍODO ──────────────────────────────────── */
+        multiView&&!multiLoading&&(()=>{
+          const NUM_MES={"01":"Enero","02":"Febrero","03":"Marzo","04":"Abril","05":"Mayo","06":"Junio",
+            "07":"Julio","08":"Agosto","09":"Septiembre","10":"Octubre","11":"Noviembre","12":"Diciembre"};
+          const SHORT={"01":"Ene","02":"Feb","03":"Mar","04":"Abr","05":"May","06":"Jun",
+            "07":"Jul","08":"Ago","09":"Sep","10":"Oct","11":"Nov","12":"Dic"};
+          /* leer todos los batches de localStorage */
+          const allData={};
+          for(let i=0;i<localStorage.length;i++){
+            const k=localStorage.key(i);
+            if(!k.startsWith("histBatch:"))continue;
+            const p=k.replace("histBatch:","");
+            try{allData[p]=JSON.parse(localStorage.getItem(k));}catch(_){}
+          }
+          const periods=Object.keys(allData).sort();
+          if(!periods.length)return h("div",{style:{padding:40,textAlign:"center",color:"var(--txd)"}},
+            "No hay períodos procesados. Usa «Procesar todos los meses» para comenzar.");
+          /* clientes únicos */
+          const cMap=new Map();
+          for(const[,data]of Object.entries(allData)){
+            if(!data?.sitios)continue;
+            for(const s of data.sitios){
+              const k=`${s.rut}|${s.sitio}|${s.edificio}`;
+              if(!cMap.has(k))cMap.set(k,{rut:s.rut,cliente:s.cliente,sitio:s.sitio,edificio:s.edificio});
+            }
+          }
+          const clients=[...cMap.values()]
+            .sort((a,b)=>parseInt(a.rut.replace(/\./g,""))-parseInt(b.rut.replace(/\./g,"")));
+          const getEntry=(rut,sitio,edificio,p)=>(allData[p]?.sitios||[])
+            .find(s=>s.rut===rut&&s.sitio===sitio&&s.edificio===edificio)||null;
+          const fUF2=v=>v!=null?parseFloat(Number(v).toFixed(4))+" UF":null;
+          /* totales globales */
+          let gOk=0,gPend=0,gCorr=0;
+          for(const[,d]of Object.entries(allData))if(d?.sitios)
+            for(const s of d.sitios){
+              if(s.estado==="ok")gOk++;else if(s.estado==="pendiente")gPend++;else if(s.estado==="corregido")gCorr++;
+            }
+          return h("div",{style:{overflowX:"auto",flex:1,display:"flex",flexDirection:"column"}},
+            h("div",{style:{padding:"6px 16px",background:"var(--surf2)",borderBottom:"1px solid var(--bdr)",
+              display:"flex",gap:20,fontSize:11,flexShrink:0}},
+              h("span",{style:{color:"var(--green)",fontWeight:700}},`✅ ${gOk} ok`),
+              h("span",{style:{color:"var(--amber)",fontWeight:700}},`⚠️ ${gPend} pendiente`),
+              h("span",{style:{color:"var(--blue)",fontWeight:700}},`✏️ ${gCorr} corregido`),
+              h("span",{style:{color:"var(--txd)",marginLeft:"auto"}},
+                `${clients.length} clientes × ${periods.length} meses`)
+            ),
+            h("div",{style:{overflowX:"auto",overflowY:"auto",flex:1}},
+              h("table",{style:{borderCollapse:"collapse",fontSize:11,minWidth:"100%"}},
+                h("thead",null,
+                  h("tr",{style:{background:"var(--surf2)",position:"sticky",top:0,zIndex:4}},
+                    h("th",{style:{position:"sticky",left:0,zIndex:5,background:"var(--surf2)",
+                      padding:"7px 10px",textAlign:"left",fontSize:9,fontWeight:700,
+                      borderRight:"1px solid var(--bdr)",whiteSpace:"nowrap",minWidth:90}},"SITIO"),
+                    h("th",{style:{position:"sticky",left:90,zIndex:5,background:"var(--surf2)",
+                      padding:"7px 10px",textAlign:"left",fontSize:9,fontWeight:700,
+                      borderRight:"1px solid var(--bdr)",whiteSpace:"nowrap",minWidth:160}},"CLIENTE"),
+                    h("th",{style:{position:"sticky",left:250,zIndex:5,background:"var(--surf2)",
+                      padding:"7px 10px",textAlign:"left",fontSize:9,fontWeight:700,
+                      borderRight:"2px solid var(--bdr)",whiteSpace:"nowrap",minWidth:100}},"RUT"),
+                    ...periods.map(p=>h("th",{key:p,colSpan:4,
+                      style:{padding:"7px 10px",textAlign:"center",fontSize:10,fontWeight:700,
+                        borderLeft:"2px solid #c7d7ea",borderBottom:"1px solid var(--bdr)",
+                        whiteSpace:"nowrap",color:"var(--blue)"}},
+                      `${SHORT[p.split("-")[1]]} ${p.split("-")[0].slice(2)}`)),
+                    h("th",{style:{padding:"7px 10px",fontSize:9,fontWeight:700,
+                      borderLeft:"2px solid var(--bdr)",whiteSpace:"nowrap"}},"ACCIÓN")
+                  ),
+                  h("tr",{style:{background:"var(--surf3)",position:"sticky",top:34,zIndex:3}},
+                    h("th",{style:{position:"sticky",left:0,zIndex:4,background:"var(--surf3)",
+                      borderRight:"1px solid var(--bdr)"},colSpan:3},""),
+                    ...periods.flatMap(p=>[
+                      h("th",{key:p+"a",style:{padding:"3px 8px",fontSize:8,fontWeight:700,
+                        borderLeft:"2px solid #c7d7ea",color:"var(--blue)",whiteSpace:"nowrap"}},"ARRIENDO"),
+                      h("th",{key:p+"s",style:{padding:"3px 8px",fontSize:8,fontWeight:700,
+                        color:"var(--amber)",whiteSpace:"nowrap"}},"SRV.ADM"),
+                      h("th",{key:p+"t",style:{padding:"3px 8px",fontSize:8,fontWeight:700,
+                        textAlign:"right",whiteSpace:"nowrap"}},"TOTAL"),
+                      h("th",{key:p+"e",style:{padding:"3px 8px",fontSize:8,fontWeight:700,
+                        textAlign:"center"}},""),
+                    ]),
+                    h("th",{style:{borderLeft:"2px solid var(--bdr)"}})
+                  )
+                ),
+                h("tbody",null,clients.map(c=>{
+                  const entries=periods.map(p=>getEntry(c.rut,c.sitio,c.edificio,p));
+                  const realEntries=entries.filter(Boolean);
+                  const allApproved=realEntries.length>0&&realEntries.every(e=>e.aprobadoLocal);
+                  const allNonPending=realEntries.every(e=>e.estado!=="pendiente");
+                  const sc=SITIO_C[c.sitio]||"#888";
+                  const rowBg=allApproved?"#dcfce740":"transparent";
+                  return h("tr",{key:c.rut+c.sitio+c.edificio,
+                    style:{borderBottom:"1px solid var(--bdr)",background:rowBg}},
+                    h("td",{style:{position:"sticky",left:0,background:allApproved?"#dcfce7":"var(--surf)",
+                      zIndex:1,padding:"6px 10px",borderRight:"1px solid var(--bdr)"}},
+                      h("span",{style:{padding:"2px 6px",borderRadius:4,fontSize:8,fontWeight:700,
+                        background:`${sc}18`,color:sc,border:`1px solid ${sc}40`,whiteSpace:"nowrap"}},
+                        c.sitio||"—"),
+                      c.edificio&&h("span",{style:{display:"block",fontSize:8,color:"var(--txd)",marginTop:1}},
+                        c.edificio)),
+                    h("td",{style:{position:"sticky",left:90,background:allApproved?"#dcfce7":"var(--surf)",
+                      zIndex:1,padding:"6px 10px",fontWeight:600,borderRight:"1px solid var(--bdr)",
+                      whiteSpace:"nowrap",maxWidth:160,overflow:"hidden",textOverflow:"ellipsis"}},
+                      c.cliente),
+                    h("td",{style:{position:"sticky",left:250,background:allApproved?"#dcfce7":"var(--surf)",
+                      zIndex:1,padding:"6px 10px",fontFamily:"'DM Mono',monospace",fontSize:9,
+                      color:"var(--txd)",borderRight:"2px solid var(--bdr)",whiteSpace:"nowrap"}},
+                      c.rut.replace(/\./g,"")),
+                    ...entries.map((e,i)=>{
+                      if(!e)return h(React.Fragment,{key:periods[i]},
+                        h("td",{style:{borderLeft:"2px solid #c7d7ea",padding:"6px 8px",
+                          color:"var(--txd)",fontSize:9,textAlign:"center"}},"·"),
+                        h("td",{style:{padding:"6px 8px",color:"var(--txd)",fontSize:9,textAlign:"center"}},"·"),
+                        h("td",{style:{padding:"6px 8px"}},""),
+                        h("td",{style:{padding:"6px 8px"}},"")
+                      );
+                      const tots=Object.values(e.facturas).map(f=>f?.total).filter(v=>v!=null&&v>0);
+                      const total=tots.length?tots.reduce((a,b)=>a+b,0):null;
+                      const eColor=e.aprobadoLocal?"var(--green)":e.estado==="ok"?"var(--green)":
+                        e.estado==="corregido"?"var(--blue)":"var(--amber)";
+                      const cellBg=e.aprobadoLocal?"#f0fdf4":undefined;
+                      const nroCellM=(tipo,color)=>{
+                        const f=e.facturas[tipo];
+                        const pLabel=`${NUM_MES[periods[i].split("-")[1]]} ${periods[i].split("-")[0]}`;
+                        if(!f)return h("span",{style:{color:"var(--txd)",fontSize:9}},
+                          (tipo==="arriendo"?e.ufArr:e.ufSrv)>0?"—":"n/a");
+                        return h("button",{onClick:()=>previewFact(f.nro,pLabel),disabled:pdfLoading,
+                          style:{background:"none",border:"none",color,fontSize:9,fontWeight:600,
+                            cursor:"pointer",fontFamily:"'DM Mono',monospace",padding:0,
+                            textDecoration:"underline dotted",whiteSpace:"nowrap"}},
+                          f.nro,f.uf!=null&&h("span",{style:{fontSize:8,color:"var(--txd)",marginLeft:2}},
+                            "("+fUF2(f.uf)+")"));
+                      };
+                      return h(React.Fragment,{key:periods[i]},
+                        h("td",{style:{borderLeft:"2px solid #c7d7ea",padding:"5px 8px",background:cellBg}},
+                          nroCellM("arriendo","var(--blue)")),
+                        h("td",{style:{padding:"5px 8px",background:cellBg}},
+                          nroCellM("servAdm","var(--amber)")),
+                        h("td",{style:{padding:"5px 8px",textAlign:"right",fontFamily:"'DM Mono',monospace",
+                          fontSize:9,fontWeight:600,background:cellBg}},
+                          total?formatCLP(total):"—"),
+                        h("td",{style:{padding:"5px 8px",textAlign:"center",background:cellBg}},
+                          h("span",{style:{color:eColor,fontSize:11,fontWeight:700}},
+                            e.aprobadoLocal?"✅":e.estado==="ok"?"✅":e.estado==="corregido"?"✏️":"⚠️"))
+                      );
+                    }),
+                    h("td",{style:{padding:"6px 10px",borderLeft:"2px solid var(--bdr)",whiteSpace:"nowrap"}},
+                      allApproved
+                        ?h("span",{style:{color:"var(--green)",fontSize:10,fontWeight:600}},"✅ Listo")
+                        :h("button",{
+                            onClick:()=>aprobarClienteGlobal(c.rut,c.sitio,c.edificio),
+                            disabled:!allNonPending,
+                            title:allNonPending?"Aprobar este cliente en todos los meses":"Hay meses pendientes",
+                            style:{fontSize:10,padding:"3px 10px",borderRadius:5,
+                              border:"1px solid "+(allNonPending?"#86efac":"var(--bdr)"),
+                              background:allNonPending?"#f0fdf4":"var(--surf2)",
+                              color:allNonPending?"#16a34a":"var(--txd)",
+                              cursor:allNonPending?"pointer":"default",fontWeight:600}},
+                          "✓ Aprobar todos")
+                    )
+                  );
+                }))
+              )
+            )
+          );
+        })(),
+
+        /* tabla resultados — solo en vista single */
+        !multiView&&batchResult&&!batchLoading&&h("div",{style:{overflowY:"auto",flex:1}},
           h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:12}},
             h("thead",null,
               h("tr",{style:{position:"sticky",top:0,background:"var(--surf2)",borderBottom:"1px solid var(--bdr)"}},
