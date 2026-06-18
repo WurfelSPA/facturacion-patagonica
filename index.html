@@ -2606,15 +2606,13 @@ function HistorialFactView({dashData,driveLoading,notify}){
                             h("button",{
                               onClick:()=>{
                                 setBatchCorrecting({rut:s.rut,sitio:s.sitio});
-                                /* Mostrar TODOS los campos esperados, pre-llenados con valores existentes */
+                                /* Mostrar SIEMPRE arriendo y servAdm + tipos adicionales ya asignados */
                                 const f={};
-                                if(s.ufArr>0)f.arriendo={nro:s.facturas.arriendo?.nro||"",uf:s.ufArr,total:""};
-                                if(s.ufSrv>0)f.servAdm={nro:s.facturas.servAdm?.nro||"",uf:s.ufSrv,total:""};
-                                /* tipos adicionales ya asignados */
+                                f.arriendo={nro:s.facturas.arriendo?.nro||"",uf:s.ufArr||0,total:""};
+                                f.servAdm={nro:s.facturas.servAdm?.nro||"",uf:s.ufSrv||0,total:""};
                                 for(const[t,v]of Object.entries(s.facturas))
-                                  if(t!=="arriendo"&&t!=="servAdm"&&v?.nro&&!f[t])
+                                  if(t!=="arriendo"&&t!=="servAdm"&&v?.nro)
                                     f[t]={nro:v.nro,uf:v.uf||null,total:""};
-                                if(!Object.keys(f).length)f.arriendo={nro:"",uf:0,total:""};
                                 setBatchCorrectForm(f);
                               },
                               style:{fontSize:10,padding:"2px 8px",borderRadius:5,border:"1px solid var(--bdr)",
