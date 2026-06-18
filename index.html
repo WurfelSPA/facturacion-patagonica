@@ -2606,13 +2606,11 @@ function HistorialFactView({dashData,driveLoading,notify}){
                             h("button",{
                               onClick:()=>{
                                 setBatchCorrecting({rut:s.rut,sitio:s.sitio});
-                                /* Mostrar SIEMPRE arriendo y servAdm + tipos adicionales ya asignados */
+                                /* Mostrar los 6 tipos siempre, pre-llenados con valores existentes */
                                 const f={};
-                                f.arriendo={nro:s.facturas.arriendo?.nro||"",uf:s.ufArr||0,total:""};
-                                f.servAdm={nro:s.facturas.servAdm?.nro||"",uf:s.ufSrv||0,total:""};
-                                for(const[t,v]of Object.entries(s.facturas))
-                                  if(t!=="arriendo"&&t!=="servAdm"&&v?.nro)
-                                    f[t]={nro:v.nro,uf:v.uf||null,total:""};
+                                for(const t of conceptos)
+                                  f[t]={nro:s.facturas[t]?.nro||"",uf:s.facturas[t]?.uf||
+                                    (t==="arriendo"?s.ufArr:t==="servAdm"?s.ufSrv:null)||0,total:""};
                                 setBatchCorrectForm(f);
                               },
                               style:{fontSize:10,padding:"2px 8px",borderRadius:5,border:"1px solid var(--bdr)",
@@ -2632,7 +2630,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
                         Object.entries(batchCorrectForm).map(([tipo,val])=>
                           h("div",{key:tipo,style:{display:"flex",flexDirection:"column",gap:3}},
                             h("label",{style:{fontSize:10,color:"var(--txm)",fontWeight:600}},
-                              tipo==="arriendo"?"Nº Arriendo":tipo==="servAdm"?"Nº Serv.Admin":"Nº "+tipo),
+                              "Nº "+(cLabel[tipo]||tipo)),
                             h("input",{value:val.nro,
                               onChange:e=>setBatchCorrectForm(p=>({...p,[tipo]:{...p[tipo],nro:e.target.value}})),
                               placeholder:"F-XXXXX o FEE-XXXXX",
