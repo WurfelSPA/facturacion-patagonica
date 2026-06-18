@@ -268,7 +268,8 @@ function extractFacturasForRut(text, rutNorm) {
   if (!nros.length) return facturas;
 
   const seenNros = new Set();
-  const rutRe = /\d{1,2}[.\s]\d{3}[.\s]\d{3}-[\dkK]/g;
+  // Acepta tanto "76.123.456-7" (con puntos/espacios) como "76123456-7" (sin separadores)
+  const rutRe = /(?:\d{1,2}[.\s]\d{3}[.\s]\d{3}|\d{7,8})-[\dkK]/g;
   while ((m = rutRe.exec(t)) !== null) {
     if (normRut(m[0]) !== rutNorm) continue;
     const rutPos = m.index;
@@ -517,7 +518,7 @@ function extractClienteFromText(text) {
 function normRut(r){ return (r||"").replace(/\./g,"").replace(/\s/g,"").toLowerCase(); }
 function extractRutFromText(text) {
   /* Busca todos los RUTs en el texto, devuelve el primero que NO sea el de Patagónica */
-  const ruts=[...(text||"").matchAll(/\d{1,2}[.\s]\d{3}[.\s]\d{3}-[\dkK]/g)].map(m=>m[0]);
+  const ruts=[...(text||"").matchAll(/(?:\d{1,2}[.\s]\d{3}[.\s]\d{3}|\d{7,8})-[\dkK]/g)].map(m=>m[0]);
   return ruts.find(r=>normRut(r)!=="966732504")||null;
 }
 
@@ -702,7 +703,13 @@ export default async function handler(req, res) {
           if (pdfRes.ok) {
             const pdfBuf = Buffer.from(await pdfRes.arrayBuffer());
             const text = extractText(pdfBuf);
-            if (dbg) dbgInfo.textSample = text.slice(0, 500);
+            if (dbg) {
+              dbgInfo.textSample = text.slice(0, 500);
+              dbgInfo.rutNorm = rutNorm;
+              // Muestra los primeros RUTs distintos encontrados en el PDF
+              const allRuts = [...text.slice(0,3000).matchAll(/(?:\d{1,2}[.\s]\d{3}[.\s]\d{3}|\d{7,8})-[\dkK]/g)].map(m=>normRut(m[0]));
+              dbgInfo.pdfRutsFound = [...new Set(allRuts)].slice(0,10);
+            }
             // extractFacturasForRut ahora retorna arrays por tipo; _resolveFacturas selecciona
             // el candidato cuya UF sea más cercana al valor esperado del sitio (ufArr/ufSrv).
             const multiFacturas = extractFacturasForRut(text, rutNorm);
