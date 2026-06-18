@@ -2068,32 +2068,18 @@ function HistorialFactView({dashData,driveLoading,notify}){
     if(pdfLoading)return;
     setPdfLoading(true);
     try{
-      let zip=zipCache[periodo];
-      if(!zip){
-        const r=await fetch(`/api/storage?periodo=${encodeURIComponent(periodo)}`);
-        if(!r.ok)throw new Error(`ZIP de ${periodo} no disponible`);
-        const ct=r.headers.get("content-type")||"";
-        if(!ct.includes("zip")&&!ct.includes("octet"))throw new Error("Respuesta no es ZIP");
-        zip=await JSZip.loadAsync(await r.arrayBuffer());
-        setZipCache(p=>({...p,[periodo]:zip}));
-      }
-      /* Buscar por número exacto; si es FEE- y no existe, intentar F- y viceversa */
-      const numPart=fNum.replace(/^F(?:EE)?-/i,"");
-      const candidates=[fNum,"F-"+numPart,"FEE-"+numPart];
-      const matchFn=(fn,pfx)=>fn===pfx+".pdf"||fn.startsWith(pfx+" ")||fn.startsWith(pfx+".");
-      const path=Object.keys(zip.files).find(p=>{
-        if(zip.files[p].dir)return false;
-        const fn=p.split("/").pop();
-        return candidates.some(c=>matchFn(fn,c));
-      });
-      if(!path)throw new Error(`${fNum} no encontrado en ZIP de ${periodo}`);
-      const blob=new Blob([await zip.files[path].async("uint8array")],{type:"application/pdf"});
-      if(pdfPrev)URL.revokeObjectURL(pdfPrev.url);
-      setPdfPrev({url:URL.createObjectURL(blob),factNum:fNum,periodo,nombre:path.split("/").pop()});
+      const MN={Enero:"01",Febrero:"02",Marzo:"03",Abril:"04",Mayo:"05",Junio:"06",
+               Julio:"07",Agosto:"08",Septiembre:"09",Octubre:"10",Noviembre:"11",Diciembre:"12"};
+      const numPart=(fNum||"").replace(/^F(?:EE)?-/i,"");
+      const[mes,anio]=(periodo||"").split(" ");
+      const mesNum=MN[mes];
+      const pCode=mesNum?`${anio}-${mesNum}`:"";
+      const url=`/api/drive-pdf?folio=${encodeURIComponent(numPart)}${pCode?`&periodo=${pCode}`:""}`;
+      setPdfPrev({url,factNum:fNum,periodo,nombre:fNum});
     }catch(e){notify("Error: "+e.message,"err");}
     setPdfLoading(false);
   };
-  const closePrev=()=>{if(pdfPrev)URL.revokeObjectURL(pdfPrev.url);setPdfPrev(null);};
+  const closePrev=()=>{setPdfPrev(null);};
 
   /* ── BATCH helpers ─────────────────────────────────────────────────────── */
   function buildBatchSitios(periodo){
