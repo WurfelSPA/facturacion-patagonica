@@ -2531,7 +2531,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
               )
             ),
             h("tbody",null,
-              batchResult.sitios.map(s=>{
+              [...batchResult.sitios].sort((a,b)=>a.rut.localeCompare(b.rut)).map(s=>{
                 const isCorr=batchCorrecting?.rut===s.rut&&batchCorrecting?.sitio===s.sitio;
                 const otros=Object.keys(s.facturas).filter(t=>t!=="arriendo"&&t!=="servAdm");
                 const sc=SITIO_C[s.sitio]||"#888";
