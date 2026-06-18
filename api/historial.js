@@ -189,6 +189,8 @@ function _detectTipoFromNmb(nmb) {
       n.includes("gastos comun") || n.includes("gtos. com")) return "servAdm";
   if (n.includes("serv. mant") || n.includes("serv mant") || n.includes("mantencion") ||
       n.includes("mantenci\u00f3n")) return "servMant";
+  if (n.includes("serv") && (n.includes("contab") || n.includes("contable"))) return "servCont";
+  if (n.includes("asesor")) return "asesoria";
   if (n.includes("arriendo")) return "arriendo";
   return null;
 }
@@ -340,7 +342,7 @@ function _resolveFacturas(multiFacturas, ufArr, ufSrv, siteIdx) {
     }
   }
 
-  const UFExp = { arriendo: ufArr, servAdm: ufSrv, habilitacion: null, servMant: null };
+  const UFExp = { arriendo: ufArr, servAdm: ufSrv, habilitacion: null, servMant: null, servCont: null, asesoria: null };
   const result = {};
   for (const [tipo, candidates] of Object.entries(byTipo)) {
     // Si el sitio no tiene este concepto (UF=0 en planilla), no asignar aunque haya candidatos.
@@ -494,6 +496,16 @@ function detectTipo(text) {
   add("servMant","Serv Mant");
   add("servMant","Mantencion");
   add("servMant","Mantención");
+  // Servicios Contables
+  add("servCont","Servicios Contables");
+  add("servCont","Serv. Contables");
+  add("servCont","Serv Contables");
+  // Asesorías de Proyecto
+  add("asesoria","Asesoria de Proyecto");
+  add("asesoria","Asesoría de Proyecto");
+  add("asesoria","Asesorias Proyecto");
+  add("asesoria","Asesorías Proyecto");
+  add("asesoria","Asesoria Proyecto");
   if(!hits.length) return null;
   hits.sort((a,b)=>a.i-b.i);
   return hits[0].tipo;

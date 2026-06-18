@@ -2066,9 +2066,9 @@ function HistorialFactView({dashData,driveLoading,notify}){
   };
   const closePrev=()=>{if(pdfPrev)URL.revokeObjectURL(pdfPrev.url);setPdfPrev(null);};
 
-  const conceptos=["arriendo","servAdm","habilitacion","servMant"];
-  const cLabel={arriendo:"Arriendo",servAdm:"Serv. Admin.",habilitacion:"Habilitación",servMant:"Serv. Mant."};
-  const cColor={arriendo:"var(--blue)",servAdm:"var(--amber)",habilitacion:"var(--green)",servMant:"var(--accl)"};
+  const conceptos=["arriendo","servAdm","habilitacion","servMant","servCont","asesoria"];
+  const cLabel={arriendo:"Arriendo",servAdm:"Serv. Admin.",habilitacion:"Habilitación",servMant:"Serv. Mant.",servCont:"Serv. Contables",asesoria:"Asesoría Proyecto"};
+  const cColor={arriendo:"var(--blue)",servAdm:"var(--amber)",habilitacion:"var(--green)",servMant:"var(--accl)",servCont:"#7c5cbf",asesoria:"#2a9d8f"};
 
   const totalLoading=loadingSet.size;
   const totalPeriods=periodsAvail.length*selGroup.length;
