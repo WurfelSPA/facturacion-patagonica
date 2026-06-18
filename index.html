@@ -2547,7 +2547,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
               )
             ),
             h("tbody",null,
-              [...batchResult.sitios].sort((a,b)=>a.rut.localeCompare(b.rut)).map(s=>{
+              [...batchResult.sitios].sort((a,b)=>parseInt(a.rut.replace(/\./g,""))-parseInt(b.rut.replace(/\./g,""))).map(s=>{
                 const isCorr=batchCorrecting?.rut===s.rut&&batchCorrecting?.sitio===s.sitio;
                 const otros=Object.keys(s.facturas).filter(t=>t!=="arriendo"&&t!=="servAdm");
                 const sc=SITIO_C[s.sitio]||"#888";
@@ -2569,7 +2569,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
                       s.edificio&&h("span",{style:{marginLeft:4,fontSize:9,color:"var(--txd)"}},s.edificio)
                     ),
                     h("td",{style:{padding:"7px 12px",fontWeight:600}},s.cliente),
-                    h("td",{style:{padding:"7px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txd)"}},s.rut),
+                    h("td",{style:{padding:"7px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txd)"}},s.rut.replace(/\./g,"")),
                     h("td",{style:{padding:"7px 12px"}},
                       s.facturas.arriendo?nroBtn(s.facturas.arriendo.nro,"var(--blue)",s.facturas.arriendo.uf):
                       s.ufArr>0?h("span",{style:{color:"var(--amber)"}},"—"):h("span",{style:{color:"var(--txd)",fontSize:10}},"n/a")
