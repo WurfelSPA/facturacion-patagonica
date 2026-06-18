@@ -1,6 +1,7 @@
 {
   "functions": {
-    "api/split-pdf.js": { "maxDuration": 60 }
+    "api/split-pdf.js": { "maxDuration": 60 },
+    "api/historial-batch.js": { "maxDuration": 300 }
   },
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1" },

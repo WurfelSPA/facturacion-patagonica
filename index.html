@@ -1931,6 +1931,13 @@ function HistorialFactView({dashData,driveLoading,notify}){
   const [refreshTrigger,setRefreshTrigger]=useState(0);
   const refreshFlag=React.useRef(false);
   const [clientTotals,setClientTotals]=useState({});   /* {nombre: total_clp_acumulado_2026} */
+  const [batchOpen,setBatchOpen]=useState(false);
+  const [batchPeriodo,setBatchPeriodo]=useState("");
+  const [batchPeriodos,setBatchPeriodos]=useState([]);
+  const [batchResult,setBatchResult]=useState(null);
+  const [batchLoading,setBatchLoading]=useState(false);
+  const [batchCorrecting,setBatchCorrecting]=useState(null);
+  const [batchCorrectForm,setBatchCorrectForm]=useState({});
 
   /* Carga diferida: acumulado CLP real por cliente usando monthly de planilla como filtro */
   React.useEffect(()=>{
@@ -1997,6 +2004,24 @@ function HistorialFactView({dashData,driveLoading,notify}){
             const [pMes,pAnio]=p.split(" ");
             const pNum=MES_NUM[pMes];
             const pKey2=pAnio&&pNum?`${pAnio}-${String(pNum).padStart(2,"0")}`:null;
+            /* Verificar localStorage batch antes de llamar al API */
+            if(!doRefresh&&pKey2){
+              try{
+                const stored=localStorage.getItem(`histBatch:${pKey2}`);
+                if(stored){
+                  const batch=JSON.parse(stored);
+                  const nr=r=>((r||"").replace(/\./g,"").replace(/-/g,"").toLowerCase());
+                  const entry=batch.sitios?.find(s=>nr(s.rut)===nr(sc.rut||"")&&s.sitio===(sc.sitio||""));
+                  if(entry&&entry.estado!=="pendiente"&&Object.keys(entry.facturas||{}).length>0){
+                    if(!cancelled){
+                      setInvoicesMap(prev=>({...prev,[siteKey(sc)]:{...(prev[siteKey(sc)]||{}),[p]:entry.facturas}}));
+                      setLoadingSet(prev=>{const s=new Set(prev);s.delete(siteKey(sc)+'|'+p);return s;});
+                    }
+                    return;
+                  }
+                }
+              }catch(_){}
+            }
             const histE2=pKey2?sc.hist?.find(h=>h.key===pKey2):null;
             const pufArr2=histE2?.uf>0?histE2.uf:sc.ufArr;
             const pufSrv2=histE2?.uf>0&&sc.ufArr>0&&sc.ufSrv>0
@@ -2066,6 +2091,96 @@ function HistorialFactView({dashData,driveLoading,notify}){
   };
   const closePrev=()=>{if(pdfPrev)URL.revokeObjectURL(pdfPrev.url);setPdfPrev(null);};
 
+  /* ── BATCH helpers ─────────────────────────────────────────────────────── */
+  function buildBatchSitios(periodo){
+    if(!dashData||!periodo)return[];
+    const MN={Enero:"01",Febrero:"02",Marzo:"03",Abril:"04",Mayo:"05",Junio:"06",
+              Julio:"07",Agosto:"08",Septiembre:"09",Octubre:"10",Noviembre:"11",Diciembre:"12"};
+    const[mes,anio]=periodo.split(" ");
+    const pNum=MN[mes];if(!pNum)return[];
+    const pKey=`${anio}-${pNum}`;
+    return dashData.clients.map(sc=>{
+      const histE=sc.hist?.find(h=>h.key===pKey);
+      const ufArr=histE?.uf>0?histE.uf:sc.ufArr;
+      const ufSrv=histE?.uf>0&&sc.ufArr>0&&sc.ufSrv>0
+        ?Math.round(sc.ufSrv*(histE.uf/sc.ufArr)*10000)/10000:sc.ufSrv;
+      return{rut:sc.rut||"",cliente:sc.nombre,sitio:sc.sitio||"",
+             edificio:sc.edificio||"",ufArr:ufArr||0,ufSrv:ufSrv||0};
+    });
+  }
+
+  /* clave localStorage para un período tipo "Marzo 2026" → "histBatch:2026-03" */
+  function batchLSKey(periodo){
+    const MN={Enero:"01",Febrero:"02",Marzo:"03",Abril:"04",Mayo:"05",Junio:"06",
+              Julio:"07",Agosto:"08",Septiembre:"09",Octubre:"10",Noviembre:"11",Diciembre:"12"};
+    const[mes,anio]=( periodo||"").split(" ");
+    const num=MN[mes];return num?`histBatch:${anio}-${num}`:`histBatch:${periodo}`;
+  }
+  function batchLSSave(periodo,data){try{localStorage.setItem(batchLSKey(periodo),JSON.stringify(data));}catch(_){}}
+  function batchLSLoad(periodo){try{const s=localStorage.getItem(batchLSKey(periodo));return s?JSON.parse(s):null;}catch(_){return null;}}
+
+  /* Carga desde localStorage cuando se abre el modal o cambia el período */
+  React.useEffect(()=>{
+    if(!batchOpen||!batchPeriodo)return;
+    setBatchResult(null);setBatchCorrecting(null);
+    const stored=batchLSLoad(batchPeriodo);
+    if(stored)setBatchResult(stored);
+  },[batchOpen,batchPeriodo]);
+
+  async function runBatch(){
+    if(!batchPeriodo||!dashData)return;
+    setBatchLoading(true);setBatchResult(null);setBatchCorrecting(null);
+    try{
+      const prevData=batchLSLoad(batchPeriodo);
+      const sitios=buildBatchSitios(batchPeriodo);
+      const r=await fetch("/api/historial-batch",{method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({periodo:batchPeriodo,sitios})});
+      const d=await r.json();
+      if(!r.ok)throw new Error(d.error||"Error del servidor");
+      /* Preservar correcciones manuales del batch previo */
+      if(prevData?.sitios){
+        for(const s of d.sitios){
+          const prev=prevData.sitios.find(p=>p.rut===s.rut&&p.sitio===s.sitio);
+          if(prev?.estado==="corregido"){s.facturas=prev.facturas;s.estado="corregido";}
+        }
+        d.stats={total:d.sitios.length,ok:d.sitios.filter(s=>s.estado==="ok").length,
+          pendiente:d.sitios.filter(s=>s.estado==="pendiente").length,
+          corregido:d.sitios.filter(s=>s.estado==="corregido").length};
+      }
+      const stored={...d,aprobado:prevData?.aprobado||null};
+      batchLSSave(batchPeriodo,stored);
+      setBatchResult(stored);
+      notify(`Procesado: ${d.stats.ok} ✅  ${d.stats.pendiente} ⚠️  ${d.stats.corregido} ✏️`,"ok");
+    }catch(e){notify("Error batch: "+e.message,"err");}
+    setBatchLoading(false);
+  }
+
+  function aprobarPeriodo(){
+    if(!batchPeriodo||!batchResult)return;
+    const aprobado=new Date().toISOString();
+    const updated={...batchResult,aprobado};
+    batchLSSave(batchPeriodo,updated);
+    setBatchResult(updated);
+    notify("Período aprobado ✅","ok");
+  }
+
+  function saveCorreccion(rut,sitio,facturas){
+    setBatchResult(prev=>{
+      if(!prev)return prev;
+      const sitios=prev.sitios.map(s=>
+        s.rut===rut&&s.sitio===sitio?{...s,facturas,estado:"corregido"}:s);
+      const stats={total:sitios.length,
+        ok:sitios.filter(s=>s.estado==="ok").length,
+        pendiente:sitios.filter(s=>s.estado==="pendiente").length,
+        corregido:sitios.filter(s=>s.estado==="corregido").length};
+      const updated={...prev,sitios,stats};
+      batchLSSave(batchPeriodo,updated);
+      return updated;
+    });
+    notify("Corrección guardada","ok");
+  }
+
   const conceptos=["arriendo","servAdm","habilitacion","servMant","servCont","asesoria"];
   const cLabel={arriendo:"Arriendo",servAdm:"Serv. Admin.",habilitacion:"Habilitación",servMant:"Serv. Mant.",servCont:"Serv. Contables",asesoria:"Asesoría Proyecto"};
   const cColor={arriendo:"var(--blue)",servAdm:"var(--amber)",habilitacion:"var(--green)",servMant:"var(--accl)",servCont:"#7c5cbf",asesoria:"#2a9d8f"};
@@ -2097,8 +2212,21 @@ function HistorialFactView({dashData,driveLoading,notify}){
         style:{marginLeft:"auto",fontSize:11,padding:"4px 10px",borderRadius:7,border:"1px solid var(--bdr)",
           background:"var(--surf2)",color:"var(--txm)",cursor:"pointer",display:"flex",alignItems:"center",gap:4}
       },h("span",null,"⟳")," Refrescar"),
-      !selClient&&h("input",{value:search,onChange:e=>setSearch(e.target.value),
-        placeholder:"Buscar por cliente, RUT o correo...",style:{marginLeft:"auto",width:250}})
+      !selClient&&h(React.Fragment,null,
+        h("input",{value:search,onChange:e=>setSearch(e.target.value),
+          placeholder:"Buscar cliente, RUT o correo...",style:{marginLeft:"auto",width:220}}),
+        h("button",{
+          onClick:()=>{
+            setBatchOpen(true);setBatchResult(null);setBatchCorrecting(null);
+            if(!batchPeriodos.length)fetch("/api/historial?listPeriodos=1")
+              .then(r=>r.json()).then(({periodos=[]})=>{setBatchPeriodos(periodos);if(periodos[0]&&!batchPeriodo)setBatchPeriodo(periodos[0]);}).catch(()=>{});
+          },
+          title:"Generar historial verificado del período",
+          style:{display:"flex",alignItems:"center",gap:5,fontSize:11,padding:"5px 12px",
+            borderRadius:7,border:"1px solid var(--blue)88",background:"var(--blue)11",
+            color:"var(--blue)",cursor:"pointer",fontWeight:600,whiteSpace:"nowrap"}},
+          "⚡ Generar historial")
+      )
     ),
 
     !selClient&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
@@ -2346,6 +2474,151 @@ function HistorialFactView({dashData,driveLoading,notify}){
         )
       );
     })(),
+
+    batchOpen&&h("div",{className:"overlay",onClick:e=>{if(e.target===e.currentTarget)setBatchOpen(false);}},
+      h("div",{style:{background:"var(--surf)",borderRadius:14,width:"96vw",maxWidth:1200,
+        maxHeight:"94vh",display:"flex",flexDirection:"column",overflow:"hidden",
+        boxShadow:"0 8px 40px rgba(0,0,0,.25)"}},
+
+        /* header */
+        h("div",{style:{padding:"14px 20px",borderBottom:"1px solid var(--bdr)",background:"var(--surf2)",
+          display:"flex",alignItems:"center",gap:10,flexShrink:0,flexWrap:"wrap"}},
+          h("span",{style:{fontWeight:700,fontSize:14,color:"var(--tx)"}},"⚡ Historial verificado"),
+          h("select",{value:batchPeriodo,onChange:e=>setBatchPeriodo(e.target.value),
+            style:{padding:"5px 10px",borderRadius:7,border:"1px solid var(--bdr)",
+              background:"var(--surf)",fontSize:12,color:"var(--tx)",marginLeft:8}},
+            h("option",{value:""},"— Período —"),
+            batchPeriodos.map(p=>h("option",{key:p,value:p},p))
+          ),
+          h("button",{onClick:runBatch,disabled:!batchPeriodo||batchLoading||!dashData,
+            style:{padding:"6px 16px",borderRadius:7,border:"none",fontSize:12,fontWeight:600,cursor:"pointer",
+              background:batchPeriodo&&!batchLoading&&dashData?"var(--blue)":"var(--bdr)",color:"white"}},
+            batchLoading?h(React.Fragment,null,h("span",{className:"spin"},"⟳")," Procesando..."):"⚡ Procesar"
+          ),
+          batchResult&&!batchResult.aprobado&&h("button",{onClick:aprobarPeriodo,
+            style:{padding:"6px 16px",borderRadius:7,border:"none",background:"var(--green)",
+              color:"white",fontSize:12,fontWeight:600,cursor:"pointer"}},
+            "✅ Aprobar período"),
+          batchResult?.aprobado&&h("span",{style:{fontSize:11,color:"var(--green)",fontWeight:700}},"✅ Aprobado"),
+          h("button",{onClick:()=>setBatchOpen(false),
+            style:{marginLeft:"auto",background:"none",border:"1px solid var(--bdr)",
+              borderRadius:7,padding:"4px 14px",cursor:"pointer",fontSize:12,color:"var(--txm)"}},"✕ Cerrar")
+        ),
+
+        /* stats */
+        batchResult&&h("div",{style:{padding:"8px 20px",background:"var(--surf2)",
+          borderBottom:"1px solid var(--bdr)",display:"flex",gap:24,fontSize:12,flexShrink:0}},
+          h("span",{style:{color:"var(--green)",fontWeight:700}},`✅ ${batchResult.stats.ok} ok`),
+          h("span",{style:{color:"var(--amber)",fontWeight:700}},`⚠️ ${batchResult.stats.pendiente} pendiente`),
+          h("span",{style:{color:"var(--blue)",fontWeight:700}},`✏️ ${batchResult.stats.corregido} corregido`)
+        ),
+
+        /* spinner */
+        batchLoading&&h("div",{style:{padding:"50px",textAlign:"center",color:"var(--txm)",fontSize:13}},
+          h("span",{className:"spin",style:{fontSize:22,display:"block",marginBottom:12}},"⟳"),
+          "Procesando — puede tardar hasta 2 min según cantidad de PDFs"
+        ),
+
+        /* tabla resultados */
+        batchResult&&!batchLoading&&h("div",{style:{overflowY:"auto",flex:1}},
+          h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:12}},
+            h("thead",null,
+              h("tr",{style:{position:"sticky",top:0,background:"var(--surf2)",borderBottom:"1px solid var(--bdr)"}},
+                ["SITIO","CLIENTE","RUT","ARRIENDO","SERV.ADM","OTROS","ESTADO"].map(col=>
+                  h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:10,
+                    fontWeight:700,color:"var(--txm)",letterSpacing:".06em",whiteSpace:"nowrap"}},col)
+                )
+              )
+            ),
+            h("tbody",null,
+              batchResult.sitios.map(s=>{
+                const isCorr=batchCorrecting?.rut===s.rut&&batchCorrecting?.sitio===s.sitio;
+                const otros=Object.keys(s.facturas).filter(t=>t!=="arriendo"&&t!=="servAdm");
+                const sc=SITIO_C[s.sitio]||"#888";
+                const estadoColor=s.estado==="ok"?"var(--green)":s.estado==="corregido"?"var(--blue)":"var(--amber)";
+                return h(React.Fragment,{key:s.rut+s.sitio},
+                  h("tr",{style:{borderBottom:"1px solid var(--bdr)",background:isCorr?"var(--blue)08":undefined}},
+                    h("td",{style:{padding:"7px 12px"}},
+                      h("span",{style:{padding:"2px 7px",borderRadius:5,fontSize:9,fontWeight:700,
+                        background:`${sc}18`,color:sc,border:`1px solid ${sc}40`}},s.sitio||"—"),
+                      s.edificio&&h("span",{style:{marginLeft:4,fontSize:9,color:"var(--txd)"}},s.edificio)
+                    ),
+                    h("td",{style:{padding:"7px 12px",fontWeight:600}},s.cliente),
+                    h("td",{style:{padding:"7px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txd)"}},s.rut),
+                    h("td",{style:{padding:"7px 12px",fontFamily:"'DM Mono',monospace"}},
+                      s.facturas.arriendo?h("span",{style:{color:"var(--blue)",fontSize:11}},s.facturas.arriendo.nro):
+                      s.ufArr>0?h("span",{style:{color:"var(--amber)"}},"—"):h("span",{style:{color:"var(--txd)",fontSize:10}},"n/a")
+                    ),
+                    h("td",{style:{padding:"7px 12px",fontFamily:"'DM Mono',monospace"}},
+                      s.facturas.servAdm?h("span",{style:{color:"var(--amber)",fontSize:11}},s.facturas.servAdm.nro):
+                      s.ufSrv>0?h("span",{style:{color:"var(--amber)"}},"—"):h("span",{style:{color:"var(--txd)",fontSize:10}},"n/a")
+                    ),
+                    h("td",{style:{padding:"7px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},
+                      otros.length>0?otros.map(t=>s.facturas[t]?.nro).filter(Boolean).join(", "):"—"
+                    ),
+                    h("td",{style:{padding:"7px 12px"}},
+                      h("div",{style:{display:"flex",alignItems:"center",gap:6}},
+                        h("span",{style:{color:estadoColor,fontWeight:700}},
+                          s.estado==="ok"?"✅":s.estado==="corregido"?"✏️":"⚠️"),
+                        s.estado==="pendiente"&&h("button",{
+                          onClick:()=>{
+                            setBatchCorrecting({rut:s.rut,sitio:s.sitio});
+                            const f={};
+                            if(s.ufArr>0&&!s.facturas.arriendo)f.arriendo={nro:"",uf:s.ufArr,total:""};
+                            if(s.ufSrv>0&&!s.facturas.servAdm)f.servAdm={nro:"",uf:s.ufSrv,total:""};
+                            setBatchCorrectForm(Object.keys(f).length?f:{arriendo:{nro:"",uf:s.ufArr||0,total:""}});
+                          },
+                          style:{fontSize:10,padding:"2px 8px",borderRadius:5,border:"1px solid var(--bdr)",
+                            background:"var(--surf2)",cursor:"pointer",color:"var(--txm)"}
+                        },"✏️")
+                      )
+                    )
+                  ),
+                  isCorr&&h("tr",{style:{background:"var(--blue)05",borderBottom:"2px solid var(--blue)40"}},
+                    h("td",{colSpan:7,style:{padding:"10px 16px"}},
+                      h("div",{style:{display:"flex",gap:14,flexWrap:"wrap",alignItems:"flex-end"}},
+                        Object.entries(batchCorrectForm).map(([tipo,val])=>
+                          h("div",{key:tipo,style:{display:"flex",flexDirection:"column",gap:3}},
+                            h("label",{style:{fontSize:10,color:"var(--txm)",fontWeight:600}},
+                              tipo==="arriendo"?"Nº Arriendo":tipo==="servAdm"?"Nº Serv.Admin":"Nº "+tipo),
+                            h("input",{value:val.nro,
+                              onChange:e=>setBatchCorrectForm(p=>({...p,[tipo]:{...p[tipo],nro:e.target.value}})),
+                              placeholder:"F-XXXXX",
+                              style:{width:130,padding:"5px 8px",borderRadius:6,border:"1px solid var(--bdr)",
+                                background:"var(--surf)",fontSize:11,fontFamily:"'DM Mono',monospace"}})
+                          )
+                        ),
+                        h("button",{
+                          onClick:async()=>{
+                            const nf={...s.facturas};
+                            for(const[tipo,val]of Object.entries(batchCorrectForm)){
+                              if(val.nro.trim())nf[tipo]={nro:val.nro.trim(),uf:val.uf||null,total:null,fuente:"manual"};
+                            }
+                            await saveCorreccion(s.rut,s.sitio,nf);
+                            setBatchCorrecting(null);
+                          },
+                          style:{padding:"6px 14px",borderRadius:6,border:"none",background:"var(--blue)",
+                            color:"white",fontSize:12,fontWeight:600,cursor:"pointer",alignSelf:"flex-end"}
+                        },"✓ Guardar"),
+                        h("button",{onClick:()=>setBatchCorrecting(null),
+                          style:{padding:"6px 14px",borderRadius:6,border:"1px solid var(--bdr)",
+                            background:"none",color:"var(--txm)",fontSize:12,cursor:"pointer",alignSelf:"flex-end"}
+                        },"Cancelar")
+                      )
+                    )
+                  )
+                );
+              })
+            )
+          )
+        ),
+
+        /* estado vacío */
+        !batchLoading&&!batchResult&&h("div",{style:{padding:"60px",textAlign:"center",color:"var(--txd)",fontSize:13}},
+          "Selecciona un período y presiona ⚡ Procesar"
+        )
+      )
+    ),
 
     pdfPrev&&h("div",{className:"overlay",onClick:e=>{if(e.target===e.currentTarget)closePrev();}},
       h("div",{style:{background:"var(--surf)",borderRadius:14,width:"88vw",height:"92vh",display:"flex",flexDirection:"column",overflow:"hidden"}},

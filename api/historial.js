@@ -59,7 +59,8 @@ async function getToken(sa) {
 // ── Drive helpers ─────────────────────────────────────────────────────────────
 async function findFile(token, name, folderId) {
   const q = encodeURIComponent(`name='${name}' and '${folderId}' in parents and trashed=false`);
-  const r = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`,
+  const r = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)&supportsAllDrives=true&includeItemsFromAllDrives=true`,
     { headers:{ Authorization:`Bearer ${token}` } });
   const d = await r.json();
   return d.files?.[0]?.id || null;
@@ -69,7 +70,7 @@ async function createJsonFile(token, name, folderId, content) {
   const meta = JSON.stringify({ name, parents:[folderId], mimeType:"application/json" });
   const body = `--${boundary}\r\nContent-Type: application/json\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${content}\r\n--${boundary}--`;
   const r = await fetch(
-    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true",
     { method:"POST", headers:{ Authorization:`Bearer ${token}`, "Content-Type":`multipart/related; boundary="${boundary}"` }, body }
   );
   const d = await r.json();
@@ -78,7 +79,7 @@ async function createJsonFile(token, name, folderId, content) {
 }
 async function updateJsonFile(token, fileId, content) {
   const r = await fetch(
-    `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+    `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media&supportsAllDrives=true`,
     { method:"PATCH", headers:{ Authorization:`Bearer ${token}`, "Content-Type":"application/json" }, body:content }
   );
   if (!r.ok) throw new Error(`Update file ${r.status}`);
@@ -311,7 +312,7 @@ function _pickByUF(candidates, expectedUF, siteIdx) {
   const minDiff = sorted[0].uf != null ? Math.abs(sorted[0].uf - expectedUF) : Infinity;
   // Umbral 0.5 UF: solo aplica cuando hay MÚLTIPLES candidatos con UF conocido
   // (para desambiguar sitios del mismo cliente). Con un único candidato no hay
-  // ambigüedad posible — el frontend puede enviar un ufSrv de período distinto.
+  // ambigüedad posible — el frontend puede enviar un ufArr de período distinto.
   const nConUF = candidates.filter(c => c.uf != null).length;
   if (nConUF > 1 && expectedUF > 0 && isFinite(minDiff) && minDiff > 0.5) return null;
   // Entre candidatos empatados (misma distancia al UF esperado), elegir por siteIdx
@@ -492,9 +493,11 @@ function detectTipo(text) {
   add("servAdm","GASTOS COMUNES");
   add("servAdm","Gtos. Com");
   add("servAdm","Adm. de Propiedad");
-  // Arriendo — variantes
+  // Arriendo — variantes (incluye "Arrendamiento" que no contiene "Arriendo" como substring)
   add("arriendo","Arriendo");
   add("arriendo","ARRIENDO");
+  add("arriendo","Arrendamiento");
+  add("arriendo","ARRENDAMIENTO");
   // Serv. Mantención — variantes
   add("servMant","Serv. Mant");
   add("servMant","Serv.Mant");
@@ -908,6 +911,7 @@ export default async function handler(req, res) {
         if (!tipo) continue;
         const totalZ = _extractTotal(text);
         const ufZ = _extractUF(text) ?? _derivarUFdePrecio(text, totalZ);
+        if (dbg) { if (!dbgInfo.zip3Candidates) dbgInfo.zip3Candidates = {}; if (!dbgInfo.zip3Candidates[tipo]) dbgInfo.zip3Candidates[tipo] = []; dbgInfo.zip3Candidates[tipo].push({ nro: nroFull, uf: ufZ }); }
         if (!multiFacturas3[tipo]) multiFacturas3[tipo] = [];
         multiFacturas3[tipo].push({ nro: nroFull, uf: ufZ, total: totalZ });
       }
@@ -960,3 +964,14 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: e.message });
   }
 }
+
+export {
+  normRut, norm, clienteMatch, detectTipo,
+  _pickByUF, _resolveFacturas,
+  _buildXmlFacturas, parseXmlDTE,
+  extractFacturasForRut, extractText,
+  _extractUF, _extractTotal, _derivarUFdePrecio,
+  extractClienteFromText, extractRutFromText,
+  getToken, driveFiles, downloadFile, findFile, createJsonFile, updateJsonFile,
+  FACT_FOLDER_ID,
+};
