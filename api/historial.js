@@ -891,6 +891,11 @@ export default async function handler(req, res) {
             const pdfCliente = extractClienteFromText(text);
             if (!pdfCliente || !clienteMatch(pdfCliente, cliente)) continue;
           }
+        } else if (rutNorm) {
+          // El nombre de archivo puede corresponder al edificio, no al cliente legal.
+          // Si el PDF tiene un RUT distinto al esperado → rechazar (cliente equivocado).
+          const pdfRut = extractRutFromText(text);
+          if (pdfRut && normRut(pdfRut) !== rutNorm) continue;
         }
 
         const tipo = detectTipo(text);
