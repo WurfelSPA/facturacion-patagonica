@@ -866,7 +866,9 @@ export default async function handler(req, res) {
       if (!zipRes.ok) return res.status(200).json({ facturas: null, source:"zip_error", ...(dbg?{dbg:dbgInfo}:{}) });
 
       const zip = await JSZip.loadAsync(Buffer.from(await zipRes.arrayBuffer()));
-      const facturas = {};
+      // Colectar todos los candidatos por tipo (igual que _buildXmlFacturas/extractFacturasForRut)
+      // para que _resolveFacturas pueda desambiguar por UF y siteIdx entre sitios del mismo cliente.
+      const multiFacturas3 = {};
       if (dbg) dbgInfo.zipFiles = [];
 
       for (const [path, entry] of Object.entries(zip.files)) {
@@ -899,19 +901,15 @@ export default async function handler(req, res) {
         }
 
         const tipo = detectTipo(text);
-        if (tipo && !facturas[tipo]) {
-          // Respetar planilla: no asignar tipos que el sitio no tiene
-          if (tipo === 'servAdm' && !(ufSrv > 0)) continue;
-          if (tipo === 'arriendo' && !(ufArr > 0)) continue;
-          const totalZ = _extractTotal(text);
-          const ufZ = _extractUF(text) ?? _derivarUFdePrecio(text, totalZ);
-          // Umbral UF: evitar cruce entre sitios del mismo cliente (igual que _pickByUF).
-          const expUFZ = tipo === 'arriendo' ? ufArr : tipo === 'servAdm' ? ufSrv : null;
-          if (expUFZ > 0 && ufZ != null && Math.abs(ufZ - expUFZ) > 0.5) continue;
-          facturas[tipo] = { nro:nroFull, uf:ufZ, total:totalZ };
-        }
+        if (!tipo) continue;
+        const totalZ = _extractTotal(text);
+        const ufZ = _extractUF(text) ?? _derivarUFdePrecio(text, totalZ);
+        if (!multiFacturas3[tipo]) multiFacturas3[tipo] = [];
+        multiFacturas3[tipo].push({ nro: nroFull, uf: ufZ, total: totalZ });
       }
 
+      // _resolveFacturas desambigua por UF/siteIdx y respeta ufArr=0/ufSrv=0 de planilla
+      const facturas = _resolveFacturas(multiFacturas3, ufArr, ufSrv, siteIdx);
       const tiene = Object.keys(facturas).length > 0;
       return res.status(200).json({ facturas: tiene ? facturas : null, source:"zip", ...(dbg?{dbg:dbgInfo}:{}) });
     }
