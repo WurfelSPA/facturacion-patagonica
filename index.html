@@ -2524,8 +2524,8 @@ function HistorialFactView({dashData,driveLoading,notify}){
           h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:12}},
             h("thead",null,
               h("tr",{style:{position:"sticky",top:0,background:"var(--surf2)",borderBottom:"1px solid var(--bdr)"}},
-                ["SITIO","CLIENTE","RUT","ARRIENDO","SERV.ADM","OTROS","ESTADO"].map(col=>
-                  h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:10,
+                ["SITIO","CLIENTE","RUT","ARRIENDO","SERV.ADM","OTROS","TOTAL","ESTADO"].map(col=>
+                  h("th",{key:col,style:{padding:"8px 12px",textAlign:col==="TOTAL"?"right":"left",fontSize:10,
                     fontWeight:700,color:"var(--txm)",letterSpacing:".06em",whiteSpace:"nowrap"}},col)
                 )
               )
@@ -2556,6 +2556,13 @@ function HistorialFactView({dashData,driveLoading,notify}){
                     h("td",{style:{padding:"7px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},
                       otros.length>0?otros.map(t=>s.facturas[t]?.nro).filter(Boolean).join(", "):"—"
                     ),
+                    h("td",{style:{padding:"7px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,
+                      textAlign:"right",fontWeight:600,color:"var(--tx)"}},
+                      (()=>{
+                        const tots=Object.values(s.facturas).map(f=>f?.total).filter(v=>v!=null&&v>0);
+                        return tots.length>0?formatCLP(tots.reduce((a,b)=>a+b,0)):h("span",{style:{color:"var(--txd)",fontWeight:400}},"—");
+                      })()
+                    ),
                     h("td",{style:{padding:"7px 12px"}},
                       h("div",{style:{display:"flex",alignItems:"center",gap:6}},
                         h("span",{style:{color:estadoColor,fontWeight:700}},
@@ -2575,7 +2582,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
                     )
                   ),
                   isCorr&&h("tr",{style:{background:"var(--blue)05",borderBottom:"2px solid var(--blue)40"}},
-                    h("td",{colSpan:7,style:{padding:"10px 16px"}},
+                    h("td",{colSpan:8,style:{padding:"10px 16px"}},
                       h("div",{style:{display:"flex",gap:14,flexWrap:"wrap",alignItems:"flex-end"}},
                         Object.entries(batchCorrectForm).map(([tipo,val])=>
                           h("div",{key:tipo,style:{display:"flex",flexDirection:"column",gap:3}},
