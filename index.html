@@ -2552,12 +2552,14 @@ function HistorialFactView({dashData,driveLoading,notify}){
                 const otros=Object.keys(s.facturas).filter(t=>t!=="arriendo"&&t!=="servAdm");
                 const sc=SITIO_C[s.sitio]||"#888";
                 const estadoColor=s.estado==="ok"?"var(--green)":s.estado==="corregido"?"var(--blue)":"var(--amber)";
-                const nroBtn=(nro,color)=>h("button",{
+                const fUF=v=>v!=null?parseFloat(Number(v).toFixed(4))+" UF":null;
+                const nroBtn=(nro,color,uf)=>h("button",{
                   onClick:()=>previewFact(nro,batchPeriodo),disabled:pdfLoading,
                   title:"Ver PDF — "+nro,
                   style:{background:"none",border:"none",color,fontSize:11,fontWeight:600,
                     cursor:pdfLoading?"wait":"pointer",fontFamily:"'DM Mono',monospace",
-                    padding:0,textDecoration:"underline dotted",textUnderlineOffset:3}},nro);
+                    padding:0,textDecoration:"underline dotted",textUnderlineOffset:3}},
+                  nro,uf!=null&&h("span",{style:{fontSize:9,color:"var(--txd)",fontWeight:400,marginLeft:4}},"("+fUF(uf)+")"));
                 return h(React.Fragment,{key:s.rut+s.sitio},
                   h("tr",{style:{borderBottom:"1px solid var(--bdr)",
                     background:s.aprobadoLocal?"#dcfce740":isCorr?"var(--blue)08":undefined}},
@@ -2569,17 +2571,17 @@ function HistorialFactView({dashData,driveLoading,notify}){
                     h("td",{style:{padding:"7px 12px",fontWeight:600}},s.cliente),
                     h("td",{style:{padding:"7px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txd)"}},s.rut),
                     h("td",{style:{padding:"7px 12px"}},
-                      s.facturas.arriendo?nroBtn(s.facturas.arriendo.nro,"var(--blue)"):
+                      s.facturas.arriendo?nroBtn(s.facturas.arriendo.nro,"var(--blue)",s.facturas.arriendo.uf):
                       s.ufArr>0?h("span",{style:{color:"var(--amber)"}},"—"):h("span",{style:{color:"var(--txd)",fontSize:10}},"n/a")
                     ),
                     h("td",{style:{padding:"7px 12px"}},
-                      s.facturas.servAdm?nroBtn(s.facturas.servAdm.nro,"var(--amber)"):
+                      s.facturas.servAdm?nroBtn(s.facturas.servAdm.nro,"var(--amber)",s.facturas.servAdm.uf):
                       s.ufSrv>0?h("span",{style:{color:"var(--amber)"}},"—"):h("span",{style:{color:"var(--txd)",fontSize:10}},"n/a")
                     ),
                     h("td",{style:{padding:"7px 12px",fontSize:10,color:"var(--txm)"}},
                       otros.length>0
                         ?otros.map((t,i)=>s.facturas[t]?.nro?h(React.Fragment,{key:t},
-                            i>0&&", ",nroBtn(s.facturas[t].nro,"var(--txm)")):null).filter(Boolean)
+                            i>0&&", ",nroBtn(s.facturas[t].nro,"var(--txm)",s.facturas[t].uf)):null).filter(Boolean)
                         :"—"
                     ),
                     h("td",{style:{padding:"7px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,
