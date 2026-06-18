@@ -2603,13 +2603,19 @@ function HistorialFactView({dashData,driveLoading,notify}){
                         :h("div",{style:{display:"flex",alignItems:"center",gap:6}},
                             h("span",{style:{color:estadoColor,fontWeight:700}},
                               s.estado==="ok"?"✅":s.estado==="corregido"?"✏️":"⚠️"),
-                            s.estado==="pendiente"&&!s.aprobadoLocal&&h("button",{
+                            h("button",{
                               onClick:()=>{
                                 setBatchCorrecting({rut:s.rut,sitio:s.sitio});
+                                /* Mostrar TODOS los campos esperados, pre-llenados con valores existentes */
                                 const f={};
-                                if(s.ufArr>0&&!s.facturas.arriendo)f.arriendo={nro:"",uf:s.ufArr,total:""};
-                                if(s.ufSrv>0&&!s.facturas.servAdm)f.servAdm={nro:"",uf:s.ufSrv,total:""};
-                                setBatchCorrectForm(Object.keys(f).length?f:{arriendo:{nro:"",uf:s.ufArr||0,total:""}});
+                                if(s.ufArr>0)f.arriendo={nro:s.facturas.arriendo?.nro||"",uf:s.ufArr,total:""};
+                                if(s.ufSrv>0)f.servAdm={nro:s.facturas.servAdm?.nro||"",uf:s.ufSrv,total:""};
+                                /* tipos adicionales ya asignados */
+                                for(const[t,v]of Object.entries(s.facturas))
+                                  if(t!=="arriendo"&&t!=="servAdm"&&v?.nro&&!f[t])
+                                    f[t]={nro:v.nro,uf:v.uf||null,total:""};
+                                if(!Object.keys(f).length)f.arriendo={nro:"",uf:0,total:""};
+                                setBatchCorrectForm(f);
                               },
                               style:{fontSize:10,padding:"2px 8px",borderRadius:5,border:"1px solid var(--bdr)",
                                 background:"var(--surf2)",cursor:"pointer",color:"var(--txm)"}
