@@ -16,7 +16,13 @@ export const config = { api: { bodyParser: true, responseLimit: "15mb" } };
 
 const PDF_FOLDER       = process.env.DRIVE_PDF_FACTURAS_ID || "";
 const HIST_NAME        = "historial-facturas.json";
+const EXCEL_JSON_NAME  = "historial-excel-2026.json";
 const FACT_FOLDER_ID   = "1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u";
+
+// Caché en memoria del JSON del Excel (se invalida cada hora)
+let _excelCache = null;
+let _excelCacheTs = 0;
+const EXCEL_CACHE_TTL = 3600 * 1000;
 
 const MES_NOM = {
   "01":"Enero","02":"Febrero","03":"Marzo","04":"Abril","05":"Mayo","06":"Junio",
@@ -529,6 +535,19 @@ function extractRutFromText(text) {
   return ruts.find(r=>normRut(r)!=="966732504")||null;
 }
 
+// ── Excel JSON cache ──────────────────────────────────────────────────────────
+async function _loadExcelCache(token) {
+  const now = Date.now();
+  if (_excelCache && (now - _excelCacheTs) < EXCEL_CACHE_TTL) return _excelCache;
+  const fileId = await findFile(token, EXCEL_JSON_NAME, FACT_FOLDER_ID);
+  if (!fileId) return null;
+  const text = await downloadFile(token, fileId);
+  if (!text) return null;
+  _excelCache = JSON.parse(text);
+  _excelCacheTs = now;
+  return _excelCache;
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin","*");
@@ -600,6 +619,56 @@ export default async function handler(req, res) {
       if (!mesNum) return res.status(400).json({ error:"Periodo inválido" });
       const dbg = debug === "1";
       const dbgInfo = {};
+
+      /* ── FUENTE 0: Excel pre-cargado (historial-excel-2026.json) ─────────────
+         Fuente más confiable: datos directamente de Nubox sin parseo dinámico.
+         Sólo se omite si se pide refresh explícito.
+      ── */
+      if (!refresh) {
+        try {
+          const excelData = await _loadExcelCache(token);
+          if (excelData) {
+            const periodoData = excelData[anioStr]?.[periodo];
+            if (periodoData) {
+              // 1. Buscar cliente: exact (normalizado) → fuzzy
+              const clienteNorm = (cliente || "").trim().toUpperCase();
+              let clienteKey = Object.keys(periodoData)
+                .find(k => k.trim().toUpperCase() === clienteNorm);
+              if (!clienteKey)
+                clienteKey = Object.keys(periodoData).find(k => clienteMatch(k, cliente));
+
+              if (clienteKey) {
+                const sitios = periodoData[clienteKey];
+                // 2. Elegir sitio: exacto → único → match por UF
+                let sitioData = null;
+                if (sitioQ && sitios[sitioQ]) {
+                  sitioData = sitios[sitioQ];
+                } else if (Object.keys(sitios).length === 1) {
+                  sitioData = Object.values(sitios)[0];
+                } else {
+                  // Multi-sitio sin sitioQ: buscar por UF más cercana
+                  for (const d of Object.values(sitios)) {
+                    const okArr = !(ufArr > 0) || !d.arriendo?.uf || Math.abs(d.arriendo.uf - ufArr) < 0.5;
+                    const okSrv = !(ufSrv > 0) || !d.servAdm?.uf  || Math.abs(d.servAdm.uf  - ufSrv) < 0.5;
+                    if (okArr && okSrv) { sitioData = d; break; }
+                  }
+                }
+                if (sitioData) {
+                  const facturas = {};
+                  if (ufArr > 0 && sitioData.arriendo) facturas.arriendo = sitioData.arriendo;
+                  if (ufSrv > 0 && sitioData.servAdm)  facturas.servAdm  = sitioData.servAdm;
+                  const hasExpected = !(ufArr > 0 && !facturas.arriendo)
+                                   && !(ufSrv > 0 && !facturas.servAdm);
+                  if (hasExpected && Object.keys(facturas).length > 0) {
+                    if (dbg) dbgInfo.excelSource = { clienteKey, sitioQ };
+                    return res.status(200).json({ facturas, source:"excel", ...(dbg?{dbg:dbgInfo}:{}) });
+                  }
+                }
+              }
+            }
+          }
+        } catch(e) { if (dbg) dbgInfo.excelError = e.message; }
+      }
 
       /* ── rutNorm y driveFileList: necesarios para FUENTE XML y FUENTE 2 ── */
       const rutNorm = normRut(rutQuery);
