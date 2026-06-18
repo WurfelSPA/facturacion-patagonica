@@ -2138,11 +2138,13 @@ function HistorialFactView({dashData,driveLoading,notify}){
         body:JSON.stringify({periodo:batchPeriodo,sitios})});
       const d=await r.json();
       if(!r.ok)throw new Error(d.error||"Error del servidor");
-      /* Preservar correcciones manuales del batch previo */
+      /* Preservar aprobados y correcciones manuales del batch previo */
       if(prevData?.sitios){
         for(const s of d.sitios){
           const prev=prevData.sitios.find(p=>p.rut===s.rut&&p.sitio===s.sitio);
-          if(prev?.estado==="corregido"){s.facturas=prev.facturas;s.estado="corregido";}
+          if(prev?.aprobadoLocal){
+            s.facturas=prev.facturas;s.estado=prev.estado;s.aprobadoLocal=true;
+          }else if(prev?.estado==="corregido"){s.facturas=prev.facturas;s.estado="corregido";}
         }
         d.stats={total:d.sitios.length,ok:d.sitios.filter(s=>s.estado==="ok").length,
           pendiente:d.sitios.filter(s=>s.estado==="pendiente").length,
@@ -2179,6 +2181,17 @@ function HistorialFactView({dashData,driveLoading,notify}){
       return updated;
     });
     notify("Corrección guardada","ok");
+  }
+
+  function toggleAprobadoLocal(rut,sitio){
+    setBatchResult(prev=>{
+      if(!prev)return prev;
+      const sitios=prev.sitios.map(s=>
+        s.rut===rut&&s.sitio===sitio?{...s,aprobadoLocal:!s.aprobadoLocal}:s);
+      const updated={...prev,sitios};
+      batchLSSave(batchPeriodo,updated);
+      return updated;
+    });
   }
 
   const conceptos=["arriendo","servAdm","habilitacion","servMant","servCont","asesoria"];
@@ -2495,11 +2508,14 @@ function HistorialFactView({dashData,driveLoading,notify}){
               background:batchPeriodo&&!batchLoading&&dashData?"var(--blue)":"var(--bdr)",color:"white"}},
             batchLoading?h(React.Fragment,null,h("span",{className:"spin"},"⟳")," Procesando..."):"⚡ Procesar"
           ),
-          batchResult&&!batchResult.aprobado&&h("button",{onClick:aprobarPeriodo,
-            style:{padding:"6px 16px",borderRadius:7,border:"none",background:"var(--green)",
-              color:"white",fontSize:12,fontWeight:600,cursor:"pointer"}},
-            "✅ Aprobar período"),
-          batchResult?.aprobado&&h("span",{style:{fontSize:11,color:"var(--green)",fontWeight:700}},"✅ Aprobado"),
+          batchResult&&!batchResult.aprobado&&h("button",{
+            onClick:aprobarPeriodo,
+            disabled:!(batchResult.sitios.some(s=>s.aprobadoLocal)),
+            title:batchResult.sitios.some(s=>s.aprobadoLocal)?"Confirmar todos los aprobados":"Aprueba al menos un cliente primero",
+            style:{padding:"6px 16px",borderRadius:7,border:"none",fontSize:12,fontWeight:600,cursor:"pointer",
+              background:batchResult.sitios.some(s=>s.aprobadoLocal)?"var(--green)":"var(--bdr)",color:"white"}},
+            `✅ Aprobar seleccionados (${batchResult.sitios.filter(s=>s.aprobadoLocal).length})`),
+          batchResult?.aprobado&&h("span",{style:{fontSize:11,color:"var(--green)",fontWeight:700}},"✅ Período aprobado"),
           h("button",{onClick:()=>setBatchOpen(false),
             style:{marginLeft:"auto",background:"none",border:"1px solid var(--bdr)",
               borderRadius:7,padding:"4px 14px",cursor:"pointer",fontSize:12,color:"var(--txm)"}},"✕ Cerrar")
@@ -2536,8 +2552,15 @@ function HistorialFactView({dashData,driveLoading,notify}){
                 const otros=Object.keys(s.facturas).filter(t=>t!=="arriendo"&&t!=="servAdm");
                 const sc=SITIO_C[s.sitio]||"#888";
                 const estadoColor=s.estado==="ok"?"var(--green)":s.estado==="corregido"?"var(--blue)":"var(--amber)";
+                const nroBtn=(nro,color)=>h("button",{
+                  onClick:()=>previewFact(nro,batchPeriodo),disabled:pdfLoading,
+                  title:"Ver PDF — "+nro,
+                  style:{background:"none",border:"none",color,fontSize:11,fontWeight:600,
+                    cursor:pdfLoading?"wait":"pointer",fontFamily:"'DM Mono',monospace",
+                    padding:0,textDecoration:"underline dotted",textUnderlineOffset:3}},nro);
                 return h(React.Fragment,{key:s.rut+s.sitio},
-                  h("tr",{style:{borderBottom:"1px solid var(--bdr)",background:isCorr?"var(--blue)08":undefined}},
+                  h("tr",{style:{borderBottom:"1px solid var(--bdr)",
+                    background:s.aprobadoLocal?"#dcfce740":isCorr?"var(--blue)08":undefined}},
                     h("td",{style:{padding:"7px 12px"}},
                       h("span",{style:{padding:"2px 7px",borderRadius:5,fontSize:9,fontWeight:700,
                         background:`${sc}18`,color:sc,border:`1px solid ${sc}40`}},s.sitio||"—"),
@@ -2545,16 +2568,19 @@ function HistorialFactView({dashData,driveLoading,notify}){
                     ),
                     h("td",{style:{padding:"7px 12px",fontWeight:600}},s.cliente),
                     h("td",{style:{padding:"7px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txd)"}},s.rut),
-                    h("td",{style:{padding:"7px 12px",fontFamily:"'DM Mono',monospace"}},
-                      s.facturas.arriendo?h("span",{style:{color:"var(--blue)",fontSize:11}},s.facturas.arriendo.nro):
+                    h("td",{style:{padding:"7px 12px"}},
+                      s.facturas.arriendo?nroBtn(s.facturas.arriendo.nro,"var(--blue)"):
                       s.ufArr>0?h("span",{style:{color:"var(--amber)"}},"—"):h("span",{style:{color:"var(--txd)",fontSize:10}},"n/a")
                     ),
-                    h("td",{style:{padding:"7px 12px",fontFamily:"'DM Mono',monospace"}},
-                      s.facturas.servAdm?h("span",{style:{color:"var(--amber)",fontSize:11}},s.facturas.servAdm.nro):
+                    h("td",{style:{padding:"7px 12px"}},
+                      s.facturas.servAdm?nroBtn(s.facturas.servAdm.nro,"var(--amber)"):
                       s.ufSrv>0?h("span",{style:{color:"var(--amber)"}},"—"):h("span",{style:{color:"var(--txd)",fontSize:10}},"n/a")
                     ),
-                    h("td",{style:{padding:"7px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},
-                      otros.length>0?otros.map(t=>s.facturas[t]?.nro).filter(Boolean).join(", "):"—"
+                    h("td",{style:{padding:"7px 12px",fontSize:10,color:"var(--txm)"}},
+                      otros.length>0
+                        ?otros.map((t,i)=>s.facturas[t]?.nro?h(React.Fragment,{key:t},
+                            i>0&&", ",nroBtn(s.facturas[t].nro,"var(--txm)")):null).filter(Boolean)
+                        :"—"
                     ),
                     h("td",{style:{padding:"7px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,
                       textAlign:"right",fontWeight:600,color:"var(--tx)"}},
@@ -2564,21 +2590,34 @@ function HistorialFactView({dashData,driveLoading,notify}){
                       })()
                     ),
                     h("td",{style:{padding:"7px 12px"}},
-                      h("div",{style:{display:"flex",alignItems:"center",gap:6}},
-                        h("span",{style:{color:estadoColor,fontWeight:700}},
-                          s.estado==="ok"?"✅":s.estado==="corregido"?"✏️":"⚠️"),
-                        s.estado==="pendiente"&&h("button",{
-                          onClick:()=>{
-                            setBatchCorrecting({rut:s.rut,sitio:s.sitio});
-                            const f={};
-                            if(s.ufArr>0&&!s.facturas.arriendo)f.arriendo={nro:"",uf:s.ufArr,total:""};
-                            if(s.ufSrv>0&&!s.facturas.servAdm)f.servAdm={nro:"",uf:s.ufSrv,total:""};
-                            setBatchCorrectForm(Object.keys(f).length?f:{arriendo:{nro:"",uf:s.ufArr||0,total:""}});
-                          },
-                          style:{fontSize:10,padding:"2px 8px",borderRadius:5,border:"1px solid var(--bdr)",
-                            background:"var(--surf2)",cursor:"pointer",color:"var(--txm)"}
-                        },"✏️")
-                      )
+                      s.aprobadoLocal
+                        ?h("div",{style:{display:"flex",alignItems:"center",gap:6}},
+                            h("span",{style:{color:"var(--green)",fontWeight:700,fontSize:13}},"✅"),
+                            h("button",{onClick:()=>toggleAprobadoLocal(s.rut,s.sitio),
+                              title:"Quitar aprobación",
+                              style:{fontSize:9,padding:"1px 6px",borderRadius:4,border:"1px solid #86efac",
+                                background:"#f0fdf4",cursor:"pointer",color:"#16a34a"}},
+                              "desaprobar"))
+                        :h("div",{style:{display:"flex",alignItems:"center",gap:6}},
+                            h("span",{style:{color:estadoColor,fontWeight:700}},
+                              s.estado==="ok"?"✅":s.estado==="corregido"?"✏️":"⚠️"),
+                            s.estado==="pendiente"&&!s.aprobadoLocal&&h("button",{
+                              onClick:()=>{
+                                setBatchCorrecting({rut:s.rut,sitio:s.sitio});
+                                const f={};
+                                if(s.ufArr>0&&!s.facturas.arriendo)f.arriendo={nro:"",uf:s.ufArr,total:""};
+                                if(s.ufSrv>0&&!s.facturas.servAdm)f.servAdm={nro:"",uf:s.ufSrv,total:""};
+                                setBatchCorrectForm(Object.keys(f).length?f:{arriendo:{nro:"",uf:s.ufArr||0,total:""}});
+                              },
+                              style:{fontSize:10,padding:"2px 8px",borderRadius:5,border:"1px solid var(--bdr)",
+                                background:"var(--surf2)",cursor:"pointer",color:"var(--txm)"}
+                            },"✏️"),
+                            (s.estado==="ok"||s.estado==="corregido")&&h("button",{
+                              onClick:()=>toggleAprobadoLocal(s.rut,s.sitio),
+                              title:"Marcar como revisado y aprobado",
+                              style:{fontSize:10,padding:"2px 8px",borderRadius:5,border:"1px solid #86efac",
+                                background:"#f0fdf4",cursor:"pointer",color:"#16a34a",fontWeight:600}
+                            },"✓"))
                     )
                   ),
                   isCorr&&h("tr",{style:{background:"var(--blue)05",borderBottom:"2px solid var(--blue)40"}},
