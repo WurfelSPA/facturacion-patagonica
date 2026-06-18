@@ -2637,14 +2637,14 @@ function HistorialFactView({dashData,driveLoading,notify}){
                               tipo==="arriendo"?"Nº Arriendo":tipo==="servAdm"?"Nº Serv.Admin":"Nº "+tipo),
                             h("input",{value:val.nro,
                               onChange:e=>setBatchCorrectForm(p=>({...p,[tipo]:{...p[tipo],nro:e.target.value}})),
-                              placeholder:"F-XXXXX",
+                              placeholder:"F-XXXXX o FEE-XXXXX",
                               style:{width:130,padding:"5px 8px",borderRadius:6,border:"1px solid var(--bdr)",
                                 background:"var(--surf)",fontSize:11,fontFamily:"'DM Mono',monospace"}})
                           )
                         ),
                         h("button",{
                           onClick:async()=>{
-                            const normNro=n=>{const t=n.trim();return/^\d+$/.test(t)?"F-"+t:t;};
+                            const normNro=n=>n.trim().toUpperCase();
                             const nf={...s.facturas};
                             for(const[tipo,val]of Object.entries(batchCorrectForm)){
                               const nro=normNro(val.nro);
