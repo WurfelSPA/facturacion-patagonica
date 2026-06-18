@@ -2011,7 +2011,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
                 if(stored){
                   const batch=JSON.parse(stored);
                   const nr=r=>((r||"").replace(/\./g,"").replace(/-/g,"").toLowerCase());
-                  const entry=batch.sitios?.find(s=>nr(s.rut)===nr(sc.rut||"")&&s.sitio===(sc.sitio||""));
+                  const entry=batch.sitios?.find(s=>nr(s.rut)===nr(sc.rut||"")&&s.sitio===(sc.sitio||"")&&(s.edificio||"")===(sc.edificio||""));
                   if(entry&&entry.estado!=="pendiente"&&Object.keys(entry.facturas||{}).length>0){
                     if(!cancelled){
                       setInvoicesMap(prev=>({...prev,[siteKey(sc)]:{...(prev[siteKey(sc)]||{}),[p]:entry.facturas}}));
@@ -2141,7 +2141,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
       /* Preservar aprobados y correcciones manuales del batch previo */
       if(prevData?.sitios){
         for(const s of d.sitios){
-          const prev=prevData.sitios.find(p=>p.rut===s.rut&&p.sitio===s.sitio);
+          const prev=prevData.sitios.find(p=>p.rut===s.rut&&p.sitio===s.sitio&&p.edificio===s.edificio);
           if(prev?.aprobadoLocal){
             s.facturas=prev.facturas;s.estado=prev.estado;s.aprobadoLocal=true;
           }else if(prev?.estado==="corregido"){s.facturas=prev.facturas;s.estado="corregido";}
@@ -2167,11 +2167,11 @@ function HistorialFactView({dashData,driveLoading,notify}){
     notify("Período aprobado ✅","ok");
   }
 
-  function saveCorreccion(rut,sitio,facturas){
+  function saveCorreccion(rut,sitio,edificio,facturas){
     setBatchResult(prev=>{
       if(!prev)return prev;
       const sitios=prev.sitios.map(s=>
-        s.rut===rut&&s.sitio===sitio?{...s,facturas,estado:"corregido"}:s);
+        s.rut===rut&&s.sitio===sitio&&s.edificio===edificio?{...s,facturas,estado:"corregido"}:s);
       const stats={total:sitios.length,
         ok:sitios.filter(s=>s.estado==="ok").length,
         pendiente:sitios.filter(s=>s.estado==="pendiente").length,
@@ -2183,11 +2183,11 @@ function HistorialFactView({dashData,driveLoading,notify}){
     notify("Corrección guardada","ok");
   }
 
-  function toggleAprobadoLocal(rut,sitio){
+  function toggleAprobadoLocal(rut,sitio,edificio){
     setBatchResult(prev=>{
       if(!prev)return prev;
       const sitios=prev.sitios.map(s=>
-        s.rut===rut&&s.sitio===sitio?{...s,aprobadoLocal:!s.aprobadoLocal}:s);
+        s.rut===rut&&s.sitio===sitio&&s.edificio===edificio?{...s,aprobadoLocal:!s.aprobadoLocal}:s);
       const updated={...prev,sitios};
       batchLSSave(batchPeriodo,updated);
       return updated;
@@ -2548,7 +2548,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
             ),
             h("tbody",null,
               [...batchResult.sitios].sort((a,b)=>parseInt(a.rut.replace(/\./g,""))-parseInt(b.rut.replace(/\./g,""))).map(s=>{
-                const isCorr=batchCorrecting?.rut===s.rut&&batchCorrecting?.sitio===s.sitio;
+                const isCorr=batchCorrecting?.rut===s.rut&&batchCorrecting?.sitio===s.sitio&&batchCorrecting?.edificio===s.edificio;
                 const otros=Object.keys(s.facturas).filter(t=>t!=="arriendo"&&t!=="servAdm");
                 const sc=SITIO_C[s.sitio]||"#888";
                 const estadoColor=s.estado==="ok"?"var(--green)":s.estado==="corregido"?"var(--blue)":"var(--amber)";
@@ -2595,7 +2595,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
                       s.aprobadoLocal
                         ?h("div",{style:{display:"flex",alignItems:"center",gap:6}},
                             h("span",{style:{color:"var(--green)",fontWeight:700,fontSize:13}},"✅"),
-                            h("button",{onClick:()=>toggleAprobadoLocal(s.rut,s.sitio),
+                            h("button",{onClick:()=>toggleAprobadoLocal(s.rut,s.sitio,s.edificio),
                               title:"Quitar aprobación",
                               style:{fontSize:9,padding:"1px 6px",borderRadius:4,border:"1px solid #86efac",
                                 background:"#f0fdf4",cursor:"pointer",color:"#16a34a"}},
@@ -2605,7 +2605,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
                               s.estado==="ok"?"✅":s.estado==="corregido"?"✏️":"⚠️"),
                             h("button",{
                               onClick:()=>{
-                                setBatchCorrecting({rut:s.rut,sitio:s.sitio});
+                                setBatchCorrecting({rut:s.rut,sitio:s.sitio,edificio:s.edificio});
                                 /* Mostrar los 6 tipos siempre, pre-llenados con valores existentes */
                                 const f={};
                                 for(const t of conceptos)
@@ -2617,7 +2617,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
                                 background:"var(--surf2)",cursor:"pointer",color:"var(--txm)"}
                             },"✏️"),
                             (s.estado==="ok"||s.estado==="corregido")&&h("button",{
-                              onClick:()=>toggleAprobadoLocal(s.rut,s.sitio),
+                              onClick:()=>toggleAprobadoLocal(s.rut,s.sitio,s.edificio),
                               title:"Marcar como revisado y aprobado",
                               style:{fontSize:10,padding:"2px 8px",borderRadius:5,border:"1px solid #86efac",
                                 background:"#f0fdf4",cursor:"pointer",color:"#16a34a",fontWeight:600}
@@ -2654,7 +2654,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
                               if(nro)nf[tipo]={nro,uf:val.uf||null,total:null,fuente:"manual"};
                               else delete nf[tipo];
                             }
-                            await saveCorreccion(s.rut,s.sitio,nf);
+                            await saveCorreccion(s.rut,s.sitio,s.edificio,nf);
                             setBatchCorrecting(null);
                           },
                           style:{padding:"6px 14px",borderRadius:6,border:"none",background:"var(--blue)",
