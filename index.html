@@ -2644,9 +2644,12 @@ function HistorialFactView({dashData,driveLoading,notify}){
                         ),
                         h("button",{
                           onClick:async()=>{
+                            const normNro=n=>{const t=n.trim();return/^\d+$/.test(t)?"F-"+t:t;};
                             const nf={...s.facturas};
                             for(const[tipo,val]of Object.entries(batchCorrectForm)){
-                              if(val.nro.trim())nf[tipo]={nro:val.nro.trim(),uf:val.uf||null,total:null,fuente:"manual"};
+                              const nro=normNro(val.nro);
+                              if(nro)nf[tipo]={nro,uf:val.uf||null,total:null,fuente:"manual"};
+                              else delete nf[tipo];
                             }
                             await saveCorreccion(s.rut,s.sitio,nf);
                             setBatchCorrecting(null);
