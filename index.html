@@ -2605,7 +2605,12 @@ function HistorialFactView({dashData,driveLoading,notify}){
             const p=k.replace("histBatch:","");
             try{allData[p]=JSON.parse(localStorage.getItem(k));}catch(_){}
           }
-          const periods=Object.keys(allData).sort();
+          /* columnas = todos los meses del período activo (batchPeriodos) */
+          const MNP={"Enero":"01","Febrero":"02","Marzo":"03","Abril":"04","Mayo":"05","Junio":"06",
+            "Julio":"07","Agosto":"08","Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12"};
+          const periods=(batchPeriodos.length
+            ?batchPeriodos.map(bp=>{const[m,a]=bp.split(" ");const n=MNP[m];return n?`${a}-${n}`:null;}).filter(Boolean)
+            :Object.keys(allData)).sort();
           if(!periods.length)return h("div",{style:{padding:40,textAlign:"center",color:"var(--txd)"}},
             "No hay períodos procesados. Usa «Procesar todos los meses» para comenzar.");
           /* clientes únicos */
@@ -2638,7 +2643,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
                 `${clients.length} clientes × ${periods.length} meses`)
             ),
             h("div",{style:{overflowX:"auto",overflowY:"auto",flex:1}},
-              h("table",{style:{borderCollapse:"collapse",fontSize:11,minWidth:"100%"}},
+              h("table",{style:{borderCollapse:"collapse",fontSize:11,minWidth:"max-content"}},
                 h("thead",null,
                   h("tr",{style:{background:"var(--surf2)",position:"sticky",top:0,zIndex:4}},
                     h("th",{style:{position:"sticky",left:0,zIndex:5,background:"var(--surf2)",
