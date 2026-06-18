@@ -1955,8 +1955,8 @@ function HistorialFactView({dashData,driveLoading,notify}){
             if(!(sc.monthly[pKey]>0) && !(sc.ufArr>0 && anio==="2026")) return;
             const histE1=sc.hist?.find(h=>h.key===pKey);
             const pufArr1=histE1?.uf>0?histE1.uf:sc.ufArr;
-            const pufSrv1=histE1?.uf>0&&sc.ufArr>0&&sc.pctAdm>0&&sc.pctAdm<1
-              ?Math.round(histE1.uf*sc.pctAdm*100)/100:sc.ufSrv;
+            const pufSrv1=histE1?.uf>0&&sc.ufArr>0&&sc.ufSrv>0
+              ?Math.round(sc.ufSrv*(histE1.uf/sc.ufArr)*10000)/10000:sc.ufSrv;
             const url=`/api/historial?cliente=${encodeURIComponent(sc.nombre)}&rut=${encodeURIComponent(sc.rut||"")}`
               +`&ufArr=${encodeURIComponent(pufArr1||"")}&ufSrv=${encodeURIComponent(pufSrv1||"")}`
               +`&siteIdx=${idx}&periodo=${encodeURIComponent(p)}`;
@@ -1999,8 +1999,8 @@ function HistorialFactView({dashData,driveLoading,notify}){
             const pKey2=pAnio&&pNum?`${pAnio}-${String(pNum).padStart(2,"0")}`:null;
             const histE2=pKey2?sc.hist?.find(h=>h.key===pKey2):null;
             const pufArr2=histE2?.uf>0?histE2.uf:sc.ufArr;
-            const pufSrv2=histE2?.uf>0&&sc.ufArr>0&&sc.pctAdm>0&&sc.pctAdm<1
-              ?Math.round(histE2.uf*sc.pctAdm*100)/100:sc.ufSrv;
+            const pufSrv2=histE2?.uf>0&&sc.ufArr>0&&sc.ufSrv>0
+              ?Math.round(sc.ufSrv*(histE2.uf/sc.ufArr)*10000)/10000:sc.ufSrv;
             const url=`/api/historial?cliente=${encodeURIComponent(sc.nombre)}&rut=${encodeURIComponent(sc.rut||"")}`
               +`&ufArr=${encodeURIComponent(pufArr2||"")}&ufSrv=${encodeURIComponent(pufSrv2||"")}`
               +`&siteIdx=${siteIdx}&sitio=${encodeURIComponent(sc.sitio||"")}`
