@@ -72,8 +72,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Parámetro folio inválido. Ejemplo: ?folio=14670" });
   }
 
-  const saRaw = process.env.GOOGLE_SA_KEY;
-  if (!saRaw) return res.status(500).json({ error: "GOOGLE_SA_KEY no configurada" });
+  const saRaw = process.env.GOOGLE_SERVICE_ACCOUNT;
+  if (!saRaw) return res.status(500).json({ error: "GOOGLE_SERVICE_ACCOUNT no configurada" });
 
   let sa;
   try { sa = JSON.parse(saRaw); } catch {
