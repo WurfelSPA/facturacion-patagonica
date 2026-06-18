@@ -475,6 +475,7 @@ async function parsePlanillaParaDashboard(file){
       ufArr:Math.round(ufArr*100)/100,
       ufSrv:Math.round(ufSrv*100)/100,
       ufTotal:Math.round((ufArr+ufSrv)*100)/100,
+      pctAdm:typeof pctAdm==="number"?pctAdm:0,
       afecto:String(row[48]||"").trim(),
       ufInicio:typeof row[61]==="number"?Math.round(row[61]*100)/100:0,
       monthly,
@@ -1952,8 +1953,12 @@ function HistorialFactView({dashData,driveLoading,notify}){
             if(!pKey) return;
             // Solo fetch si el cliente tiene UF activo en ese período según planilla
             if(!(sc.monthly[pKey]>0) && !(sc.ufArr>0 && anio==="2026")) return;
+            const histE1=sc.hist?.find(h=>h.key===pKey);
+            const pufArr1=histE1?.uf>0?histE1.uf:sc.ufArr;
+            const pufSrv1=histE1?.uf>0&&sc.ufArr>0&&sc.pctAdm>0&&sc.pctAdm<1
+              ?Math.round(histE1.uf*sc.pctAdm*100)/100:sc.ufSrv;
             const url=`/api/historial?cliente=${encodeURIComponent(sc.nombre)}&rut=${encodeURIComponent(sc.rut||"")}`
-              +`&ufArr=${encodeURIComponent(sc.ufArr||"")}&ufSrv=${encodeURIComponent(sc.ufSrv||"")}`
+              +`&ufArr=${encodeURIComponent(pufArr1||"")}&ufSrv=${encodeURIComponent(pufSrv1||"")}`
               +`&siteIdx=${idx}&periodo=${encodeURIComponent(p)}`;
             fetch(url).then(r=>r.json()).then(({facturas})=>{
               if(cancelled||!facturas) return;
@@ -1989,8 +1994,15 @@ function HistorialFactView({dashData,driveLoading,notify}){
            siteIdx permite desempatar cuando varios sitios del mismo cliente tienen igual UF (ej: NCH Chile enero). */
         selGroup.forEach((sc,siteIdx)=>{
           periodos.slice(0,10).forEach(p=>{
+            const [pMes,pAnio]=p.split(" ");
+            const pNum=MES_NUM[pMes];
+            const pKey2=pAnio&&pNum?`${pAnio}-${String(pNum).padStart(2,"0")}`:null;
+            const histE2=pKey2?sc.hist?.find(h=>h.key===pKey2):null;
+            const pufArr2=histE2?.uf>0?histE2.uf:sc.ufArr;
+            const pufSrv2=histE2?.uf>0&&sc.ufArr>0&&sc.pctAdm>0&&sc.pctAdm<1
+              ?Math.round(histE2.uf*sc.pctAdm*100)/100:sc.ufSrv;
             const url=`/api/historial?cliente=${encodeURIComponent(sc.nombre)}&rut=${encodeURIComponent(sc.rut||"")}`
-              +`&ufArr=${encodeURIComponent(sc.ufArr||"")}&ufSrv=${encodeURIComponent(sc.ufSrv||"")}`
+              +`&ufArr=${encodeURIComponent(pufArr2||"")}&ufSrv=${encodeURIComponent(pufSrv2||"")}`
               +`&siteIdx=${siteIdx}&sitio=${encodeURIComponent(sc.sitio||"")}`
               +`&periodo=${encodeURIComponent(p)}`
               +(doRefresh?"&refresh=1":"");
