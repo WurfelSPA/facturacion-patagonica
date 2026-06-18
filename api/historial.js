@@ -895,6 +895,9 @@ export default async function handler(req, res) {
 
         const tipo = detectTipo(text);
         if (tipo && !facturas[tipo]) {
+          // Respetar planilla: no asignar tipos que el sitio no tiene
+          if (tipo === 'servAdm' && !(ufSrv > 0)) continue;
+          if (tipo === 'arriendo' && !(ufArr > 0)) continue;
           const totalZ = _extractTotal(text);
           const ufZ = _extractUF(text) ?? _derivarUFdePrecio(text, totalZ);
           // Umbral UF: evitar cruce entre sitios del mismo cliente (igual que _pickByUF).
