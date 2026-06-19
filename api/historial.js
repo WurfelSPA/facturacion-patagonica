@@ -11,8 +11,18 @@
  */
 
 import JSZip from "jszip";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 export const config = { api: { bodyParser: true, responseLimit: "15mb" } };
+
+// Pre-carga del JSON del Excel embebido en el bundle de la función (includeFiles en vercel.json)
+// Esto elimina la dependencia de Drive para el JSON y garantiza datos siempre actualizados al deploy.
+let _EXCEL_EMBEDDED = null;
+try {
+  const raw = readFileSync(join(process.cwd(), "historial-excel-2026.json"), "utf8");
+  _EXCEL_EMBEDDED = JSON.parse(raw);
+} catch(_) { /* no disponible en entorno local sin el archivo */ }
 
 const PDF_FOLDER       = process.env.DRIVE_PDF_FACTURAS_ID || "";
 const HIST_NAME        = "historial-facturas.json";
@@ -541,10 +551,18 @@ function extractRutFromText(text) {
 async function _loadExcelCache(token) {
   const now = Date.now();
   if (_excelCache && (now - _excelCacheTs) < EXCEL_CACHE_TTL) return _excelCache;
-  // Usamos el ID directo del archivo para evitar fallos en búsqueda por nombre (findFile)
-  const text = await downloadFile(token, EXCEL_JSON_ID);
-  if (!text) return null;
+
+  // 1. Prioridad: archivo embebido en el bundle (vercel.json includeFiles)
+  if (_EXCEL_EMBEDDED) {
+    _excelCache = _EXCEL_EMBEDDED;
+    _excelCacheTs = now;
+    return _excelCache;
+  }
+
+  // 2. Fallback: descarga desde Drive por ID directo
   try {
+    const text = await downloadFile(token, EXCEL_JSON_ID);
+    if (!text) return null;
     _excelCache = JSON.parse(text);
     _excelCacheTs = now;
     return _excelCache;
