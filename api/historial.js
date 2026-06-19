@@ -639,13 +639,19 @@ export default async function handler(req, res) {
 
               if (clienteKey) {
                 const sitios = periodoData[clienteKey];
-                // 2. Elegir sitio: exacto → único → match por UF
+                // 2. Elegir sitio: exacto → normalizado (sin guión) → único → match por UF
+                const normS = s => (s||"").toUpperCase().replace(/-/g,"");
                 let sitioData = null;
-                if (sitioQ && sitios[sitioQ]) {
-                  sitioData = sitios[sitioQ];
-                } else if (Object.keys(sitios).length === 1) {
+                if (sitioQ) {
+                  // Primero exacto, luego normalizado (ej: "5-A" == "5A")
+                  const sitioKey = sitios[sitioQ]
+                    ? sitioQ
+                    : Object.keys(sitios).find(k => normS(k) === normS(sitioQ));
+                  if (sitioKey) sitioData = sitios[sitioKey];
+                }
+                if (!sitioData && Object.keys(sitios).length === 1) {
                   sitioData = Object.values(sitios)[0];
-                } else {
+                } else if (!sitioData) {
                   // Multi-sitio sin sitioQ: buscar por UF más cercana
                   for (const d of Object.values(sitios)) {
                     const okArr = !(ufArr > 0) || !d.arriendo?.uf || Math.abs(d.arriendo.uf - ufArr) < 0.5;
