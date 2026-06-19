@@ -1970,7 +1970,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
               ?Math.round(sc.ufSrv*(histE1.uf/sc.ufArr)*10000)/10000:sc.ufSrv;
             const url=`/api/historial?cliente=${encodeURIComponent(sc.nombre)}&rut=${encodeURIComponent(sc.rut||"")}`
               +`&ufArr=${encodeURIComponent(pufArr1||"")}&ufSrv=${encodeURIComponent(pufSrv1||"")}`
-              +`&siteIdx=${idx}&periodo=${encodeURIComponent(p)}`;
+              +`&siteIdx=${idx}&sitio=${encodeURIComponent(sc.sitio||"")}&periodo=${encodeURIComponent(p)}`;
             fetch(url).then(r=>r.json()).then(({facturas})=>{
               if(cancelled||!facturas) return;
               const t=Object.values(facturas).reduce((s,f)=>s+(f?.total||0),0);
