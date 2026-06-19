@@ -669,13 +669,16 @@ export default async function handler(req, res) {
             if (dbg) dbgInfo.excel0_hasPeriodo = !!periodoData;
             if (periodoData) {
               if (dbg) dbgInfo.excel0_clientes = Object.keys(periodoData).slice(0, 15);
-              // 1. Buscar cliente: exact (normalizado) → fuzzy
-              const clienteNorm = (cliente || "").trim().toUpperCase();
-              let clienteKey = Object.keys(periodoData)
-                .find(k => k.trim().toUpperCase() === clienteNorm);
+              // 1. Buscar cliente: strip (solo alfanumérico, sin espacios ni puntos) → fuzzy
+              // strip("NCH CHILE S A") = "nchchilesa" = strip("NCH Chile S.A.") → match exacto robusto
+              // NFD + diacríticos eliminados para manejar acentos (Crédito = Credito)
+              const strip = s => (s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
+              const clienteNorm = strip(cliente);
+              let clienteKey = Object.keys(periodoData).find(k => strip(k) === clienteNorm);
               if (!clienteKey)
                 clienteKey = Object.keys(periodoData).find(k => clienteMatch(k, cliente));
               if (dbg) dbgInfo.excel0_clienteKey = clienteKey || null;
+              if (dbg) dbgInfo.excel0_clienteNorm = clienteNorm;
 
               if (clienteKey) {
                 const sitios = periodoData[clienteKey];
