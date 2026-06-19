@@ -18,6 +18,8 @@ const PDF_FOLDER       = process.env.DRIVE_PDF_FACTURAS_ID || "";
 const HIST_NAME        = "historial-facturas.json";
 const EXCEL_JSON_NAME  = "historial-excel-2026.json";
 const FACT_FOLDER_ID   = "1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u";
+// ID directo del JSON generado desde el Excel (evita búsqueda por nombre con findFile)
+const EXCEL_JSON_ID    = "1sL_qOK9QsGjgtoaLIdhA37nN0I566M1t";
 
 // Caché en memoria del JSON del Excel (se invalida cada hora)
 let _excelCache = null;
@@ -539,13 +541,16 @@ function extractRutFromText(text) {
 async function _loadExcelCache(token) {
   const now = Date.now();
   if (_excelCache && (now - _excelCacheTs) < EXCEL_CACHE_TTL) return _excelCache;
-  const fileId = await findFile(token, EXCEL_JSON_NAME, FACT_FOLDER_ID);
-  if (!fileId) return null;
-  const text = await downloadFile(token, fileId);
+  // Usamos el ID directo del archivo para evitar fallos en búsqueda por nombre (findFile)
+  const text = await downloadFile(token, EXCEL_JSON_ID);
   if (!text) return null;
-  _excelCache = JSON.parse(text);
-  _excelCacheTs = now;
-  return _excelCache;
+  try {
+    _excelCache = JSON.parse(text);
+    _excelCacheTs = now;
+    return _excelCache;
+  } catch(_) {
+    return null;
+  }
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
