@@ -1943,6 +1943,17 @@ function HistorialFactView({dashData,driveLoading,notify}){
   const [multiProgress,setMultiProgress]=useState("");
   const [batchVersion,setBatchVersion]=useState(0);
 
+  /* Invalidar caché localStorage si la versión cambió (evita datos stale de deploys anteriores) */
+  const HIST_CACHE_VER = "fuente0-v3";
+  React.useEffect(()=>{
+    try{
+      if(localStorage.getItem("histBatch_ver")!==HIST_CACHE_VER){
+        Object.keys(localStorage).filter(k=>k.startsWith("histBatch:")).forEach(k=>localStorage.removeItem(k));
+        localStorage.setItem("histBatch_ver",HIST_CACHE_VER);
+      }
+    }catch(_){}
+  },[]);
+
   /* Carga diferida: acumulado CLP real por cliente usando monthly de planilla como filtro */
   React.useEffect(()=>{
     if(!dashData)return;
@@ -2037,9 +2048,23 @@ function HistorialFactView({dashData,driveLoading,notify}){
               +(doRefresh?"&refresh=1":"");
             fetch(url)
               .then(r=>r.json())
-              .then(({facturas})=>{
+              .then(({facturas,source})=>{
                 if(cancelled) return;
-                if(facturas) setInvoicesMap(prev=>({...prev,[siteKey(sc)]:{...(prev[siteKey(sc)]||{}),[p]:facturas}}));
+                if(facturas){
+                  setInvoicesMap(prev=>({...prev,[siteKey(sc)]:{...(prev[siteKey(sc)]||{}),[p]:facturas}}));
+                  /* Si vino de FUENTE 0 (excel), actualizar localStorage para que próxima carga sea correcta */
+                  if(source==="excel"&&pKey2){
+                    try{
+                      const stored=localStorage.getItem(`histBatch:${pKey2}`);
+                      const batch=stored?JSON.parse(stored):{sitios:[]};
+                      const nr=r=>((r||"").replace(/\./g,"").replace(/-/g,"").toLowerCase());
+                      const idx=batch.sitios?.findIndex(s=>nr(s.rut)===nr(sc.rut||"")&&s.sitio===(sc.sitio||"")&&(s.edificio||"")===(sc.edificio||""));
+                      const entry={rut:sc.rut,sitio:sc.sitio||"",edificio:sc.edificio||"",estado:"ok",facturas};
+                      if(idx>=0) batch.sitios[idx]=entry; else batch.sitios=(batch.sitios||[]).concat(entry);
+                      localStorage.setItem(`histBatch:${pKey2}`,JSON.stringify(batch));
+                    }catch(_){}
+                  }
+                }
                 setLoadingSet(prev=>{const s=new Set(prev);s.delete(siteKey(sc)+'|'+p);return s;});
               })
               .catch(()=>{if(!cancelled)setLoadingSet(prev=>{const s=new Set(prev);s.delete(siteKey(sc)+'|'+p);return s;});});
