@@ -632,18 +632,24 @@ export default async function handler(req, res) {
       if (!refresh) {
         try {
           const excelData = await _loadExcelCache(token);
+          if (dbg) dbgInfo.excel0_loaded = !!excelData;
           if (excelData) {
+            if (dbg) dbgInfo.excel0_years = Object.keys(excelData);
             const periodoData = excelData[anioStr]?.[periodo];
+            if (dbg) dbgInfo.excel0_hasPeriodo = !!periodoData;
             if (periodoData) {
+              if (dbg) dbgInfo.excel0_clientes = Object.keys(periodoData).slice(0, 15);
               // 1. Buscar cliente: exact (normalizado) → fuzzy
               const clienteNorm = (cliente || "").trim().toUpperCase();
               let clienteKey = Object.keys(periodoData)
                 .find(k => k.trim().toUpperCase() === clienteNorm);
               if (!clienteKey)
                 clienteKey = Object.keys(periodoData).find(k => clienteMatch(k, cliente));
+              if (dbg) dbgInfo.excel0_clienteKey = clienteKey || null;
 
               if (clienteKey) {
                 const sitios = periodoData[clienteKey];
+                if (dbg) dbgInfo.excel0_sitios = Object.keys(sitios);
                 // 2. Elegir sitio: exacto → normalizado (sin guión) → único → match por UF
                 const normS = s => (s||"").toUpperCase().replace(/-/g,"");
                 let sitioData = null;
@@ -664,12 +670,14 @@ export default async function handler(req, res) {
                     if (okArr && okSrv) { sitioData = d; break; }
                   }
                 }
+                if (dbg) dbgInfo.excel0_sitioData = sitioData;
                 if (sitioData) {
                   const facturas = {};
                   if (ufArr > 0 && sitioData.arriendo) facturas.arriendo = sitioData.arriendo;
                   if (ufSrv > 0 && sitioData.servAdm)  facturas.servAdm  = sitioData.servAdm;
                   const hasExpected = !(ufArr > 0 && !facturas.arriendo)
                                    && !(ufSrv > 0 && !facturas.servAdm);
+                  if (dbg) dbgInfo.excel0_facturas = facturas;
                   if (hasExpected && Object.keys(facturas).length > 0) {
                     if (dbg) dbgInfo.excelSource = { clienteKey, sitioQ };
                     return res.status(200).json({ facturas, source:"excel", ...(dbg?{dbg:dbgInfo}:{}) });
@@ -678,7 +686,7 @@ export default async function handler(req, res) {
               }
             }
           }
-        } catch(e) { if (dbg) dbgInfo.excelError = e.message; }
+        } catch(e) { if (dbg) dbgInfo.excel0_error = e.message; }
       }
 
       /* ── rutNorm y driveFileList: necesarios para FUENTE XML y FUENTE 2 ── */
