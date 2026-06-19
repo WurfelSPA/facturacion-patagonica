@@ -657,9 +657,9 @@ export default async function handler(req, res) {
 
       /* ── FUENTE 0: Excel pre-cargado (historial-excel-2026.json) ─────────────
          Fuente más confiable: datos directamente de Nubox sin parseo dinámico.
-         Sólo se omite si se pide refresh explícito.
+         Siempre corre primero — refresh solo aplica a FUENTE 2 (PDFs desde Drive).
       ── */
-      if (!refresh) {
+      {
         try {
           const excelData = await _loadExcelCache(token);
           if (dbg) dbgInfo.excel0_loaded = !!excelData;
