@@ -19,10 +19,21 @@ export const config = { api: { bodyParser: true, responseLimit: "15mb" } };
 // Pre-carga del JSON del Excel embebido en el bundle de la función (includeFiles en vercel.json)
 // Esto elimina la dependencia de Drive para el JSON y garantiza datos siempre actualizados al deploy.
 let _EXCEL_EMBEDDED = null;
-try {
-  const raw = readFileSync(join(process.cwd(), "historial-excel-2026.json"), "utf8");
-  _EXCEL_EMBEDDED = JSON.parse(raw);
-} catch(_) { /* no disponible en entorno local sin el archivo */ }
+let _EXCEL_EMBEDDED_PATH = null;
+const _JSON_FNAME = "historial-excel-2026.json";
+// Intenta varios paths porque process.cwd() varía entre entornos Vercel
+for (const candidate of [
+  join(process.cwd(), _JSON_FNAME),
+  join(process.cwd(), "api", _JSON_FNAME),
+  "/var/task/" + _JSON_FNAME,
+]) {
+  try {
+    const raw = readFileSync(candidate, "utf8");
+    _EXCEL_EMBEDDED = JSON.parse(raw);
+    _EXCEL_EMBEDDED_PATH = candidate;
+    break;
+  } catch(_) { /* no disponible en este path, probar siguiente */ }
+}
 
 const PDF_FOLDER       = process.env.DRIVE_PDF_FACTURAS_ID || "";
 const HIST_NAME        = "historial-facturas.json";
@@ -642,6 +653,7 @@ export default async function handler(req, res) {
       if (!mesNum) return res.status(400).json({ error:"Periodo inválido" });
       const dbg = debug === "1";
       const dbgInfo = {};
+      if (dbg) dbgInfo.embeddedPath = _EXCEL_EMBEDDED_PATH || "(no cargado)";
 
       /* ── FUENTE 0: Excel pre-cargado (historial-excel-2026.json) ─────────────
          Fuente más confiable: datos directamente de Nubox sin parseo dinámico.
