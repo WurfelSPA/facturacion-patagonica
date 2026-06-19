@@ -706,12 +706,18 @@ export default async function handler(req, res) {
                 if (dbg) dbgInfo.excel0_sitioData = sitioData;
                 if (sitioData) {
                   const facturas = {};
-                  if (ufArr > 0 && sitioData.arriendo) facturas.arriendo = sitioData.arriendo;
-                  if (ufSrv > 0 && sitioData.servAdm)  facturas.servAdm  = sitioData.servAdm;
-                  const hasExpected = !(ufArr > 0 && !facturas.arriendo)
-                                   && !(ufSrv > 0 && !facturas.servAdm);
+                  if (sitioQ) {
+                    // Lookup directo por sitio: devolver TODO lo disponible en JSON
+                    // sin restricción de ufArr/ufSrv → evita caída a FUENTE XML
+                    if (sitioData.arriendo) facturas.arriendo = sitioData.arriendo;
+                    if (sitioData.servAdm)  facturas.servAdm  = sitioData.servAdm;
+                  } else {
+                    // Sin sitio especificado: usar ufArr/ufSrv para desambiguar conceptos
+                    if (ufArr > 0 && sitioData.arriendo) facturas.arriendo = sitioData.arriendo;
+                    if (ufSrv > 0 && sitioData.servAdm)  facturas.servAdm  = sitioData.servAdm;
+                  }
                   if (dbg) dbgInfo.excel0_facturas = facturas;
-                  if (hasExpected && Object.keys(facturas).length > 0) {
+                  if (Object.keys(facturas).length > 0) {
                     if (dbg) dbgInfo.excelSource = { clienteKey, sitioQ };
                     return res.status(200).json({ facturas, source:"excel", ...(dbg?{dbg:dbgInfo}:{}) });
                   }
