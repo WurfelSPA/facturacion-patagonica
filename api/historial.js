@@ -707,10 +707,9 @@ export default async function handler(req, res) {
                 if (sitioData) {
                   const facturas = {};
                   if (sitioQ) {
-                    // Lookup directo por sitio: devolver TODO lo disponible en JSON
-                    // sin restricción de ufArr/ufSrv → evita caída a FUENTE XML
-                    if (sitioData.arriendo) facturas.arriendo = sitioData.arriendo;
-                    if (sitioData.servAdm)  facturas.servAdm  = sitioData.servAdm;
+                    // Lookup directo por sitio: devolver TODOS los tipos del JSON
+                    // (arriendo, servAdm, habilitacion, servCont, asesoria, etc.)
+                    Object.assign(facturas, sitioData);
                   } else {
                     // Sin sitio especificado: usar ufArr/ufSrv para desambiguar conceptos
                     if (ufArr > 0 && sitioData.arriendo) facturas.arriendo = sitioData.arriendo;
@@ -1102,3 +1101,4 @@ export {
   getToken, driveFiles, downloadFile, findFile, createJsonFile, updateJsonFile,
   FACT_FOLDER_ID,
 };
+                                                                                                                    
