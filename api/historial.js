@@ -620,20 +620,34 @@ export default async function handler(req, res) {
 
     // ── GET ?listPeriodos=1 ── períodos disponibles en carpeta facturación ─
     if (req.method === "GET" && req.query.listPeriodos === "1") {
-      const files = await driveFiles(token, FACT_FOLDER_ID);
       const periodoSet = new Set();
-      for (const f of files) {
-        let anio, mesNum;
-        // Formato 1: "2026-05.zip"
-        const m1 = f.name.match(/^(\d{4})-(\d{2})\.zip$/i);
-        if (m1) { anio = m1[1]; mesNum = m1[2]; }
-        else {
-          // Formato 2: "Facturas HTML_PISA_2026_05.zip" o "Facturas HTML_PISA_2026-05.zip"
-          const m2 = f.name.match(/PISA[_-](\d{4})[_-](\d{2})\.zip$/i);
-          if (m2) { anio = m2[1]; mesNum = m2[2]; }
+
+      // 1. Períodos del JSON embebido (siempre disponible, no depende de Drive)
+      if (_EXCEL_EMBEDDED) {
+        for (const anioKey of Object.keys(_EXCEL_EMBEDDED)) {
+          for (const periodo of Object.keys(_EXCEL_EMBEDDED[anioKey] || {})) {
+            periodoSet.add(periodo); // Ej: "Enero 2026"
+          }
         }
-        if (anio && mesNum && MES_NOM[mesNum]) periodoSet.add(`${MES_NOM[mesNum]} ${anio}`);
       }
+
+      // 2. Períodos de archivos ZIP en Drive (merge — agrega meses futuros no en JSON)
+      try {
+        const files = await driveFiles(token, FACT_FOLDER_ID);
+        for (const f of files) {
+          let anio, mesNum;
+          // Formato 1: "2026-05.zip"
+          const m1 = f.name.match(/^(\d{4})-(\d{2})\.zip$/i);
+          if (m1) { anio = m1[1]; mesNum = m1[2]; }
+          else {
+            // Formato 2: "Facturas HTML_PISA_2026_05.zip" o "Facturas HTML_PISA_2026-05.zip"
+            const m2 = f.name.match(/PISA[_-](\d{4})[_-](\d{2})\.zip$/i);
+            if (m2) { anio = m2[1]; mesNum = m2[2]; }
+          }
+          if (anio && mesNum && MES_NOM[mesNum]) periodoSet.add(`${MES_NOM[mesNum]} ${anio}`);
+        }
+      } catch(_) { /* Drive no disponible — usamos solo períodos del JSON */ }
+
       const periodos = [...periodoSet].sort((a,b) => {
         const [ma,ya] = [a.split(" ")[0], a.split(" ")[1]];
         const [mb,yb] = [b.split(" ")[0], b.split(" ")[1]];
@@ -1086,19 +1100,4 @@ export default async function handler(req, res) {
 
     return res.status(405).json({ error:"Method not allowed" });
   } catch (e) {
-    console.error("historial:", e.message);
-    return res.status(500).json({ error: e.message });
-  }
-}
-
-export {
-  normRut, norm, clienteMatch, detectTipo,
-  _pickByUF, _resolveFacturas,
-  _buildXmlFacturas, parseXmlDTE,
-  extractFacturasForRut, extractText,
-  _extractUF, _extractTotal, _derivarUFdePrecio,
-  extractClienteFromText, extractRutFromText,
-  getToken, driveFiles, downloadFile, findFile, createJsonFile, updateJsonFile,
-  FACT_FOLDER_ID,
-};
-                                                                                                                    
+    console.error("hi
