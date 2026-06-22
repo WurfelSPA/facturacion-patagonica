@@ -4,7 +4,7 @@
       "LA ARAUCANA C C A F": {
         "A-2": {
           "arriendo": {
-            "nro": "F-10, F-6",
+            "nro": "FE-10, FE-6",
             "total": 6916004,
             "uf": 174.0
           }
@@ -13,16 +13,16 @@
       "BANCO DE CREDITO E INVERSIONES": {
         "D-2": {
           "arriendo": {
-            "nro": "F-11, F-9",
+            "nro": "FE-11, FE-9",
             "total": 32195192,
             "uf": 810.0
           }
         }
       },
       "CLARO CHILE SPA": {
-        "A2": {
+        "A-2": {
           "arriendo": {
-            "nro": "F-12",
+            "nro": "FE-12",
             "total": 1073173,
             "uf": 27.0
           }
@@ -41,20 +41,20 @@
             "uf": 10.89
           }
         },
-        "A2": {
+        "A-2": {
           "arriendo": {
             "nro": "F-14013",
             "total": 4347262,
             "uf": 91.91
           }
         },
-        "A1": {
+        "A-1": {
           "arriendo": {
             "nro": "F-14014",
             "total": 37384225
           }
         },
-        "3A": {
+        "3-A": {
           "arriendo": {
             "nro": "F-14015",
             "total": 3143452
@@ -62,7 +62,7 @@
         }
       },
       "DISTRIBUIDORA SANCHEZ 4G SPA": {
-        "5A": {
+        "5-A": {
           "arriendo": {
             "nro": "F-14016",
             "total": 1132813,
@@ -155,7 +155,7 @@
             "uf": 7.48
           }
         },
-        "4A": {
+        "4-A": {
           "arriendo": {
             "nro": "F-14047",
             "total": 7713538,
@@ -192,7 +192,7 @@
         }
       },
       "SOC COMERCIAL JOSE MARIN ANTONIN Y COMPANIA LIMITADA": {
-        "5A": {
+        "5-A": {
           "arriendo": {
             "nro": "F-14024",
             "total": 5563321,
@@ -248,7 +248,7 @@
             "uf": 18.57
           }
         },
-        "4A": {
+        "4-A": {
           "arriendo": {
             "nro": "F-14046",
             "total": 6851749,
@@ -257,7 +257,7 @@
         }
       },
       "JOHN CRANE CHILE S A": {
-        "5A": {
+        "5-A": {
           "arriendo": {
             "nro": "F-14028",
             "total": 10266744,
@@ -266,7 +266,7 @@
         }
       },
       "MEGAMIN S.A.": {
-        "5A": {
+        "5-A": {
           "arriendo": {
             "nro": "F-14029",
             "total": 11069411,
@@ -289,7 +289,7 @@
         }
       },
       "TRANE DE CHILE S A": {
-        "5A": {
+        "5-A": {
           "arriendo": {
             "nro": "F-14031",
             "total": 19129179,
@@ -298,7 +298,7 @@
         }
       },
       "DRAGER CHILE LIMITADA": {
-        "5A": {
+        "5-A": {
           "arriendo": {
             "nro": "F-14032",
             "total": 24372758,
@@ -307,7 +307,7 @@
         }
       },
       "PATRICIO RODRIGO OLMEDO NUNEZ": {
-        "5A": {
+        "5-A": {
           "arriendo": {
             "nro": "F-14033",
             "total": 236496,
@@ -370,7 +370,7 @@
         }
       },
       "CORSUD SPA": {
-        "4A": {
+        "4-A": {
           "arriendo": {
             "nro": "F-14039",
             "total": 4327868,
@@ -393,7 +393,7 @@
         }
       },
       "COMERCIALIZADORA JUANA CATALDO E HIJO SPA": {
-        "4A": {
+        "4-A": {
           "arriendo": {
             "nro": "F-14041",
             "total": 4469766,
@@ -402,7 +402,7 @@
         }
       },
       "PARKER HANNIFIN CORPORATION CHILE LIMITADA": {
-        "4A": {
+        "4-A": {
           "arriendo": {
             "nro": "F-14042",
             "total": 5008975,
@@ -411,7 +411,7 @@
         }
       },
       "PERFOMEX CHILE SPA": {
-        "4A": {
+        "4-A": {
           "arriendo": {
             "nro": "F-14043",
             "total": 5330610,
@@ -434,7 +434,7 @@
         }
       },
       "INDUSTRIA YKK CHILE LTDA": {
-        "4A": {
+        "4-A": {
           "arriendo": {
             "nro": "F-14045",
             "total": 6292674,
@@ -443,7 +443,7 @@
         }
       },
       "SONEPAR CHILE SA": {
-        "4A": {
+        "4-A": {
           "arriendo": {
             "nro": "F-14048, F-14049",
             "total": 47632567,
@@ -478,7 +478,7 @@
         }
       },
       "GTD MANQUEHUE S.A.": {
-        "A2": {
+        "A-2": {
           "arriendo": {
             "nro": "F-14052",
             "total": 274334,
@@ -487,7 +487,7 @@
         }
       },
       "ENLACES REGIONALES DE CHILE SOCIEDAD ANONIMA": {
-        "A2": {
+        "A-2": {
           "arriendo": {
             "nro": "F-14053",
             "total": 662187,
@@ -496,7 +496,7 @@
         }
       },
       "ROCKETMAN SPA": {
-        "A2": {
+        "A-2": {
           "arriendo": {
             "nro": "F-14055",
             "total": 1797366,
@@ -505,7 +505,7 @@
         }
       },
       "COMERCIAL HUSSMANN CHILE LIMITADA": {
-        "A2": {
+        "A-2": {
           "arriendo": {
             "nro": "F-14056",
             "total": 2450567,
@@ -541,7 +541,7 @@
         }
       },
       "COMERCIAL KPC CHILE LIMITADA": {
-        "A2": {
+        "A-2": {
           "arriendo": {
             "nro": "F-14059",
             "total": 3754130,
@@ -550,7 +550,7 @@
         }
       },
       "SEGAFREDO ZANETTI CHILE S.A.": {
-        "A2": {
+        "A-2": {
           "arriendo": {
             "nro": "F-14062",
             "total": 6570792,
@@ -559,7 +559,7 @@
         }
       },
       "FESTO S A": {
-        "A2": {
+        "A-2": {
           "arriendo": {
             "nro": "F-14063",
             "total": 8395592,
@@ -568,7 +568,7 @@
         }
       },
       "VOITH TURBO S A": {
-        "A2": {
+        "A-2": {
           "arriendo": {
             "nro": "F-14064",
             "total": 9829227,
@@ -577,7 +577,7 @@
         }
       },
       "VISIBILITY S. A.": {
-        "A2": {
+        "A-2": {
           "arriendo": {
             "nro": "F-14065",
             "total": 1527761,
@@ -714,14 +714,6 @@
           }
         }
       },
-      "PATAGONICA INMOBILIARIA SPA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14082",
-            "total": 58065008
-          }
-        }
-      },
       "BANCO SECURITY": {
         "A-2": {
           "servAdm": {
@@ -730,7 +722,7 @@
             "uf": 4.0
           },
           "arriendo": {
-            "nro": "F-4",
+            "nro": "FE-4",
             "total": 5006948,
             "uf": 125.97
           }
@@ -744,7 +736,7 @@
             "uf": 12.6
           },
           "arriendo": {
-            "nro": "F-8",
+            "nro": "FE-8",
             "total": 4173451,
             "uf": 105.0
           }
@@ -782,7 +774,7 @@
         }
       },
       "SOCIEDAD DE SERVICIOS Y ELECTRONICA SPA": {
-        "A2": {
+        "A-2": {
           "arriendo": {
             "nro": "F-14128",
             "total": 4948905,
@@ -802,7 +794,7 @@
       "BANCO DEL ESTADO DE CHILE": {
         "A-2": {
           "arriendo": {
-            "nro": "F-5",
+            "nro": "FE-5",
             "total": 18255866,
             "uf": 459.3
           }
@@ -811,7 +803,7 @@
       "CAJA DE COMPENSACION DE ASIGNACION FAMILIAR DE LOS ANDES": {
         "A-2": {
           "arriendo": {
-            "nro": "F-7",
+            "nro": "FE-7",
             "total": 11606565,
             "uf": 292.01
           }
@@ -819,300 +811,12 @@
       }
     },
     "Febrero 2026": {
-      "LA ARAUCANA C C A F": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14, F-19",
-            "total": 6906626
-          }
-        }
-      },
       "BANCO DE CREDITO E INVERSIONES": {
         "D-2": {
           "arriendo": {
-            "nro": "F-13, F-20",
+            "nro": "FE-13, FE-20",
             "total": 32151532,
             "uf": 810.0
-          }
-        }
-      },
-      "CLARO CHILE SPA": {
-        "A2": {
-          "arriendo": {
-            "nro": "F-21",
-            "total": 1073173,
-            "uf": 27.0
-          }
-        }
-      },
-      "SANCHEZ HERMANOS SPA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14155, F-14162, F-14169",
-            "total": 30427551
-          },
-          "servAdm": {
-            "nro": "F-14211",
-            "total": 514388,
-            "uf": 10.89
-          }
-        },
-        "A-1": {
-          "arriendo": {
-            "nro": "F-14171",
-            "total": 37314575
-          }
-        },
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14187, F-14192",
-            "total": 7358030
-          }
-        }
-      },
-      "DISTRIBUIDORA SANCHEZ 4G SPA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14150",
-            "total": 1090410
-          }
-        },
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14191",
-            "total": 4098690
-          }
-        }
-      },
-      "WEIDMULLER SPA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14151",
-            "total": 2311075
-          },
-          "servAdm": {
-            "nro": "F-14206",
-            "total": 282938,
-            "uf": 5.99
-          }
-        }
-      },
-      "NCH CHILE S A": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14152",
-            "total": 2859115
-          },
-          "servAdm": {
-            "nro": "F-14207",
-            "total": 350011,
-            "uf": 7.41
-          }
-        },
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14182",
-            "total": 1957376
-          },
-          "servAdm": {
-            "nro": "F-14232",
-            "total": 237592,
-            "uf": 5.03
-          }
-        }
-      },
-      "COMERCIAL GRANJA MARINA LIMITADA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14154",
-            "total": 3005071
-          },
-          "servAdm": {
-            "nro": "F-14218",
-            "total": 835870
-          }
-        }
-      },
-      "GRUPO DROP SPA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14153",
-            "total": 2995868
-          },
-          "servAdm": {
-            "nro": "F-14209",
-            "total": 366544,
-            "uf": 7.76
-          }
-        }
-      },
-      "SOCIEDAD DE ALIMENTOS LEEFOOD SPA.": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14145",
-            "total": 7553373
-          }
-        },
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14159",
-            "total": 5753558
-          },
-          "servAdm": {
-            "nro": "F-14208",
-            "total": 353318,
-            "uf": 7.48
-          }
-        }
-      },
-      "ALIMENTOS NEVA SPA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14156",
-            "total": 3738027
-          },
-          "servAdm": {
-            "nro": "F-14210",
-            "total": 455818,
-            "uf": 9.65
-          }
-        }
-      },
-      "GALLYAS TELECOM S.A.": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14157",
-            "total": 4933169
-          },
-          "servAdm": {
-            "nro": "F-14213",
-            "total": 604608,
-            "uf": 12.8
-          }
-        }
-      },
-      "SOC COMERCIAL JOSE MARIN ANTONIN Y COMPANIA LIMITADA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14158",
-            "total": 5414965
-          }
-        }
-      },
-      "COMERCIAL SNA-E (CHILE) LIMITADA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14205",
-            "total": 15244705
-          },
-          "servAdm": {
-            "nro": "F-14217",
-            "total": 1864837,
-            "uf": 39.48
-          }
-        }
-      },
-      "COMERCIAL INGERSOLL RAND (CHILE) LIMITADA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14167",
-            "total": 17378449
-          },
-          "servAdm": {
-            "nro": "F-14212",
-            "total": 539423,
-            "uf": 11.42
-          }
-        }
-      },
-      "OLYMPUS CORPORATION CHILE SPA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14144",
-            "total": 6734466
-          }
-        },
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14161",
-            "total": 7186391
-          },
-          "servAdm": {
-            "nro": "F-14215",
-            "total": 877154,
-            "uf": 18.57
-          }
-        },
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14246, F-14247",
-            "total": 6736195,
-            "uf": 30.5
-          }
-        }
-      },
-      "JOHN CRANE CHILE S A": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14163",
-            "total": 10030064
-          }
-        }
-      },
-      "MEGAMIN S.A.": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14204",
-            "total": 10831006
-          }
-        }
-      },
-      "COMERCIALIZADORA INDUSTRIAL W & L LIMITADA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14166",
-            "total": 15643397
-          },
-          "servAdm": {
-            "nro": "F-14216",
-            "total": 965955,
-            "uf": 20.45
-          }
-        }
-      },
-      "TRANE DE CHILE S A": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14168",
-            "total": 18629983
-          }
-        }
-      },
-      "DRAGER CHILE LIMITADA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14170",
-            "total": 23713994
-          }
-        }
-      },
-      "PATRICIO RODRIGO OLMEDO NUNEZ": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14149",
-            "total": 236175,
-            "uf": 5.0
-          }
-        },
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14176",
-            "total": 766249
-          },
-          "servAdm": {
-            "nro": "F-14227",
-            "total": 92581,
-            "uf": 1.96
           }
         }
       },
@@ -1201,6 +905,14 @@
           }
         }
       },
+      "INDUSTRIA YKK CHILE LTDA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14142",
+            "total": 6176149
+          }
+        }
+      },
       "MEDILAND SPA": {
         "4-A": {
           "arriendo": {
@@ -1214,11 +926,48 @@
           }
         }
       },
-      "INDUSTRIA YKK CHILE LTDA": {
+      "OLYMPUS CORPORATION CHILE SPA": {
         "4-A": {
           "arriendo": {
-            "nro": "F-14142",
-            "total": 6176149
+            "nro": "F-14144",
+            "total": 6734466
+          }
+        },
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14161",
+            "total": 7186391
+          },
+          "servAdm": {
+            "nro": "F-14215",
+            "total": 877154,
+            "uf": 18.57
+          }
+        },
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14246, F-14247",
+            "total": 6736195,
+            "uf": 30.5
+          }
+        }
+      },
+      "SOCIEDAD DE ALIMENTOS LEEFOOD SPA.": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14145",
+            "total": 7553373
+          }
+        },
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14159",
+            "total": 5753558
+          },
+          "servAdm": {
+            "nro": "F-14208",
+            "total": 353318,
+            "uf": 7.48
           }
         }
       },
@@ -1254,12 +1003,248 @@
           }
         }
       },
+      "PATRICIO RODRIGO OLMEDO NUNEZ": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14149",
+            "total": 236175,
+            "uf": 5.0
+          }
+        },
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14176",
+            "total": 766249
+          },
+          "servAdm": {
+            "nro": "F-14227",
+            "total": 92581,
+            "uf": 1.96
+          }
+        }
+      },
+      "DISTRIBUIDORA SANCHEZ 4G SPA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14150",
+            "total": 1090410
+          }
+        },
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14191",
+            "total": 4098690
+          }
+        }
+      },
+      "WEIDMULLER SPA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14151",
+            "total": 2311075
+          },
+          "servAdm": {
+            "nro": "F-14206",
+            "total": 282938,
+            "uf": 5.99
+          }
+        }
+      },
+      "NCH CHILE S A": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14152",
+            "total": 2859115
+          },
+          "servAdm": {
+            "nro": "F-14207",
+            "total": 350011,
+            "uf": 7.41
+          }
+        },
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14182",
+            "total": 1957376
+          },
+          "servAdm": {
+            "nro": "F-14232",
+            "total": 237592,
+            "uf": 5.03
+          }
+        }
+      },
+      "GRUPO DROP SPA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14153",
+            "total": 2995868
+          },
+          "servAdm": {
+            "nro": "F-14209",
+            "total": 366544,
+            "uf": 7.76
+          }
+        }
+      },
+      "COMERCIAL GRANJA MARINA LIMITADA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14154",
+            "total": 3005071
+          },
+          "servAdm": {
+            "nro": "F-14218",
+            "total": 835870
+          }
+        }
+      },
+      "SANCHEZ HERMANOS SPA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14155, F-14162, F-14169",
+            "total": 30427551
+          },
+          "servAdm": {
+            "nro": "F-14211",
+            "total": 514388,
+            "uf": 10.89
+          }
+        },
+        "A-1": {
+          "arriendo": {
+            "nro": "F-14171",
+            "total": 37314575
+          }
+        },
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14187, F-14192",
+            "total": 7358030
+          }
+        }
+      },
+      "ALIMENTOS NEVA SPA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14156",
+            "total": 3738027
+          },
+          "servAdm": {
+            "nro": "F-14210",
+            "total": 455818,
+            "uf": 9.65
+          }
+        }
+      },
+      "GALLYAS TELECOM S.A.": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14157",
+            "total": 4933169
+          },
+          "servAdm": {
+            "nro": "F-14213",
+            "total": 604608,
+            "uf": 12.8
+          }
+        }
+      },
+      "SOC COMERCIAL JOSE MARIN ANTONIN Y COMPANIA LIMITADA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14158",
+            "total": 5414965
+          }
+        }
+      },
+      "A3D CHILE S A": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14160",
+            "total": 6275584
+          },
+          "servAdm": {
+            "nro": "F-14214",
+            "total": 783156,
+            "uf": 16.58
+          }
+        }
+      },
+      "JOHN CRANE CHILE S A": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14163",
+            "total": 10030064
+          }
+        }
+      },
+      "COMERCIALIZADORA INDUSTRIAL W & L LIMITADA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14166",
+            "total": 15643397
+          },
+          "servAdm": {
+            "nro": "F-14216",
+            "total": 965955,
+            "uf": 20.45
+          }
+        }
+      },
+      "COMERCIAL INGERSOLL RAND (CHILE) LIMITADA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14167",
+            "total": 17378449
+          },
+          "servAdm": {
+            "nro": "F-14212",
+            "total": 539423,
+            "uf": 11.42
+          }
+        }
+      },
+      "TRANE DE CHILE S A": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14168",
+            "total": 18629983
+          }
+        }
+      },
+      "DRAGER CHILE LIMITADA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14170",
+            "total": 23713994
+          }
+        }
+      },
       "GTD MANQUEHUE S.A.": {
         "A-2": {
           "arriendo": {
             "nro": "F-14172",
             "total": 273963,
             "uf": 5.8
+          }
+        }
+      },
+      "SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE LOS LIBERTADORES": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14173, F-14175, F-14196, F-14200, F-14201, F-14248, F-14249, F-14250, F-14252, F-14253",
+            "total": 37139624
+          },
+          "habilitacion": {
+            "nro": "F-14189, F-14251",
+            "total": 14845004,
+            "uf": 314.28
+          },
+          "servAdm": {
+            "nro": "F-14225, F-14226, F-14240, F-14243, F-14244, F-14254, F-14255, F-14256, F-14257, F-14258, F-14259",
+            "total": 6028129,
+            "uf": 127.62
           }
         }
       },
@@ -1272,6 +1257,40 @@
           }
         }
       },
+      "SANVIL INGENIERIA SPA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14177",
+            "total": 843329
+          },
+          "servAdm": {
+            "nro": "F-14228",
+            "total": 102027,
+            "uf": 2.16
+          }
+        }
+      },
+      "CFMEDICA LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14178",
+            "total": 964000
+          },
+          "servAdm": {
+            "nro": "F-14230",
+            "total": 117142,
+            "uf": 2.48
+          }
+        }
+      },
+      "VISIBILITY S. A.": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14179",
+            "total": 1482916
+          }
+        }
+      },
       "ROCKETMAN SPA": {
         "A-2": {
           "arriendo": {
@@ -1281,11 +1300,37 @@
           }
         }
       },
+      "UNEX APARELLAJE ELECTRICO (CHILE) LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14181",
+            "total": 1923531
+          },
+          "servAdm": {
+            "nro": "F-14229",
+            "total": 116670,
+            "uf": 2.47
+          }
+        }
+      },
       "COMERCIAL HUSSMANN CHILE LIMITADA": {
         "A-2": {
           "arriendo": {
             "nro": "F-14183",
             "total": 2427339
+          }
+        }
+      },
+      "FEN INGENIERÍA SPA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14184",
+            "total": 2763831
+          },
+          "servAdm": {
+            "nro": "F-14235",
+            "total": 336785,
+            "uf": 7.13
           }
         }
       },
@@ -1322,11 +1367,63 @@
           }
         }
       },
+      "SOCIEDAD FABRICA Y DISTRIBUIDORA DE ALIMENTOS JP LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14190",
+            "total": 4072710
+          },
+          "servAdm": {
+            "nro": "F-14237",
+            "total": 510138,
+            "uf": 10.8
+          }
+        }
+      },
+      "SOCIEDAD COMERCIAL E INDUSTRIAL HYDROTORC LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14194",
+            "total": 4453491
+          },
+          "servAdm": {
+            "nro": "F-14238",
+            "total": 544619,
+            "uf": 11.53
+          }
+        }
+      },
+      "CASINO IMPERIO LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14197",
+            "total": 6141847
+          },
+          "servAdm": {
+            "nro": "F-14241",
+            "total": 748202,
+            "uf": 15.84
+          }
+        }
+      },
       "SEGAFREDO ZANETTI CHILE S.A.": {
         "A-2": {
           "arriendo": {
             "nro": "F-14198",
             "total": 6454102
+          }
+        }
+      },
+      "IN WASSER SPA.": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14199",
+            "total": 6576277
+          },
+          "servAdm": {
+            "nro": "F-14242",
+            "total": 808191,
+            "uf": 17.11
           }
         }
       },
@@ -1346,133 +1443,24 @@
           }
         }
       },
-      "VISIBILITY S. A.": {
-        "A-2": {
+      "MEGAMIN S.A.": {
+        "5-A": {
           "arriendo": {
-            "nro": "F-14179",
-            "total": 1482916
+            "nro": "F-14204",
+            "total": 10831006
           }
         }
       },
-      "CFMEDICA LIMITADA": {
-        "A-2": {
+      "COMERCIAL SNA-E (CHILE) LIMITADA": {
+        "5-A": {
           "arriendo": {
-            "nro": "F-14178",
-            "total": 964000
+            "nro": "F-14205",
+            "total": 15244705
           },
           "servAdm": {
-            "nro": "F-14230",
-            "total": 117142,
-            "uf": 2.48
-          }
-        }
-      },
-      "SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE LOS LIBERTADORES": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14173, F-14175, F-14196, F-14200, F-14201, F-14248, F-14249, F-14250, F-14252, F-14253",
-            "total": 37139624
-          },
-          "habilitacion": {
-            "nro": "F-14189, F-14251",
-            "total": 14845004,
-            "uf": 314.28
-          },
-          "servAdm": {
-            "nro": "F-14225, F-14226, F-14240, F-14243, F-14244, F-14254, F-14255, F-14256, F-14257, F-14258, F-14259",
-            "total": 6028129,
-            "uf": 127.62
-          }
-        }
-      },
-      "SANVIL INGENIERIA SPA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14177",
-            "total": 843329
-          },
-          "servAdm": {
-            "nro": "F-14228",
-            "total": 102027,
-            "uf": 2.16
-          }
-        }
-      },
-      "UNEX APARELLAJE ELECTRICO (CHILE) LIMITADA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14181",
-            "total": 1923531
-          },
-          "servAdm": {
-            "nro": "F-14229",
-            "total": 116670,
-            "uf": 2.47
-          }
-        }
-      },
-      "SOCIEDAD FABRICA Y DISTRIBUIDORA DE ALIMENTOS JP LIMITADA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14190",
-            "total": 4072710
-          },
-          "servAdm": {
-            "nro": "F-14237",
-            "total": 510138,
-            "uf": 10.8
-          }
-        }
-      },
-      "IN WASSER SPA.": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14199",
-            "total": 6576277
-          },
-          "servAdm": {
-            "nro": "F-14242",
-            "total": 808191,
-            "uf": 17.11
-          }
-        }
-      },
-      "SOCIEDAD COMERCIAL E INDUSTRIAL HYDROTORC LIMITADA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14194",
-            "total": 4453491
-          },
-          "servAdm": {
-            "nro": "F-14238",
-            "total": 544619,
-            "uf": 11.53
-          }
-        }
-      },
-      "FEN INGENIERÍA SPA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14184",
-            "total": 2763831
-          },
-          "servAdm": {
-            "nro": "F-14235",
-            "total": 336785,
-            "uf": 7.13
-          }
-        }
-      },
-      "CASINO IMPERIO LIMITADA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14197",
-            "total": 6141847
-          },
-          "servAdm": {
-            "nro": "F-14241",
-            "total": 748202,
-            "uf": 15.84
+            "nro": "F-14217",
+            "total": 1864837,
+            "uf": 39.48
           }
         }
       },
@@ -1484,7 +1472,7 @@
             "uf": 4.0
           },
           "arriendo": {
-            "nro": "F-16",
+            "nro": "FE-16",
             "total": 5000159,
             "uf": 125.97
           }
@@ -1498,22 +1486,9 @@
             "uf": 12.6
           },
           "arriendo": {
-            "nro": "F-15",
+            "nro": "FE-15",
             "total": 4167791,
             "uf": 105.0
-          }
-        }
-      },
-      "A3D CHILE S A": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14160",
-            "total": 6275584
-          },
-          "servAdm": {
-            "nro": "F-14214",
-            "total": 783156,
-            "uf": 16.58
           }
         }
       },
@@ -1526,10 +1501,18 @@
           }
         }
       },
+      "LA ARAUCANA C C A F": {
+        "A-2": {
+          "arriendo": {
+            "nro": "FE-14, FE-19",
+            "total": 6906626
+          }
+        }
+      },
       "BANCO DEL ESTADO DE CHILE": {
         "A-2": {
           "arriendo": {
-            "nro": "F-17",
+            "nro": "FE-17",
             "total": 18231109,
             "uf": 459.3
           }
@@ -1538,64 +1521,40 @@
       "CAJA DE COMPENSACION DE ASIGNACION FAMILIAR DE LOS ANDES": {
         "A-2": {
           "arriendo": {
-            "nro": "F-18",
+            "nro": "FE-18",
             "total": 11590826,
             "uf": 292.01
+          }
+        }
+      },
+      "CLARO CHILE SPA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "FE-21",
+            "total": 1073173,
+            "uf": 27.0
           }
         }
       }
     },
     "Marzo 2026": {
-      "LA ARAUCANA C C A F": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-22",
-            "total": 3464254,
-            "uf": 87.0
-          }
-        }
-      },
-      "BANCO DE CREDITO E INVERSIONES": {
-        "D-2": {
-          "arriendo": {
-            "nro": "F-27",
-            "total": 16126699,
-            "uf": 405.0
-          }
-        }
-      },
-      "SANCHEZ HERMANOS SPA": {
+      "PATRICIO RODRIGO OLMEDO NUNEZ": {
         "5-A": {
           "arriendo": {
-            "nro": "F-14267, F-14274, F-14281",
-            "total": 30527936
-          },
-          "servAdm": {
-            "nro": "F-14354",
-            "total": 516019,
-            "uf": 10.89
-          },
-          "servCont": {
-            "nro": "F-14396",
-            "total": 4978223,
-            "uf": 105.0
-          },
-          "asesoria": {
-            "nro": "F-14415, F-14416",
-            "total": 9719387,
-            "uf": 205.0
-          }
-        },
-        "A-1": {
-          "arriendo": {
-            "nro": "F-14300",
-            "total": 37436525
+            "nro": "F-14261",
+            "total": 236923,
+            "uf": 5.0
           }
         },
         "A-2": {
           "arriendo": {
-            "nro": "F-14316, F-14320",
-            "total": 7382166
+            "nro": "F-14305",
+            "total": 768698
+          },
+          "servAdm": {
+            "nro": "F-14334",
+            "total": 92874,
+            "uf": 1.96
           }
         }
       },
@@ -1604,7 +1563,15 @@
           "arriendo": {
             "nro": "F-14262",
             "total": 1093994
-          },
+          }
+        },
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14319",
+            "total": 4112158
+          }
+        },
+        "SIN-SITIO": {
           "servCont": {
             "nro": "F-14397",
             "total": 2133524,
@@ -1614,12 +1581,6 @@
             "nro": "F-14417",
             "total": 948232,
             "uf": 20.0
-          }
-        },
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14319",
-            "total": 4112158
           }
         }
       },
@@ -1660,18 +1621,6 @@
           }
         }
       },
-      "COMERCIAL GRANJA MARINA LIMITADA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14266",
-            "total": 3014773
-          },
-          "servAdm": {
-            "nro": "F-14369",
-            "total": 835870
-          }
-        }
-      },
       "GRUPO DROP SPA": {
         "5-A": {
           "arriendo": {
@@ -1685,22 +1634,52 @@
           }
         }
       },
-      "SOCIEDAD DE ALIMENTOS LEEFOOD SPA.": {
+      "COMERCIAL GRANJA MARINA LIMITADA": {
         "5-A": {
           "arriendo": {
-            "nro": "F-14271",
-            "total": 5772206
+            "nro": "F-14266",
+            "total": 3014773
           },
           "servAdm": {
-            "nro": "F-14346",
-            "total": 354437,
-            "uf": 7.48
+            "nro": "F-14369",
+            "total": 835870
+          }
+        }
+      },
+      "SANCHEZ HERMANOS SPA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14267, F-14274, F-14281",
+            "total": 30527936
+          },
+          "servAdm": {
+            "nro": "F-14354",
+            "total": 516019,
+            "uf": 10.89
           }
         },
-        "4-A": {
+        "A-1": {
           "arriendo": {
-            "nro": "F-14296, F-14297",
-            "total": 15155558
+            "nro": "F-14300",
+            "total": 37436525
+          }
+        },
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14316, F-14320",
+            "total": 7382166
+          }
+        },
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14396",
+            "total": 4978223,
+            "uf": 105.0
+          },
+          "asesoria": {
+            "nro": "F-14415, F-14416",
+            "total": 9719387,
+            "uf": 205.0
           }
         }
       },
@@ -1738,29 +1717,35 @@
           }
         }
       },
-      "COMERCIAL SNA-E (CHILE) LIMITADA": {
+      "SOCIEDAD DE ALIMENTOS LEEFOOD SPA.": {
         "5-A": {
           "arriendo": {
-            "nro": "F-14277",
-            "total": 15293941
+            "nro": "F-14271",
+            "total": 5772206
           },
           "servAdm": {
-            "nro": "F-14367",
-            "total": 1870745,
-            "uf": 39.48
+            "nro": "F-14346",
+            "total": 354437,
+            "uf": 7.48
+          }
+        },
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14296, F-14297",
+            "total": 15155558
           }
         }
       },
-      "COMERCIAL INGERSOLL RAND (CHILE) LIMITADA": {
+      "A3D CHILE S A": {
         "5-A": {
           "arriendo": {
-            "nro": "F-14279, F-14331",
-            "total": 27058039
+            "nro": "F-14272",
+            "total": 6296263
           },
           "servAdm": {
-            "nro": "F-14355",
-            "total": 541132,
-            "uf": 11.42
+            "nro": "F-14361",
+            "total": 785637,
+            "uf": 16.58
           }
         }
       },
@@ -1809,6 +1794,19 @@
           }
         }
       },
+      "COMERCIAL SNA-E (CHILE) LIMITADA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14277",
+            "total": 15293941
+          },
+          "servAdm": {
+            "nro": "F-14367",
+            "total": 1870745,
+            "uf": 39.48
+          }
+        }
+      },
       "COMERCIALIZADORA INDUSTRIAL W & L LIMITADA": {
         "5-A": {
           "arriendo": {
@@ -1819,6 +1817,19 @@
             "nro": "F-14365",
             "total": 969016,
             "uf": 20.45
+          }
+        }
+      },
+      "COMERCIAL INGERSOLL RAND (CHILE) LIMITADA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14279, F-14331",
+            "total": 27058039
+          },
+          "servAdm": {
+            "nro": "F-14355",
+            "total": 541132,
+            "uf": 11.42
           }
         }
       },
@@ -1835,26 +1846,6 @@
           "arriendo": {
             "nro": "F-14282",
             "total": 23791109
-          }
-        }
-      },
-      "PATRICIO RODRIGO OLMEDO NUNEZ": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14261",
-            "total": 236923,
-            "uf": 5.0
-          }
-        },
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14305",
-            "total": 768698
-          },
-          "servAdm": {
-            "nro": "F-14334",
-            "total": 92874,
-            "uf": 1.96
           }
         }
       },
@@ -1943,6 +1934,14 @@
           }
         }
       },
+      "INDUSTRIA YKK CHILE LTDA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14293",
+            "total": 6196059
+          }
+        }
+      },
       "MEDILAND SPA": {
         "4-A": {
           "arriendo": {
@@ -1956,43 +1955,11 @@
           }
         }
       },
-      "INDUSTRIA YKK CHILE LTDA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14293",
-            "total": 6196059
-          }
-        }
-      },
       "SONEPAR CHILE SA": {
         "4-A": {
           "arriendo": {
             "nro": "F-14298, F-14299",
             "total": 46538404
-          }
-        }
-      },
-      "INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14374",
-            "total": 38074421
-          },
-          "servAdm": {
-            "nro": "F-14377, F-14378",
-            "total": 4701502,
-            "uf": 99.22
-          }
-        },
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14375, F-14376",
-            "total": 8848727
-          },
-          "servAdm": {
-            "nro": "F-14379, F-14380",
-            "total": 548240,
-            "uf": 11.57
           }
         }
       },
@@ -2005,12 +1972,75 @@
           }
         }
       },
+      "SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE LOS LIBERTADORES": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14302, F-14304, F-14322, F-14327, F-14328, F-14332, F-14381, F-14384",
+            "total": 22498638,
+            "uf": 4.77
+          },
+          "habilitacion": {
+            "nro": "F-14326",
+            "total": 7446019,
+            "uf": 157.14
+          },
+          "servAdm": {
+            "nro": "F-14333, F-14359, F-14364, F-14366, F-14382",
+            "total": 2720825,
+            "uf": 57.42
+          }
+        }
+      },
       "ENLACES REGIONALES DE CHILE SOCIEDAD ANONIMA": {
         "A-2": {
           "arriendo": {
             "nro": "F-14303",
             "total": 663385,
             "uf": 14.0
+          }
+        }
+      },
+      "SANVIL INGENIERIA SPA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14306",
+            "total": 846022
+          },
+          "servAdm": {
+            "nro": "F-14335",
+            "total": 102351,
+            "uf": 2.16
+          }
+        }
+      },
+      "CFMEDICA LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14307, F-14337",
+            "total": 1084613,
+            "uf": 2.48
+          }
+        }
+      },
+      "VISIBILITY S. A.": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14308",
+            "total": 1487750
+          }
+        },
+        "B": {
+          "servAdm": {
+            "nro": "F-14338, F-14383",
+            "total": 359553,
+            "uf": 7.6
+          }
+        },
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14386",
+            "total": 3555874,
+            "uf": 75.0
           }
         }
       },
@@ -2023,11 +2053,33 @@
           }
         }
       },
+      "UNEX APARELLAJE ELECTRICO (CHILE) LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14310, F-14336",
+            "total": 2046721,
+            "uf": 2.47
+          }
+        }
+      },
       "COMERCIAL HUSSMANN CHILE LIMITADA": {
         "A-2": {
           "arriendo": {
             "nro": "F-14312",
             "total": 2435093
+          }
+        }
+      },
+      "FEN INGENIERÍA SPA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14313",
+            "total": 2772720
+          },
+          "servAdm": {
+            "nro": "F-14344",
+            "total": 337853,
+            "uf": 7.13
           }
         }
       },
@@ -2064,11 +2116,63 @@
           }
         }
       },
+      "SOCIEDAD FABRICA Y DISTRIBUIDORA DE ALIMENTOS JP LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14318",
+            "total": 4086173
+          },
+          "servAdm": {
+            "nro": "F-14353",
+            "total": 511754,
+            "uf": 10.8
+          }
+        }
+      },
+      "SOCIEDAD COMERCIAL E INDUSTRIAL HYDROTORC LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14321",
+            "total": 4467865
+          },
+          "servAdm": {
+            "nro": "F-14356",
+            "total": 546344,
+            "uf": 11.53
+          }
+        }
+      },
+      "CASINO IMPERIO LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14323",
+            "total": 6161601
+          },
+          "servAdm": {
+            "nro": "F-14360",
+            "total": 750572,
+            "uf": 15.84
+          }
+        }
+      },
       "SEGAFREDO ZANETTI CHILE S.A.": {
         "A-2": {
           "arriendo": {
             "nro": "F-14324",
             "total": 6474892
+          }
+        }
+      },
+      "IN WASSER SPA.": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14325",
+            "total": 6597612
+          },
+          "servAdm": {
+            "nro": "F-14362",
+            "total": 810751,
+            "uf": 17.11
           }
         }
       },
@@ -2088,141 +2192,6 @@
           }
         }
       },
-      "VISIBILITY S. A.": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14308",
-            "total": 1487750
-          }
-        },
-        "B": {
-          "servAdm": {
-            "nro": "F-14338, F-14383",
-            "total": 359553,
-            "uf": 7.6
-          },
-          "servCont": {
-            "nro": "F-14386",
-            "total": 3555874,
-            "uf": 75.0
-          }
-        }
-      },
-      "CFMEDICA LIMITADA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14307, F-14337",
-            "total": 1084613,
-            "uf": 2.48
-          }
-        }
-      },
-      "SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE LOS LIBERTADORES": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14302, F-14304, F-14322, F-14327, F-14328, F-14332, F-14381, F-14384",
-            "total": 22498638,
-            "uf": 4.77
-          },
-          "habilitacion": {
-            "nro": "F-14326",
-            "total": 7446019,
-            "uf": 157.14
-          },
-          "servAdm": {
-            "nro": "F-14333, F-14359, F-14364, F-14366, F-14382",
-            "total": 2720825,
-            "uf": 57.42
-          }
-        }
-      },
-      "SANVIL INGENIERIA SPA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14306",
-            "total": 846022
-          },
-          "servAdm": {
-            "nro": "F-14335",
-            "total": 102351,
-            "uf": 2.16
-          }
-        }
-      },
-      "UNEX APARELLAJE ELECTRICO (CHILE) LIMITADA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14310, F-14336",
-            "total": 2046721,
-            "uf": 2.47
-          }
-        }
-      },
-      "SOCIEDAD FABRICA Y DISTRIBUIDORA DE ALIMENTOS JP LIMITADA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14318",
-            "total": 4086173
-          },
-          "servAdm": {
-            "nro": "F-14353",
-            "total": 511754,
-            "uf": 10.8
-          }
-        }
-      },
-      "IN WASSER SPA.": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14325",
-            "total": 6597612
-          },
-          "servAdm": {
-            "nro": "F-14362",
-            "total": 810751,
-            "uf": 17.11
-          }
-        }
-      },
-      "SOCIEDAD COMERCIAL E INDUSTRIAL HYDROTORC LIMITADA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14321",
-            "total": 4467865
-          },
-          "servAdm": {
-            "nro": "F-14356",
-            "total": 546344,
-            "uf": 11.53
-          }
-        }
-      },
-      "FEN INGENIERÍA SPA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14313",
-            "total": 2772720
-          },
-          "servAdm": {
-            "nro": "F-14344",
-            "total": 337853,
-            "uf": 7.13
-          }
-        }
-      },
-      "CASINO IMPERIO LIMITADA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14323",
-            "total": 6161601
-          },
-          "servAdm": {
-            "nro": "F-14360",
-            "total": 750572,
-            "uf": 15.84
-          }
-        }
-      },
       "BANCO SECURITY": {
         "A-2": {
           "servAdm": {
@@ -2231,7 +2200,7 @@
             "uf": 4.0
           },
           "arriendo": {
-            "nro": "F-24",
+            "nro": "FE-24",
             "total": 5016001,
             "uf": 125.97
           }
@@ -2245,22 +2214,9 @@
             "uf": 12.6
           },
           "arriendo": {
-            "nro": "F-23",
+            "nro": "FE-23",
             "total": 4180996,
             "uf": 105.0
-          }
-        }
-      },
-      "A3D CHILE S A": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14272",
-            "total": 6296263
-          },
-          "servAdm": {
-            "nro": "F-14361",
-            "total": 785637,
-            "uf": 16.58
           }
         }
       },
@@ -2281,6 +2237,297 @@
           }
         }
       },
+      "INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14374",
+            "total": 38074421
+          },
+          "servAdm": {
+            "nro": "F-14377, F-14378",
+            "total": 4701502,
+            "uf": 99.22
+          }
+        },
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14375, F-14376",
+            "total": 8848727
+          },
+          "servAdm": {
+            "nro": "F-14379, F-14380",
+            "total": 548240,
+            "uf": 11.57
+          }
+        }
+      },
+      "GYSLING,SANCHEZ Y MIJAC SPA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14387",
+            "total": 142235,
+            "uf": 3.0
+          }
+        }
+      },
+      "INVERSIONES BMA LIMITADA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14388",
+            "total": 71118,
+            "uf": 1.5
+          }
+        }
+      },
+      "INVERSIONES JBS SPA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14389",
+            "total": 142235,
+            "uf": 3.0
+          }
+        }
+      },
+      "CAMPO SAN MIGUEL": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14390",
+            "total": 142235,
+            "uf": 3.0
+          }
+        }
+      },
+      "INVERSIONES LAGUNAS EL PARRAL SPA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14391",
+            "total": 142235,
+            "uf": 3.0
+          }
+        }
+      },
+      "PMGD CALLE LARGA SPA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14392",
+            "total": 284470,
+            "uf": 6.0
+          }
+        }
+      },
+      "PMGD PUENTE SPA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14393",
+            "total": 284470,
+            "uf": 6.0
+          }
+        }
+      },
+      "PMGD SALERNO SPA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14394",
+            "total": 284470,
+            "uf": 6.0
+          }
+        }
+      },
+      "VERONA SOLAR SPA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14395",
+            "total": 284470,
+            "uf": 6.0
+          }
+        }
+      },
+      "SERVICIOS Y GESTION SOUTH 53 SPA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14398",
+            "total": 568940,
+            "uf": 12.0
+          }
+        }
+      },
+      "INVERSIONES MYR SPA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14399",
+            "total": 142235,
+            "uf": 3.0
+          }
+        }
+      },
+      "INVERSIONES ML LIMITADA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14400",
+            "total": 71118,
+            "uf": 1.5
+          }
+        }
+      },
+      "INVERSIONES BYA SPA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14401",
+            "total": 142235,
+            "uf": 3.0
+          }
+        }
+      },
+      "INVERSIONES BYA ZF SPA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14402",
+            "total": 142235,
+            "uf": 3.0
+          }
+        }
+      },
+      "INVERSIONES SM LIMITADA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14403",
+            "total": 284470,
+            "uf": 6.0
+          }
+        }
+      },
+      "INVERSIONES T. S. D. SPA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14404",
+            "total": 284470,
+            "uf": 6.0
+          }
+        }
+      },
+      "INVERSIONES TSD ZF SPA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14405",
+            "total": 142235,
+            "uf": 3.0
+          }
+        }
+      },
+      "INVERSIONES BS LIMITADA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14406",
+            "total": 142235,
+            "uf": 3.0
+          }
+        }
+      },
+      "INVERSIONES P. S. D. SPA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14407",
+            "total": 284470,
+            "uf": 6.0
+          }
+        }
+      },
+      "INVERSIONES PSD ZF SPA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14408",
+            "total": 142235,
+            "uf": 3.0
+          }
+        }
+      },
+      "INVERSIONES CS LIMITADA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14409",
+            "total": 142235,
+            "uf": 3.0
+          }
+        }
+      },
+      "INVERSIONES AMV SPA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14410",
+            "total": 71118,
+            "uf": 1.5
+          }
+        }
+      },
+      "INVERSIONES MV LIMITADA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14411",
+            "total": 142235,
+            "uf": 3.0
+          }
+        }
+      },
+      "CAMPO MAR SPA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14412",
+            "total": 2133524,
+            "uf": 45.0
+          },
+          "asesoria": {
+            "nro": "F-14418",
+            "total": 21335241,
+            "uf": 450.0
+          }
+        }
+      },
+      "SAN MIGUEL SPA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14413",
+            "total": 2844699,
+            "uf": 60.0
+          },
+          "asesoria": {
+            "nro": "F-14419",
+            "total": 5689397,
+            "uf": 120.0
+          }
+        }
+      },
+      "CHICUREO NORTE SPA": {
+        "SIN-SITIO": {
+          "servCont": {
+            "nro": "F-14414",
+            "total": 2844699,
+            "uf": 60.0
+          },
+          "asesoria": {
+            "nro": "F-14420",
+            "total": 5689397,
+            "uf": 120.0
+          }
+        }
+      },
+      "SANCHEZ Y SANCHEZ SPA": {
+        "SIN-SITIO": {
+          "asesoria": {
+            "nro": "F-14421",
+            "total": 9719388,
+            "uf": 205.0
+          }
+        }
+      },
+      "INVERSIONES AHIMSA LIMITADA": {
+        "SIN-SITIO": {
+          "asesoria": {
+            "nro": "F-14422",
+            "total": 142235,
+            "uf": 3.0
+          }
+        }
+      },
       "LOINCO CAPITAL SPA": {
         "A-2": {
           "arriendo": {
@@ -2290,10 +2537,19 @@
           }
         }
       },
+      "LA ARAUCANA C C A F": {
+        "A-2": {
+          "arriendo": {
+            "nro": "FE-22",
+            "total": 3464254,
+            "uf": 87.0
+          }
+        }
+      },
       "BANCO DEL ESTADO DE CHILE": {
         "A-2": {
           "arriendo": {
-            "nro": "F-25",
+            "nro": "FE-25",
             "total": 18288871,
             "uf": 459.3
           }
@@ -2302,54 +2558,40 @@
       "CAJA DE COMPENSACION DE ASIGNACION FAMILIAR DE LOS ANDES": {
         "A-2": {
           "arriendo": {
-            "nro": "F-26",
+            "nro": "FE-26",
             "total": 11627549,
             "uf": 292.01
-          }
-        }
-      }
-    },
-    "Abril 2026": {
-      "LA ARAUCANA C C A F": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-28",
-            "total": 3466230,
-            "uf": 87.0
           }
         }
       },
       "BANCO DE CREDITO E INVERSIONES": {
         "D-2": {
           "arriendo": {
-            "nro": "F-33",
-            "total": 16135897,
+            "nro": "FE-27",
+            "total": 16126699,
             "uf": 405.0
           }
         }
-      },
-      "SANCHEZ HERMANOS SPA": {
+      }
+    },
+    "Abril 2026": {
+      "PATRICIO RODRIGO OLMEDO NUNEZ": {
         "5-A": {
           "arriendo": {
-            "nro": "F-14430, F-14437, F-14443",
-            "total": 30546063
-          },
-          "servAdm": {
-            "nro": "F-14518",
-            "total": 516312,
-            "uf": 10.89
-          }
-        },
-        "A-1": {
-          "arriendo": {
-            "nro": "F-14462",
-            "total": 37458547
+            "nro": "F-14424",
+            "total": 237059,
+            "uf": 5.0
           }
         },
         "A-2": {
           "arriendo": {
-            "nro": "F-14477, F-14481",
-            "total": 7386524
+            "nro": "F-14466",
+            "total": 769141
+          },
+          "servAdm": {
+            "nro": "F-14499",
+            "total": 92927,
+            "uf": 1.96
           }
         }
       },
@@ -2404,18 +2646,6 @@
           }
         }
       },
-      "COMERCIAL GRANJA MARINA LIMITADA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14429",
-            "total": 3016526
-          },
-          "servAdm": {
-            "nro": "F-14533",
-            "total": 835870
-          }
-        }
-      },
       "GRUPO DROP SPA": {
         "5-A": {
           "arriendo": {
@@ -2429,22 +2659,40 @@
           }
         }
       },
-      "SOCIEDAD DE ALIMENTOS LEEFOOD SPA.": {
+      "COMERCIAL GRANJA MARINA LIMITADA": {
         "5-A": {
           "arriendo": {
-            "nro": "F-14434",
-            "total": 5775572
+            "nro": "F-14429",
+            "total": 3016526
           },
           "servAdm": {
-            "nro": "F-14510",
-            "total": 354639,
-            "uf": 7.48
+            "nro": "F-14533",
+            "total": 835870
+          }
+        }
+      },
+      "SANCHEZ HERMANOS SPA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14430, F-14437, F-14443",
+            "total": 30546063
+          },
+          "servAdm": {
+            "nro": "F-14518",
+            "total": 516312,
+            "uf": 10.89
           }
         },
-        "4-A": {
+        "A-1": {
           "arriendo": {
-            "nro": "F-14458",
-            "total": 7582186
+            "nro": "F-14462",
+            "total": 37458547
+          }
+        },
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14477, F-14481",
+            "total": 7386524
           }
         }
       },
@@ -2482,29 +2730,35 @@
           }
         }
       },
-      "COMERCIAL SNA-E (CHILE) LIMITADA": {
+      "SOCIEDAD DE ALIMENTOS LEEFOOD SPA.": {
         "5-A": {
           "arriendo": {
-            "nro": "F-14440",
-            "total": 15302833
+            "nro": "F-14434",
+            "total": 5775572
           },
           "servAdm": {
-            "nro": "F-14531",
-            "total": 1871812,
-            "uf": 39.48
+            "nro": "F-14510",
+            "total": 354639,
+            "uf": 7.48
+          }
+        },
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14458",
+            "total": 7582186
           }
         }
       },
-      "COMERCIAL INGERSOLL RAND (CHILE) LIMITADA": {
+      "A3D CHILE S A": {
         "5-A": {
-          "servAdm": {
-            "nro": "F-14519, F-14547",
-            "total": 1082880,
-            "uf": 22.84
-          },
           "arriendo": {
-            "nro": "F-14540",
-            "total": 9632920
+            "nro": "F-14435",
+            "total": 6299998
+          },
+          "servAdm": {
+            "nro": "F-14525",
+            "total": 786085,
+            "uf": 16.58
           }
         }
       },
@@ -2549,6 +2803,19 @@
           }
         }
       },
+      "COMERCIAL SNA-E (CHILE) LIMITADA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14440",
+            "total": 15302833
+          },
+          "servAdm": {
+            "nro": "F-14531",
+            "total": 1871812,
+            "uf": 39.48
+          }
+        }
+      },
       "COMERCIALIZADORA INDUSTRIAL W & L LIMITADA": {
         "5-A": {
           "arriendo": {
@@ -2575,26 +2842,6 @@
           "arriendo": {
             "nro": "F-14444",
             "total": 23805034
-          }
-        }
-      },
-      "PATRICIO RODRIGO OLMEDO NUNEZ": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14424",
-            "total": 237059,
-            "uf": 5.0
-          }
-        },
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14466",
-            "total": 769141
-          },
-          "servAdm": {
-            "nro": "F-14499",
-            "total": 92927,
-            "uf": 1.96
           }
         }
       },
@@ -2683,6 +2930,14 @@
           }
         }
       },
+      "INDUSTRIA YKK CHILE LTDA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14455",
+            "total": 6199654
+          }
+        }
+      },
       "MEDILAND SPA": {
         "4-A": {
           "arriendo": {
@@ -2693,14 +2948,6 @@
             "nro": "F-14507",
             "total": 329037,
             "uf": 6.94
-          }
-        }
-      },
-      "INDUSTRIA YKK CHILE LTDA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14455",
-            "total": 6199654
           }
         }
       },
@@ -2745,12 +2992,53 @@
           }
         }
       },
+      "SANVIL INGENIERIA SPA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14464",
+            "total": 391357
+          },
+          "servAdm": {
+            "nro": "F-14496",
+            "total": 47886,
+            "uf": 1.01
+          }
+        }
+      },
       "ENLACES REGIONALES DE CHILE SOCIEDAD ANONIMA": {
         "A-2": {
           "arriendo": {
             "nro": "F-14465",
             "total": 663763,
             "uf": 14.0
+          }
+        }
+      },
+      "CFMEDICA LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14467",
+            "total": 1156830
+          },
+          "servAdm": {
+            "nro": "F-14501",
+            "total": 140338,
+            "uf": 2.96
+          }
+        }
+      },
+      "VISIBILITY S. A.": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14468",
+            "total": 1488624
+          }
+        },
+        "B": {
+          "servAdm": {
+            "nro": "F-14502",
+            "total": 180165,
+            "uf": 3.8
           }
         }
       },
@@ -2763,11 +3051,37 @@
           }
         }
       },
+      "UNEX APARELLAJE ELECTRICO (CHILE) LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14470",
+            "total": 1930792
+          },
+          "servAdm": {
+            "nro": "F-14500",
+            "total": 117107,
+            "uf": 2.47
+          }
+        }
+      },
       "COMERCIAL HUSSMANN CHILE LIMITADA": {
         "A-2": {
           "arriendo": {
             "nro": "F-14473",
             "total": 2436494
+          }
+        }
+      },
+      "FEN INGENIERÍA SPA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14474",
+            "total": 2774326
+          },
+          "servAdm": {
+            "nro": "F-14508",
+            "total": 338044,
+            "uf": 7.13
           }
         }
       },
@@ -2804,11 +3118,63 @@
           }
         }
       },
+      "SOCIEDAD FABRICA Y DISTRIBUIDORA DE ALIMENTOS JP LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14479",
+            "total": 4088606
+          },
+          "servAdm": {
+            "nro": "F-14517",
+            "total": 512046,
+            "uf": 10.8
+          }
+        }
+      },
+      "SOCIEDAD COMERCIAL E INDUSTRIAL HYDROTORC LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14482",
+            "total": 4470460
+          },
+          "servAdm": {
+            "nro": "F-14520",
+            "total": 546656,
+            "uf": 11.53
+          }
+        }
+      },
+      "CASINO IMPERIO LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14483",
+            "total": 6165169
+          },
+          "servAdm": {
+            "nro": "F-14524",
+            "total": 751001,
+            "uf": 15.84
+          }
+        }
+      },
       "SEGAFREDO ZANETTI CHILE S.A.": {
         "A-2": {
           "arriendo": {
             "nro": "F-14484",
             "total": 6478647
+          }
+        }
+      },
+      "IN WASSER SPA.": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14485",
+            "total": 6601465
+          },
+          "servAdm": {
+            "nro": "F-14526",
+            "total": 811213,
+            "uf": 17.11
           }
         }
       },
@@ -2825,34 +3191,6 @@
           "arriendo": {
             "nro": "F-14487",
             "total": 9654631
-          }
-        }
-      },
-      "VISIBILITY S. A.": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14468",
-            "total": 1488624
-          }
-        },
-        "B": {
-          "servAdm": {
-            "nro": "F-14502",
-            "total": 180165,
-            "uf": 3.8
-          }
-        }
-      },
-      "CFMEDICA LIMITADA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14467",
-            "total": 1156830
-          },
-          "servAdm": {
-            "nro": "F-14501",
-            "total": 140338,
-            "uf": 2.96
           }
         }
       },
@@ -2874,97 +3212,6 @@
           }
         }
       },
-      "SANVIL INGENIERIA SPA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14464",
-            "total": 391357
-          },
-          "servAdm": {
-            "nro": "F-14496",
-            "total": 47886,
-            "uf": 1.01
-          }
-        }
-      },
-      "UNEX APARELLAJE ELECTRICO (CHILE) LIMITADA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14470",
-            "total": 1930792
-          },
-          "servAdm": {
-            "nro": "F-14500",
-            "total": 117107,
-            "uf": 2.47
-          }
-        }
-      },
-      "SOCIEDAD FABRICA Y DISTRIBUIDORA DE ALIMENTOS JP LIMITADA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14479",
-            "total": 4088606
-          },
-          "servAdm": {
-            "nro": "F-14517",
-            "total": 512046,
-            "uf": 10.8
-          }
-        }
-      },
-      "IN WASSER SPA.": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14485",
-            "total": 6601465
-          },
-          "servAdm": {
-            "nro": "F-14526",
-            "total": 811213,
-            "uf": 17.11
-          }
-        }
-      },
-      "SOCIEDAD COMERCIAL E INDUSTRIAL HYDROTORC LIMITADA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14482",
-            "total": 4470460
-          },
-          "servAdm": {
-            "nro": "F-14520",
-            "total": 546656,
-            "uf": 11.53
-          }
-        }
-      },
-      "FEN INGENIERÍA SPA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14474",
-            "total": 2774326
-          },
-          "servAdm": {
-            "nro": "F-14508",
-            "total": 338044,
-            "uf": 7.13
-          }
-        }
-      },
-      "CASINO IMPERIO LIMITADA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14483",
-            "total": 6165169
-          },
-          "servAdm": {
-            "nro": "F-14524",
-            "total": 751001,
-            "uf": 15.84
-          }
-        }
-      },
       "BANCO SECURITY": {
         "A-2": {
           "servAdm": {
@@ -2973,9 +3220,22 @@
             "uf": 4.0
           },
           "arriendo": {
-            "nro": "F-30",
+            "nro": "FE-30",
             "total": 5018861,
             "uf": 125.97
+          }
+        }
+      },
+      "COMERCIAL INGERSOLL RAND (CHILE) LIMITADA": {
+        "5-A": {
+          "servAdm": {
+            "nro": "F-14519, F-14547",
+            "total": 1082880,
+            "uf": 22.84
+          },
+          "arriendo": {
+            "nro": "F-14540",
+            "total": 9632920
           }
         }
       },
@@ -2987,22 +3247,9 @@
             "uf": 12.6
           },
           "arriendo": {
-            "nro": "F-29",
+            "nro": "FE-29",
             "total": 4183381,
             "uf": 105.0
-          }
-        }
-      },
-      "A3D CHILE S A": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14435",
-            "total": 6299998
-          },
-          "servAdm": {
-            "nro": "F-14525",
-            "total": 786085,
-            "uf": 16.58
           }
         }
       },
@@ -3032,24 +3279,6 @@
           }
         }
       },
-      "BANCO DEL ESTADO DE CHILE": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-31",
-            "total": 18299302,
-            "uf": 459.3
-          }
-        }
-      },
-      "CAJA DE COMPENSACION DE ASIGNACION FAMILIAR DE LOS ANDES": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-32, F-35",
-            "total": 23268362,
-            "uf": 584.02
-          }
-        }
-      },
       "BANCO BICE": {
         "A-2": {
           "servAdm": {
@@ -3058,63 +3287,254 @@
             "uf": 4.0
           },
           "arriendo": {
-            "nro": "F-34",
+            "nro": "FE-34",
             "total": 5018861,
             "uf": 125.97
           }
         }
-      }
-    },
-    "Mayo 2026": {
+      },
       "LA ARAUCANA C C A F": {
         "A-2": {
           "arriendo": {
-            "nro": "F-36",
-            "total": 3496251,
+            "nro": "FE-28",
+            "total": 3466230,
             "uf": 87.0
+          }
+        }
+      },
+      "BANCO DEL ESTADO DE CHILE": {
+        "A-2": {
+          "arriendo": {
+            "nro": "FE-31",
+            "total": 18299302,
+            "uf": 459.3
+          }
+        }
+      },
+      "CAJA DE COMPENSACION DE ASIGNACION FAMILIAR DE LOS ANDES": {
+        "A-2": {
+          "arriendo": {
+            "nro": "FE-32, FE-35",
+            "total": 23268362,
+            "uf": 584.02
           }
         }
       },
       "BANCO DE CREDITO E INVERSIONES": {
         "D-2": {
           "arriendo": {
-            "nro": "F-40",
-            "total": 16275650,
+            "nro": "FE-33",
+            "total": 16135897,
             "uf": 405.0
           }
         }
-      },
-      "CLARO CHILE SPA": {
-        "A2": {
+      }
+    },
+    "Mayo 2026": {
+      "CONGO FILMS S.A.S. AGENCIA EN CHILE": {
+        "4-A": {
           "arriendo": {
-            "nro": "F-41",
-            "total": 1075726,
-            "uf": 27.0
+            "nro": "F-14548, F-14549, F-14552",
+            "total": 8610800,
+            "uf": 16.0
+          },
+          "servAdm": {
+            "nro": "F-14624",
+            "total": 516480,
+            "uf": 10.8
           }
         }
       },
-      "SANCHEZ HERMANOS SPA": {
-        "5-A": {
+      "PULLMAN CARGO S A": {
+        "4-A": {
           "arriendo": {
-            "nro": "F-14571, F-14578, F-14585",
-            "total": 30821509
+            "nro": "F-14550",
+            "total": 4021181
           },
           "servAdm": {
-            "nro": "F-14637",
-            "total": 520784,
-            "uf": 10.89
+            "nro": "F-14622",
+            "total": 489700,
+            "uf": 10.24
+          }
+        }
+      },
+      "TEZMAN CHILE SPA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14551",
+            "total": 4026251
+          },
+          "servAdm": {
+            "nro": "F-14623",
+            "total": 491134,
+            "uf": 10.27
+          }
+        }
+      },
+      "CORSUD SPA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14553",
+            "total": 4304591
+          }
+        }
+      },
+      "COMERCIALIZADORA JUANA CATALDO E HIJO SPA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14554",
+            "total": 4448059
+          }
+        }
+      },
+      "FEDEX EXPRESS CHILE SPA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14555",
+            "total": 4524549
+          },
+          "servAdm": {
+            "nro": "F-14625",
+            "total": 276413,
+            "uf": 5.78
+          }
+        }
+      },
+      "PARKER HANNIFIN CORPORATION CHILE LIMITADA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14556",
+            "total": 4977351
+          }
+        }
+      },
+      "PERFOMEX CHILE SPA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14557",
+            "total": 5302543
+          }
+        }
+      },
+      "INDUSTRIA YKK CHILE LTDA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14558",
+            "total": 6254286
+          }
+        }
+      },
+      "MEDILAND SPA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14559",
+            "total": 6517474
+          },
+          "servAdm": {
+            "nro": "F-14626",
+            "total": 331886,
+            "uf": 6.94
+          }
+        }
+      },
+      "OLYMPUS CORPORATION CHILE SPA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14560",
+            "total": 6819544
           }
         },
-        "A-1": {
+        "5-A": {
           "arriendo": {
-            "nro": "F-14587",
-            "total": 37793163
+            "nro": "F-14577",
+            "total": 7277253
+          },
+          "servAdm": {
+            "nro": "F-14627, F-14636",
+            "total": 1303635,
+            "uf": 27.26
           }
         },
         "A-2": {
           "arriendo": {
-            "nro": "F-14602, F-14606",
-            "total": 7387746
+            "nro": "F-14663, F-14664",
+            "total": 6401612
+          },
+          "habilitacion": {
+            "nro": "F-14667",
+            "total": 122973165,
+            "uf": 2550.99
+          }
+        }
+      },
+      "SOCIEDAD DE ALIMENTOS LEEFOOD SPA.": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14561",
+            "total": 7649152
+          }
+        },
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14576",
+            "total": 5826738
+          },
+          "servAdm": {
+            "nro": "F-14635",
+            "total": 357710,
+            "uf": 7.48
+          }
+        }
+      },
+      "SONEPAR CHILE SA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14562, F-14563",
+            "total": 46979148
+          }
+        }
+      },
+      "INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14564",
+            "total": 38436334
+          },
+          "servAdm": {
+            "nro": "F-14628",
+            "total": 2372464,
+            "uf": 49.61
+          }
+        },
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14607, F-14609",
+            "total": 8861121
+          },
+          "servAdm": {
+            "nro": "F-14650, F-14652",
+            "total": 553303,
+            "uf": 11.57
+          }
+        }
+      },
+      "PATRICIO RODRIGO OLMEDO NUNEZ": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14565",
+            "total": 239111,
+            "uf": 5.0
+          }
+        },
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14592",
+            "total": 774117
+          },
+          "servAdm": {
+            "nro": "F-14643",
+            "total": 93732,
+            "uf": 1.96
           }
         }
       },
@@ -3169,18 +3589,6 @@
           }
         }
       },
-      "COMERCIAL GRANJA MARINA LIMITADA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14570",
-            "total": 3043147
-          },
-          "servAdm": {
-            "nro": "F-14620",
-            "total": 835870
-          }
-        }
-      },
       "GRUPO DROP SPA": {
         "5-A": {
           "arriendo": {
@@ -3194,22 +3602,40 @@
           }
         }
       },
-      "SOCIEDAD DE ALIMENTOS LEEFOOD SPA.": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14561",
-            "total": 7649152
-          }
-        },
+      "COMERCIAL GRANJA MARINA LIMITADA": {
         "5-A": {
           "arriendo": {
-            "nro": "F-14576",
-            "total": 5826738
+            "nro": "F-14570",
+            "total": 3043147
           },
           "servAdm": {
-            "nro": "F-14635",
-            "total": 357710,
-            "uf": 7.48
+            "nro": "F-14620",
+            "total": 835870
+          }
+        }
+      },
+      "SANCHEZ HERMANOS SPA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14571, F-14578, F-14585",
+            "total": 30821509
+          },
+          "servAdm": {
+            "nro": "F-14637",
+            "total": 520784,
+            "uf": 10.89
+          }
+        },
+        "A-1": {
+          "arriendo": {
+            "nro": "F-14587",
+            "total": 37793163
+          }
+        },
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14602, F-14606",
+            "total": 7387746
           }
         }
       },
@@ -3223,6 +3649,19 @@
             "nro": "F-14632",
             "total": 461486,
             "uf": 9.65
+          }
+        }
+      },
+      "A3D CHILE S A": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14573",
+            "total": 4468715
+          },
+          "servAdm": {
+            "nro": "F-14633",
+            "total": 566216,
+            "uf": 11.84
           }
         }
       },
@@ -3247,62 +3686,6 @@
           }
         }
       },
-      "COMERCIAL SNA-E (CHILE) LIMITADA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14581",
-            "total": 15437931
-          },
-          "servAdm": {
-            "nro": "F-14638",
-            "total": 1888023,
-            "uf": 39.48
-          }
-        }
-      },
-      "COMERCIAL INGERSOLL RAND (CHILE) LIMITADA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14583, F-14668",
-            "total": 19578392
-          },
-          "servAdm": {
-            "nro": "F-14640, F-14669",
-            "total": 1092260,
-            "uf": 22.84
-          }
-        }
-      },
-      "OLYMPUS CORPORATION CHILE SPA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14560",
-            "total": 6819544
-          }
-        },
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14577",
-            "total": 7277253
-          },
-          "servAdm": {
-            "nro": "F-14627, F-14636",
-            "total": 1303635,
-            "uf": 27.26
-          }
-        },
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14663, F-14664",
-            "total": 6401612
-          },
-          "habilitacion": {
-            "nro": "F-14667",
-            "total": 122973165,
-            "uf": 2550.99
-          }
-        }
-      },
       "JOHN CRANE CHILE S A": {
         "5-A": {
           "arriendo": {
@@ -3319,6 +3702,19 @@
           }
         }
       },
+      "COMERCIAL SNA-E (CHILE) LIMITADA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14581",
+            "total": 15437931
+          },
+          "servAdm": {
+            "nro": "F-14638",
+            "total": 1888023,
+            "uf": 39.48
+          }
+        }
+      },
       "COMERCIALIZADORA INDUSTRIAL W & L LIMITADA": {
         "5-A": {
           "arriendo": {
@@ -3329,6 +3725,19 @@
             "nro": "F-14639",
             "total": 977966,
             "uf": 20.45
+          }
+        }
+      },
+      "COMERCIAL INGERSOLL RAND (CHILE) LIMITADA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14583, F-14668",
+            "total": 19578392
+          },
+          "servAdm": {
+            "nro": "F-14640, F-14669",
+            "total": 1092260,
+            "uf": 22.84
           }
         }
       },
@@ -3348,170 +3757,30 @@
           }
         }
       },
-      "PATRICIO RODRIGO OLMEDO NUNEZ": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14565",
-            "total": 239111,
-            "uf": 5.0
-          }
-        },
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14592",
-            "total": 774117
-          },
-          "servAdm": {
-            "nro": "F-14643",
-            "total": 93732,
-            "uf": 1.96
-          }
-        }
-      },
-      "CONGO FILMS S.A.S. AGENCIA EN CHILE": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14548, F-14549, F-14552",
-            "total": 8610800,
-            "uf": 16.0
-          },
-          "servAdm": {
-            "nro": "F-14624",
-            "total": 516480,
-            "uf": 10.8
-          }
-        }
-      },
-      "PULLMAN CARGO S A": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14550",
-            "total": 4021181
-          },
-          "servAdm": {
-            "nro": "F-14622",
-            "total": 489700,
-            "uf": 10.24
-          }
-        }
-      },
-      "TEZMAN CHILE SPA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14551",
-            "total": 4026251
-          },
-          "servAdm": {
-            "nro": "F-14623",
-            "total": 491134,
-            "uf": 10.27
-          }
-        }
-      },
-      "CORSUD SPA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14553",
-            "total": 4304591
-          }
-        }
-      },
-      "FEDEX EXPRESS CHILE SPA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14555",
-            "total": 4524549
-          },
-          "servAdm": {
-            "nro": "F-14625",
-            "total": 276413,
-            "uf": 5.78
-          }
-        }
-      },
-      "COMERCIALIZADORA JUANA CATALDO E HIJO SPA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14554",
-            "total": 4448059
-          }
-        }
-      },
-      "PARKER HANNIFIN CORPORATION CHILE LIMITADA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14556",
-            "total": 4977351
-          }
-        }
-      },
-      "PERFOMEX CHILE SPA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14557",
-            "total": 5302543
-          }
-        }
-      },
-      "MEDILAND SPA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14559",
-            "total": 6517474
-          },
-          "servAdm": {
-            "nro": "F-14626",
-            "total": 331886,
-            "uf": 6.94
-          }
-        }
-      },
-      "INDUSTRIA YKK CHILE LTDA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14558",
-            "total": 6254286
-          }
-        }
-      },
-      "SONEPAR CHILE SA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14562, F-14563",
-            "total": 46979148
-          }
-        }
-      },
-      "INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14564",
-            "total": 38436334
-          },
-          "servAdm": {
-            "nro": "F-14628",
-            "total": 2372464,
-            "uf": 49.61
-          }
-        },
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14607, F-14609",
-            "total": 8861121
-          },
-          "servAdm": {
-            "nro": "F-14650, F-14652",
-            "total": 553303,
-            "uf": 11.57
-          }
-        }
-      },
       "GTD MANQUEHUE S.A.": {
         "A-2": {
           "arriendo": {
             "nro": "F-14588",
             "total": 277369,
             "uf": 5.8
+          }
+        }
+      },
+      "SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE LOS LIBERTADORES": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14589, F-14591, F-14610, F-14615, F-14616, F-14665",
+            "total": 23095407
+          },
+          "habilitacion": {
+            "nro": "F-14614",
+            "total": 7514793,
+            "uf": 157.14
+          },
+          "servAdm": {
+            "nro": "F-14641, F-14642, F-14654, F-14658, F-14659",
+            "total": 2735433,
+            "uf": 57.2
           }
         }
       },
@@ -3524,6 +3793,34 @@
           }
         }
       },
+      "CFMEDICA LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14593",
+            "total": 1163528
+          },
+          "servAdm": {
+            "nro": "F-14644",
+            "total": 141554,
+            "uf": 2.96
+          }
+        }
+      },
+      "VISIBILITY S. A.": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14594",
+            "total": 1491193
+          }
+        },
+        "B": {
+          "servAdm": {
+            "nro": "F-14660",
+            "total": 181725,
+            "uf": 3.8
+          }
+        }
+      },
       "ROCKETMAN SPA": {
         "A-2": {
           "arriendo": {
@@ -3533,11 +3830,37 @@
           }
         }
       },
+      "UNEX APARELLAJE ELECTRICO (CHILE) LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14596",
+            "total": 1943212
+          },
+          "servAdm": {
+            "nro": "F-14645",
+            "total": 118121,
+            "uf": 2.47
+          }
+        }
+      },
       "COMERCIAL HUSSMANN CHILE LIMITADA": {
         "A-2": {
           "arriendo": {
             "nro": "F-14598",
             "total": 2452793
+          }
+        }
+      },
+      "FEN INGENIERÍA SPA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14599",
+            "total": 2788236
+          },
+          "servAdm": {
+            "nro": "F-14647",
+            "total": 340973,
+            "uf": 7.13
           }
         }
       },
@@ -3574,11 +3897,63 @@
           }
         }
       },
+      "SOCIEDAD FABRICA Y DISTRIBUIDORA DE ALIMENTOS JP LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14604",
+            "total": 4081294
+          },
+          "servAdm": {
+            "nro": "F-14649",
+            "total": 516480,
+            "uf": 10.8
+          }
+        }
+      },
+      "SOCIEDAD COMERCIAL E INDUSTRIAL HYDROTORC LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14608",
+            "total": 4489044
+          },
+          "servAdm": {
+            "nro": "F-14651",
+            "total": 551391,
+            "uf": 11.53
+          }
+        }
+      },
+      "CASINO IMPERIO LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14611",
+            "total": 6196080
+          },
+          "servAdm": {
+            "nro": "F-14656",
+            "total": 757505,
+            "uf": 15.84
+          }
+        }
+      },
       "SEGAFREDO ZANETTI CHILE S.A.": {
         "A-2": {
           "arriendo": {
             "nro": "F-14612",
             "total": 6508747
+          }
+        }
+      },
+      "IN WASSER SPA.": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14613",
+            "total": 6620620
+          },
+          "servAdm": {
+            "nro": "F-14657",
+            "total": 818239,
+            "uf": 17.11
           }
         }
       },
@@ -3598,127 +3973,11 @@
           }
         }
       },
-      "VISIBILITY S. A.": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14594",
-            "total": 1491193
-          }
-        },
+      "IDEAL S.A.": {
         "B": {
           "servAdm": {
-            "nro": "F-14660",
-            "total": 181725,
-            "uf": 3.8
-          }
-        }
-      },
-      "CFMEDICA LIMITADA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14593",
-            "total": 1163528
-          },
-          "servAdm": {
-            "nro": "F-14644",
-            "total": 141554,
-            "uf": 2.96
-          }
-        }
-      },
-      "SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE LOS LIBERTADORES": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14589, F-14591, F-14610, F-14615, F-14616, F-14665",
-            "total": 23095407
-          },
-          "habilitacion": {
-            "nro": "F-14614",
-            "total": 7514793,
-            "uf": 157.14
-          },
-          "servAdm": {
-            "nro": "F-14641, F-14642, F-14654, F-14658, F-14659",
-            "total": 2735433,
-            "uf": 57.2
-          }
-        }
-      },
-      "UNEX APARELLAJE ELECTRICO (CHILE) LIMITADA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14596",
-            "total": 1943212
-          },
-          "servAdm": {
-            "nro": "F-14645",
-            "total": 118121,
-            "uf": 2.47
-          }
-        }
-      },
-      "SOCIEDAD FABRICA Y DISTRIBUIDORA DE ALIMENTOS JP LIMITADA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14604",
-            "total": 4081294
-          },
-          "servAdm": {
-            "nro": "F-14649",
-            "total": 516480,
-            "uf": 10.8
-          }
-        }
-      },
-      "IN WASSER SPA.": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14613",
-            "total": 6620620
-          },
-          "servAdm": {
-            "nro": "F-14657",
-            "total": 818239,
-            "uf": 17.11
-          }
-        }
-      },
-      "SOCIEDAD COMERCIAL E INDUSTRIAL HYDROTORC LIMITADA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14608",
-            "total": 4489044
-          },
-          "servAdm": {
-            "nro": "F-14651",
-            "total": 551391,
-            "uf": 11.53
-          }
-        }
-      },
-      "FEN INGENIERÍA SPA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14599",
-            "total": 2788236
-          },
-          "servAdm": {
-            "nro": "F-14647",
-            "total": 340973,
-            "uf": 7.13
-          }
-        }
-      },
-      "CASINO IMPERIO LIMITADA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14611",
-            "total": 6196080
-          },
-          "servAdm": {
-            "nro": "F-14656",
-            "total": 757505,
-            "uf": 15.84
+            "nro": "F-14619",
+            "total": 297420
           }
         }
       },
@@ -3730,22 +3989,23 @@
             "uf": 12.6
           },
           "arriendo": {
-            "nro": "F-37",
+            "nro": "FE-37",
             "total": 4219613,
             "uf": 105.0
           }
         }
       },
-      "A3D CHILE S A": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14573",
-            "total": 4468715
-          },
+      "BANCO BICE": {
+        "A-2": {
           "servAdm": {
-            "nro": "F-14633",
-            "total": 566216,
-            "uf": 11.84
+            "nro": "F-14655, F-14666",
+            "total": 382578,
+            "uf": 8.0
+          },
+          "arriendo": {
+            "nro": "FE-38, FE-42",
+            "total": 10124660,
+            "uf": 251.94
           }
         }
       },
@@ -3758,14 +4018,6 @@
           }
         }
       },
-      "IDEAL S.A.": {
-        "B": {
-          "servAdm": {
-            "nro": "F-14619",
-            "total": 297420
-          }
-        }
-      },
       "LOINCO CAPITAL SPA": {
         "A-2": {
           "arriendo": {
@@ -3775,387 +4027,44 @@
           }
         }
       },
-      "BANCO DEL ESTADO DE CHILE": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-39",
-            "total": 18457793,
-            "uf": 459.3
-          }
-        }
-      },
-      "BANCO BICE": {
-        "A-2": {
-          "servAdm": {
-            "nro": "F-14655, F-14666",
-            "total": 382578,
-            "uf": 8.0
-          },
-          "arriendo": {
-            "nro": "F-38, F-42",
-            "total": 10124660,
-            "uf": 251.94
-          }
-        }
-      }
-    },
-    "Junio 2026": {
       "LA ARAUCANA C C A F": {
         "A-2": {
           "arriendo": {
-            "nro": "F-46",
-            "total": 3540498,
+            "nro": "FE-36",
+            "total": 3496251,
             "uf": 87.0
+          }
+        }
+      },
+      "BANCO DEL ESTADO DE CHILE": {
+        "A-2": {
+          "arriendo": {
+            "nro": "FE-39",
+            "total": 18457793,
+            "uf": 459.3
           }
         }
       },
       "BANCO DE CREDITO E INVERSIONES": {
         "D-2": {
           "arriendo": {
-            "nro": "F-43",
-            "total": 16481629,
+            "nro": "FE-40",
+            "total": 16275650,
             "uf": 405.0
           }
         }
       },
-      "SANCHEZ HERMANOS SPA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14688, F-14732, F-14734",
-            "total": 31724874
-          },
-          "servAdm": {
-            "nro": "F-14764",
-            "total": 527376,
-            "uf": 10.89
-          }
-        },
-        "A-1": {
-          "arriendo": {
-            "nro": "F-14701",
-            "total": 38286347
-          }
-        },
+      "CLARO CHILE SPA": {
         "A-2": {
           "arriendo": {
-            "nro": "F-14731, F-14733",
-            "total": 7485355
+            "nro": "FE-41",
+            "total": 1075726,
+            "uf": 27.0
           }
         }
-      },
-      "DISTRIBUIDORA SANCHEZ 4G SPA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14687",
-            "total": 1118971
-          }
-        },
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14704",
-            "total": 4167902
-          }
-        }
-      },
-      "WEIDMULLER SPA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14692",
-            "total": 2370583
-          },
-          "servAdm": {
-            "nro": "F-14752",
-            "total": 290080,
-            "uf": 5.99
-          }
-        }
-      },
-      "NCH CHILE S A": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14697",
-            "total": 2932743
-          },
-          "servAdm": {
-            "nro": "F-14755",
-            "total": 358848,
-            "uf": 7.41
-          }
-        },
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14718",
-            "total": 2001688
-          },
-          "servAdm": {
-            "nro": "F-14748",
-            "total": 243591,
-            "uf": 5.03
-          }
-        }
-      },
-      "COMERCIAL GRANJA MARINA LIMITADA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14699",
-            "total": 3082383
-          },
-          "servAdm": {
-            "nro": "F-14780",
-            "total": 835870
-          }
-        }
-      },
-      "GRUPO DROP SPA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14696",
-            "total": 3073001
-          },
-          "servAdm": {
-            "nro": "F-14757",
-            "total": 375797,
-            "uf": 7.76
-          }
-        }
-      },
-      "SOCIEDAD DE ALIMENTOS LEEFOOD SPA.": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14739",
-            "total": 7765639
-          }
-        },
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14740",
-            "total": 5884361
-          },
-          "servAdm": {
-            "nro": "F-14756",
-            "total": 362237,
-            "uf": 7.48
-          }
-        }
-      },
-      "ALIMENTOS NEVA SPA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14698",
-            "total": 3833920
-          },
-          "servAdm": {
-            "nro": "F-14759",
-            "total": 467325,
-            "uf": 9.65
-          }
-        }
-      },
-      "GALLYAS TELECOM S.A.": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14686",
-            "total": 5060340
-          },
-          "servAdm": {
-            "nro": "F-14768",
-            "total": 619872,
-            "uf": 12.8
-          }
-        }
-      },
-      "SOC COMERCIAL JOSE MARIN ANTONIN Y COMPANIA LIMITADA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14700",
-            "total": 5555231
-          }
-        }
-      },
-      "COMERCIAL SNA-E (CHILE) LIMITADA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14685",
-            "total": 15637049
-          },
-          "servAdm": {
-            "nro": "F-14776",
-            "total": 1911918,
-            "uf": 39.48
-          }
-        }
-      },
-      "JOHN CRANE CHILE S A": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14689",
-            "total": 10288915
-          }
-        }
-      },
-      "MEGAMIN S.A.": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14690",
-            "total": 11110095
-          }
-        }
-      },
-      "COMERCIALIZADORA INDUSTRIAL W & L LIMITADA": {
-        "5-A": {
-          "servAdm": {
-            "nro": "F-14773",
-            "total": 990343,
-            "uf": 20.45
-          },
-          "arriendo": {
-            "nro": "F-14781",
-            "total": 16049897
-          }
-        }
-      },
-      "TRANE DE CHILE S A": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14695",
-            "total": 19112280
-          }
-        }
-      },
-      "DRAGER CHILE LIMITADA": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14693",
-            "total": 24328494
-          }
-        }
-      },
-      "PATRICIO RODRIGO OLMEDO NUNEZ": {
-        "5-A": {
-          "arriendo": {
-            "nro": "F-14694",
-            "total": 242138,
-            "uf": 5.0
-          }
-        },
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14717",
-            "total": 784023
-          },
-          "servAdm": {
-            "nro": "F-14743",
-            "total": 94918,
-            "uf": 1.96
-          }
-        }
-      },
-      "CONGO FILMS S.A.S. AGENCIA EN CHILE": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14682, F-14683, F-14684",
-            "total": 8721827,
-            "uf": 16.0
-          },
-          "servAdm": {
-            "nro": "F-14762",
-            "total": 523017,
-            "uf": 10.8
-          }
-        }
-      },
-      "PULLMAN CARGO S A": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14680, F-14782",
-            "total": 8352485
-          },
-          "servAdm": {
-            "nro": "F-14760, F-14783",
-            "total": 1016978,
-            "uf": 21.0
-          }
-        }
-      },
-      "TEZMAN CHILE SPA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14673",
-            "total": 4078059
-          },
-          "servAdm": {
-            "nro": "F-14761",
-            "total": 497351,
-            "uf": 10.27
-          }
-        }
-      },
-      "CORSUD SPA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14679",
-            "total": 4359969
-          }
-        }
-      },
-      "FEDEX EXPRESS CHILE SPA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14677",
-            "total": 4582800
-          },
-          "servAdm": {
-            "nro": "F-14751",
-            "total": 279911,
-            "uf": 5.78
-          }
-        }
-      },
-      "COMERCIALIZADORA JUANA CATALDO E HIJO SPA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14681",
-            "total": 4505251
-          }
-        }
-      },
-      "PARKER HANNIFIN CORPORATION CHILE LIMITADA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14676",
-            "total": 5041445
-          }
-        }
-      },
-      "PERFOMEX CHILE SPA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14675",
-            "total": 5370751
-          }
-        }
-      },
-      "MEDILAND SPA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14674",
-            "total": 6601527
-          },
-          "servAdm": {
-            "nro": "F-14753",
-            "total": 336087,
-            "uf": 6.94
-          }
-        }
-      },
-      "INDUSTRIA YKK CHILE LTDA": {
-        "4-A": {
-          "arriendo": {
-            "nro": "F-14678",
-            "total": 6334803
-          }
-        }
-      },
+      }
+    },
+    "Junio 2026": {
       "SONEPAR CHILE SA": {
         "4-A": {
           "arriendo": {
@@ -4188,12 +4097,322 @@
           }
         }
       },
-      "GTD MANQUEHUE S.A.": {
+      "TEZMAN CHILE SPA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14673",
+            "total": 4078059
+          },
+          "servAdm": {
+            "nro": "F-14761",
+            "total": 497351,
+            "uf": 10.27
+          }
+        }
+      },
+      "MEDILAND SPA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14674",
+            "total": 6601527
+          },
+          "servAdm": {
+            "nro": "F-14753",
+            "total": 336087,
+            "uf": 6.94
+          }
+        }
+      },
+      "PERFOMEX CHILE SPA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14675",
+            "total": 5370751
+          }
+        }
+      },
+      "PARKER HANNIFIN CORPORATION CHILE LIMITADA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14676",
+            "total": 5041445
+          }
+        }
+      },
+      "FEDEX EXPRESS CHILE SPA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14677",
+            "total": 4582800
+          },
+          "servAdm": {
+            "nro": "F-14751",
+            "total": 279911,
+            "uf": 5.78
+          }
+        }
+      },
+      "INDUSTRIA YKK CHILE LTDA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14678",
+            "total": 6334803
+          }
+        }
+      },
+      "CORSUD SPA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14679",
+            "total": 4359969
+          }
+        }
+      },
+      "PULLMAN CARGO S A": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14680, F-14782",
+            "total": 8352485
+          },
+          "servAdm": {
+            "nro": "F-14760, F-14783",
+            "total": 1016978,
+            "uf": 21.0
+          }
+        }
+      },
+      "COMERCIALIZADORA JUANA CATALDO E HIJO SPA": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14681",
+            "total": 4505251
+          }
+        }
+      },
+      "CONGO FILMS S.A.S. AGENCIA EN CHILE": {
+        "4-A": {
+          "arriendo": {
+            "nro": "F-14682, F-14683, F-14684",
+            "total": 8721827,
+            "uf": 16.0
+          },
+          "servAdm": {
+            "nro": "F-14762",
+            "total": 523017,
+            "uf": 10.8
+          }
+        }
+      },
+      "COMERCIAL SNA-E (CHILE) LIMITADA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14685",
+            "total": 15637049
+          },
+          "servAdm": {
+            "nro": "F-14776",
+            "total": 1911918,
+            "uf": 39.48
+          }
+        }
+      },
+      "GALLYAS TELECOM S.A.": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14686",
+            "total": 5060340
+          },
+          "servAdm": {
+            "nro": "F-14768",
+            "total": 619872,
+            "uf": 12.8
+          }
+        }
+      },
+      "DISTRIBUIDORA SANCHEZ 4G SPA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14687",
+            "total": 1118971
+          }
+        },
         "A-2": {
           "arriendo": {
-            "nro": "F-14703",
-            "total": 280879,
-            "uf": 5.8
+            "nro": "F-14704",
+            "total": 4167902
+          }
+        }
+      },
+      "SANCHEZ HERMANOS SPA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14688, F-14732, F-14734",
+            "total": 31724874
+          },
+          "servAdm": {
+            "nro": "F-14764",
+            "total": 527376,
+            "uf": 10.89
+          }
+        },
+        "A-1": {
+          "arriendo": {
+            "nro": "F-14701",
+            "total": 38286347
+          }
+        },
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14731, F-14733",
+            "total": 7485355
+          }
+        }
+      },
+      "JOHN CRANE CHILE S A": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14689",
+            "total": 10288915
+          }
+        }
+      },
+      "MEGAMIN S.A.": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14690",
+            "total": 11110095
+          }
+        }
+      },
+      "A3D CHILE S A": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14691",
+            "total": 4528450
+          },
+          "servAdm": {
+            "nro": "F-14766",
+            "total": 573381,
+            "uf": 11.84
+          }
+        }
+      },
+      "WEIDMULLER SPA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14692",
+            "total": 2370583
+          },
+          "servAdm": {
+            "nro": "F-14752",
+            "total": 290080,
+            "uf": 5.99
+          }
+        }
+      },
+      "DRAGER CHILE LIMITADA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14693",
+            "total": 24328494
+          }
+        }
+      },
+      "PATRICIO RODRIGO OLMEDO NUNEZ": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14694",
+            "total": 242138,
+            "uf": 5.0
+          }
+        },
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14717",
+            "total": 784023
+          },
+          "servAdm": {
+            "nro": "F-14743",
+            "total": 94918,
+            "uf": 1.96
+          }
+        }
+      },
+      "TRANE DE CHILE S A": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14695",
+            "total": 19112280
+          }
+        }
+      },
+      "GRUPO DROP SPA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14696",
+            "total": 3073001
+          },
+          "servAdm": {
+            "nro": "F-14757",
+            "total": 375797,
+            "uf": 7.76
+          }
+        }
+      },
+      "NCH CHILE S A": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14697",
+            "total": 2932743
+          },
+          "servAdm": {
+            "nro": "F-14755",
+            "total": 358848,
+            "uf": 7.41
+          }
+        },
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14718",
+            "total": 2001688
+          },
+          "servAdm": {
+            "nro": "F-14748",
+            "total": 243591,
+            "uf": 5.03
+          }
+        }
+      },
+      "ALIMENTOS NEVA SPA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14698",
+            "total": 3833920
+          },
+          "servAdm": {
+            "nro": "F-14759",
+            "total": 467325,
+            "uf": 9.65
+          }
+        }
+      },
+      "COMERCIAL GRANJA MARINA LIMITADA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14699",
+            "total": 3082383
+          },
+          "servAdm": {
+            "nro": "F-14780",
+            "total": 835870
+          }
+        }
+      },
+      "SOC COMERCIAL JOSE MARIN ANTONIN Y COMPANIA LIMITADA": {
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14700",
+            "total": 5555231
           }
         }
       },
@@ -4206,20 +4425,54 @@
           }
         }
       },
-      "ROCKETMAN SPA": {
+      "GTD MANQUEHUE S.A.": {
         "A-2": {
           "arriendo": {
-            "nro": "F-14723",
-            "total": 1840245,
-            "uf": 38.0
+            "nro": "F-14703",
+            "total": 280879,
+            "uf": 5.8
           }
         }
       },
-      "COMERCIAL HUSSMANN CHILE LIMITADA": {
+      "IN WASSER SPA.": {
         "A-2": {
           "arriendo": {
-            "nro": "F-14719",
-            "total": 2484149
+            "nro": "F-14705",
+            "total": 6706899
+          },
+          "servAdm": {
+            "nro": "F-14771",
+            "total": 828595,
+            "uf": 17.11
+          }
+        }
+      },
+      "SEGAFREDO ZANETTI CHILE S.A.": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14706",
+            "total": 6592824
+          }
+        }
+      },
+      "SOCIEDAD FABRICA Y DISTRIBUIDORA DE ALIMENTOS JP LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14707",
+            "total": 4135746
+          },
+          "servAdm": {
+            "nro": "F-14763",
+            "total": 523017,
+            "uf": 10.8
+          }
+        }
+      },
+      "VOITH TURBO S A": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14710",
+            "total": 9865736
           }
         }
       },
@@ -4232,6 +4485,19 @@
           "servAdm": {
             "nro": "F-14779",
             "total": 377230
+          }
+        }
+      },
+      "SOCIEDAD COMERCIAL E INDUSTRIAL HYDROTORC LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14712",
+            "total": 4547176
+          },
+          "servAdm": {
+            "nro": "F-14765",
+            "total": 558369,
+            "uf": 11.53
           }
         }
       },
@@ -4248,35 +4514,29 @@
           }
         }
       },
-      "COMERCIAL KPC CHILE LIMITADA": {
+      "UNEX APARELLAJE ELECTRICO (CHILE) LIMITADA": {
         "A-2": {
           "arriendo": {
-            "nro": "F-14720",
-            "total": 3785195
+            "nro": "F-14714",
+            "total": 1968086
+          },
+          "servAdm": {
+            "nro": "F-14744",
+            "total": 119616,
+            "uf": 2.47
           }
         }
       },
-      "SEGAFREDO ZANETTI CHILE S.A.": {
+      "FEN INGENIERÍA SPA": {
         "A-2": {
           "arriendo": {
-            "nro": "F-14706",
-            "total": 6592824
-          }
-        }
-      },
-      "FESTO S A": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14722",
-            "total": 8510759
-          }
-        }
-      },
-      "VOITH TURBO S A": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14710",
-            "total": 9865736
+            "nro": "F-14715",
+            "total": 2824187
+          },
+          "servAdm": {
+            "nro": "F-14754",
+            "total": 345288,
+            "uf": 7.13
           }
         }
       },
@@ -4295,6 +4555,22 @@
           }
         }
       },
+      "COMERCIAL HUSSMANN CHILE LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14719",
+            "total": 2484149
+          }
+        }
+      },
+      "COMERCIAL KPC CHILE LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14720",
+            "total": 3785195
+          }
+        }
+      },
       "CFMEDICA LIMITADA": {
         "A-2": {
           "arriendo": {
@@ -4305,6 +4581,36 @@
             "nro": "F-14745",
             "total": 143345,
             "uf": 2.96
+          }
+        }
+      },
+      "FESTO S A": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14722",
+            "total": 8510759
+          }
+        }
+      },
+      "ROCKETMAN SPA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14723",
+            "total": 1840245,
+            "uf": 38.0
+          }
+        }
+      },
+      "CASINO IMPERIO LIMITADA": {
+        "A-2": {
+          "arriendo": {
+            "nro": "F-14724",
+            "total": 6275969
+          },
+          "servAdm": {
+            "nro": "F-14770",
+            "total": 767092,
+            "uf": 15.84
           }
         }
       },
@@ -4326,81 +4632,36 @@
           }
         }
       },
-      "UNEX APARELLAJE ELECTRICO (CHILE) LIMITADA": {
-        "A-2": {
+      "SOCIEDAD DE ALIMENTOS LEEFOOD SPA.": {
+        "4-A": {
           "arriendo": {
-            "nro": "F-14714",
-            "total": 1968086
+            "nro": "F-14739",
+            "total": 7765639
+          }
+        },
+        "5-A": {
+          "arriendo": {
+            "nro": "F-14740",
+            "total": 5884361
           },
           "servAdm": {
-            "nro": "F-14744",
-            "total": 119616,
-            "uf": 2.47
+            "nro": "F-14756",
+            "total": 362237,
+            "uf": 7.48
           }
         }
       },
-      "SOCIEDAD FABRICA Y DISTRIBUIDORA DE ALIMENTOS JP LIMITADA": {
+      "BANCO BICE": {
         "A-2": {
-          "arriendo": {
-            "nro": "F-14707",
-            "total": 4135746
-          },
           "servAdm": {
-            "nro": "F-14763",
-            "total": 523017,
-            "uf": 10.8
-          }
-        }
-      },
-      "IN WASSER SPA.": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14705",
-            "total": 6706899
+            "nro": "F-14747",
+            "total": 193711,
+            "uf": 4.0
           },
-          "servAdm": {
-            "nro": "F-14771",
-            "total": 828595,
-            "uf": 17.11
-          }
-        }
-      },
-      "SOCIEDAD COMERCIAL E INDUSTRIAL HYDROTORC LIMITADA": {
-        "A-2": {
           "arriendo": {
-            "nro": "F-14712",
-            "total": 4547176
-          },
-          "servAdm": {
-            "nro": "F-14765",
-            "total": 558369,
-            "uf": 11.53
-          }
-        }
-      },
-      "FEN INGENIERÍA SPA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14715",
-            "total": 2824187
-          },
-          "servAdm": {
-            "nro": "F-14754",
-            "total": 345288,
-            "uf": 7.13
-          }
-        }
-      },
-      "CASINO IMPERIO LIMITADA": {
-        "A-2": {
-          "arriendo": {
-            "nro": "F-14724",
-            "total": 6275969
-          },
-          "servAdm": {
-            "nro": "F-14770",
-            "total": 767092,
-            "uf": 15.84
+            "nro": "FE-44, FE-48",
+            "total": 10509175,
+            "uf": 258.24
           }
         }
       },
@@ -4412,22 +4673,22 @@
             "uf": 12.6
           },
           "arriendo": {
-            "nro": "F-47",
+            "nro": "FE-47",
             "total": 4273015,
             "uf": 105.0
           }
         }
       },
-      "A3D CHILE S A": {
+      "COMERCIALIZADORA INDUSTRIAL W & L LIMITADA": {
         "5-A": {
-          "arriendo": {
-            "nro": "F-14691",
-            "total": 4528450
-          },
           "servAdm": {
-            "nro": "F-14766",
-            "total": 573381,
-            "uf": 11.84
+            "nro": "F-14773",
+            "total": 990343,
+            "uf": 20.45
+          },
+          "arriendo": {
+            "nro": "F-14781",
+            "total": 16049897
           }
         }
       },
@@ -4448,26 +4709,30 @@
           }
         }
       },
+      "BANCO DE CREDITO E INVERSIONES": {
+        "D-2": {
+          "arriendo": {
+            "nro": "FE-43",
+            "total": 16481629,
+            "uf": 405.0
+          }
+        }
+      },
       "BANCO DEL ESTADO DE CHILE": {
         "A-2": {
           "arriendo": {
-            "nro": "F-45",
+            "nro": "FE-45",
             "total": 18691388,
             "uf": 459.3
           }
         }
       },
-      "BANCO BICE": {
+      "LA ARAUCANA C C A F": {
         "A-2": {
-          "servAdm": {
-            "nro": "F-14747",
-            "total": 193711,
-            "uf": 4.0
-          },
           "arriendo": {
-            "nro": "F-44, F-48",
-            "total": 10509175,
-            "uf": 258.24
+            "nro": "FE-46",
+            "total": 3540498,
+            "uf": 87.0
           }
         }
       }

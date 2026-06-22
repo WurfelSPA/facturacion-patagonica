@@ -1944,7 +1944,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
   const [batchVersion,setBatchVersion]=useState(0);
 
   /* Invalidar caché localStorage si la versión cambió (evita datos stale de deploys anteriores) */
-  const HIST_CACHE_VER = "fuente0-v3";
+  const HIST_CACHE_VER = "fuente0-v4";
   React.useEffect(()=>{
     try{
       if(localStorage.getItem("histBatch_ver")!==HIST_CACHE_VER){
