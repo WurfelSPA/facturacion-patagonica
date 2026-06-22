@@ -4507,4 +4507,20 @@ function App(){
               disabled:!!syncStatus,
               title:"Escribe 'Enviado' en columna HC de la planilla para todos los correos enviados esta sesión",
               style:{background:"var(--surf2)",border:"1px solid var(--bdr)",color:syncStatus?"var(--accl)":"var(--txm)",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:syncStatus?"default":"pointer",display:"flex",alignItems:"center",gap:5,minWidth:180}
-            },syncStatus?`📋 Sincronizando... ${syncStatus.done}/${syncStatus.total}`:"📋 Sincronizar pla
+            },syncStatus?`📋 Sincronizando... ${syncStatus.done}/${syncStatus.total}`:"📋 Sincronizar planilla"),
+          h("button",{
+              onClick:unlocked?sendAll:()=>setShowPwdModal(true),
+              style:{background:unlocked?"var(--gbg)":"var(--surf2)",border:unlocked?"1px solid var(--gdim)":"1px solid var(--bdr)",color:unlocked?"var(--green)":"var(--txm)",borderRadius:8,padding:"7px 16px",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:6,cursor:"pointer"}
+            },unlocked?`✉ Enviar todos (${Math.max(0,stats.ok-stats.sent)})`:`🔒 Enviar todos (${Math.max(0,stats.ok-stats.sent)})`)
+        )
+      )
+    )
+    ,view==="ventas"&&h(VentasView,{periodo})
+    ,view==="contratos"&&h(ContratosView,{dashData,driveLoading})
+    ,view==="historial-fact"&&h(HistorialFactView,{dashData,driveLoading,notify})
+  ));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(h(App));
+</script>
+</body>
+</html>

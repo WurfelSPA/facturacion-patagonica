@@ -1,0 +1,12 @@
+{
+  "functions": {
+    "api/split-pdf.js": { "maxDuration": 60 },
+    "api/drive-pdf.js": { "maxDuration": 60 },
+    "api/historial-batch.js": { "maxDuration": 300 },
+    "api/historial.js": { "includeFiles": "historial-excel-2026.json" }
+  },
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
+}
