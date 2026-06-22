@@ -45,6 +45,8 @@ const EXCEL_JSON_ID    = "1sL_qOK9QsGjgtoaLIdhA37nN0I566M1t";
 // Caché en memoria del JSON del Excel (se invalida cada hora)
 let _excelCache = null;
 let _excelCacheTs = 0;
+let _rutMapCache = null;
+let _rutMapCacheTs = 0;
 const EXCEL_CACHE_TTL = 3600 * 1000;
 
 const MES_NOM = {
@@ -616,6 +618,42 @@ export default async function handler(req, res) {
       res.setHeader("Content-Type", ct);
       res.setHeader("Cache-Control","private, max-age=300");
       return res.status(200).send(buf);
+    }
+
+    // ── GET ?rutMap=1 ── mapa RazonSocial→RUT desde ZIPs Drive ──────────────
+    if (req.method === "GET" && req.query.rutMap === "1") {
+      const now = Date.now();
+      if (_rutMapCache && (now - _rutMapCacheTs) < 3600000) {
+        res.setHeader("Cache-Control","public, max-age=1800");
+        return res.status(200).json({ ruts: _rutMapCache });
+      }
+      const ruts = {};
+      try {
+        const files = await driveFiles(token, FACT_FOLDER_ID);
+        const zipFiles = files.filter(f => f.name.match(/\.zip$/i)).slice(0, 8);
+        await Promise.all(zipFiles.map(async f => {
+          try {
+            const rz = await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`,
+              { headers:{ Authorization:`Bearer ${token}` } });
+            if (!rz.ok) return;
+            const buf = await rz.arrayBuffer();
+            const zip = await JSZip.loadAsync(buf);
+            await Promise.all(Object.keys(zip.files).map(async name => {
+              if (!name.match(/\.xml$/i)) return;
+              const xml = await zip.files[name].async("string");
+              const rzn = (xml.match(/<RazonSocial>([^<]+)<\/RazonSocial>/) || [])[1];
+              const rut = (xml.match(/<RUTRecep>([\d.]+[-]\w)<\/RUTRecep>/) || [])[1];
+              if (rzn && rut && !ruts[rzn.trim()]) ruts[rzn.trim()] = rut.trim();
+            }));
+          } catch(_) {}
+        }));
+        _rutMapCache = ruts;
+        _rutMapCacheTs = now;
+      } catch(e) {
+        if (!_rutMapCache) return res.status(503).json({ error:"Drive no disponible", ruts:{} });
+      }
+      res.setHeader("Cache-Control","public, max-age=1800");
+      return res.status(200).json({ ruts: _rutMapCache || {} });
     }
 
     // ── GET ?resumen=1 ── resumen de ventas por cliente desde JSON embebido ──
