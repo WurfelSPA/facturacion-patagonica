@@ -144,15 +144,6 @@
           }
         }
       },
-      "COMERCIAL GRANJA MARINA LIMITADA": {
-        "5A": {
-          "arriendo": {
-            "nro": "F-14124",
-            "uf": null,
-            "total": 835870
-          }
-        }
-      },
       "COMERCIAL HUSSMANN CHILE LIMITADA": {
         "A2": {
           "arriendo": {
@@ -229,42 +220,12 @@
           }
         }
       },
-      "CONGO FILMS S.A.S. AGENCIA EN CHILE": {
-        "4A": {
-          "servAdm": {
-            "nro": "FEE-14106",
-            "uf": 10.8,
-            "total": 510830
-          },
-          "arriendo": {
-            "nro": "F-14034",
-            "uf": 90.0,
-            "total": 4256920
-          }
-        }
-      },
       "CORSUD SPA": {
         "4A": {
           "arriendo": {
             "nro": "F-14039",
             "uf": 91.5,
             "total": 4327868
-          }
-        }
-      },
-      "DISTRIBUIDORA SANCHEZ 4G SPA": {
-        "5A": {
-          "arriendo": {
-            "nro": "F-14016",
-            "uf": 23.95,
-            "total": 1132813
-          }
-        },
-        "A2": {
-          "arriendo": {
-            "nro": "F-14066",
-            "uf": 90.0,
-            "total": 4069164
           }
         }
       },
@@ -392,32 +353,6 @@
           }
         }
       },
-      "INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA": {
-        "4A": {
-          "servAdm": {
-            "nro": "FEE-14122",
-            "uf": 49.61,
-            "total": 2346509
-          },
-          "arriendo": {
-            "nro": "F-14051",
-            "uf": 826.93,
-            "total": 39113052
-          }
-        },
-        "A2": {
-          "servAdm": {
-            "nro": "FEE-14092",
-            "uf": 5.61,
-            "total": 265349
-          },
-          "arriendo": {
-            "nro": "F-14060",
-            "uf": 93.53,
-            "total": 4423886
-          }
-        }
-      },
       "JOHN CRANE CHILE S A": {
         "5A": {
           "arriendo": {
@@ -508,27 +443,6 @@
           }
         }
       },
-      "OLYMPUS CORPORATION CHILE SPA": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14046",
-            "uf": 144.86,
-            "total": 6851749
-          }
-        },
-        "5A": {
-          "servAdm": {
-            "nro": "FEE-14116",
-            "uf": 18.57,
-            "total": 878345
-          },
-          "arriendo": {
-            "nro": "F-14027",
-            "uf": 154.71,
-            "total": 7317646
-          }
-        }
-      },
       "PARKER HANNIFIN CORPORATION CHILE LIMITADA": {
         "4A": {
           "arriendo": {
@@ -577,61 +491,12 @@
           }
         }
       },
-      "PULLMAN CARGO S A": {
-        "4A": {
-          "servAdm": {
-            "nro": "FEE-14103",
-            "uf": 10.24,
-            "total": 484343
-          },
-          "arriendo": {
-            "nro": "F-14036",
-            "uf": 85.37,
-            "total": 4037925
-          }
-        }
-      },
       "ROCKETMAN SPA": {
         "A2": {
           "arriendo": {
             "nro": "F-14055",
             "uf": 38.0,
             "total": 1797366
-          }
-        }
-      },
-      "SANCHEZ HERMANOS SPA": {
-        "3A": {
-          "arriendo": {
-            "nro": "F-14015",
-            "uf": 69.37,
-            "total": 3143452
-          }
-        },
-        "5A": {
-          "servAdm": {
-            "nro": "FEE-14107",
-            "uf": 10.89,
-            "total": 515087
-          },
-          "arriendo": {
-            "nro": "F-14010",
-            "uf": 410.17,
-            "total": 19400676
-          }
-        },
-        "A1": {
-          "arriendo": {
-            "nro": "F-14014",
-            "uf": 814.88,
-            "total": 37384225
-          }
-        },
-        "A2": {
-          "arriendo": {
-            "nro": "F-14013",
-            "uf": 91.91,
-            "total": 4347262
           }
         }
       },
@@ -655,20 +520,6 @@
             "nro": "F-14062",
             "uf": 138.92,
             "total": 6570792
-          }
-        }
-      },
-      "SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE LOS LIBERTADORES": {
-        "A2": {
-          "arriendo": {
-            "nro": "F-14069",
-            "uf": null,
-            "total": 546850
-          },
-          "servAdm": {
-            "nro": "FEE-14084",
-            "uf": 1.59,
-            "total": 75206
           }
         }
       },
@@ -736,15 +587,6 @@
             "nro": "FEE-14105",
             "uf": 10.8,
             "total": 510830
-          }
-        }
-      },
-      "SONEPAR CHILE SA": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14048",
-            "uf": 314.21,
-            "total": 14861853
           }
         }
       },
@@ -960,20 +802,6 @@
           }
         }
       },
-      "COMERCIAL GRANJA MARINA LIMITADA": {
-        "5A": {
-          "arriendo": {
-            "nro": "F-14154",
-            "uf": 64.83,
-            "total": 3005071
-          },
-          "servAdm": {
-            "nro": "FEE-14218",
-            "uf": null,
-            "total": 835870
-          }
-        }
-      },
       "COMERCIAL HUSSMANN CHILE LIMITADA": {
         "A2": {
           "arriendo": {
@@ -1043,42 +871,12 @@
           }
         }
       },
-      "CONGO FILMS S.A.S. AGENCIA EN CHILE": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14132",
-            "uf": 16.0,
-            "total": 755759
-          },
-          "servAdm": {
-            "nro": "FEE-14221",
-            "uf": 10.8,
-            "total": 510138
-          }
-        }
-      },
       "CORSUD SPA": {
         "4A": {
           "arriendo": {
             "nro": "F-14137",
             "uf": 91.5,
             "total": 4250852
-          }
-        }
-      },
-      "DISTRIBUIDORA SANCHEZ 4G SPA": {
-        "5A": {
-          "arriendo": {
-            "nro": "F-14150",
-            "uf": 23.95,
-            "total": 1090410
-          }
-        },
-        "A2": {
-          "arriendo": {
-            "nro": "F-14191",
-            "uf": 90.0,
-            "total": 4098690
           }
         }
       },
@@ -1197,32 +995,6 @@
           }
         }
       },
-      "INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14148",
-            "uf": 826.93,
-            "total": 37950667
-          },
-          "servAdm": {
-            "nro": "FEE-14224",
-            "uf": 49.61,
-            "total": 2343327
-          }
-        },
-        "A2": {
-          "arriendo": {
-            "nro": "F-14193",
-            "uf": 93.53,
-            "total": 4296132
-          },
-          "servAdm": {
-            "nro": "FEE-14233",
-            "uf": 5.61,
-            "total": 264988
-          }
-        }
-      },
       "JOHN CRANE CHILE S A": {
         "5A": {
           "arriendo": {
@@ -1313,34 +1085,6 @@
           }
         }
       },
-      "OLYMPUS CORPORATION CHILE SPA": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14144",
-            "uf": 144.86,
-            "total": 6734466
-          }
-        },
-        "5A": {
-          "arriendo": {
-            "nro": "F-14161",
-            "uf": 154.71,
-            "total": 7186391
-          },
-          "servAdm": {
-            "nro": "FEE-14215",
-            "uf": 18.57,
-            "total": 877154
-          }
-        },
-        "A2": {
-          "arriendo": {
-            "nro": "F-14246",
-            "uf": 30.5,
-            "total": 1442623
-          }
-        }
-      },
       "PARKER HANNIFIN CORPORATION CHILE LIMITADA": {
         "4A": {
           "arriendo": {
@@ -1380,54 +1124,12 @@
           }
         }
       },
-      "PULLMAN CARGO S A": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14134",
-            "uf": 85.37,
-            "total": 3971043
-          },
-          "servAdm": {
-            "nro": "FEE-14219",
-            "uf": 10.24,
-            "total": 483686
-          }
-        }
-      },
       "ROCKETMAN SPA": {
         "A2": {
           "arriendo": {
             "nro": "F-14180",
             "uf": 38.0,
             "total": 1794929
-          }
-        }
-      },
-      "SANCHEZ HERMANOS SPA": {
-        "5A": {
-          "arriendo": {
-            "nro": "F-14155",
-            "uf": 79.13,
-            "total": 3486359
-          },
-          "servAdm": {
-            "nro": "FEE-14211",
-            "uf": 10.89,
-            "total": 514388
-          }
-        },
-        "A1": {
-          "arriendo": {
-            "nro": "F-14171",
-            "uf": 814.88,
-            "total": 37314575
-          }
-        },
-        "A2": {
-          "arriendo": {
-            "nro": "F-14187",
-            "uf": 69.37,
-            "total": 3164887
           }
         }
       },
@@ -1451,20 +1153,6 @@
             "nro": "F-14198",
             "uf": 138.92,
             "total": 6454102
-          }
-        }
-      },
-      "SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE LOS LIBERTADORES": {
-        "A2": {
-          "arriendo": {
-            "nro": "F-14173",
-            "uf": 13.21,
-            "total": 560662
-          },
-          "servAdm": {
-            "nro": "FEE-14225",
-            "uf": 1.59,
-            "total": 75103
           }
         }
       },
@@ -1523,15 +1211,6 @@
             "nro": "FEE-14237",
             "uf": 10.8,
             "total": 510138
-          }
-        }
-      },
-      "SONEPAR CHILE SA": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14146",
-            "uf": 314.21,
-            "total": 14583791
           }
         }
       },
@@ -1712,15 +1391,6 @@
           }
         }
       },
-      "CAMPO MAR SPA": {
-        "": {
-          "arriendo": {
-            "nro": "F-14418",
-            "uf": 450.0,
-            "total": 21335241
-          }
-        }
-      },
       "Campo San Miguel": {
         "": {
           "arriendo": {
@@ -1750,29 +1420,6 @@
             "nro": "F-14307",
             "uf": 20.7,
             "total": 967099
-          }
-        }
-      },
-      "CHICUREO NORTE SPA": {
-        "": {
-          "arriendo": {
-            "nro": "F-14420",
-            "uf": 120.0,
-            "total": 5689397
-          }
-        }
-      },
-      "COMERCIAL GRANJA MARINA LIMITADA": {
-        "5A": {
-          "arriendo": {
-            "nro": "F-14266",
-            "uf": 64.83,
-            "total": 3014773
-          },
-          "servAdm": {
-            "nro": "FEE-14369",
-            "uf": null,
-            "total": 835870
           }
         }
       },
@@ -1845,49 +1492,12 @@
           }
         }
       },
-      "CONGO FILMS S.A.S. AGENCIA EN CHILE": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14283",
-            "uf": 16.0,
-            "total": 758154
-          },
-          "servAdm": {
-            "nro": "FEE-14352",
-            "uf": 10.8,
-            "total": 511754
-          }
-        }
-      },
       "CORSUD SPA": {
         "4A": {
           "arriendo": {
             "nro": "F-14288",
             "uf": 91.5,
             "total": 4264545
-          }
-        }
-      },
-      "DISTRIBUIDORA SANCHEZ 4G SPA": {
-        "5A": {
-          "arriendo": {
-            "nro": "F-14262",
-            "uf": 23.95,
-            "total": 1093994
-          }
-        },
-        "A2": {
-          "arriendo": {
-            "nro": "F-14319",
-            "uf": 90.0,
-            "total": 4112158
-          }
-        },
-        "": {
-          "arriendo": {
-            "nro": "F-14417",
-            "uf": 20.0,
-            "total": 948232
           }
         }
       },
@@ -2021,32 +1631,6 @@
             "nro": "F-14293",
             "uf": 133.04,
             "total": 6196059
-          }
-        }
-      },
-      "INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14374",
-            "uf": 826.93,
-            "total": 38074421
-          },
-          "servAdm": {
-            "nro": "FEE-14377",
-            "uf": 49.61,
-            "total": 2350751
-          }
-        },
-        "A2": {
-          "arriendo": {
-            "nro": "F-14375",
-            "uf": 93.53,
-            "total": 4310129
-          },
-          "servAdm": {
-            "nro": "FEE-14379",
-            "uf": 5.61,
-            "total": 265828
           }
         }
       },
@@ -2293,34 +1877,6 @@
           }
         }
       },
-      "OLYMPUS CORPORATION CHILE SPA": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14295",
-            "uf": 144.86,
-            "total": 6756146
-          }
-        },
-        "5A": {
-          "arriendo": {
-            "nro": "F-14273",
-            "uf": 154.71,
-            "total": 7209544
-          },
-          "servAdm": {
-            "nro": "FEE-14363",
-            "uf": 18.57,
-            "total": 879932
-          }
-        },
-        "A2": {
-          "arriendo": {
-            "nro": "F-14373",
-            "uf": 114.4,
-            "total": 5310692
-          }
-        }
-      },
       "PARKER HANNIFIN CORPORATION CHILE LIMITADA": {
         "4A": {
           "arriendo": {
@@ -2387,70 +1943,12 @@
           }
         }
       },
-      "PULLMAN CARGO S A": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14285",
-            "uf": 85.37,
-            "total": 3983819
-          },
-          "servAdm": {
-            "nro": "FEE-14350",
-            "uf": 10.24,
-            "total": 485219
-          }
-        }
-      },
       "ROCKETMAN SPA": {
         "A2": {
           "arriendo": {
             "nro": "F-14309",
             "uf": 38.0,
             "total": 1800615
-          }
-        }
-      },
-      "SAN MIGUEL SPA": {
-        "": {
-          "arriendo": {
-            "nro": "F-14419",
-            "uf": 120.0,
-            "total": 5689397
-          }
-        }
-      },
-      "SANCHEZ HERMANOS SPA": {
-        "5A": {
-          "arriendo": {
-            "nro": "F-14267",
-            "uf": 79.13,
-            "total": 3498201
-          },
-          "servAdm": {
-            "nro": "FEE-14354",
-            "uf": 10.89,
-            "total": 516019
-          }
-        },
-        "A1": {
-          "arriendo": {
-            "nro": "F-14300",
-            "uf": 814.88,
-            "total": 37436525
-          }
-        },
-        "A2": {
-          "arriendo": {
-            "nro": "F-14316",
-            "uf": 69.37,
-            "total": 3175269
-          }
-        },
-        "": {
-          "arriendo": {
-            "nro": "F-14415",
-            "uf": 95.0,
-            "total": 4504106
           }
         }
       },
@@ -2483,20 +1981,6 @@
             "nro": "F-14324",
             "uf": 138.92,
             "total": 6474892
-          }
-        }
-      },
-      "SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE LOS LIBERTADORES": {
-        "A2": {
-          "arriendo": {
-            "nro": "F-14302",
-            "uf": null,
-            "total": 562638
-          },
-          "servAdm": {
-            "nro": "FEE-14333",
-            "uf": 1.81,
-            "total": 85766
           }
         }
       },
@@ -2564,15 +2048,6 @@
             "nro": "FEE-14353",
             "uf": 10.8,
             "total": 511754
-          }
-        }
-      },
-      "SONEPAR CHILE SA": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14298",
-            "uf": 314.21,
-            "total": 14630814
           }
         }
       },
@@ -2799,20 +2274,6 @@
           }
         }
       },
-      "COMERCIAL GRANJA MARINA LIMITADA": {
-        "5A": {
-          "arriendo": {
-            "nro": "F-14429",
-            "uf": 64.83,
-            "total": 3016526
-          },
-          "servAdm": {
-            "nro": "FEE-14533",
-            "uf": null,
-            "total": 835870
-          }
-        }
-      },
       "COMERCIAL HUSSMANN CHILE LIMITADA": {
         "A2": {
           "arriendo": {
@@ -2882,42 +2343,12 @@
           }
         }
       },
-      "CONGO FILMS S.A.S. AGENCIA EN CHILE": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14445",
-            "uf": 16.0,
-            "total": 758587
-          },
-          "servAdm": {
-            "nro": "FEE-14516",
-            "uf": 10.8,
-            "total": 512046
-          }
-        }
-      },
       "CORSUD SPA": {
         "4A": {
           "arriendo": {
             "nro": "F-14450",
             "uf": 91.5,
             "total": 4267018
-          }
-        }
-      },
-      "DISTRIBUIDORA SANCHEZ 4G SPA": {
-        "5A": {
-          "arriendo": {
-            "nro": "F-14425",
-            "uf": 23.95,
-            "total": 1094641
-          }
-        },
-        "A2": {
-          "arriendo": {
-            "nro": "F-14480",
-            "uf": 90.0,
-            "total": 4114590
           }
         }
       },
@@ -3045,32 +2476,6 @@
           }
         }
       },
-      "INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14461",
-            "uf": 826.93,
-            "total": 38096770
-          },
-          "servAdm": {
-            "nro": "FEE-14536",
-            "uf": 49.61,
-            "total": 2352092
-          }
-        },
-        "A2": {
-          "arriendo": {
-            "nro": "F-14488",
-            "uf": 93.53,
-            "total": 4312657
-          },
-          "servAdm": {
-            "nro": "FEE-14537",
-            "uf": 5.61,
-            "total": 265979
-          }
-        }
-      },
       "JOHN CRANE CHILE S A": {
         "5A": {
           "arriendo": {
@@ -3161,34 +2566,6 @@
           }
         }
       },
-      "OLYMPUS CORPORATION CHILE SPA": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14457",
-            "uf": 144.86,
-            "total": 6760061
-          }
-        },
-        "5A": {
-          "arriendo": {
-            "nro": "F-14436",
-            "uf": 154.71,
-            "total": 7213725
-          },
-          "servAdm": {
-            "nro": "FEE-14527",
-            "uf": 18.57,
-            "total": 880435
-          }
-        },
-        "A2": {
-          "arriendo": {
-            "nro": "F-14542",
-            "uf": 114.4,
-            "total": 5313784
-          }
-        }
-      },
       "PARKER HANNIFIN CORPORATION CHILE LIMITADA": {
         "4A": {
           "arriendo": {
@@ -3228,54 +2605,12 @@
           }
         }
       },
-      "PULLMAN CARGO S A": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14447",
-            "uf": 85.37,
-            "total": 3986126
-          },
-          "servAdm": {
-            "nro": "FEE-14514",
-            "uf": 10.24,
-            "total": 485495
-          }
-        }
-      },
       "ROCKETMAN SPA": {
         "A2": {
           "arriendo": {
             "nro": "F-14469",
             "uf": 38.0,
             "total": 1801642
-          }
-        }
-      },
-      "SANCHEZ HERMANOS SPA": {
-        "5A": {
-          "arriendo": {
-            "nro": "F-14430",
-            "uf": 79.13,
-            "total": 3500339
-          },
-          "servAdm": {
-            "nro": "FEE-14518",
-            "uf": 10.89,
-            "total": 516312
-          }
-        },
-        "A1": {
-          "arriendo": {
-            "nro": "F-14462",
-            "uf": 814.88,
-            "total": 37458547
-          }
-        },
-        "A2": {
-          "arriendo": {
-            "nro": "F-14477",
-            "uf": 69.37,
-            "total": 3177143
           }
         }
       },
@@ -3299,20 +2634,6 @@
             "nro": "F-14484",
             "uf": 138.92,
             "total": 6478647
-          }
-        }
-      },
-      "SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE LOS LIBERTADORES": {
-        "A2": {
-          "arriendo": {
-            "nro": "F-14490",
-            "uf": 13.21,
-            "total": 562995
-          },
-          "servAdm": {
-            "nro": "FEE-14497",
-            "uf": 1.59,
-            "total": 75384
           }
         }
       },
@@ -3371,15 +2692,6 @@
             "nro": "FEE-14517",
             "uf": 10.8,
             "total": 512046
-          }
-        }
-      },
-      "SONEPAR CHILE SA": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14459",
-            "uf": 314.21,
-            "total": 14639305
           }
         }
       },
@@ -3595,20 +2907,6 @@
           }
         }
       },
-      "COMERCIAL GRANJA MARINA LIMITADA": {
-        "5A": {
-          "arriendo": {
-            "nro": "F-14570",
-            "uf": 64.83,
-            "total": 3043147
-          },
-          "servAdm": {
-            "nro": "FEE-14620",
-            "uf": null,
-            "total": 835870
-          }
-        }
-      },
       "COMERCIAL HUSSMANN CHILE LIMITADA": {
         "A2": {
           "arriendo": {
@@ -3678,42 +2976,12 @@
           }
         }
       },
-      "CONGO FILMS S.A.S. AGENCIA EN CHILE": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14548",
-            "uf": 16.0,
-            "total": 765157
-          },
-          "servAdm": {
-            "nro": "FEE-14624",
-            "uf": 10.8,
-            "total": 516480
-          }
-        }
-      },
       "CORSUD SPA": {
         "4A": {
           "arriendo": {
             "nro": "F-14553",
             "uf": 91.5,
             "total": 4304591
-          }
-        }
-      },
-      "DISTRIBUIDORA SANCHEZ 4G SPA": {
-        "5A": {
-          "arriendo": {
-            "nro": "F-14566",
-            "uf": 23.95,
-            "total": 1104477
-          }
-        },
-        "A2": {
-          "arriendo": {
-            "nro": "F-14605",
-            "uf": 90.0,
-            "total": 4113433
           }
         }
       },
@@ -3841,32 +3109,6 @@
           }
         }
       },
-      "INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14564",
-            "uf": 826.93,
-            "total": 38436334
-          },
-          "servAdm": {
-            "nro": "FEE-14628",
-            "uf": 49.61,
-            "total": 2372464
-          }
-        },
-        "A2": {
-          "arriendo": {
-            "nro": "F-14607",
-            "uf": 93.53,
-            "total": 4320624
-          },
-          "servAdm": {
-            "nro": "FEE-14650",
-            "uf": 5.61,
-            "total": 268283
-          }
-        }
-      },
       "JOHN CRANE CHILE S A": {
         "5A": {
           "arriendo": {
@@ -3957,34 +3199,6 @@
           }
         }
       },
-      "OLYMPUS CORPORATION CHILE SPA": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14560",
-            "uf": 144.86,
-            "total": 6819544
-          }
-        },
-        "5A": {
-          "arriendo": {
-            "nro": "F-14577",
-            "uf": 154.71,
-            "total": 7277253
-          },
-          "servAdm": {
-            "nro": "FEE-14627",
-            "uf": 8.69,
-            "total": 415575
-          }
-        },
-        "A2": {
-          "arriendo": {
-            "nro": "F-14663",
-            "uf": 114.4,
-            "total": 5333233
-          }
-        }
-      },
       "PARKER HANNIFIN CORPORATION CHILE LIMITADA": {
         "4A": {
           "arriendo": {
@@ -4024,20 +3238,6 @@
           }
         }
       },
-      "PULLMAN CARGO S A": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14550",
-            "uf": 85.37,
-            "total": 4021181
-          },
-          "servAdm": {
-            "nro": "FEE-14622",
-            "uf": 10.24,
-            "total": 489700
-          }
-        }
-      },
       "ROCKETMAN SPA": {
         "A2": {
           "arriendo": {
@@ -4047,54 +3247,12 @@
           }
         }
       },
-      "SANCHEZ HERMANOS SPA": {
-        "5A": {
-          "arriendo": {
-            "nro": "F-14571",
-            "uf": 79.13,
-            "total": 3532833
-          },
-          "servAdm": {
-            "nro": "FEE-14637",
-            "uf": 10.89,
-            "total": 520784
-          }
-        },
-        "A1": {
-          "arriendo": {
-            "nro": "F-14587",
-            "uf": 814.88,
-            "total": 37793163
-          }
-        },
-        "A2": {
-          "arriendo": {
-            "nro": "F-14602",
-            "uf": 69.37,
-            "total": 3177679
-          }
-        }
-      },
       "SEGAFREDO ZANETTI CHILE S.A.": {
         "A2": {
           "arriendo": {
             "nro": "F-14612",
             "uf": 138.92,
             "total": 6508747
-          }
-        }
-      },
-      "SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE LOS LIBERTADORES": {
-        "A2": {
-          "arriendo": {
-            "nro": "F-14589",
-            "uf": 13.21,
-            "total": 622203
-          },
-          "servAdm": {
-            "nro": "FEE-14641",
-            "uf": 1.59,
-            "total": 76037
           }
         }
       },
@@ -4153,15 +3311,6 @@
             "nro": "FEE-14649",
             "uf": 10.8,
             "total": 516480
-          }
-        }
-      },
-      "SONEPAR CHILE SA": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14562",
-            "uf": 314.21,
-            "total": 14768330
           }
         }
       },
@@ -4368,20 +3517,6 @@
           }
         }
       },
-      "COMERCIAL GRANJA MARINA LIMITADA": {
-        "5A": {
-          "arriendo": {
-            "nro": "F-14699",
-            "uf": 64.83,
-            "total": 3082383
-          },
-          "servAdm": {
-            "nro": "FEE-14780",
-            "uf": null,
-            "total": 835870
-          }
-        }
-      },
       "COMERCIAL HUSSMANN CHILE LIMITADA": {
         "A2": {
           "arriendo": {
@@ -4437,42 +3572,12 @@
           }
         }
       },
-      "CONGO FILMS S.A.S. AGENCIA EN CHILE": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14682",
-            "uf": 77.45,
-            "total": 3675328
-          },
-          "servAdm": {
-            "nro": "FEE-14762",
-            "uf": 10.8,
-            "total": 523017
-          }
-        }
-      },
       "CORSUD SPA": {
         "4A": {
           "arriendo": {
             "nro": "F-14679",
             "uf": 91.5,
             "total": 4359969
-          }
-        }
-      },
-      "DISTRIBUIDORA SANCHEZ 4G SPA": {
-        "5A": {
-          "arriendo": {
-            "nro": "F-14687",
-            "uf": 23.95,
-            "total": 1118971
-          }
-        },
-        "A2": {
-          "arriendo": {
-            "nro": "F-14704",
-            "uf": 90.0,
-            "total": 4167902
           }
         }
       },
@@ -4600,32 +3705,6 @@
           }
         }
       },
-      "INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14672",
-            "uf": 826.93,
-            "total": 38936811
-          },
-          "servAdm": {
-            "nro": "FEE-14777",
-            "uf": 49.61,
-            "total": 2402489
-          }
-        },
-        "A2": {
-          "arriendo": {
-            "nro": "F-14708",
-            "uf": 99.29,
-            "total": 4600589
-          },
-          "servAdm": {
-            "nro": "FEE-14749",
-            "uf": 5.61,
-            "total": 271678
-          }
-        }
-      },
       "JOHN CRANE CHILE S A": {
         "5A": {
           "arriendo": {
@@ -4746,20 +3825,6 @@
           }
         }
       },
-      "PULLMAN CARGO S A": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14680",
-            "uf": 85.37,
-            "total": 4072850
-          },
-          "servAdm": {
-            "nro": "FEE-14760",
-            "uf": 10.24,
-            "total": 495898
-          }
-        }
-      },
       "ROCKETMAN SPA": {
         "A2": {
           "arriendo": {
@@ -4769,54 +3834,12 @@
           }
         }
       },
-      "SANCHEZ HERMANOS SPA": {
-        "5A": {
-          "arriendo": {
-            "nro": "F-14688",
-            "uf": 410.17,
-            "total": 19557957
-          },
-          "servAdm": {
-            "nro": "FEE-14764",
-            "uf": 10.89,
-            "total": 527376
-          }
-        },
-        "A1": {
-          "arriendo": {
-            "nro": "F-14701",
-            "uf": 814.88,
-            "total": 38286347
-          }
-        },
-        "A2": {
-          "arriendo": {
-            "nro": "F-14731",
-            "uf": 69.37,
-            "total": 3219663
-          }
-        }
-      },
       "SEGAFREDO ZANETTI CHILE S.A.": {
         "A2": {
           "arriendo": {
             "nro": "F-14706",
             "uf": 138.92,
             "total": 6592824
-          }
-        }
-      },
-      "SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE LOS LIBERTADORES": {
-        "A2": {
-          "arriendo": {
-            "nro": "F-14725",
-            "uf": 13.21,
-            "total": 630199
-          },
-          "servAdm": {
-            "nro": "FEE-14741",
-            "uf": 1.59,
-            "total": 77000
           }
         }
       },
@@ -4875,15 +3898,6 @@
             "nro": "FEE-14763",
             "uf": 10.8,
             "total": 523017
-          }
-        }
-      },
-      "SONEPAR CHILE SA": {
-        "4A": {
-          "arriendo": {
-            "nro": "F-14670",
-            "uf": 314.21,
-            "total": 14958497
           }
         }
       },
