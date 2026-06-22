@@ -631,22 +631,24 @@ export default async function handler(req, res) {
       try {
         const files = await driveFiles(token, FACT_FOLDER_ID);
         const zipFiles = files.filter(f => f.name.match(/\.zip$/i)).slice(0, 8);
-        await Promise.all(zipFiles.map(async f => {
+        // Procesar de a uno para no saturar memoria/tiempo en Vercel
+        for (const f of zipFiles) {
           try {
             const rz = await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`,
               { headers:{ Authorization:`Bearer ${token}` } });
-            if (!rz.ok) return;
+            if (!rz.ok) continue;
             const buf = await rz.arrayBuffer();
             const zip = await JSZip.loadAsync(buf);
-            await Promise.all(Object.keys(zip.files).map(async name => {
-              if (!name.match(/\.xml$/i)) return;
+            for (const name of Object.keys(zip.files)) {
+              if (!name.match(/\.xml$/i)) continue;
               const xml = await zip.files[name].async("string");
+              // RUT y RazonSocial del receptor (nuestro cliente)
               const rzn = (xml.match(/<RazonSocial>([^<]+)<\/RazonSocial>/) || [])[1];
-              const rut = (xml.match(/<RUTRecep>([\d.]+[-]\w)<\/RUTRecep>/) || [])[1];
-              if (rzn && rut && !ruts[rzn.trim()]) ruts[rzn.trim()] = rut.trim();
-            }));
+              const rut = (xml.match(/<RUTRecep>([0-9][0-9.]*[-][0-9Kk])<\/RUTRecep>/) || [])[1];
+              if (rzn && rut && !ruts[rzn.trim()]) ruts[rzn.trim()] = rut.trim().toUpperCase();
+            }
           } catch(_) {}
-        }));
+        }
         _rutMapCache = ruts;
         _rutMapCacheTs = now;
       } catch(e) {
