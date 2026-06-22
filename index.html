@@ -1965,9 +1965,25 @@ function HistorialFactView({dashData,driveLoading,notify}){
       .then(r=>r.json())
       .then(({periodos=[]})=>{
         if(cancelled) return;
-        // Por cada sitio-cliente, fetch solo períodos donde monthly[key]>0
-        dashData.clients.forEach((sc,siteIdx)=>{
-          const sameNombre=dashData.clients.filter(c=>c.nombre===sc.nombre);
+        /* Deduplicar por (nombre, sitio): varios rows del mismo cliente/sitio (ej: reajuste UF)
+           causarían doble conteo de los mismos números de factura. Usamos el primer row encontrado
+           pero fusionamos los monthly de todos los rows con el mismo key para no perder meses. */
+        const dedupMap=new Map();
+        dashData.clients.forEach(c=>{
+          const k=`${c.nombre}|||${c.sitio}`;
+          if(!dedupMap.has(k)){
+            dedupMap.set(k,{...c,monthly:{...c.monthly}});
+          } else {
+            const ex=dedupMap.get(k);
+            Object.entries(c.monthly).forEach(([m,v])=>{if(!(ex.monthly[m]>0)&&v>0)ex.monthly[m]=v;});
+            if(!ex.ufArr&&c.ufArr)ex.ufArr=c.ufArr;
+            if(!ex.ufSrv&&c.ufSrv)ex.ufSrv=c.ufSrv;
+          }
+        });
+        const dedupedClients=[...dedupMap.values()];
+        // Por cada sitio-cliente único, fetch solo períodos donde monthly[key]>0
+        dedupedClients.forEach((sc,siteIdx)=>{
+          const sameNombre=dedupedClients.filter(c=>c.nombre===sc.nombre);
           const idx=sameNombre.indexOf(sc);
           periodos.forEach(p=>{
             const [mes,anio]=p.split(" ");
@@ -4491,20 +4507,4 @@ function App(){
               disabled:!!syncStatus,
               title:"Escribe 'Enviado' en columna HC de la planilla para todos los correos enviados esta sesión",
               style:{background:"var(--surf2)",border:"1px solid var(--bdr)",color:syncStatus?"var(--accl)":"var(--txm)",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:syncStatus?"default":"pointer",display:"flex",alignItems:"center",gap:5,minWidth:180}
-            },syncStatus?`📋 Sincronizando... ${syncStatus.done}/${syncStatus.total}`:"📋 Sincronizar planilla"),
-          h("button",{
-              onClick:unlocked?sendAll:()=>setShowPwdModal(true),
-              style:{background:unlocked?"var(--gbg)":"var(--surf2)",border:unlocked?"1px solid var(--gdim)":"1px solid var(--bdr)",color:unlocked?"var(--green)":"var(--txm)",borderRadius:8,padding:"7px 16px",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:6,cursor:"pointer"}
-            },unlocked?`✉ Enviar todos (${Math.max(0,stats.ok-stats.sent)})`:`🔒 Enviar todos (${Math.max(0,stats.ok-stats.sent)})`)
-        )
-      )
-    )
-    ,view==="ventas"&&h(VentasView,{periodo})
-    ,view==="contratos"&&h(ContratosView,{dashData,driveLoading})
-    ,view==="historial-fact"&&h(HistorialFactView,{dashData,driveLoading,notify})
-  ));
-}
-ReactDOM.createRoot(document.getElementById("root")).render(h(App));
-</script>
-</body>
-</html>
+            },syncStatus?`📋 Sincronizando... ${syncStatus.done}/${syncStatus.total}`:"📋 Sincronizar pla
