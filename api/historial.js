@@ -618,6 +618,35 @@ export default async function handler(req, res) {
       return res.status(200).send(buf);
     }
 
+    // ── GET ?resumen=1 ── resumen de ventas por cliente desde JSON embebido ──
+    if (req.method === "GET" && req.query.resumen === "1") {
+      if (!_EXCEL_EMBEDDED) {
+        return res.status(503).json({ error: "JSON embebido no disponible" });
+      }
+      // Agregar totales por (cliente, periodo) sumando todos los sitios y tipos
+      const clientMap = {};
+      for (const [, periodos] of Object.entries(_EXCEL_EMBEDDED)) {
+        for (const [periodo, clientes] of Object.entries(periodos)) {
+          for (const [nombre, sitios] of Object.entries(clientes)) {
+            if (!clientMap[nombre]) clientMap[nombre] = { nombre, meses: {}, total: 0 };
+            let periodoTotal = 0;
+            for (const tipos of Object.values(sitios)) {
+              for (const factura of Object.values(tipos)) {
+                periodoTotal += (factura.total || 0);
+              }
+            }
+            if (periodoTotal > 0) {
+              clientMap[nombre].meses[periodo] = (clientMap[nombre].meses[periodo] || 0) + periodoTotal;
+              clientMap[nombre].total += periodoTotal;
+            }
+          }
+        }
+      }
+      const clientes = Object.values(clientMap).sort((a, b) => b.total - a.total);
+      res.setHeader("Cache-Control", "public, max-age=300");
+      return res.status(200).json({ clientes });
+    }
+
     // ── GET ?listPeriodos=1 ── períodos disponibles en carpeta facturación ─
     if (req.method === "GET" && req.query.listPeriodos === "1") {
       const periodoSet = new Set();

@@ -1930,7 +1930,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
   const [search,setSearch]=useState("");
   const [refreshTrigger,setRefreshTrigger]=useState(0);
   const refreshFlag=React.useRef(false);
-  const [clientTotals,setClientTotals]=useState({});   /* {nombre: total_clp_acumulado_2026} */
+  const [resumenData,setResumenData]=useState(null);   /* [{nombre, meses:{}, total}] desde /api/historial?resumen=1 */
   const [batchOpen,setBatchOpen]=useState(false);
   const [batchPeriodo,setBatchPeriodo]=useState("");
   const [batchPeriodos,setBatchPeriodos]=useState([]);
@@ -1954,60 +1954,16 @@ function HistorialFactView({dashData,driveLoading,notify}){
     }catch(_){}
   },[]);
 
-  /* Carga diferida: acumulado CLP real por cliente usando monthly de planilla como filtro */
+  /* Carga resumen de ventas desde JSON embebido (una sola llamada, sin Drive) */
   React.useEffect(()=>{
-    if(!dashData)return;
     let cancelled=false;
-    setClientTotals({});
-    const MES_NUM={Enero:"01",Febrero:"02",Marzo:"03",Abril:"04",Mayo:"05",Junio:"06",
-                   Julio:"07",Agosto:"08",Septiembre:"09",Octubre:"10",Noviembre:"11",Diciembre:"12"};
-    fetch("/api/historial?listPeriodos=1")
+    setResumenData(null);
+    fetch("/api/historial?resumen=1")
       .then(r=>r.json())
-      .then(({periodos=[]})=>{
-        if(cancelled) return;
-        /* Deduplicar por (nombre, sitio): varios rows del mismo cliente/sitio (ej: reajuste UF)
-           causarían doble conteo de los mismos números de factura. Usamos el primer row encontrado
-           pero fusionamos los monthly de todos los rows con el mismo key para no perder meses. */
-        const dedupMap=new Map();
-        dashData.clients.forEach(c=>{
-          const k=`${c.nombre}|||${c.sitio}`;
-          if(!dedupMap.has(k)){
-            dedupMap.set(k,{...c,monthly:{...c.monthly}});
-          } else {
-            const ex=dedupMap.get(k);
-            Object.entries(c.monthly).forEach(([m,v])=>{if(!(ex.monthly[m]>0)&&v>0)ex.monthly[m]=v;});
-            if(!ex.ufArr&&c.ufArr)ex.ufArr=c.ufArr;
-            if(!ex.ufSrv&&c.ufSrv)ex.ufSrv=c.ufSrv;
-          }
-        });
-        const dedupedClients=[...dedupMap.values()];
-        // Por cada sitio-cliente único, fetch solo períodos donde monthly[key]>0
-        dedupedClients.forEach((sc,siteIdx)=>{
-          const sameNombre=dedupedClients.filter(c=>c.nombre===sc.nombre);
-          const idx=sameNombre.indexOf(sc);
-          periodos.forEach(p=>{
-            const [mes,anio]=p.split(" ");
-            const pKey=anio&&MES_NUM[mes]?`${anio}-${MES_NUM[mes]}`:null;
-            if(!pKey) return;
-            // Solo fetch si el cliente tiene UF activo en ese período según planilla
-            if(!(sc.monthly[pKey]>0) && !(sc.ufArr>0 && anio==="2026")) return;
-            const histE1=sc.hist?.find(h=>h.key===pKey);
-            const pufArr1=histE1?.uf>0?histE1.uf:sc.ufArr;
-            const pufSrv1=histE1?.uf>0&&sc.ufArr>0&&sc.ufSrv>0
-              ?Math.round(sc.ufSrv*(histE1.uf/sc.ufArr)*10000)/10000:sc.ufSrv;
-            const url=`/api/historial?cliente=${encodeURIComponent(sc.nombre)}&rut=${encodeURIComponent(sc.rut||"")}`
-              +`&ufArr=${encodeURIComponent(pufArr1||"")}&ufSrv=${encodeURIComponent(pufSrv1||"")}`
-              +`&siteIdx=${idx}&sitio=${encodeURIComponent(sc.sitio||"")}&periodo=${encodeURIComponent(p)}`;
-            fetch(url).then(r=>r.json()).then(({facturas})=>{
-              if(cancelled||!facturas) return;
-              const t=Object.values(facturas).reduce((s,f)=>s+(f?.total||0),0);
-              if(t>0) setClientTotals(prev=>({...prev,[sc.nombre]:(prev[sc.nombre]||0)+t}));
-            }).catch(()=>{});
-          });
-        });
-      }).catch(()=>{});
+      .then(d=>{if(!cancelled)setResumenData(d.clientes||[]);})
+      .catch(()=>{if(!cancelled)setResumenData([]);});
     return ()=>{cancelled=true;};
-  },[dashData]);
+  },[]);
 
   /* Clave única por fila de planilla: sitio + edificio (ej: 'A-2|T. Of. 44') */
   const siteKey=sc=>`${sc.sitio}${sc.edificio?'|'+sc.edificio:''}`;
@@ -2095,7 +2051,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
     ?(()=>{const seen=new Set();return [...dashData.clients].sort((a,b)=>(a.ri||0)-(b.ri||0)).filter(c=>{const k=c.nombre+"|"+c.sitio;if(seen.has(k))return false;seen.add(k);return true;});})()
     :[];
 
-  /* Búsqueda por nombre, correo y RUT */
+  /* Búsqueda por nombre, correo y RUT (para detalle y modal historial) */
   const filtered=clients.filter(c=>{
     if(!search) return true;
     const q=search.toLowerCase();
@@ -2103,6 +2059,30 @@ function HistorialFactView({dashData,driveLoading,notify}){
     return c.nombre.toLowerCase().includes(q)||
       (c.email||"").toLowerCase().includes(q)||
       rutNorm.includes(q.replace(/\./g,""));
+  });
+
+  /* Columnas de meses para tabla resumen (más reciente primero) */
+  const MESES_RESUMEN=["Junio 2026","Mayo 2026","Abril 2026","Marzo 2026","Febrero 2026","Enero 2026"];
+  const MESES_LABELS=["Jun","May","Abr","Mar","Feb","Ene"];
+
+  /* Mapa nombre→RUT desde planilla (para mostrar RUT en tabla resumen) */
+  const rutMap=React.useMemo(()=>{
+    if(!dashData)return {};
+    const stripN=s=>(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
+    const m={};
+    dashData.clients.forEach(c=>{if(c.rut&&!m[stripN(c.nombre)])m[stripN(c.nombre)]=c.rut;});
+    return m;
+  },[dashData]);
+
+  /* Función strip para matching de nombres */
+  const stripNombre=s=>(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
+
+  /* Filtrado tabla resumen por nombre o RUT */
+  const filteredResumen=(resumenData||[]).filter(c=>{
+    if(!search)return true;
+    const q=search.toLowerCase();
+    const rut=(rutMap[stripNombre(c.nombre)]||"").replace(/\./g,"").toLowerCase();
+    return c.nombre.toLowerCase().includes(q)||rut.includes(q.replace(/\./g,""));
   });
 
   const previewFact=async(fNum,periodo)=>{
@@ -2299,7 +2279,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
       },h("span",null,"⟳")," Refrescar"),
       !selClient&&h(React.Fragment,null,
         h("input",{value:search,onChange:e=>setSearch(e.target.value),
-          placeholder:"Buscar cliente, RUT o correo...",style:{marginLeft:"auto",width:220}}),
+          placeholder:"Buscar cliente o RUT...",style:{marginLeft:"auto",width:200}}),
         h("button",{
           onClick:()=>{
             setBatchOpen(true);setBatchResult(null);setBatchCorrecting(null);
@@ -2314,53 +2294,57 @@ function HistorialFactView({dashData,driveLoading,notify}){
       )
     ),
 
-    !selClient&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
-      h("div",{style:{display:"grid",gridTemplateColumns:"90px 1fr 180px 130px",padding:"8px 14px",
-        borderBottom:"1px solid var(--bdr)",background:"var(--surf2)",fontSize:10,fontWeight:700,color:"var(--txm)",letterSpacing:".06em"}},
-        h("div",null,"SITIO"),h("div",null,"CLIENTE"),h("div",null,"CORREO"),h("div",{style:{textAlign:"right"}},"ACUMULADO 2026")
+    !selClient&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden",overflowX:"auto"}},
+      h("div",{style:{display:"grid",gridTemplateColumns:"120px 1fr 90px 90px 90px 90px 90px 90px 130px",
+        padding:"8px 14px",borderBottom:"1px solid var(--bdr)",background:"var(--surf2)",
+        fontSize:10,fontWeight:700,color:"var(--txm)",letterSpacing:".06em",minWidth:900}},
+        h("div",null,"RUT"),
+        h("div",null,"CLIENTE"),
+        ...MESES_LABELS.map(m=>h("div",{key:m,style:{textAlign:"right"}},m)),
+        h("div",{style:{textAlign:"right"}},"TOTAL 2026")
       ),
-      driveLoading?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txm)",fontSize:13}},
-        h("span",{className:"spin",style:{fontSize:18,marginRight:8}},"⟳"),"Cargando..."
-      ):
-      !dashData?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:13}},
-        "Carga la planilla en el Dashboard para ver los clientes"
-      ):
-      filtered.length===0?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados"):
-      h("div",{style:{maxHeight:"calc(100vh - 200px)",overflowY:"auto"}},
-        filtered.map(c=>{
-          const color=SITIO_C[c.sitio]||"#888";
-          const cliTotal=clientTotals[c.nombre]||0;
-          return h("div",{key:c.nombre+c.sitio,onClick:()=>{
-              const seen=new Set();
-              setSelGroup(dashData.clients.filter(cl=>{
-                if(cl.nombre!==c.nombre)return false;
-                const k=(cl.sitio||'')+'|'+(cl.edificio||'');
-                if(seen.has(k))return false;
-                seen.add(k);return true;
-              }));
+      resumenData===null
+        ?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txm)",fontSize:13}},
+            h("span",{className:"spin",style:{fontSize:18,marginRight:8}},"⟳"),"Cargando...")
+        :filteredResumen.length===0
+        ?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados")
+        :h("div",{style:{maxHeight:"calc(100vh - 200px)",overflowY:"auto"}},
+          filteredResumen.map(c=>{
+            const rut=rutMap[stripNombre(c.nombre)]||"—";
+            const canClick=dashData&&dashData.clients.some(cl=>stripNombre(cl.nombre)===stripNombre(c.nombre));
+            return h("div",{key:c.nombre,
+              onClick:()=>{
+                if(!dashData)return;
+                const cStrip=stripNombre(c.nombre);
+                const seen=new Set();
+                const grp=dashData.clients.filter(cl=>{
+                  if(stripNombre(cl.nombre)!==cStrip)return false;
+                  const k=(cl.sitio||'')+'|'+(cl.edificio||'');
+                  if(seen.has(k))return false;
+                  seen.add(k);return true;
+                });
+                if(grp.length)setSelGroup(grp);
+              },
+              style:{display:"grid",gridTemplateColumns:"120px 1fr 90px 90px 90px 90px 90px 90px 130px",
+                padding:"10px 14px",borderBottom:"1px solid var(--bdr)",minWidth:900,
+                cursor:canClick?"pointer":"default",transition:"background .1s"}
             },
-            style:{display:"grid",gridTemplateColumns:"90px 1fr 180px 130px",padding:"10px 14px",
-              borderBottom:"1px solid var(--bdr)",cursor:"pointer",transition:"background .1s"}
-          },
-            h("div",{style:{display:"flex",alignItems:"center",gap:5}},
-              h("span",{style:{padding:"2px 7px",borderRadius:6,fontSize:9,fontWeight:700,
-                background:`${color}18`,color,border:`1px solid ${color}40`}},c.sitio||"—"),
-              c.edificio&&h("span",{style:{fontSize:9,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},c.edificio)
-            ),
-            h("div",null,
-              h("div",{style:{fontWeight:600,fontSize:12,lineHeight:1.4}},c.nombre),
-              c.rut&&h("div",{style:{fontSize:9,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},c.rut)
-            ),
-            h("div",{style:{fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace",
-              alignSelf:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},c.email||"—"),
-            h("div",{style:{alignSelf:"center",textAlign:"right",fontFamily:"'DM Mono',monospace"}},
-              cliTotal>0
-                ?h("span",{style:{fontSize:11,fontWeight:700,color:"var(--blue)"}},"$"+cliTotal.toLocaleString("es-CL"))
-                :h("span",{style:{fontSize:10,color:"var(--txd)",opacity:.5}},"…")
-            )
-          );
-        })
-      )
+              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txd)",alignSelf:"center",whiteSpace:"nowrap"}},rut),
+              h("div",{style:{alignSelf:"center"}},
+                h("div",{style:{fontWeight:600,fontSize:12,lineHeight:1.4}},c.nombre)
+              ),
+              ...MESES_RESUMEN.map(p=>{
+                const v=c.meses[p]||0;
+                return h("div",{key:p,style:{textAlign:"right",fontFamily:"'DM Mono',monospace",
+                  fontSize:10,alignSelf:"center",color:v>0?"var(--tx)":"var(--txd)",opacity:v>0?1:.4}},
+                  v>0?("$"+(Math.round(v/1000)).toLocaleString("es-CL")+"K"):"—");
+              }),
+              h("div",{style:{textAlign:"right",fontFamily:"'DM Mono',monospace",fontSize:11,
+                fontWeight:700,color:"var(--blue)",alignSelf:"center",whiteSpace:"nowrap"}},
+                "$"+c.total.toLocaleString("es-CL"))
+            );
+          })
+        )
     ),
 
     ...selGroup.map(sc=>{
@@ -4524,3 +4508,4 @@ ReactDOM.createRoot(document.getElementById("root")).render(h(App));
 </script>
 </body>
 </html>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
