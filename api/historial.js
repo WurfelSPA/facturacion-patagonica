@@ -643,7 +643,7 @@ export default async function handler(req, res) {
               if (!name.match(/\.xml$/i)) continue;
               const xml = await zip.files[name].async("string");
               // RUT y RazonSocial del receptor (nuestro cliente)
-              const rzn = (xml.match(/<RazonSocial>([^<]+)<\/RazonSocial>/) || [])[1];
+              const rzn = (xml.match(/<RznSocRecep>([^<]+)<\/RznSocRecep>/) || [])[1];
               const rut = (xml.match(/<RUTRecep>([0-9][0-9.]*[-][0-9Kk])<\/RUTRecep>/) || [])[1];
               if (rzn && rut && !ruts[rzn.trim()]) ruts[rzn.trim()] = rut.trim().toUpperCase();
             }
