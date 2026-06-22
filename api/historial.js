@@ -645,7 +645,13 @@ export default async function handler(req, res) {
               // RUT y RazonSocial del receptor (nuestro cliente)
               const rzn = (xml.match(/<RznSocRecep>([^<]+)<\/RznSocRecep>/) || [])[1];
               const rut = (xml.match(/<RUTRecep>([0-9][0-9.]*[-][0-9Kk])<\/RUTRecep>/) || [])[1];
-              if (rzn && rut && !ruts[rzn.trim()]) ruts[rzn.trim()] = rut.trim().toUpperCase();
+              if (rzn && rut) {
+                // Normalizar RUT al formato XX.XXX.XXX-X
+                const rutClean = rut.trim().replace(/\./g,"");
+                const [num, dv] = rutClean.split("-");
+                const rutNorm = num ? num.replace(/\B(?=(\d{3})+(?!\d))/g,".")+"-"+(dv||"").toUpperCase() : rut.trim();
+                if (!ruts[rzn.trim()]) ruts[rzn.trim()] = rutNorm;
+              }
             }
           } catch(_) {}
         }
