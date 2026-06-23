@@ -837,7 +837,7 @@ export default async function handler(req, res) {
         }
       }
       const clientes = Object.values(clientMap).sort((a, b) => b.total - a.total);
-      res.setHeader("Cache-Control", "public, max-age=300");
+      res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({ clientes });
     }
 
