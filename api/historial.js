@@ -670,7 +670,9 @@ export default async function handler(req, res) {
       const result = {};
       let totalXml = 0, skippedEmisor = 0, skippedNC = 0, kept = 0;
       const files = await driveFiles(token, FACT_FOLDER_ID);
-      const zipFiles = files.filter(f => f.name.match(/\.zip$/i));
+      // Preferir los ZIPs de solo XML (más pequeños, ~600KB) sobre los ZIPs grandes (~6MB)
+      const xmlOnly = files.filter(f => f.name.match(/Facturas XML_PISA_/i));
+      const zipFiles = xmlOnly.length > 0 ? xmlOnly : files.filter(f => f.name.match(/\.zip$/i));
       for (const f of zipFiles) {
         let mesNum, anio;
         const m1 = f.name.match(/^(\d{4})-(\d{2})\.zip$/i);
@@ -740,7 +742,8 @@ export default async function handler(req, res) {
       const EMISOR_FILTER = "9562956-3";
       const notas = [];
       const files = await driveFiles(token, FACT_FOLDER_ID);
-      const zipFiles = files.filter(f => f.name.match(/\.zip$/i));
+      const xmlOnly = files.filter(f => f.name.match(/Facturas XML_PISA_/i));
+      const zipFiles = xmlOnly.length > 0 ? xmlOnly : files.filter(f => f.name.match(/\.zip$/i));
       for (const f of zipFiles) {
         let mesNum, anio;
         const m1 = f.name.match(/^(\d{4})-(\d{2})\.zip$/i);
