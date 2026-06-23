@@ -670,9 +670,14 @@ export default async function handler(req, res) {
       const result = {};
       let totalXml = 0, skippedEmisor = 0, skippedNC = 0, kept = 0;
       const files = await driveFiles(token, FACT_FOLDER_ID);
-      // Preferir los ZIPs de solo XML (más pequeños, ~600KB) sobre los ZIPs grandes (~6MB)
-      const xmlOnly = files.filter(f => f.name.match(/Facturas XML_PISA_/i));
-      const zipFiles = xmlOnly.length > 0 ? xmlOnly : files.filter(f => f.name.match(/\.zip$/i));
+      // Usar los ZIPs grandes (2026-XX.zip) que contienen todas las entidades mezcladas.
+      // Los ZIPs "Facturas XML_PISA_" son de otra entidad distinta a 9562956-3.
+      // Parámetro opcional ?mes=01..06 para procesar un solo mes (evita timeout).
+      const mesFilter = req.query.mes || null;
+      const bigZips = files.filter(f => f.name.match(/^\d{4}-\d{2}\.zip$/i));
+      const zipFiles = mesFilter
+        ? bigZips.filter(f => f.name.includes(`-${mesFilter}.zip`))
+        : bigZips;
       const sampleEmisores = new Set();
       for (const f of zipFiles) {
         let mesNum, anio;
@@ -744,9 +749,9 @@ export default async function handler(req, res) {
       const EMISOR_FILTER = "9562956-3";
       const notas = [];
       const files = await driveFiles(token, FACT_FOLDER_ID);
-      const xmlOnly = files.filter(f => f.name.match(/Facturas XML_PISA_/i));
-      const zipFiles = xmlOnly.length > 0 ? xmlOnly : files.filter(f => f.name.match(/\.zip$/i));
-      for (const f of zipFiles) {
+      // Usar ZIPs grandes (todas las entidades) y filtrar por emisor
+      const bigZipsNC = files.filter(f => f.name.match(/^\d{4}-\d{2}\.zip$/i));
+      for (const f of bigZipsNC) {
         let mesNum, anio;
         const m1 = f.name.match(/^(\d{4})-(\d{2})\.zip$/i);
         if (m1) { anio = m1[1]; mesNum = m1[2]; }
