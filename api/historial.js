@@ -681,7 +681,6 @@ export default async function handler(req, res) {
         ? allPisaZips.filter(f => { const m = f.name.match(/PISA[_-](\d{4})[_-](\d{2})\.zip$/i); return m && m[2] === mesFilter; })
         : allPisaZips;
       const sampleEmisores = new Set();
-      const sampleEmisores = new Set();
       for (const f of zipFiles) {
         let mesNum, anio;
         const m1 = f.name.match(/^(\d{4})-(\d{2})\.zip$/i);
