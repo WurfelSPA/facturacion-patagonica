@@ -681,6 +681,7 @@ export default async function handler(req, res) {
         ? allPisaZips.filter(f => { const m = f.name.match(/PISA[_-](\d{4})[_-](\d{2})\.zip$/i); return m && m[2] === mesFilter; })
         : allPisaZips;
       const sampleEmisores = new Set();
+      const zipErrors = [];
       for (const f of zipFiles) {
         let mesNum, anio;
         const m1 = f.name.match(/^(\d{4})-(\d{2})\.zip$/i);
@@ -691,8 +692,8 @@ export default async function handler(req, res) {
         try {
           const rz = await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`,
             { headers: { Authorization: `Bearer ${token}` } });
-          if (!rz.ok) continue;
-          const buf = await rz.arrayBuffer();
+          if (!rz.ok) { zipErrors.push(`${f.name}: HTTP ${rz.status}`); continue; }
+          const buf = Buffer.from(await rz.arrayBuffer());
           const zip = await JSZip.loadAsync(buf);
           for (const xmlName of Object.keys(zip.files)) {
             if (!xmlName.match(/\.xml$/i)) continue;
@@ -740,10 +741,10 @@ export default async function handler(req, res) {
             }
             kept++;
           }
-        } catch(_) {}
+        } catch(e) { zipErrors.push(`${f.name}: ${e.message}`); }
       }
       res.setHeader("Cache-Control","no-store");
-      return res.status(200).json({ json:result, stats:{ totalXml, skippedNC, kept }, sampleEmisores:[...sampleEmisores], pisaZipsFound: zipFiles.map(f=>f.name) });
+      return res.status(200).json({ json:result, stats:{ totalXml, skippedNC, kept }, sampleEmisores:[...sampleEmisores], pisaZipsFound: zipFiles.map(f=>f.name), zipErrors });
     }
 
     // ── GET ?sampleXml=1 ── diagnóstico: primeros 2000 chars del primer XML en PISA ZIP ─
