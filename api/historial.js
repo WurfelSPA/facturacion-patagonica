@@ -673,6 +673,7 @@ export default async function handler(req, res) {
       // Preferir los ZIPs de solo XML (más pequeños, ~600KB) sobre los ZIPs grandes (~6MB)
       const xmlOnly = files.filter(f => f.name.match(/Facturas XML_PISA_/i));
       const zipFiles = xmlOnly.length > 0 ? xmlOnly : files.filter(f => f.name.match(/\.zip$/i));
+      const sampleEmisores = new Set();
       for (const f of zipFiles) {
         let mesNum, anio;
         const m1 = f.name.match(/^(\d{4})-(\d{2})\.zip$/i);
@@ -691,6 +692,7 @@ export default async function handler(req, res) {
             totalXml++;
             const xml = await zip.files[xmlName].async("string");
             const rutEmRaw = (xml.match(/<RUTEmisor>([^<]+)<\/RUTEmisor>/) || [])[1];
+            if (sampleEmisores.size < 5 && rutEmRaw) sampleEmisores.add(rutEmRaw.trim());
             if (!rutEmRaw || normRut(rutEmRaw) !== EMISOR_FILTER) { skippedEmisor++; continue; }
             const tipoDTE = (xml.match(/<TipoDTE>([^<]+)<\/TipoDTE>/) || [])[1];
             const isNC = tipoDTE === "61"; // Nota de Crédito Electrónica
@@ -734,7 +736,7 @@ export default async function handler(req, res) {
         } catch(_) {}
       }
       res.setHeader("Cache-Control","no-store");
-      return res.status(200).json({ json:result, stats:{ totalXml, skippedEmisor, skippedNC, kept } });
+      return res.status(200).json({ json:result, stats:{ totalXml, skippedEmisor, skippedNC, kept }, sampleEmisores:[...sampleEmisores] });
     }
 
     // ── GET ?findNC=1 ── encuentra y devuelve todas las notas de crédito del emisor ─
