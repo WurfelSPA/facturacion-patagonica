@@ -2113,6 +2113,17 @@ function HistorialFactView({dashData,driveLoading,notify}){
   };
   const sortArrow=col=>sortCol===col?(sortDir==="asc"?"↑":"↓"):"↕";
 
+  const totalesResumen=React.useMemo(()=>{
+    const tots={meses:{},total:0};
+    for(const c of filteredResumen){
+      for(const[mes,val]of Object.entries(c.meses||{})){
+        tots.meses[mes]=(tots.meses[mes]||0)+val;
+      }
+      tots.total+=(c.total||0);
+    }
+    return tots;
+  },[filteredResumen]);
+
   const previewFact=async(fNum,periodo)=>{
     if(pdfLoading)return;
     setPdfLoading(true);
@@ -2177,12 +2188,25 @@ function HistorialFactView({dashData,driveLoading,notify}){
         h("div",{onClick:()=>toggleSort("total"),style:{textAlign:"right",cursor:"pointer",userSelect:"none"}},
           "TOTAL 2026 ",h("span",{style:{opacity:.5,fontSize:9}},sortArrow("total")))
       ),
+      resumenData!==null&&filteredResumen.length>0&&h("div",{style:{
+        display:"grid",gridTemplateColumns:"120px 1fr 90px 90px 90px 90px 90px 90px 130px",
+        padding:"9px 14px",borderBottom:"2px solid var(--bdr)",
+        background:"#ddeaf8",fontSize:11,fontWeight:800,
+        color:"var(--tx)",minWidth:900}},
+        h("div",null,""),
+        h("div",{style:{fontSize:10,letterSpacing:".04em",color:"var(--txm)"}},"TOTAL ("+(filteredResumen.length)+" clientes)"),
+        ...MESES_RESUMEN.map(mes=>h("div",{key:mes,style:{textAlign:"right",color:"var(--accl)"}},
+          "$"+(Math.round((totalesResumen.meses[mes]||0)/1000)).toLocaleString("es-CL")+"K"
+        )),
+        h("div",{style:{textAlign:"right",color:"var(--accl)"}},
+          "$"+(Math.round(totalesResumen.total/1000)).toLocaleString("es-CL")+"K")
+      ),
       resumenData===null
         ?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txm)",fontSize:13}},
             h("span",{className:"spin",style:{fontSize:18,marginRight:8}},"⟳"),"Cargando...")
         :filteredResumen.length===0
         ?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados")
-        :h("div",{style:{maxHeight:"calc(100vh - 200px)",overflowY:"auto"}},
+        :h("div",{style:{maxHeight:"calc(100vh - 260px)",overflowY:"auto"}},
           filteredResumen.map(c=>{
             const rut=rutMap[stripNombre(c.nombre)]||"—";
             const canClick=dashData&&dashData.clients.some(cl=>stripNombre(cl.nombre)===stripNombre(c.nombre));
