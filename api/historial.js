@@ -749,8 +749,12 @@ export default async function handler(req, res) {
     // ── GET ?sampleXml=1 ── diagnóstico: primeros 2000 chars del primer XML en PISA ZIP ─
     if (req.method === "GET" && req.query.sampleXml === "1") {
       const files = await driveFiles(token, FACT_FOLDER_ID);
-      const pisaZips = files.filter(f => f.name.match(/Facturas XML_PISA_/i));
-      if (!pisaZips.length) return res.status(200).json({ error: "No PISA ZIPs found", files: files.map(f=>f.name) });
+      const allPisaZips = files.filter(f => f.name.match(/Facturas XML_PISA_/i));
+      const mesSx = req.query.mes || null;
+      const pisaZips = mesSx
+        ? allPisaZips.filter(f => { const m = f.name.match(/PISA[_-](\d{4})[_-](\d{2})\.zip$/i); return m && m[2] === mesSx; })
+        : allPisaZips;
+      if (!pisaZips.length) return res.status(200).json({ error: "No PISA ZIPs found", allZips: allPisaZips.map(f=>f.name) });
       const f = pisaZips[0];
       const rz = await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`,
         { headers: { Authorization: `Bearer ${token}` } });
