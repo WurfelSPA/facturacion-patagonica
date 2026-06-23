@@ -664,20 +664,19 @@ export default async function handler(req, res) {
       return res.status(200).json({ ruts: _rutMapCache || {} });
     }
 
-    // ── GET ?buildJson=1 ── reconstruye JSON filtrado al emisor 9.562.956-3 ────
+    // ── GET ?buildJson=1[&mes=01] ── reconstruye JSON desde ZIPs XML de PISA ────
+    // Emisor real: 96673250-4 (PATAGONICA INMOBILIARIA SPA). Incluye NCs como negativos.
     if (req.method === "GET" && req.query.buildJson === "1") {
-      const EMISOR_FILTER = "9562956-3";
       const result = {};
-      let totalXml = 0, skippedEmisor = 0, skippedNC = 0, kept = 0;
+      let totalXml = 0, skippedNC = 0, kept = 0;
       const files = await driveFiles(token, FACT_FOLDER_ID);
-      // Usar los ZIPs grandes (2026-XX.zip) que contienen todas las entidades mezcladas.
-      // Los ZIPs "Facturas XML_PISA_" son de otra entidad distinta a 9562956-3.
-      // Parámetro opcional ?mes=01..06 para procesar un solo mes (evita timeout).
+      // Usar ZIPs XML de PISA (contienen los XMLs reales de 96673250-4)
       const mesFilter = req.query.mes || null;
-      const bigZips = files.filter(f => f.name.match(/^\d{4}-\d{2}\.zip$/i));
+      const allPisaZips = files.filter(f => f.name.match(/Facturas XML_PISA_/i));
       const zipFiles = mesFilter
-        ? bigZips.filter(f => f.name.includes(`-${mesFilter}.zip`))
-        : bigZips;
+        ? allPisaZips.filter(f => { const m = f.name.match(/PISA[_-](\d{4})[_-](\d{2})\.zip$/i); return m && m[2] === mesFilter; })
+        : allPisaZips;
+      const sampleEmisores = new Set();
       const sampleEmisores = new Set();
       for (const f of zipFiles) {
         let mesNum, anio;
@@ -697,8 +696,8 @@ export default async function handler(req, res) {
             totalXml++;
             const xml = await zip.files[xmlName].async("string");
             const rutEmRaw = (xml.match(/<RUTEmisor>([^<]+)<\/RUTEmisor>/) || [])[1];
-            if (sampleEmisores.size < 5 && rutEmRaw) sampleEmisores.add(rutEmRaw.trim());
-            if (!rutEmRaw || normRut(rutEmRaw) !== EMISOR_FILTER) { skippedEmisor++; continue; }
+            if (sampleEmisores.size < 3 && rutEmRaw) sampleEmisores.add(rutEmRaw.trim());
+            // Sin filtro de emisor: los PISA ZIPs tienen solo una entidad (96673250-4)
             const tipoDTE = (xml.match(/<TipoDTE>([^<]+)<\/TipoDTE>/) || [])[1];
             const isNC = tipoDTE === "61"; // Nota de Crédito Electrónica
             const rznRaw = (xml.match(/<RznSocRecep>([^<]+)<\/RznSocRecep>/) || [])[1];
@@ -741,7 +740,7 @@ export default async function handler(req, res) {
         } catch(_) {}
       }
       res.setHeader("Cache-Control","no-store");
-      return res.status(200).json({ json:result, stats:{ totalXml, skippedEmisor, skippedNC, kept }, sampleEmisores:[...sampleEmisores] });
+      return res.status(200).json({ json:result, stats:{ totalXml, skippedNC, kept }, sampleEmisores:[...sampleEmisores], pisaZipsFound: zipFiles.map(f=>f.name) });
     }
 
     // ── GET ?sampleXml=1 ── diagnóstico: primeros 2000 chars del primer XML en PISA ZIP ─
@@ -766,17 +765,20 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── GET ?findNC=1 ── encuentra y devuelve todas las notas de crédito ─
+    // ── GET ?findNC=1[&mes=01] ── encuentra notas de crédito en PISA ZIPs ─
     if (req.method === "GET" && req.query.findNC === "1") {
       const notas = [];
       const files = await driveFiles(token, FACT_FOLDER_ID);
-      // Usar ZIPs XML de PISA (donde están los XMLs reales)
-      const pisaZipsNC = files.filter(f => f.name.match(/Facturas XML_PISA_/i));
+      // PISA ZIPs: Facturas XML_PISA_2026_XX.zip — única entidad emisora (96673250-4)
+      const mesFilter = req.query.mes || null;
+      const allPisaZips = files.filter(f => f.name.match(/Facturas XML_PISA_/i));
+      const pisaZipsNC = mesFilter
+        ? allPisaZips.filter(f => { const m = f.name.match(/PISA[_-](\d{4})[_-](\d{2})\.zip$/i); return m && m[2] === mesFilter; })
+        : allPisaZips;
       for (const f of pisaZipsNC) {
         let mesNum, anio;
-        const m1 = f.name.match(/^(\d{4})-(\d{2})\.zip$/i);
-        if (m1) { anio = m1[1]; mesNum = m1[2]; }
-        else { const m2 = f.name.match(/PISA[_-](\d{4})[_-](\d{2})\.zip$/i); if (m2) { anio = m2[1]; mesNum = m2[2]; } }
+        const m2 = f.name.match(/PISA[_-](\d{4})[_-](\d{2})\.zip$/i);
+        if (m2) { anio = m2[1]; mesNum = m2[2]; }
         if (!anio || !mesNum || !MES_NOM[mesNum]) continue;
         const periodo = `${MES_NOM[mesNum]} ${anio}`;
         try {
@@ -790,7 +792,6 @@ export default async function handler(req, res) {
             const xml = await zip.files[xmlName].async("string");
             const tipoDTE = (xml.match(/<TipoDTE>([^<]+)<\/TipoDTE>/) || [])[1];
             if (tipoDTE !== "61") continue;
-            // Sin filtro de emisor — los PISA ZIPs tienen solo una entidad
             const g = tag => { const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`)); return m ? m[1].trim() : ""; };
             notas.push({
               periodo, folio: g("Folio"), fechaEmision: g("FchEmis"),
@@ -803,7 +804,7 @@ export default async function handler(req, res) {
         } catch(_) {}
       }
       notas.sort((a,b) => a.periodo.localeCompare(b.periodo));
-      return res.status(200).json({ count: notas.length, notas });
+      return res.status(200).json({ count: notas.length, notas, pisaZipsFound: pisaZipsNC.map(f=>f.name) });
     }
 
     // ── GET ?resumen=1 ── resumen de ventas por cliente desde JSON embebido ──
