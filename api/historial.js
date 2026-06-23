@@ -691,7 +691,7 @@ export default async function handler(req, res) {
             const rutEmRaw = (xml.match(/<RUTEmisor>([^<]+)<\/RUTEmisor>/) || [])[1];
             if (!rutEmRaw || normRut(rutEmRaw) !== EMISOR_FILTER) { skippedEmisor++; continue; }
             const tipoDTE = (xml.match(/<TipoDTE>([^<]+)<\/TipoDTE>/) || [])[1];
-            if (tipoDTE === "61") { skippedNC++; continue; }
+            const isNC = tipoDTE === "61"; // Nota de Crédito Electrónica
             const rznRaw = (xml.match(/<RznSocRecep>([^<]+)<\/RznSocRecep>/) || [])[1];
             if (!rznRaw) continue;
             const nombre = rznRaw.trim();
@@ -701,6 +701,13 @@ export default async function handler(req, res) {
             if (!result[anio][periodo]) result[anio][periodo] = {};
             if (!result[anio][periodo][nombre]) result[anio][periodo][nombre] = {};
             const cs = result[anio][periodo][nombre];
+            if (isNC) {
+              // Nota de Crédito: total negativo para descontar del resumen (igual que Nubox)
+              if (!cs["default"]) cs["default"] = {};
+              cs["default"][`NC-${dte.folio}`] = { nro:`NC-${dte.folio}`, uf:null, total:-dte.total };
+              kept++;
+              continue;
+            }
             const seen = new Set();
             let added = false;
             for (const item of dte.items) {
@@ -726,6 +733,46 @@ export default async function handler(req, res) {
       }
       res.setHeader("Cache-Control","no-store");
       return res.status(200).json({ json:result, stats:{ totalXml, skippedEmisor, skippedNC, kept } });
+    }
+
+    // ── GET ?findNC=1 ── encuentra y devuelve todas las notas de crédito del emisor ─
+    if (req.method === "GET" && req.query.findNC === "1") {
+      const EMISOR_FILTER = "9562956-3";
+      const notas = [];
+      const files = await driveFiles(token, FACT_FOLDER_ID);
+      const zipFiles = files.filter(f => f.name.match(/\.zip$/i));
+      for (const f of zipFiles) {
+        let mesNum, anio;
+        const m1 = f.name.match(/^(\d{4})-(\d{2})\.zip$/i);
+        if (m1) { anio = m1[1]; mesNum = m1[2]; }
+        else { const m2 = f.name.match(/PISA[_-](\d{4})[_-](\d{2})\.zip$/i); if (m2) { anio = m2[1]; mesNum = m2[2]; } }
+        if (!anio || !mesNum || !MES_NOM[mesNum]) continue;
+        const periodo = `${MES_NOM[mesNum]} ${anio}`;
+        try {
+          const rz = await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`,
+            { headers: { Authorization: `Bearer ${token}` } });
+          if (!rz.ok) continue;
+          const buf = await rz.arrayBuffer();
+          const zip = await JSZip.loadAsync(buf);
+          for (const xmlName of Object.keys(zip.files)) {
+            if (!xmlName.match(/\.xml$/i)) continue;
+            const xml = await zip.files[xmlName].async("string");
+            const tipoDTE = (xml.match(/<TipoDTE>([^<]+)<\/TipoDTE>/) || [])[1];
+            if (tipoDTE !== "61") continue;
+            const rutEm = (xml.match(/<RUTEmisor>([^<]+)<\/RUTEmisor>/) || [])[1];
+            if (!rutEm || normRut(rutEm) !== EMISOR_FILTER) continue;
+            const g = tag => { const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`)); return m ? m[1].trim() : ""; };
+            notas.push({
+              periodo, folio: g("Folio"), fechaEmision: g("FchEmis"),
+              receptor: g("RznSocRecep"), rutRecep: g("RUTRecep"),
+              total: parseInt(g("MntTotal"))||0,
+              razonRef: g("RazonRef"), folioRef: g("FolioRef"), tipoRef: g("TpoDocRef"),
+            });
+          }
+        } catch(_) {}
+      }
+      notas.sort((a,b) => a.periodo.localeCompare(b.periodo));
+      return res.status(200).json({ count: notas.length, notas });
     }
 
     // ── GET ?resumen=1 ── resumen de ventas por cliente desde JSON embebido ──
