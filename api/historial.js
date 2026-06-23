@@ -630,8 +630,12 @@ export default async function handler(req, res) {
       const ruts = {};
       try {
         const files = await driveFiles(token, FACT_FOLDER_ID);
-        const zipFiles = files.filter(f => f.name.match(/\.zip$/i)).slice(0, 8);
-        // Procesar de a uno para no saturar memoria/tiempo en Vercel
+        // Solo PISA XML ZIPs (545KB cada uno, contienen los XMLs con RUT del receptor)
+        // Ordenar desc para procesar los más recientes primero y tener datos frescos rápido
+        const pisaZips = files.filter(f => f.name.match(/Facturas XML_PISA_/i))
+          .sort((a,b)=>b.name.localeCompare(a.name));
+        // Procesar solo los últimos 2 meses para no superar timeout de 30s
+        const zipFiles = pisaZips.slice(0, 2);
         for (const f of zipFiles) {
           try {
             const rz = await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`,
