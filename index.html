@@ -2264,7 +2264,12 @@ function HistorialFactView({dashData,driveLoading,notify}){
       const siteLd=new Set([...loadingSet].filter(k=>k.startsWith(siteKey(sc)+'|')));
       const periodos=periodsAvail.filter(p=>siteLd.has(siteKey(sc)+'|'+p)||siteInv[p]);
       const granTotal=Object.values(siteInv).reduce((s,pd)=>s+conceptos.reduce((s2,c)=>s2+(pd[c]?.total||0),0),0);
-      const granTotalStr=granTotal>0?"$"+granTotal.toLocaleString("es-CL"):null;
+      /* Restar NCs del cliente (sólo en el primer sitio del grupo para no duplicar) */
+      const _stripNx=s=>(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
+      const _ncEntry=window._NC_STATIC&&Object.entries(window._NC_STATIC).find(([n])=>_stripNx(n)===_stripNx(sc.nombre));
+      const _ncClientTotal=_ncEntry?Object.values(_ncEntry[1]).flat().reduce((s,nc)=>s+nc.total,0):0;
+      const granTotalNet=granTotal+(selGroup.indexOf(sc)===0?_ncClientTotal:0);
+      const granTotalStr=granTotalNet>0?"$"+granTotalNet.toLocaleString("es-CL"):null;
       return h("div",{key:siteKey(sc),style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
         h("div",{style:{padding:"12px 16px",background:"var(--surf2)",borderBottom:"1px solid var(--bdr)",
           display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
@@ -2455,7 +2460,12 @@ function HistorialFactView({dashData,driveLoading,notify}){
         return s;
       };
       const consolidadoGT=allPerds.reduce((s,p)=>s+conceptos.reduce((s2,c)=>s2+sumConc(p,c),0),0);
-      const consolidadoGTStr=consolidadoGT>0?"$"+consolidadoGT.toLocaleString("es-CL"):null;
+      /* Restar NCs del cliente del total consolidado */
+      const _stripNc=s=>(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
+      const _ncEntryC=window._NC_STATIC&&selGroup[0]&&Object.entries(window._NC_STATIC).find(([n])=>_stripNc(n)===_stripNc(selGroup[0].nombre));
+      const _ncCT=_ncEntryC?Object.values(_ncEntryC[1]).flat().reduce((s,nc)=>s+nc.total,0):0;
+      const consolidadoGTNet=consolidadoGT+_ncCT;
+      const consolidadoGTStr=consolidadoGTNet>0?"$"+consolidadoGTNet.toLocaleString("es-CL"):null;
       return h("div",{style:{background:"var(--surf)",border:"2px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
         h("div",{style:{padding:"10px 16px",background:"var(--surf2)",borderBottom:"1px solid var(--bdr)",
           display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
