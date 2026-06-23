@@ -2114,15 +2114,17 @@ function HistorialFactView({dashData,driveLoading,notify}){
   const sortArrow=col=>sortCol===col?(sortDir==="asc"?"↑":"↓"):"↕";
 
   const totalesResumen=React.useMemo(()=>{
-    const tots={meses:{},total:0};
+    const tots={meses:{},total:0,enPlanilla:0,sinPlanilla:0};
     for(const c of filteredResumen){
       for(const[mes,val]of Object.entries(c.meses||{})){
         tots.meses[mes]=(tots.meses[mes]||0)+val;
       }
       tots.total+=(c.total||0);
+      const inP=dashData&&dashData.clients.some(cl=>stripNombre(cl.nombre)===stripNombre(c.nombre));
+      if(inP)tots.enPlanilla++;else tots.sinPlanilla++;
     }
     return tots;
-  },[filteredResumen]);
+  },[filteredResumen,dashData]);
 
   const previewFact=async(fNum,periodo)=>{
     if(pdfLoading)return;
@@ -2194,7 +2196,14 @@ function HistorialFactView({dashData,driveLoading,notify}){
         background:"#ddeaf8",fontSize:11,fontWeight:800,
         color:"var(--tx)",minWidth:900}},
         h("div",null,""),
-        h("div",{style:{fontSize:10,letterSpacing:".04em",color:"var(--txm)"}},"TOTAL ("+(filteredResumen.length)+" clientes)"),
+        h("div",{style:{fontSize:10,letterSpacing:".04em",color:"var(--txm)"}},
+          "TOTAL ",h("span",{style:{fontWeight:900}},filteredResumen.length),
+          " = ",
+          h("span",{style:{color:"var(--green)"}},totalesResumen.enPlanilla," Planilla"),
+          totalesResumen.sinPlanilla>0&&h("span",null,
+            " + ",h("span",{style:{color:"var(--amber)"}},totalesResumen.sinPlanilla," No incluidos")
+          )
+        ),
         ...MESES_RESUMEN.map(mes=>h("div",{key:mes,style:{textAlign:"right",color:"var(--accl)"}},
           "$"+(Math.round((totalesResumen.meses[mes]||0)/1000)).toLocaleString("es-CL")+"K"
         )),
