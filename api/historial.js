@@ -664,20 +664,89 @@ export default async function handler(req, res) {
       return res.status(200).json({ ruts: _rutMapCache || {} });
     }
 
+    // ── GET ?buildJson=1 ── reconstruye JSON filtrado al emisor 9.562.956-3 ────
+    if (req.method === "GET" && req.query.buildJson === "1") {
+      const EMISOR_FILTER = "9562956-3";
+      const result = {};
+      let totalXml = 0, skippedEmisor = 0, skippedNC = 0, kept = 0;
+      const files = await driveFiles(token, FACT_FOLDER_ID);
+      const zipFiles = files.filter(f => f.name.match(/\.zip$/i));
+      for (const f of zipFiles) {
+        let mesNum, anio;
+        const m1 = f.name.match(/^(\d{4})-(\d{2})\.zip$/i);
+        if (m1) { anio = m1[1]; mesNum = m1[2]; }
+        else { const m2 = f.name.match(/PISA[_-](\d{4})[_-](\d{2})\.zip$/i); if (m2) { anio = m2[1]; mesNum = m2[2]; } }
+        if (!anio || !mesNum || !MES_NOM[mesNum]) continue;
+        const periodo = `${MES_NOM[mesNum]} ${anio}`;
+        try {
+          const rz = await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`,
+            { headers: { Authorization: `Bearer ${token}` } });
+          if (!rz.ok) continue;
+          const buf = await rz.arrayBuffer();
+          const zip = await JSZip.loadAsync(buf);
+          for (const xmlName of Object.keys(zip.files)) {
+            if (!xmlName.match(/\.xml$/i)) continue;
+            totalXml++;
+            const xml = await zip.files[xmlName].async("string");
+            const rutEmRaw = (xml.match(/<RUTEmisor>([^<]+)<\/RUTEmisor>/) || [])[1];
+            if (!rutEmRaw || normRut(rutEmRaw) !== EMISOR_FILTER) { skippedEmisor++; continue; }
+            const tipoDTE = (xml.match(/<TipoDTE>([^<]+)<\/TipoDTE>/) || [])[1];
+            if (tipoDTE === "61") { skippedNC++; continue; }
+            const rznRaw = (xml.match(/<RznSocRecep>([^<]+)<\/RznSocRecep>/) || [])[1];
+            if (!rznRaw) continue;
+            const nombre = rznRaw.trim();
+            const dte = parseXmlDTE(xml);
+            if (!dte.total || dte.total <= 0) continue;
+            if (!result[anio]) result[anio] = {};
+            if (!result[anio][periodo]) result[anio][periodo] = {};
+            if (!result[anio][periodo][nombre]) result[anio][periodo][nombre] = {};
+            const cs = result[anio][periodo][nombre];
+            const seen = new Set();
+            let added = false;
+            for (const item of dte.items) {
+              const tipo = _detectTipoFromNmb(item.nmb);
+              if (!tipo) continue;
+              const sitio = (tipo === "arriendo" && item.cod) ? _normCod(item.cod) : "default";
+              const k = `${sitio}|${tipo}`;
+              if (seen.has(k)) continue;
+              seen.add(k);
+              if (!cs[sitio]) cs[sitio] = {};
+              if (!cs[sitio][tipo]) {
+                cs[sitio][tipo] = { nro:`${tipo==="servAdm"?"FEE":"F"}-${dte.folio}`, uf:_ufFromXmlItem(item)||null, total:dte.total };
+                added = true;
+              }
+            }
+            if (!added) {
+              if (!cs["default"]) cs["default"] = {};
+              cs["default"][`F${dte.folio}`] = { nro:`F-${dte.folio}`, uf:null, total:dte.total };
+            }
+            kept++;
+          }
+        } catch(_) {}
+      }
+      res.setHeader("Cache-Control","no-store");
+      return res.status(200).json({ json:result, stats:{ totalXml, skippedEmisor, skippedNC, kept } });
+    }
+
     // ── GET ?resumen=1 ── resumen de ventas por cliente desde JSON embebido ──
     if (req.method === "GET" && req.query.resumen === "1") {
       if (!_EXCEL_EMBEDDED) {
         return res.status(503).json({ error: "JSON embebido no disponible" });
       }
-      // Agregar totales por (cliente, periodo) sumando todos los sitios y tipos
+      // Agregar totales por (cliente, periodo) sumando todos los sitios y tipos.
+      // Deduplicar por folio para evitar doble conteo en facturas con múltiples ítems.
       const clientMap = {};
       for (const [, periodos] of Object.entries(_EXCEL_EMBEDDED)) {
         for (const [periodo, clientes] of Object.entries(periodos)) {
           for (const [nombre, sitios] of Object.entries(clientes)) {
             if (!clientMap[nombre]) clientMap[nombre] = { nombre, meses: {}, total: 0 };
+            const seenFolios = new Set();
             let periodoTotal = 0;
             for (const tipos of Object.values(sitios)) {
               for (const factura of Object.values(tipos)) {
+                const folio = (factura.nro||"").replace(/^(?:FEE|F)-/,"");
+                if (folio && seenFolios.has(folio)) continue;
+                if (folio) seenFolios.add(folio);
                 periodoTotal += (factura.total || 0);
               }
             }

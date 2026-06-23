@@ -3,7 +3,7 @@
     "api/split-pdf.js": { "maxDuration": 60 },
     "api/drive-pdf.js": { "maxDuration": 60 },
     "api/historial-batch.js": { "maxDuration": 300 },
-    "api/historial.js": { "includeFiles": "historial-excel-2026.json", "maxDuration": 60 }
+    "api/historial.js": { "includeFiles": "historial-excel-2026.json", "maxDuration": 120 }
   },
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1" },
