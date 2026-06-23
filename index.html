@@ -2209,19 +2209,19 @@ function HistorialFactView({dashData,driveLoading,notify}){
         :h("div",{style:{maxHeight:"calc(100vh - 260px)",overflowY:"auto"}},
           filteredResumen.map(c=>{
             const rut=rutMap[stripNombre(c.nombre)]||"—";
-            const canClick=dashData&&dashData.clients.some(cl=>stripNombre(cl.nombre)===stripNombre(c.nombre));
+            const canClick=true;
             return h("div",{key:c.nombre,
               onClick:()=>{
-                if(!dashData)return;
                 const cStrip=stripNombre(c.nombre);
                 const seen=new Set();
-                const grp=dashData.clients.filter(cl=>{
-                  if(stripNombre(cl.nombre)!==cStrip)return false;
+                const grp=dashData?dashData.clients.filter(cl=>{
+                  if(stripNombre(cl.nombre)!==cStrip&&!clienteMatch(cl.nombre,c.nombre))return false;
                   const k=(cl.sitio||'')+'|'+(cl.edificio||'');
                   if(seen.has(k))return false;
                   seen.add(k);return true;
-                });
+                }):[];
                 if(grp.length)setSelGroup(grp);
+                else notify("\""+c.nombre+"\" no tiene datos en planilla — solo historial de facturas disponible","info");
               },
               style:{display:"grid",gridTemplateColumns:"120px 1fr 90px 90px 90px 90px 90px 90px 130px",
                 padding:"10px 14px",borderBottom:"1px solid var(--bdr)",minWidth:900,
