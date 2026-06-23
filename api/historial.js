@@ -744,14 +744,35 @@ export default async function handler(req, res) {
       return res.status(200).json({ json:result, stats:{ totalXml, skippedEmisor, skippedNC, kept }, sampleEmisores:[...sampleEmisores] });
     }
 
-    // ── GET ?findNC=1 ── encuentra y devuelve todas las notas de crédito del emisor ─
+    // ── GET ?sampleXml=1 ── diagnóstico: primeros 2000 chars del primer XML en PISA ZIP ─
+    if (req.method === "GET" && req.query.sampleXml === "1") {
+      const files = await driveFiles(token, FACT_FOLDER_ID);
+      const pisaZips = files.filter(f => f.name.match(/Facturas XML_PISA_/i));
+      if (!pisaZips.length) return res.status(200).json({ error: "No PISA ZIPs found", files: files.map(f=>f.name) });
+      const f = pisaZips[0];
+      const rz = await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`,
+        { headers: { Authorization: `Bearer ${token}` } });
+      if (!rz.ok) return res.status(200).json({ error: `Drive ${rz.status}` });
+      const zip = await JSZip.loadAsync(Buffer.from(await rz.arrayBuffer()));
+      const xmlNames = Object.keys(zip.files).filter(n => n.match(/\.xml$/i));
+      if (!xmlNames.length) return res.status(200).json({ error: "No XML files in ZIP", zipFile: f.name, allFiles: Object.keys(zip.files).slice(0,20) });
+      const firstXml = await zip.files[xmlNames[0]].async("string");
+      return res.status(200).json({
+        zipFile: f.name,
+        xmlFile: xmlNames[0],
+        totalXmlFiles: xmlNames.length,
+        sample: firstXml.substring(0, 2000),
+        allXmlNames: xmlNames.slice(0, 5),
+      });
+    }
+
+    // ── GET ?findNC=1 ── encuentra y devuelve todas las notas de crédito ─
     if (req.method === "GET" && req.query.findNC === "1") {
-      const EMISOR_FILTER = "9562956-3";
       const notas = [];
       const files = await driveFiles(token, FACT_FOLDER_ID);
-      // Usar ZIPs grandes (todas las entidades) y filtrar por emisor
-      const bigZipsNC = files.filter(f => f.name.match(/^\d{4}-\d{2}\.zip$/i));
-      for (const f of bigZipsNC) {
+      // Usar ZIPs XML de PISA (donde están los XMLs reales)
+      const pisaZipsNC = files.filter(f => f.name.match(/Facturas XML_PISA_/i));
+      for (const f of pisaZipsNC) {
         let mesNum, anio;
         const m1 = f.name.match(/^(\d{4})-(\d{2})\.zip$/i);
         if (m1) { anio = m1[1]; mesNum = m1[2]; }
@@ -769,14 +790,14 @@ export default async function handler(req, res) {
             const xml = await zip.files[xmlName].async("string");
             const tipoDTE = (xml.match(/<TipoDTE>([^<]+)<\/TipoDTE>/) || [])[1];
             if (tipoDTE !== "61") continue;
-            const rutEm = (xml.match(/<RUTEmisor>([^<]+)<\/RUTEmisor>/) || [])[1];
-            if (!rutEm || normRut(rutEm) !== EMISOR_FILTER) continue;
+            // Sin filtro de emisor — los PISA ZIPs tienen solo una entidad
             const g = tag => { const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`)); return m ? m[1].trim() : ""; };
             notas.push({
               periodo, folio: g("Folio"), fechaEmision: g("FchEmis"),
               receptor: g("RznSocRecep"), rutRecep: g("RUTRecep"),
               total: parseInt(g("MntTotal"))||0,
               razonRef: g("RazonRef"), folioRef: g("FolioRef"), tipoRef: g("TpoDocRef"),
+              rutEmisor: g("RUTEmisor"),
             });
           }
         } catch(_) {}
