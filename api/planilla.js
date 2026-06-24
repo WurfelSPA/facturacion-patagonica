@@ -219,14 +219,18 @@ async function buildWhiteStyles(zip) {
   const bId   = xf0M ? (xf0M[1].match(/borderId="(\d+)"/) || [,"0"])[1] : "0";
 
   const align    = `<alignment horizontal="center" vertical="center" wrapText="1"/>`;
+  // xfBold   → encabezados col 1+2: blanco + negrita + centrado
+  // xfNormal → encabezados col 3-5: blanco + normal + centrado
+  // xfData   → celdas de datos rows 5+: blanco + normal + sin alignment forzado
   const xfBold   = `<xf numFmtId="0" fontId="${boldFontId}" fillId="${whiteFillId}" borderId="${bId}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">${align}</xf>`;
   const xfNormal = `<xf numFmtId="0" fontId="0" fillId="${whiteFillId}" borderId="${bId}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">${align}</xf>`;
-  sx = sx.replace('</cellXfs>', xfBold + xfNormal + '</cellXfs>');
-  if (xfsM) sx = sx.replace(`<cellXfs count="${xfN}">`, `<cellXfs count="${xfN+2}">`);
+  const xfData   = `<xf numFmtId="0" fontId="0" fillId="${whiteFillId}" borderId="${bId}" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>`;
+  sx = sx.replace('</cellXfs>', xfBold + xfNormal + xfData + '</cellXfs>');
+  if (xfsM) sx = sx.replace(`<cellXfs count="${xfN}">`, `<cellXfs count="${xfN+3}">`);
 
   zip.file("xl/styles.xml", sx);
   return {
-    boldIdx: xfN, normalIdx: xfN + 1,
+    boldIdx: xfN, normalIdx: xfN + 1, dataIdx: xfN + 2,
     debug: { whiteFillId, boldFontId, originalFillN: fillN, originalFontN: fontN, originalXfN: xfN,
              foundFills: !!fillsM, foundFonts: !!fontsM, foundCellXfs: !!xfsM,
              hasClosingFills: sx.includes("</fills>"),
@@ -311,7 +315,7 @@ async function addNextMonth(buffer, dryRun) {
     newCols:[nMes,nGc,nCom,nCorr,nPag]};
 
   // ── Crear estilos para celdas nuevas (blanco + negrita/normal + texto negro) ──
-  const { boldIdx, normalIdx, debug: styleDebug } = await buildWhiteStyles(zip);
+  const { boldIdx, normalIdx, dataIdx, debug: styleDebug } = await buildWhiteStyles(zip);
   // Re-leer el XML del sheet (el ZIP no cambió pero por si acaso)
   xml = await zip.file(sheetPath).async("string");
 
@@ -340,14 +344,14 @@ async function addNextMonth(buffer, dryRun) {
       const n=parseInt(rn); if(n<5) return match;
       let cells="";
       const mXml=extractCell(inner,`${pMes}${n}`);
-      if(mXml){const v=cValue(mXml);if(v){cells+=`<c r="${nMes}${n}"${a(cStyle(mXml))}><v>${escXml(v)}</v></c>`;vCount++;}}
+      if(mXml){const v=cValue(mXml);if(v){cells+=`<c r="${nMes}${n}" s="${dataIdx}"><v>${escXml(v)}</v></c>`;vCount++;}}
       const gXml=extractCell(inner,`${pGc}${n}`);
       if(gXml){
-        const f=cFormula(gXml), v=cValue(gXml), sa=a(cStyle(gXml));
+        const f=cFormula(gXml), v=cValue(gXml);
         if(f){
           const nf=f.replace(new RegExp(`(\\$?)${pMes}(\\$?\\d+)`,"g"),`$1${nMes}$2`);
-          cells+=`<c r="${nGc}${n}"${sa}><f>${escXml(nf)}</f>${v?`<v>${escXml(v)}</v>`:""}</c>`;fCount++;
-        } else if(v){cells+=`<c r="${nGc}${n}"${sa}><v>${escXml(v)}</v></c>`;vCount++;}
+          cells+=`<c r="${nGc}${n}" s="${dataIdx}"><f>${escXml(nf)}</f>${v?`<v>${escXml(v)}</v>`:""}</c>`;fCount++;
+        } else if(v){cells+=`<c r="${nGc}${n}" s="${dataIdx}"><v>${escXml(v)}</v></c>`;vCount++;}
       }
       if(!cells) return match;
       rowsMod++; return open+inner+cells+close;
@@ -359,7 +363,7 @@ async function addNextMonth(buffer, dryRun) {
   const buf=await zip.generateAsync({type:"nodebuffer",compression:"DEFLATE",compressionOptions:{level:6}});
   return {ok:true,nextMonth:{name:nextName,year:nextYear},newCols:[nMes,nGc,nCom,nCorr,nPag],
     stats:{rowsModified:rowsMod,formulasCopied:fCount,valuesCopied:vCount},
-    styleIndices:{boldIdx,normalIdx,...styleDebug},buffer:buf};
+    styleIndices:{boldIdx,normalIdx,dataIdx,...styleDebug},buffer:buf};
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
