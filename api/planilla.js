@@ -1,9 +1,11 @@
 /**
  * /api/planilla
- * GET        → descarga la planilla xlsx desde Google Drive (Service Account)
- * GET ?diag  → diagnóstico SA
- * POST       → escribe "Enviado" en columna HC sin tocar formato
- *              Body: { sheetRow: number } | { sheetRows: number[] }
+ * GET              → descarga la planilla xlsx desde Google Drive (Service Account)
+ * GET ?diag=1      → diagnóstico SA
+ * GET ?addMonth=1  → agrega 5 columnas del mes siguiente (mes-año/GC/Comentarios/Correo Enviado/Pagado)
+ * GET ?addMonth=1&dry=1 → dry-run: muestra qué haría sin modificar nada
+ * POST             → escribe "Enviado" en columna HC sin tocar formato
+ *                   Body: { sheetRow: number } | { sheetRows: number[] }
  *
  * Estrategia de escritura: abre el .xlsx como ZIP, modifica sólo el XML de la
  * celda HC (sin re-parsear ni re-generar el libro completo), y re-sube.
@@ -170,6 +172,125 @@ async function patchXlsx(buffer, rows, value, col) {
   });
 }
 
+// ── Agregar mes siguiente ─────────────────────────────────────────────────────
+
+function colToNum(col) { let n=0; for(const c of col) n=n*26+(c.charCodeAt(0)-64); return n; }
+function numToCol(n)   { let s=""; while(n>0){const r=(n-1)%26;s=String.fromCharCode(65+r)+s;n=Math.floor((n-1)/26);} return s; }
+function excelSerial(y,m,d){ return Math.round((Date.UTC(y,m-1,d)-Date.UTC(1899,11,30))/86400000); }
+
+function extractCell(rowInner, ref) {
+  const idx=rowInner.indexOf(`r="${ref}"`); if(idx===-1) return null;
+  const cs=rowInner.lastIndexOf("<c",idx); if(cs===-1||idx-cs>150) return null;
+  const sc=rowInner.indexOf("/>",cs), fc=rowInner.indexOf("</c>",cs);
+  if(sc!==-1&&(fc===-1||sc<fc)) return rowInner.slice(cs,sc+2);
+  if(fc!==-1) return rowInner.slice(cs,fc+4);
+  return null;
+}
+function cStyle(x)   { const m=(x||"").match(/\bs="(\d+)"/);   return m?m[1]:null; }
+function cValue(x)   { const m=(x||"").match(/<v>([^<]*)<\/v>/); return m?m[1]:null; }
+function cFormula(x) { const m=(x||"").match(/<f[^>]*>([^<]*)<\/f>/); return m?m[1]:null; }
+
+function insertInRow(xml, rowNum, cells) {
+  const re=new RegExp(`(<row r="${rowNum}"(?:\\s[^>]*)?>)([\\s\\S]*?)(</row>)`);
+  const m=xml.match(re);
+  if(m) return xml.replace(re, m[1]+m[2]+cells+m[3]);
+  return xml.replace("</sheetData>",`<row r="${rowNum}">${cells}</row></sheetData>`);
+}
+
+const MES_ES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+
+async function addNextMonth(buffer, dryRun) {
+  const zip=await JSZip.loadAsync(Buffer.from(buffer));
+  const sheetPath=await getSheetPath(zip);
+  let xml=await zip.file(sheetPath).async("string");
+
+  const dimM=xml.match(/<dimension ref="[^:]+:([A-Z]+)(\d+)"/);
+  if(!dimM) throw new Error("<dimension> no encontrado");
+  const lastCol=colToNum(dimM[1]), lastRow=parseInt(dimM[2]);
+
+  // Columnas del último mes (las 5 finales)
+  const pMes=numToCol(lastCol-4), pGc=numToCol(lastCol-3), pCom=numToCol(lastCol-2),
+        pCorr=numToCol(lastCol-1), pPag=numToCol(lastCol);
+  // Nuevas columnas
+  const nMes=numToCol(lastCol+1), nGc=numToCol(lastCol+2), nCom=numToCol(lastCol+3),
+        nCorr=numToCol(lastCol+4), nPag=numToCol(lastCol+5);
+
+  // Fila 3: fecha del mes anterior y estilos
+  const r3M=xml.match(new RegExp(`<row r="3"(?:\\s[^>]*)?>([\\s\\S]*?)<\\/row>`));
+  if(!r3M) throw new Error("Fila 3 no encontrada");
+  const r3=r3M[1];
+
+  if(r3.includes(`r="${nMes}3"`)) {
+    const s=parseFloat(cValue(extractCell(r3,`${nMes}3`))||"0");
+    const d=new Date(Date.UTC(1899,11,30)+s*86400000);
+    return {ok:false,alreadyExists:true,message:`Columnas de ${MES_ES[d.getUTCMonth()]} ${d.getUTCFullYear()} ya existen.`};
+  }
+
+  const prevXml=extractCell(r3,`${pMes}3`);
+  const prevSerial=parseFloat(cValue(prevXml)||"0");
+  if(!prevSerial) throw new Error(`No se pudo leer fecha de ${pMes}3`);
+
+  const prevDate=new Date(Date.UTC(1899,11,30)+prevSerial*86400000);
+  const nextDate=new Date(Date.UTC(prevDate.getUTCFullYear(),prevDate.getUTCMonth()+1,1));
+  const nextSerial=excelSerial(nextDate.getUTCFullYear(),nextDate.getUTCMonth()+1,1);
+  const nextName=MES_ES[nextDate.getUTCMonth()], nextYear=nextDate.getUTCFullYear();
+
+  const a=s=>s?` s="${s}"`:"";
+  const sM=cStyle(prevXml), sG=cStyle(extractCell(r3,`${pGc}3`)),
+        sCo=cStyle(extractCell(r3,`${pCom}3`)), sCr=cStyle(extractCell(r3,`${pCorr}3`)),
+        sP=cStyle(extractCell(r3,`${pPag}3`));
+
+  const r4M=xml.match(new RegExp(`<row r="4"(?:\\s[^>]*)?>([\\s\\S]*?)<\\/row>`));
+  const r4=r4M?r4M[1]:"";
+  const sM4=cStyle(extractCell(r4,`${pMes}4`)), sG4=cStyle(extractCell(r4,`${pGc}4`));
+
+  if(dryRun) return {ok:true,dryRun:true,
+    nextMonth:{name:nextName,year:nextYear,date:nextDate.toISOString().slice(0,10),serial:nextSerial},
+    newCols:[nMes,nGc,nCom,nCorr,nPag]};
+
+  // Fila 3
+  xml=insertInRow(xml,3,[
+    `<c r="${nMes}3"${a(sM)}><v>${nextSerial}</v></c>`,
+    `<c r="${nGc}3"${a(sG)} t="inlineStr"><is><t>GC</t></is></c>`,
+    `<c r="${nCom}3"${a(sCo)} t="inlineStr"><is><t>Comentarios</t></is></c>`,
+    `<c r="${nCorr}3"${a(sCr)} t="inlineStr"><is><t>Correo Enviado</t></is></c>`,
+    `<c r="${nPag}3"${a(sP)} t="inlineStr"><is><t>Pagado</t></is></c>`,
+  ].join(""));
+  // Fila 4
+  xml=insertInRow(xml,4,[
+    `<c r="${nMes}4"${a(sM4)} t="inlineStr"><is><t>U.F.</t></is></c>`,
+    `<c r="${nGc}4"${a(sG4)} t="inlineStr"><is><t>U.F.</t></is></c>`,
+  ].join(""));
+
+  // Filas de datos
+  let rowsMod=0, fCount=0, vCount=0;
+  xml=xml.replace(
+    new RegExp(`(<row r="(\\d+)"(?:\\s[^>]*)?>)([\\s\\S]*?)(</row>)`,"g"),
+    (match,open,rn,inner,close)=>{
+      const n=parseInt(rn); if(n<5) return match;
+      let cells="";
+      const mXml=extractCell(inner,`${pMes}${n}`);
+      if(mXml){const v=cValue(mXml);if(v){cells+=`<c r="${nMes}${n}"${a(cStyle(mXml))}><v>${escXml(v)}</v></c>`;vCount++;}}
+      const gXml=extractCell(inner,`${pGc}${n}`);
+      if(gXml){
+        const f=cFormula(gXml), v=cValue(gXml), sa=a(cStyle(gXml));
+        if(f){
+          const nf=f.replace(new RegExp(`(\\$?)${pMes}(\\$?\\d+)`,"g"),`$1${nMes}$2`);
+          cells+=`<c r="${nGc}${n}"${sa}><f>${escXml(nf)}</f>${v?`<v>${escXml(v)}</v>`:""}</c>`;fCount++;
+        } else if(v){cells+=`<c r="${nGc}${n}"${sa}><v>${escXml(v)}</v></c>`;vCount++;}
+      }
+      if(!cells) return match;
+      rowsMod++; return open+inner+cells+close;
+    }
+  );
+
+  xml=xml.replace(/<dimension ref="[^"]+"/,`<dimension ref="A1:${nPag}${lastRow}"`);
+  zip.file(sheetPath,xml);
+  const buf=await zip.generateAsync({type:"nodebuffer",compression:"DEFLATE",compressionOptions:{level:6}});
+  return {ok:true,nextMonth:{name:nextName,year:nextYear},newCols:[nMes,nGc,nCom,nCorr,nPag],
+    stats:{rowsModified:rowsMod,formulasCopied:fCount,valuesCopied:vCount},buffer:buf};
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -184,6 +305,30 @@ export default async function handler(req, res) {
   // ── GET ?diag ─────────────────────────────────────────────────────────────
   if (req.method === "GET" && req.query.diag === "1")
     return res.status(200).json({ client_email: sa.client_email, project_id: sa.project_id });
+
+  // ── GET ?addMonth=1 ───────────────────────────────────────────────────────
+  if (req.method === "GET" && req.query.addMonth === "1") {
+    const dryRun = req.query.dry === "1";
+    try {
+      const token  = await getAccessToken(sa);
+      const buf    = await downloadFile(token);
+      const result = await addNextMonth(buf, dryRun);
+      if (!result.ok) return res.status(200).json(result);
+      if (!dryRun && result.buffer) await uploadFile(token, result.buffer);
+      return res.status(200).json({
+        ok: true, dryRun,
+        message: dryRun
+          ? `[DRY RUN] Se agregarían columnas para ${result.nextMonth.name} ${result.nextMonth.year}`
+          : `✅ Columnas de ${result.nextMonth.name} ${result.nextMonth.year} agregadas`,
+        nextMonth: result.nextMonth,
+        newCols:   result.newCols,
+        stats:     result.stats,
+      });
+    } catch(e) {
+      console.error("[addMonth]", e.message);
+      return res.status(500).json({ error: e.message });
+    }
+  }
 
   // ── POST ──────────────────────────────────────────────────────────────────
   if (req.method === "POST") {
