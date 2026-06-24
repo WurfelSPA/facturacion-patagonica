@@ -2184,9 +2184,9 @@ function HistorialFactView({dashData,driveLoading,notify}){
     ),
 
     !selClient&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden",overflowX:"auto"}},
-      h("div",{style:{display:"grid",gridTemplateColumns:"120px 1fr 90px 90px 90px 90px 90px 90px 130px",
+      h("div",{style:{display:"grid",gridTemplateColumns:"120px 1fr 110px 110px 110px 110px 110px 110px 140px",
         padding:"8px 14px",borderBottom:"1px solid var(--bdr)",background:"var(--surf2)",
-        fontSize:10,fontWeight:700,color:"var(--txm)",letterSpacing:".06em",minWidth:900}},
+        fontSize:10,fontWeight:700,color:"var(--txm)",letterSpacing:".06em",minWidth:1060}},
         h("div",{onClick:()=>toggleSort("rut"),style:{cursor:"pointer",userSelect:"none"}},
           "RUT ",h("span",{style:{opacity:.5,fontSize:9}},sortArrow("rut"))),
         h("div",{onClick:()=>toggleSort("nombre"),style:{cursor:"pointer",userSelect:"none"}},
@@ -2196,10 +2196,10 @@ function HistorialFactView({dashData,driveLoading,notify}){
           "TOTAL 2026 ",h("span",{style:{opacity:.5,fontSize:9}},sortArrow("total")))
       ),
       resumenData!==null&&filteredResumen.length>0&&h("div",{style:{
-        display:"grid",gridTemplateColumns:"120px 1fr 90px 90px 90px 90px 90px 90px 130px",
+        display:"grid",gridTemplateColumns:"120px 1fr 110px 110px 110px 110px 110px 110px 140px",
         padding:"9px 14px",borderBottom:"2px solid var(--bdr)",
         background:"#ddeaf8",fontSize:11,fontWeight:800,
-        color:"var(--tx)",minWidth:900}},
+        color:"var(--tx)",minWidth:1060}},
         h("div",null,""),
         h("div",{style:{fontSize:10,letterSpacing:".04em",color:"var(--txm)"}},
           "TOTAL ",h("span",{style:{fontWeight:900}},filteredResumen.length),
@@ -2210,10 +2210,10 @@ function HistorialFactView({dashData,driveLoading,notify}){
           )
         ),
         ...MESES_RESUMEN.map(mes=>h("div",{key:mes,style:{textAlign:"right",color:"var(--accl)"}},
-          "$"+(Math.round((totalesResumen.meses[mes]||0)/1000)).toLocaleString("es-CL")+"K"
+          "$"+Math.round(totalesResumen.meses[mes]||0).toLocaleString("es-CL")
         )),
         h("div",{style:{textAlign:"right",color:"var(--accl)"}},
-          "$"+(Math.round(totalesResumen.total/1000)).toLocaleString("es-CL")+"K")
+          "$"+Math.round(totalesResumen.total).toLocaleString("es-CL"))
       ),
       resumenData===null
         ?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txm)",fontSize:13}},
@@ -2237,8 +2237,8 @@ function HistorialFactView({dashData,driveLoading,notify}){
                 if(grp.length)setSelGroup(grp);
                 else setSelGroup([{nombre:c.nombre,rut:rut!=="—"?rut:"",sitio:"—",edificio:"",ufArr:0,ufSrv:0,_sinPlanilla:true}]);
               },
-              style:{display:"grid",gridTemplateColumns:"120px 1fr 90px 90px 90px 90px 90px 90px 130px",
-                padding:"10px 14px",borderBottom:"1px solid var(--bdr)",minWidth:900,
+              style:{display:"grid",gridTemplateColumns:"120px 1fr 110px 110px 110px 110px 110px 110px 140px",
+                padding:"10px 14px",borderBottom:"1px solid var(--bdr)",minWidth:1060,
                 cursor:canClick?"pointer":"default",transition:"background .1s"}
             },
               h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txd)",alignSelf:"center",whiteSpace:"nowrap"}},rut),
@@ -2249,7 +2249,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
                 const v=c.meses[p]||0;
                 return h("div",{key:p,style:{textAlign:"right",fontFamily:"'DM Mono',monospace",
                   fontSize:10,alignSelf:"center",color:v>0?"var(--tx)":"var(--txd)",opacity:v>0?1:.4}},
-                  v>0?("$"+(Math.round(v/1000)).toLocaleString("es-CL")+"K"):"—");
+                  v>0?("$"+Math.round(v).toLocaleString("es-CL")):"—");
               }),
               h("div",{style:{textAlign:"right",fontFamily:"'DM Mono',monospace",fontSize:11,
                 fontWeight:700,color:"var(--blue)",alignSelf:"center",whiteSpace:"nowrap"}},
