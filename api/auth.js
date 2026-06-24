@@ -182,22 +182,7 @@ export default async function handler(req, res) {
 
   // ── INIT ──────────────────────────────────────────────────────────────────
   if (action==='init') {
-    const { folderId, users } = req.body || {};
-    if (!folderId || !Array.isArray(users) || !users.length)
-      return res.status(400).json({error:'Requiere folderId y users[]'});
-
-    const token = await saToken();
-    const credentials = {};
-    for (const u of users) {
-      const salt = generateSalt();
-      const hash = await hashPassword('123', salt);
-      credentials[u.email.toLowerCase()] = {
-        name: u.name, hash, salt, mustChangePassword: true,
-        resetToken: null, resetTokenExpiry: null
-      };
-    }
-    const fileId = await createCredentialsFile(token, folderId, credentials);
-    return res.status(200).json({ok:true, fileId, message:`credentials.json creado. Agrega DRIVE_CREDENTIALS_ID=${fileId} en Vercel.`});
+    return res.status(200).json({ok:true, test:'handler works', body: req.body});
   }
 
   // ── LOGIN ──────────────────────────────────────────────────────────────────
