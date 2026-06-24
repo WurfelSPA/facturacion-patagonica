@@ -207,6 +207,10 @@ export default async function handler(req, res) {
     const { email='', password='' } = req.body || {};
     if (!email || !password)
       return res.status(400).json({error:'Email y contraseña requeridos'});
+    if (!email.toLowerCase().endsWith('@patagonica.cl'))
+      return res.status(403).json({error:'Solo se permite acceso con correo corporativo @patagonica.cl'});
+    if (!email.toLowerCase().endsWith('@patagonica.cl'))
+      return res.status(403).json({error:'Solo se permite acceso con correo corporativo @patagonica.cl'});
 
     let creds;
     try {
@@ -408,3 +412,4 @@ a{color:#4f46e5;font-size:14px}</style></head><body>
     return res.status(500).json({error: String(e.message||e), stack: e.stack});
   }
 }
+
