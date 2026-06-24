@@ -12,6 +12,9 @@
 
 export const config = { api: { bodyParser: true } };
 
+// Node.js 18: crypto global = legacy module; Web Crypto API lives in globalThis.crypto
+const webcrypto = globalThis.crypto;
+
 // ── Helpers JWT (HMAC-SHA256) ────────────────────────────────────────────────
 function b64url(buf) {
   return btoa(String.fromCharCode(...new Uint8Array(buf)))
@@ -26,7 +29,7 @@ function b64urlDecode(str) {
 }
 
 async function getHmacKey(secret) {
-  return crypto.subtle.importKey(
+  return webcrypto.subtle.importKey(
     'raw', new TextEncoder().encode(secret),
     { name:'HMAC', hash:'SHA-256' }, false, ['sign','verify']
   );
@@ -36,7 +39,7 @@ async function signToken(payload, secret) {
   const header = b64urlStr(JSON.stringify({alg:'HS256',typ:'JWT'}));
   const body   = b64urlStr(JSON.stringify(payload));
   const key    = await getHmacKey(secret);
-  const sig    = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${header}.${body}`));
+  const sig    = await webcrypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${header}.${body}`));
   return `${header}.${body}.${b64url(sig)}`;
 }
 
@@ -46,7 +49,7 @@ async function verifyToken(token, secret) {
   const [header, body, sig] = parts;
   const key = await getHmacKey(secret);
   const raw = Uint8Array.from(b64urlDecode(sig), c=>c.charCodeAt(0));
-  const ok  = await crypto.subtle.verify('HMAC', key, raw, new TextEncoder().encode(`${header}.${body}`));
+  const ok  = await webcrypto.subtle.verify('HMAC', key, raw, new TextEncoder().encode(`${header}.${body}`));
   if (!ok) return null;
   const payload = JSON.parse(decodeURIComponent(escape(b64urlDecode(body))));
   if (payload.exp < Math.floor(Date.now()/1000)) return null;
@@ -62,19 +65,19 @@ function hexEncode(buf) {
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 function generateSalt() {
-  return hexEncode(crypto.getRandomValues(new Uint8Array(16)));
+  return hexEncode(webcrypto.getRandomValues(new Uint8Array(16)));
 }
 async function hashPassword(password, salt) {
   const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits(
+  const key = await webcrypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await webcrypto.subtle.deriveBits(
     {name:'PBKDF2', salt:enc.encode(salt), iterations:100000, hash:'SHA-256'},
     key, 256
   );
   return hexEncode(bits);
 }
 async function sha256hex(str) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  const buf = await webcrypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
   return hexEncode(buf);
 }
 
@@ -88,11 +91,11 @@ async function saToken() {
     aud:'https://oauth2.googleapis.com/token', iat:now, exp:now+3600
   }));
   const pem = sa.private_key.replace(/-----[^-]+-----/g,'').replace(/\s/g,'');
-  const key = await crypto.subtle.importKey(
+  const key = await webcrypto.subtle.importKey(
     'pkcs8', Uint8Array.from(atob(pem),c=>c.charCodeAt(0)).buffer,
     {name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'}, false, ['sign']
   );
-  const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(`${header}.${claim}`));
+  const sig = await webcrypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(`${header}.${claim}`));
   const jwt = `${header}.${claim}.${b64url(sig)}`;
   const r = await fetch('https://oauth2.googleapis.com/token',{
     method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
@@ -289,7 +292,7 @@ export default async function handler(req, res) {
     const user = creds[email.toLowerCase()];
     if (!user) return res.status(200).json({ok:true});
 
-    const rawToken = hexEncode(crypto.getRandomValues(new Uint8Array(32)));
+    const rawToken = hexEncode(webcrypto.getRandomValues(new Uint8Array(32)));
     const tokenHash = await sha256hex(rawToken);
     const expiry = Math.floor(Date.now()/1000) + 3600;
     creds[email.toLowerCase()] = {...user, resetToken:tokenHash, resetTokenExpiry:expiry};
