@@ -182,7 +182,21 @@ export default async function handler(req, res) {
 
   // ── INIT ──────────────────────────────────────────────────────────────────
   if (action==='init') {
-    return res.status(200).json({ok:true, test:'handler works', body: req.body});
+    const { folderId, users } = req.body || {};
+    if (!folderId || !Array.isArray(users) || !users.length)
+      return res.status(400).json({error:'Requiere folderId y users[]'});
+    const token = await saToken();
+    const credentials = {};
+    for (const u of users) {
+      const salt = generateSalt();
+      const hash = await hashPassword('123', salt);
+      credentials[u.email.toLowerCase()] = {
+        name: u.name, hash, salt, mustChangePassword: true,
+        resetToken: null, resetTokenExpiry: null
+      };
+    }
+    const fileId = await createCredentialsFile(token, folderId, credentials);
+    return res.status(200).json({ok:true, fileId, message:`credentials.json creado. Agrega DRIVE_CREDENTIALS_ID=${fileId} en Vercel.`});
   }
 
   // ── LOGIN ──────────────────────────────────────────────────────────────────
@@ -228,7 +242,7 @@ export default async function handler(req, res) {
     const cookieToken = parseCookie(req.headers.cookie, 'auth_token');
     const payload = await verifyToken(cookieToken, JWT_SECRET);
     if (!payload) return res.status(401).json({error:'No autenticado'});
-    return res.status(200).json({email:payload.email, name:payload.name});
+    return res.status(200).json({email:payload.email, name:payload.name, mustChangePassword:!!payload.mustChangePassword});
   }
 
   // ── CHANGE-PASSWORD ───────────────────────────────────────────────────────

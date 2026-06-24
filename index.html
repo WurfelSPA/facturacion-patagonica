@@ -2865,12 +2865,20 @@ function App(){
   const [currentUser,setCurrentUser]=React.useState(null);
   const [showChangePwd,setShowChangePwd]=React.useState(false);
   const [userMenuOpen,setUserMenuOpen]=React.useState(false);
+  const [authLoading,setAuthLoading]=React.useState(true);
+  const [authMustChange,setAuthMustChange]=React.useState(false);
   const [pwdInput,setPwdInput]=useState("");
   React.useEffect(function(){
     fetch('/api/auth?action=me')
       .then(function(r){return r.ok?r.json():null;})
-      .then(function(d){if(d&&d.email)setCurrentUser(d);})
-      .catch(function(){});
+      .then(function(d){
+        if(d&&d.email){
+          setCurrentUser(d);
+          setAuthMustChange(!!d.mustChangePassword);
+        }
+        setAuthLoading(false);
+      })
+      .catch(function(){ setAuthLoading(false); });
   },[]);
   const [pwdError,setPwdError]=useState(false);
   const [notif,setNotif]=useState(null);
@@ -3766,11 +3774,118 @@ function App(){
       )
     );
   }
+  /* ── AUTH SCREENS ── */
+  function LoginScreen(){
+    var em=React.useState(''); var setEm=em[1]; em=em[0];
+    var pw=React.useState(''); var setPw=pw[1]; pw=pw[0];
+    var msg=React.useState(''); var setMsg=msg[1]; msg=msg[0];
+    var busy=React.useState(false); var setBusy=busy[1]; busy=busy[0];
+    var showFg=React.useState(false); var setShowFg=showFg[1]; showFg=showFg[0];
+    var fgEm=React.useState(''); var setFgEm=fgEm[1]; fgEm=fgEm[0];
+    var fgMsg=React.useState(''); var setFgMsg=fgMsg[1]; fgMsg=fgMsg[0];
+    var fgBusy=React.useState(false); var setFgBusy=fgBusy[1]; fgBusy=fgBusy[0];
+    function doLogin(){
+      if(!em||!pw){setMsg('Completa todos los campos');return;}
+      setBusy(true);setMsg('');
+      fetch('/api/auth?action=login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:em,password:pw})})
+        .then(function(r){return r.json();})
+        .then(function(d){
+          if(d.ok){
+            setCurrentUser({email:em,name:d.name});
+            setAuthMustChange(!!d.mustChangePassword);
+            setAuthLoading(false);
+          } else setMsg(d.error||'Error al ingresar');
+        })
+        .catch(function(){setMsg('Error de conexión');})
+        .finally(function(){setBusy(false);});
+    }
+    function doForgot(){
+      if(!fgEm){setFgMsg('Ingresa tu correo');return;}
+      setFgBusy(true);
+      fetch('/api/auth?action=forgot-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:fgEm})})
+        .then(function(){setFgMsg('Si tu correo está registrado, recibirás un link en minutos.');})
+        .catch(function(){setFgMsg('Error de conexión');})
+        .finally(function(){setFgBusy(false);});
+    }
+    var inp={width:'100%',padding:'11px 14px',border:'1.5px solid var(--bdr)',borderRadius:9,fontSize:14,outline:'none',marginBottom:16,background:'var(--bg)',color:'var(--tx)',fontFamily:'inherit'};
+    var lbl={fontSize:12,fontWeight:600,color:'var(--txm)',display:'block',marginBottom:6,textTransform:'uppercase',letterSpacing:'.05em'};
+    var btn={width:'100%',padding:13,background:'var(--acc)',color:'#fff',border:'none',borderRadius:9,fontSize:15,fontWeight:600,cursor:'pointer'};
+    var card={background:'var(--surf)',borderRadius:20,padding:'44px 40px',width:'100%',maxWidth:400,boxShadow:'0 20px 60px rgba(0,0,0,.3)'};
+    var wrap={minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)'};
+    return h('div',{style:wrap},
+      h('div',{style:card},
+        h('div',{style:{display:'flex',alignItems:'center',gap:12,marginBottom:32}},
+          h('div',{style:{width:40,height:40,background:'linear-gradient(135deg,var(--acc),#7c3aed)',borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,color:'#fff',fontWeight:700}},'⬡'),
+          h('div',null,h('div',{style:{fontSize:16,fontWeight:700,color:'var(--tx)'}},'Patagónica'),h('div',{style:{fontSize:10,color:'var(--txm)',fontFamily:'monospace'}},'Portal de Facturación'))
+        ),
+        !showFg ? h('div',null,
+          h('h1',{style:{fontSize:20,fontWeight:700,color:'var(--tx)',marginBottom:6}},'Iniciar sesión'),
+          h('p',{style:{color:'var(--txm)',fontSize:13,marginBottom:28}},'Ingresa con tu correo corporativo.'),
+          h('label',{style:lbl},'Correo electrónico'),
+          h('input',{type:'email',value:em,onChange:function(e){setEm(e.target.value);},placeholder:'tu@patagonica.cl',style:inp,autoComplete:'email'}),
+          h('label',{style:lbl},'Contraseña'),
+          h('input',{type:'password',value:pw,onChange:function(e){setPw(e.target.value);},placeholder:'••••••••',style:inp,autoComplete:'current-password',onKeyDown:function(e){if(e.key==='Enter')doLogin();}}),
+          msg&&h('div',{style:{padding:'8px 12px',borderRadius:8,marginBottom:12,fontSize:13,background:'#fee2e2',color:'#991b1b'}},msg),
+          h('button',{onClick:doLogin,disabled:busy,style:{...btn,opacity:busy?.6:1}},busy?'Ingresando...':'Ingresar'),
+          h('button',{onClick:function(){setShowFg(true);setMsg('');},style:{background:'none',border:'none',color:'var(--acc)',fontSize:13,cursor:'pointer',width:'100%',marginTop:14,textAlign:'center'}},'Olvidé mi contraseña')
+        ) : h('div',null,
+          h('button',{onClick:function(){setShowFg(false);setFgMsg('');},style:{background:'none',border:'none',color:'var(--acc)',fontSize:13,cursor:'pointer',padding:0,marginBottom:12}},'← Volver'),
+          h('h1',{style:{fontSize:20,fontWeight:700,color:'var(--tx)',marginBottom:6}},'Recuperar contraseña'),
+          h('p',{style:{color:'var(--txm)',fontSize:13,marginBottom:24}},'Te enviaremos un link a tu correo.'),
+          h('label',{style:lbl},'Correo electrónico'),
+          h('input',{type:'email',value:fgEm,onChange:function(e){setFgEm(e.target.value);},placeholder:'tu@patagonica.cl',style:inp}),
+          fgMsg&&h('div',{style:{padding:'8px 12px',borderRadius:8,marginBottom:12,fontSize:13,background:fgMsg.includes('link')?'#d1fae5':'#fee2e2',color:fgMsg.includes('link')?'#065f46':'#991b1b'}},fgMsg),
+          h('button',{onClick:doForgot,disabled:fgBusy,style:{...btn,opacity:fgBusy?.6:1}},fgBusy?'Enviando...':'Enviar link')
+        )
+      )
+    );
+  }
+  function ForceChangeScreen(){
+    var p1=React.useState(''); var setP1=p1[1]; p1=p1[0];
+    var p2=React.useState(''); var setP2=p2[1]; p2=p2[0];
+    var msg=React.useState(''); var setMsg=msg[1]; msg=msg[0];
+    var ok=React.useState(false); var setOk=ok[1]; ok=ok[0];
+    var busy=React.useState(false); var setBusy=busy[1]; busy=busy[0];
+    function save(){
+      if(p1.length<8){setMsg('Mínimo 8 caracteres');return;}
+      if(p1!==p2){setMsg('Las contraseñas no coinciden');return;}
+      setBusy(true);
+      fetch('/api/auth?action=change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({newPassword:p1})})
+        .then(function(r){return r.json();})
+        .then(function(d){
+          if(d.ok){setOk(true);setMsg('¡Listo! Entrando al portal...');setTimeout(function(){setAuthMustChange(false);},1200);}
+          else setMsg(d.error||'Error');
+        })
+        .catch(function(){setMsg('Error de conexión');})
+        .finally(function(){setBusy(false);});
+    }
+    var inp={width:'100%',padding:'11px 14px',border:'1.5px solid var(--bdr)',borderRadius:9,fontSize:14,outline:'none',marginBottom:16,background:'var(--bg)',color:'var(--tx)',fontFamily:'inherit'};
+    var lbl={fontSize:12,fontWeight:600,color:'var(--txm)',display:'block',marginBottom:6,textTransform:'uppercase',letterSpacing:'.05em'};
+    var wrap={minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)'};
+    return h('div',{style:wrap},
+      h('div',{style:{background:'var(--surf)',borderRadius:20,padding:'44px 40px',width:'100%',maxWidth:400,boxShadow:'0 20px 60px rgba(0,0,0,.3)'}},
+        h('div',{style:{display:'inline-block',background:'#fef3c7',color:'#92400e',borderRadius:6,fontSize:11,fontWeight:700,padding:'3px 10px',marginBottom:20,textTransform:'uppercase'}},'Primer ingreso'),
+        h('h1',{style:{fontSize:20,fontWeight:700,color:'var(--tx)',marginBottom:8}},'Crea tu contraseña'),
+        h('p',{style:{color:'var(--txm)',fontSize:13,marginBottom:24}},'Por seguridad debes cambiar la contraseña inicial antes de continuar. Mínimo 8 caracteres.'),
+        h('label',{style:lbl},'Nueva contraseña'),
+        h('input',{type:'password',value:p1,onChange:function(e){setP1(e.target.value);},placeholder:'Mínimo 8 caracteres',style:inp}),
+        h('label',{style:lbl},'Confirmar contraseña'),
+        h('input',{type:'password',value:p2,onChange:function(e){setP2(e.target.value);},placeholder:'Repite tu contraseña',style:inp,onKeyDown:function(e){if(e.key==='Enter')save();}}),
+        msg&&h('div',{style:{padding:'8px 12px',borderRadius:8,marginBottom:12,fontSize:13,background:ok?'#d1fae5':'#fee2e2',color:ok?'#065f46':'#991b1b'}},msg),
+        h('button',{onClick:save,disabled:busy,style:{width:'100%',padding:13,background:'var(--acc)',color:'#fff',border:'none',borderRadius:9,fontSize:15,fontWeight:600,cursor:'pointer',opacity:busy?.6:1}},busy?'Guardando...':'Guardar y entrar')
+      )
+    );
+  }
   /* ══════════════════════════════════════════════════════════
      RENDER PRINCIPAL
   ══════════════════════════════════════════════════════════ */
   const enrichedSB=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
   const statsSB={ok:enrichedSB.filter(r=>r.estado==="ok").length};
+  if(authLoading) return h('div',{style:{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg)'}},
+    h('div',{style:{color:'var(--txm)',fontSize:14}},'Cargando...')
+  );
+  if(!currentUser) return h(LoginScreen,null);
+  if(authMustChange) return h(ForceChangeScreen,null);
   return h("div",{style:{display:"flex",minHeight:"100vh"}},
     h(Sidebar,{view,setView,procesar,files,periodo,splitLoading,splitPDF,unlocked,setShowPwdModal,sendAll,setUnlocked,stats:statsSB,sentSet,currentUser,onChangePwd:function(){setShowChangePwd(true);},userMenuOpen,setUserMenuOpen}),
     h("div",{className:"app-content"},
