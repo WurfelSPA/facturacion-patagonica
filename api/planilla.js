@@ -204,9 +204,19 @@ async function addNextMonth(buffer, dryRun) {
   const sheetPath=await getSheetPath(zip);
   let xml=await zip.file(sheetPath).async("string");
 
+  // Obtener última columna y fila: desde <dimension> o escaneando celdas
+  let lastCol=0, lastRow=0;
   const dimM=xml.match(/<dimension ref="[^:]+:([A-Z]+)(\d+)"/);
-  if(!dimM) throw new Error("<dimension> no encontrado");
-  const lastCol=colToNum(dimM[1]), lastRow=parseInt(dimM[2]);
+  if(dimM){ lastCol=colToNum(dimM[1]); lastRow=parseInt(dimM[2]); }
+  else {
+    // Escanear todos los r="XX999" para encontrar máximos
+    for(const m of xml.matchAll(/\br="([A-Z]+)(\d+)"/g)){
+      const c=colToNum(m[1]), r=parseInt(m[2]);
+      if(c>lastCol) lastCol=c;
+      if(r>lastRow) lastRow=r;
+    }
+  }
+  if(!lastCol||!lastRow) throw new Error("No se pudo determinar el rango de la planilla");
 
   // Columnas del último mes (las 5 finales)
   const pMes=numToCol(lastCol-4), pGc=numToCol(lastCol-3), pCom=numToCol(lastCol-2),
