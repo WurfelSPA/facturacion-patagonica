@@ -20,6 +20,27 @@ const SPREADSHEET_ID = process.env.DRIVE_PLANILLA_ID || "1yIKK0ZgU5C1ARsD6NIryRl
 const SHEET_NAME     = "Flujo";
 const HC_COL_DEFAULT = "HC";   // fallback estático (nunca debería usarse — el frontend siempre envía sentCol dinámico)
 
+const FILL_FILE_ID = process.env.DRIVE_PLANILLA_FILL_ID;
+
+async function downloadFillData(token) {
+  if (!FILL_FILE_ID) return {};
+  const r = await fetch(`https://www.googleapis.com/drive/v3/files/${FILL_FILE_ID}?alt=media`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!r.ok) return {};
+  try { return await r.json(); } catch { return {}; }
+}
+
+async function uploadFillData(token, data) {
+  if (!FILL_FILE_ID) throw new Error('DRIVE_PLANILLA_FILL_ID no configurado');
+  const r = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${FILL_FILE_ID}?uploadType=media`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(data, null, 2)
+  });
+  if (!r.ok) throw new Error(`Drive fill upload ${r.status}: ${(await r.text()).slice(0,200)}`);
+}
+
 // ── JWT / SA ──────────────────────────────────────────────────────────────────
 async function signJWT(payload, privateKey) {
   const header = { alg: "RS256", typ: "JWT" };
@@ -479,6 +500,35 @@ export default async function handler(req, res) {
   }
 
   // ── POST ──────────────────────────────────────────────────────────────────
+
+  // GET ?action=load-fill
+  if (req.method === "GET" && req.query.action === "load-fill") {
+    const { periodo } = req.query;
+    if (!periodo) return res.status(400).json({ error: "Se requiere periodo" });
+    try {
+      const token = await getAccessToken(sa);
+      const allData = await downloadFillData(token);
+      return res.status(200).json({ values: allData[periodo]?.values || {} });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // POST ?action=save-fill
+  if (req.method === "POST" && req.query.action === "save-fill") {
+    const { periodo, values } = req.body || {};
+    if (!periodo || !values) return res.status(400).json({ error: "Se requiere periodo y values" });
+    try {
+      const token = await getAccessToken(sa);
+      const allData = await downloadFillData(token);
+      allData[periodo] = { savedAt: new Date().toISOString(), values };
+      await uploadFillData(token, allData);
+      return res.status(200).json({ ok: true });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   if (req.method === "POST") {
     const body = req.body || {};
     let rows = [];

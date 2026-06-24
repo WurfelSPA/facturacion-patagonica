@@ -3734,6 +3734,155 @@ function App(){
     );
   };
 
+  function LlenarPlanillaView({periodo,planillaFile,onBack}){
+    var rowsS=React.useState([]); var setRows=rowsS[1]; var rows=rowsS[0];
+    var editsS=React.useState({}); var setEdits=editsS[1]; var edits=editsS[0];
+    var loadingS=React.useState(true); var setLoading=loadingS[1]; var loading=loadingS[0];
+    var savingS=React.useState(false); var setSaving=savingS[1]; var saving=savingS[0];
+    var msgS=React.useState(null); var setMsg=msgS[1]; var msg=msgS[0];
+
+    React.useEffect(function(){
+      if(!planillaFile)return;
+      var cancelled=false;
+      async function load(){
+        setLoading(true);
+        var buf=await readFileAsBuffer(planillaFile);
+        var wb=XLSX.read(buf,{type:"array",cellDates:true,raw:true});
+        var ws=wb.Sheets["Flujo"];
+        if(!ws){setLoading(false);return;}
+        var raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
+        var fila3=raw[2]||[];
+        var mesNum=MES_NUM[periodo.split(" ")[0]];
+        var anio=parseInt(periodo.split(" ")[1]);
+        var colMes=-1;
+        function esTargetMes(val){
+          if(!val)return false;
+          if(typeof val==="number"&&val>40000&&val<60000){
+            var d=new Date(new Date(Date.UTC(1899,11,30)).getTime()+Math.round(val)*86400000);
+            return d.getUTCFullYear()===anio&&(d.getUTCMonth()+1)===mesNum;
+          }
+          if(val instanceof Date)return val.getFullYear()===anio&&(val.getMonth()+1)===mesNum;
+          return false;
+        }
+        for(var i=50;i<fila3.length;i++){if(esTargetMes(fila3[i])){colMes=i;break;}}
+        var colGC=colMes+1;
+        var EXCL=["","VACANTE","Nombre Cliente","Areas Comunes Edificio","Areas comunes Edificio (Subterraneos)","Area Comun"];
+        var parsed=[];
+        for(var ri=4;ri<raw.length;ri++){
+          var row=raw[ri];if(!row)continue;
+          var cliente=row[5];
+          if(!cliente||EXCL.includes(String(cliente).trim()))continue;
+          var sitio=String(row[1]||"").trim();
+          var edificio=String(row[2]||"").trim();
+          var rut=String(row[3]||"").trim();
+          var clienteStr=String(cliente).trim();
+          var key=sitio+"|"+edificio+"|"+rut+"|"+clienteStr;
+          var uf=colMes>=0?(parseFloat(row[colMes])||0):0;
+          var gc=colGC>=0?(parseFloat(row[colGC])||0):0;
+          parsed.push({key,sitio,edificio,rut,cliente:clienteStr,uf,gc});
+        }
+        if(!cancelled)setRows(parsed);
+        try{
+          var r=await fetch("/api/planilla?action=load-fill&periodo="+encodeURIComponent(periodo));
+          if(r.ok){var d=await r.json();if(d.values&&!cancelled)setEdits(d.values);}
+        }catch(e){}
+        if(!cancelled)setLoading(false);
+      }
+      load();
+      return function(){cancelled=true;};
+    },[planillaFile,periodo]);
+
+    function setEdit(key,field,val){
+      setEdits(function(prev){
+        var next=Object.assign({},prev);
+        next[key]=Object.assign({},prev[key]||{});
+        next[key][field]=val;
+        return next;
+      });
+    }
+
+    async function save(){
+      setSaving(true);setMsg(null);
+      var values={};
+      rows.forEach(function(row){
+        var e=edits[row.key]||{};
+        var uf=e.uf!==undefined?parseFloat(e.uf)||0:parseFloat(row.uf)||0;
+        var gc=e.gc!==undefined?parseFloat(e.gc)||0:parseFloat(row.gc)||0;
+        if(uf||gc)values[row.key]={uf,gc};
+      });
+      try{
+        var r=await fetch("/api/planilla?action=save-fill",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({periodo,values})
+        });
+        var d=await r.json();
+        if(d.ok)setMsg({type:"ok",text:"✓ Guardado correctamente"});
+        else setMsg({type:"err",text:d.error||"Error al guardar"});
+      }catch(e){setMsg({type:"err",text:"Error de conexión"});}
+      setSaving(false);
+    }
+
+    var thBase={textAlign:"left",padding:"8px 10px",borderBottom:"2px solid var(--bdr)",fontWeight:700,fontSize:11,whiteSpace:"nowrap"};
+    var tdBase={padding:"5px 8px",borderBottom:"1px solid var(--bdr)",fontSize:12};
+    var inputStyle={width:82,textAlign:"right",padding:"3px 6px",border:"1px solid var(--bdr)",borderRadius:4,
+      background:"var(--surf)",color:"var(--tx)",fontSize:12,fontFamily:"'DM Mono',monospace"};
+    var mesLabel=(periodo.split(" ")[0]||"").substring(0,3).toUpperCase()+" UF";
+
+    if(loading)return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}},
+      h("span",{style:{color:"var(--txm)",fontSize:13}},"Cargando planilla..."));
+
+    return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}},
+      h("div",{style:{display:"flex",alignItems:"center",gap:12,padding:"16px 28px",borderBottom:"1px solid var(--bdr)",flexShrink:0}},
+        h("button",{onClick:onBack,style:{background:"none",border:"none",cursor:"pointer",color:"var(--txm)",fontSize:20,lineHeight:1}},"←"),
+        h("span",{style:{fontWeight:700,fontSize:15}},"Llenar Planilla — "+periodo),
+        h("div",{style:{marginLeft:"auto",display:"flex",gap:8,alignItems:"center"}},
+          msg&&h("span",{style:{fontSize:12,color:msg.type==="ok"?"var(--green)":"var(--red)"}},msg.text),
+          h("button",{onClick:onBack,style:{fontSize:12,padding:"6px 14px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--txm)",cursor:"pointer"}},"Cancelar"),
+          h("button",{onClick:save,disabled:saving,className:"btn-primary",style:{fontSize:12,padding:"6px 18px",opacity:saving?0.6:1}},saving?"Guardando...":"Guardar")
+        )
+      ),
+      h("div",{style:{flex:1,overflowY:"auto",overflowX:"auto"}},
+        h("table",{style:{width:"100%",borderCollapse:"collapse"}},
+          h("thead",null,
+            h("tr",null,
+              h("th",{style:{...thBase,background:"var(--surf2)",color:"var(--txm)"}},"Sitio"),
+              h("th",{style:{...thBase,background:"var(--surf2)",color:"var(--txm)"}},"Edificio"),
+              h("th",{style:{...thBase,background:"var(--surf2)",color:"var(--txm)"}},"RUT"),
+              h("th",{style:{...thBase,background:"var(--surf2)",color:"var(--txm)",minWidth:180}},"Nombre Cliente"),
+              h("th",{style:{...thBase,background:"var(--acc)",color:"#fff",textAlign:"right"}},mesLabel),
+              h("th",{style:{...thBase,background:"var(--acc)",color:"#fff",textAlign:"right"}},"GC UF")
+            )
+          ),
+          h("tbody",null,
+            rows.map(function(row,i){
+              var e=edits[row.key]||{};
+              var ufVal=e.uf!==undefined?e.uf:(row.uf||"");
+              var gcVal=e.gc!==undefined?e.gc:(row.gc||"");
+              return h("tr",{key:row.key,style:{background:i%2===0?"var(--surf)":"var(--surf2)"}},
+                h("td",{style:tdBase},row.sitio),
+                h("td",{style:tdBase},row.edificio),
+                h("td",{style:{...tdBase,fontFamily:"'DM Mono',monospace",fontSize:11}},row.rut),
+                h("td",{style:{...tdBase,maxWidth:220,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},row.cliente),
+                h("td",{style:{...tdBase,padding:"3px 6px"}},
+                  h("input",{type:"number",step:"0.01",min:"0",value:ufVal,
+                    onChange:function(ev){setEdit(row.key,"uf",ev.target.value);},
+                    style:inputStyle})
+                ),
+                h("td",{style:{...tdBase,padding:"3px 6px"}},
+                  h("input",{type:"number",step:"0.01",min:"0",value:gcVal,
+                    onChange:function(ev){setEdit(row.key,"gc",ev.target.value);},
+                    style:inputStyle})
+                )
+              );
+            })
+          )
+        )
+      )
+    );
+  }
+
+
   function ChangePwdModal(){
     var cur=React.useState(''); var setCur=cur[1]; cur=cur[0];
     var np=React.useState(''); var setNp=np[1]; np=np[0];
@@ -3989,51 +4138,57 @@ function App(){
     /* VIEWS */
     view==="dashboard"&&renderDashboard(dashSitio,dashMes,dashSearch),
 
+    view==="llenar"&&h(LlenarPlanillaView,{periodo,planillaFile:files.planilla,onBack:()=>setView("upload")}),
+
     view==="upload"&&h("main",{style:{flex:1,display:"flex",alignItems:"flex-start",justifyContent:"center"},className:"fade-up"},
       h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",gap:24,padding:"40px 40px 40px"}},
 
-        /* ── Botón Enviar Planilla ── */
-        files.planilla&&h("button",{
-          style:{fontSize:13,fontWeight:600,padding:"8px 20px",borderRadius:10,border:"1px solid var(--bdr)",
-            background:"var(--surf)",color:"var(--txm)",cursor:"pointer",display:"flex",alignItems:"center",gap:6,
-            fontFamily:"'DM Sans',sans-serif"},
-          onClick:async()=>{
-            try{
-              const token=await getToken();
-              notify("Leyendo comentarios de la planilla...","info");
-              const grupos=await extraerComentariosMes(files.planilla,periodo);
-              const sitiosConComentarios=Object.keys(grupos).filter(s=>grupos[s].length>0);
-              // Construir cuerpo del correo
-              let bodyHtml=`<p>Estimados,</p><p>Adjunto planilla facturación <strong>${periodo}</strong></p>`;
-              if(sitiosConComentarios.length===0){
-                bodyHtml+=`<p>Sin comentarios especiales para este período.</p>`;
-              } else {
-                for(const sitio of sitiosConComentarios){
-                  bodyHtml+=`<p><strong>Sitio ${sitio}</strong></p><ul>`;
-                  for(const {edif,cliente,comentario} of grupos[sitio]){
-                    bodyHtml+=`<li><strong>${cliente}</strong>${edif?` ${edif}`:""}:&nbsp;${comentario}</li>`;
+        /* ── Pills: Llenar + Subir Planilla ── */
+        h("div",{style:{display:"flex",gap:10,justifyContent:"center"}},
+          h("button",{
+            style:{fontSize:12,fontWeight:600,padding:"7px 18px",borderRadius:20,border:"1px solid var(--bdr)",
+              background:"var(--surf)",color:"var(--txm)",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"},
+            onClick:()=>setView("llenar")
+          },"\u25cf Llenar Planilla "+periodo),
+          files.planilla&&h("button",{
+            style:{fontSize:12,fontWeight:600,padding:"7px 18px",borderRadius:20,border:"1px solid var(--bdr)",
+              background:"var(--surf)",color:"var(--txm)",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"},
+            onClick:async()=>{
+              try{
+                const token=await getToken();
+                notify("Leyendo comentarios de la planilla...","info");
+                const grupos=await extraerComentariosMes(files.planilla,periodo);
+                const sitiosConComentarios=Object.keys(grupos).filter(s=>grupos[s].length>0);
+                let bodyHtml=`<p>Estimados,</p><p>Adjunto planilla facturación <strong>${periodo}</strong></p>`;
+                if(sitiosConComentarios.length===0){
+                  bodyHtml+=`<p>Sin comentarios especiales para este período.</p>`;
+                } else {
+                  for(const sitio of sitiosConComentarios){
+                    bodyHtml+=`<p><strong>Sitio ${sitio}</strong></p><ul>`;
+                    for(const {edif,cliente,comentario} of grupos[sitio]){
+                      bodyHtml+=`<li><strong>${cliente}</strong>${edif?` ${edif}`:""}:&nbsp;${comentario}</li>`;
+                    }
+                    bodyHtml+=`</ul>`;
                   }
-                  bodyHtml+=`</ul>`;
                 }
-              }
-              bodyHtml+=`<br><p>Quedo atento a sus comentarios</p><p>Saludos</p>`;
-              bodyHtml+=`<br><hr><p style="color:#999;font-size:11px">Este correo fue generado automáticamente con apoyo de inteligencia artificial — Sistema de Facturación Patagónica Inmobiliaria SpA</p>`;
-              // Adjuntar planilla como base64
-              const planBuf=await readFileAsBuffer(files.planilla);
-              const planBytes=new Uint8Array(planBuf);
-              let binary="";
-              for(let i=0;i<planBytes.length;i+=8192) binary+=String.fromCharCode(...planBytes.subarray(i,i+8192));
-              const planB64=btoa(binary);
-              const planNombre=`Planilla Facturación ${periodo}.xlsx`;
-              const subject=`Facturación ${periodo}`;
-              const TO="bpulgar@patagonica.cl,contabilidad@patagonica.cl";
-              const CC="mmunoz@patagonica.cl,alagies@patagonica.cl";
-              await sendGmail(token,TO,CC,REMITENTE,subject,bodyHtml,planB64,planNombre,
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-              notify(`✓ Planilla ${periodo} enviada`,"ok");
-            }catch(e){notify("Error: "+e.message,"err");}
-          }
-        },"📧 Enviar Planilla "+periodo),
+                bodyHtml+=`<br><p>Quedo atento a sus comentarios</p><p>Saludos</p>`;
+                bodyHtml+=`<br><hr><p style="color:#999;font-size:11px">Este correo fue generado automáticamente con apoyo de inteligencia artificial.</p>`;
+                const planBuf=await readFileAsBuffer(files.planilla);
+                const planBytes=new Uint8Array(planBuf);
+                let binary="";
+                for(let i=0;i<planBytes.length;i+=8192) binary+=String.fromCharCode(...planBytes.subarray(i,i+8192));
+                const planB64=btoa(binary);
+                const planNombre=`Planilla Facturación ${periodo}.xlsx`;
+                const subject=`Facturación ${periodo}`;
+                const TO="bpulgar@patagonica.cl,contabilidad@patagonica.cl";
+                const CC="mmunoz@patagonica.cl,alagies@patagonica.cl";
+                await sendGmail(token,TO,CC,REMITENTE,subject,bodyHtml,planB64,planNombre,
+                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                notify(`\u2713 Planilla ${periodo} enviada`,"ok");
+              }catch(e){notify("Error: "+e.message,"err");}
+            }
+          },"\u25cf Subir Planilla "+periodo)
+        ),
 
         /* ── Selector + Botón ── */
         h("div",{style:{display:"flex",alignItems:"center",gap:12}},
