@@ -224,7 +224,14 @@ async function buildWhiteStyles(zip) {
   if (xfsM) sx = sx.replace(`<cellXfs count="${xfN}">`, `<cellXfs count="${xfN+2}">`);
 
   zip.file("xl/styles.xml", sx);
-  return { boldIdx: xfN, normalIdx: xfN + 1 }; // índices de los 2 nuevos xf
+  return {
+    boldIdx: xfN, normalIdx: xfN + 1,
+    debug: { whiteFillId, boldFontId, originalFillN: fillN, originalFontN: fontN, originalXfN: xfN,
+             foundFills: !!fillsM, foundFonts: !!fontsM, foundCellXfs: !!xfsM,
+             hasClosingFills: sx.includes("</fills>"),
+             hasClosingFonts: sx.includes("</fonts>"),
+             hasClosingCellXfs: sx.includes("</cellXfs>") }
+  };
 }
 
 function extractCell(rowInner, ref) {
@@ -303,7 +310,7 @@ async function addNextMonth(buffer, dryRun) {
     newCols:[nMes,nGc,nCom,nCorr,nPag]};
 
   // ── Crear estilos para celdas nuevas (blanco + negrita/normal + texto negro) ──
-  const { boldIdx, normalIdx } = await buildWhiteStyles(zip);
+  const { boldIdx, normalIdx, debug: styleDebug } = await buildWhiteStyles(zip);
   // Re-leer el XML del sheet (el ZIP no cambió pero por si acaso)
   xml = await zip.file(sheetPath).async("string");
 
@@ -350,7 +357,8 @@ async function addNextMonth(buffer, dryRun) {
   zip.file(sheetPath,xml);
   const buf=await zip.generateAsync({type:"nodebuffer",compression:"DEFLATE",compressionOptions:{level:6}});
   return {ok:true,nextMonth:{name:nextName,year:nextYear},newCols:[nMes,nGc,nCom,nCorr,nPag],
-    stats:{rowsModified:rowsMod,formulasCopied:fCount,valuesCopied:vCount},buffer:buf};
+    stats:{rowsModified:rowsMod,formulasCopied:fCount,valuesCopied:vCount},
+    styleIndices:{boldIdx,normalIdx,...styleDebug},buffer:buf};
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -367,6 +375,43 @@ export default async function handler(req, res) {
   // ── GET ?diag ─────────────────────────────────────────────────────────────
   if (req.method === "GET" && req.query.diag === "1")
     return res.status(200).json({ client_email: sa.client_email, project_id: sa.project_id });
+
+  // ── GET ?stylesdiag=1 ────────────────────────────────────────────────────
+  // Diagnóstico: muestra estructura de xl/styles.xml sin modificar nada
+  if (req.method === "GET" && req.query.stylesdiag === "1") {
+    try {
+      const token = await getAccessToken(sa);
+      const buf   = await downloadFile(token);
+      const zip   = await JSZip.loadAsync(Buffer.from(buf));
+      const sf    = zip.file("xl/styles.xml");
+      if (!sf) return res.status(200).json({ error: "styles.xml no encontrado en el ZIP" });
+      const sx = await sf.async("string");
+      // Contar elementos clave
+      const fillsM    = sx.match(/<fills[^>]*count="(\d+)"/);
+      const fontsM    = sx.match(/<fonts[^>]*count="(\d+)"/);
+      const cellXfsM  = sx.match(/<cellXfs[^>]*count="(\d+)"/);
+      const hasFills  = sx.includes("</fills>");
+      const hasFonts  = sx.includes("</fonts>");
+      const hasCellXfs= sx.includes("</cellXfs>");
+      // Últimas 3 entradas de cellXfs
+      const allXf = [...sx.matchAll(/<xf [^>]+\/>/g)].map(m=>m[0]);
+      const lastXfs = allXf.slice(-3);
+      // Primeros 200 chars de styles.xml para ver el namespace
+      const header = sx.slice(0, 300);
+      return res.status(200).json({
+        fillsCount: fillsM ? fillsM[1] : null,
+        fontsCount: fontsM ? fontsM[1] : null,
+        cellXfsCount: cellXfsM ? cellXfsM[1] : null,
+        hasClosingFills: hasFills,
+        hasClosingFonts: hasFonts,
+        hasClosingCellXfs: hasCellXfs,
+        lastXfs,
+        header,
+      });
+    } catch(e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
 
   // ── GET ?addMonth=1 ───────────────────────────────────────────────────────
   if (req.method === "GET" && req.query.addMonth === "1") {
@@ -389,9 +434,10 @@ export default async function handler(req, res) {
         message: dryRun
           ? `[DRY RUN] Se agregarían columnas para ${result.nextMonth.name} ${result.nextMonth.year}`
           : `✅ Columnas de ${result.nextMonth.name} ${result.nextMonth.year} agregadas`,
-        nextMonth: result.nextMonth,
-        newCols:   result.newCols,
-        stats:     result.stats,
+        nextMonth:    result.nextMonth,
+        newCols:      result.newCols,
+        stats:        result.stats,
+        styleIndices: result.styleIndices,
       });
     } catch(e) {
       console.error("[addMonth]", e.message);
