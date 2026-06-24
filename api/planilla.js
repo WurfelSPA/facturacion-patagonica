@@ -218,8 +218,9 @@ async function buildWhiteStyles(zip) {
   const xf0M  = sx.match(/<cellXfs[^>]*>([\s\S]*?)<\/cellXfs>/);
   const bId   = xf0M ? (xf0M[1].match(/borderId="(\d+)"/) || [,"0"])[1] : "0";
 
-  const xfBold   = `<xf numFmtId="0" fontId="${boldFontId}" fillId="${whiteFillId}" borderId="${bId}" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>`;
-  const xfNormal = `<xf numFmtId="0" fontId="0" fillId="${whiteFillId}" borderId="${bId}" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>`;
+  const align    = `<alignment horizontal="center" vertical="center" wrapText="1"/>`;
+  const xfBold   = `<xf numFmtId="0" fontId="${boldFontId}" fillId="${whiteFillId}" borderId="${bId}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">${align}</xf>`;
+  const xfNormal = `<xf numFmtId="0" fontId="0" fillId="${whiteFillId}" borderId="${bId}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">${align}</xf>`;
   sx = sx.replace('</cellXfs>', xfBold + xfNormal + '</cellXfs>');
   if (xfsM) sx = sx.replace(`<cellXfs count="${xfN}">`, `<cellXfs count="${xfN+2}">`);
 
