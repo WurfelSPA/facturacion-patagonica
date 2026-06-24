@@ -3814,9 +3814,9 @@ function App(){
     var wrap={minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)'};
     return h('div',{style:wrap},
       h('div',{style:card},
-        h('div',{style:{display:'flex',alignItems:'center',gap:12,marginBottom:32}},
-          h('div',{style:{width:40,height:40,background:'linear-gradient(135deg,var(--acc),#7c3aed)',borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,color:'#fff',fontWeight:700}},'⬡'),
-          h('div',null,h('div',{style:{fontSize:16,fontWeight:700,color:'var(--tx)'}},'Patagónica'),h('div',{style:{fontSize:10,color:'var(--txm)',fontFamily:'monospace'}},'Portal de Facturación'))
+        h('div',{style:{textAlign:'center',marginBottom:28}},
+          h('img',{src:'/logo.png',style:{height:52,maxWidth:'220px',objectFit:'contain',display:'block',margin:'0 auto'}}),
+          h('div',{style:{fontSize:11,color:'var(--txm)',marginTop:7,letterSpacing:'.04em'}}, 'Portal de Facturación')
         ),
         !showFg ? h('div',null,
           h('h1',{style:{fontSize:20,fontWeight:700,color:'var(--tx)',marginBottom:6}},'Iniciar sesión'),
