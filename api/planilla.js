@@ -178,6 +178,55 @@ function colToNum(col) { let n=0; for(const c of col) n=n*26+(c.charCodeAt(0)-64
 function numToCol(n)   { let s=""; while(n>0){const r=(n-1)%26;s=String.fromCharCode(65+r)+s;n=Math.floor((n-1)/26);} return s; }
 function excelSerial(y,m,d){ return Math.round((Date.UTC(y,m-1,d)-Date.UTC(1899,11,30))/86400000); }
 
+/**
+ * Agrega a styles.xml:
+ *   - un fill blanco sólido
+ *   - una fuente negrita negra
+ *   - dos xf: {blanco+negrita+negro} y {blanco+normal+negro}
+ * Devuelve los índices de estilo resultantes.
+ */
+async function buildWhiteStyles(zip) {
+  let sx = await zip.file("xl/styles.xml").async("string");
+
+  // ── 1. Fill blanco sólido ────────────────────────────────────────────────
+  const fillsM = sx.match(/<fills count="(\d+)">/);
+  const fillN   = fillsM ? parseInt(fillsM[1]) : 2;
+  const whiteFill = '<fill><patternFill patternType="solid"><fgColor rgb="FFFFFFFF"/><bgColor indexed="64"/></patternFill></fill>';
+  sx = sx.replace('</fills>', whiteFill + '</fills>');
+  if (fillsM) sx = sx.replace(`<fills count="${fillN}">`, `<fills count="${fillN+1}">`);
+  const whiteFillId = fillN; // índice del nuevo fill
+
+  // ── 2. Fuente negrita negra (basada en font[0]) ──────────────────────────
+  const fontsM = sx.match(/<fonts count="(\d+)">/);
+  const fontN   = fontsM ? parseInt(fontsM[1]) : 1;
+  // Extraer font[0] y hacerle negrita (sin duplicar <b/> si ya existe)
+  const font0M  = sx.match(/<fonts[^>]*>\s*(<font[\s\S]*?<\/font>)/);
+  let boldFont;
+  if (font0M) {
+    boldFont = font0M[1].includes("<b/>") ? font0M[1] : font0M[1].replace("<font>","<font><b/>");
+  } else {
+    boldFont = '<font><b/><sz val="11"/><color rgb="FF000000"/><name val="Calibri"/></font>';
+  }
+  sx = sx.replace('</fonts>', boldFont + '</fonts>');
+  if (fontsM) sx = sx.replace(`<fonts count="${fontN}">`, `<fonts count="${fontN+1}">`);
+  const boldFontId = fontN; // índice de la nueva fuente negrita
+
+  // ── 3. Dos xf nuevos en cellXfs ─────────────────────────────────────────
+  const xfsM  = sx.match(/<cellXfs count="(\d+)">/);
+  const xfN   = xfsM ? parseInt(xfsM[1]) : 1;
+  // Reutilizar borderId del xf[0] para mantener bordes consistentes
+  const xf0M  = sx.match(/<cellXfs[^>]*>([\s\S]*?)<\/cellXfs>/);
+  const bId   = xf0M ? (xf0M[1].match(/borderId="(\d+)"/) || [,"0"])[1] : "0";
+
+  const xfBold   = `<xf numFmtId="0" fontId="${boldFontId}" fillId="${whiteFillId}" borderId="${bId}" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>`;
+  const xfNormal = `<xf numFmtId="0" fontId="0" fillId="${whiteFillId}" borderId="${bId}" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>`;
+  sx = sx.replace('</cellXfs>', xfBold + xfNormal + '</cellXfs>');
+  if (xfsM) sx = sx.replace(`<cellXfs count="${xfN}">`, `<cellXfs count="${xfN+2}">`);
+
+  zip.file("xl/styles.xml", sx);
+  return { boldIdx: xfN, normalIdx: xfN + 1 }; // índices de los 2 nuevos xf
+}
+
 function extractCell(rowInner, ref) {
   const idx=rowInner.indexOf(`r="${ref}"`); if(idx===-1) return null;
   const cs=rowInner.lastIndexOf("<c",idx); if(cs===-1||idx-cs>150) return null;
@@ -246,30 +295,33 @@ async function addNextMonth(buffer, dryRun) {
   const nextName=MES_ES[nextDate.getUTCMonth()], nextYear=nextDate.getUTCFullYear();
 
   const a=s=>s?` s="${s}"`:"";
-  const sM=cStyle(prevXml), sG=cStyle(extractCell(r3,`${pGc}3`)),
-        sCo=cStyle(extractCell(r3,`${pCom}3`)), sCr=cStyle(extractCell(r3,`${pCorr}3`)),
-        sP=cStyle(extractCell(r3,`${pPag}3`));
-
-  const r4M=xml.match(new RegExp(`<row r="4"(?:\\s[^>]*)?>([\\s\\S]*?)<\\/row>`));
-  const r4=r4M?r4M[1]:"";
-  const sM4=cStyle(extractCell(r4,`${pMes}4`)), sG4=cStyle(extractCell(r4,`${pGc}4`));
+  // Estilo original del mes anterior (verde) — se mantiene para la celda de fecha
+  const sM=cStyle(prevXml);
 
   if(dryRun) return {ok:true,dryRun:true,
     nextMonth:{name:nextName,year:nextYear,date:nextDate.toISOString().slice(0,10),serial:nextSerial},
     newCols:[nMes,nGc,nCom,nCorr,nPag]};
 
-  // Fila 3
+  // ── Crear estilos para celdas nuevas (blanco + negrita/normal + texto negro) ──
+  const { boldIdx, normalIdx } = await buildWhiteStyles(zip);
+  // Re-leer el XML del sheet (el ZIP no cambió pero por si acaso)
+  xml = await zip.file(sheetPath).async("string");
+
+  // Fila 3:
+  //   nMes3  → verde del mes anterior (sM)   + valor numérico de fecha
+  //   nGc3   → blanco + negrita + negro
+  //   nCom3, nCorr3, nPag3 → blanco + normal + negro
   xml=insertInRow(xml,3,[
     `<c r="${nMes}3"${a(sM)}><v>${nextSerial}</v></c>`,
-    `<c r="${nGc}3"${a(sG)} t="inlineStr"><is><t>GC</t></is></c>`,
-    `<c r="${nCom}3"${a(sCo)} t="inlineStr"><is><t>Comentarios</t></is></c>`,
-    `<c r="${nCorr}3"${a(sCr)} t="inlineStr"><is><t>Correo Enviado</t></is></c>`,
-    `<c r="${nPag}3"${a(sP)} t="inlineStr"><is><t>Pagado</t></is></c>`,
+    `<c r="${nGc}3" s="${boldIdx}" t="inlineStr"><is><t>GC</t></is></c>`,
+    `<c r="${nCom}3" s="${normalIdx}" t="inlineStr"><is><t>Comentarios</t></is></c>`,
+    `<c r="${nCorr}3" s="${normalIdx}" t="inlineStr"><is><t>Correo Enviado</t></is></c>`,
+    `<c r="${nPag}3" s="${normalIdx}" t="inlineStr"><is><t>Pagado</t></is></c>`,
   ].join(""));
-  // Fila 4
+  // Fila 4: ambas U.F. con negrita+blanco (las 2 primeras columnas)
   xml=insertInRow(xml,4,[
-    `<c r="${nMes}4"${a(sM4)} t="inlineStr"><is><t>U.F.</t></is></c>`,
-    `<c r="${nGc}4"${a(sG4)} t="inlineStr"><is><t>U.F.</t></is></c>`,
+    `<c r="${nMes}4" s="${boldIdx}" t="inlineStr"><is><t>U.F.</t></is></c>`,
+    `<c r="${nGc}4" s="${boldIdx}" t="inlineStr"><is><t>U.F.</t></is></c>`,
   ].join(""));
 
   // Filas de datos
