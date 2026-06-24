@@ -10,6 +10,8 @@
  * POST ?action=reset-password  → valida token y actualiza contraseña
  */
 
+export const config = { api: { bodyParser: true } };
+
 // ── Helpers JWT (HMAC-SHA256) ────────────────────────────────────────────────
 function b64url(buf) {
   return btoa(String.fromCharCode(...new Uint8Array(buf)))
@@ -169,6 +171,7 @@ function parseCookie(cookieHeader, name) {
 
 // ── Handler principal ─────────────────────────────────────────────────────────
 export default async function handler(req, res) {
+  try {
   res.setHeader('Access-Control-Allow-Origin','*');
   res.setHeader('Access-Control-Allow-Methods','GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers','Content-Type');
@@ -398,5 +401,9 @@ a{color:#4f46e5;font-size:14px}</style></head><body>
   }
 
   return res.status(400).json({error:'Action desconocida'});
+  } catch(e) {
+    console.error('auth error:', e);
+    return res.status(500).json({error: String(e.message||e), stack: e.stack});
+  }
 }
                                                                                                                                                                                                                              
