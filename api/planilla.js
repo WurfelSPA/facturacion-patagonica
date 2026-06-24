@@ -211,20 +211,31 @@ async function buildWhiteStyles(zip) {
   if (fontsM) sx = sx.replace(`<fonts count="${fontN}">`, `<fonts count="${fontN+1}">`);
   const boldFontId = fontN; // índice de la nueva fuente negrita
 
-  // ── 3. Dos xf nuevos en cellXfs ─────────────────────────────────────────
+  // ── 3. Borde fino en todos los lados ────────────────────────────────────
+  const bordersM  = sx.match(/<borders count="(\d+)">/);
+  const borderN   = bordersM ? parseInt(bordersM[1]) : 1;
+  const thinBorder = '<border>'
+    + '<left style="thin"><color rgb="FF000000"/></left>'
+    + '<right style="thin"><color rgb="FF000000"/></right>'
+    + '<top style="thin"><color rgb="FF000000"/></top>'
+    + '<bottom style="thin"><color rgb="FF000000"/></bottom>'
+    + '<diagonal/>'
+    + '</border>';
+  sx = sx.replace('</borders>', thinBorder + '</borders>');
+  if (bordersM) sx = sx.replace(`<borders count="${borderN}">`, `<borders count="${borderN+1}">`);
+  const thinBorderId = borderN; // índice del nuevo borde fino
+
+  // ── 4. Tres xf nuevos en cellXfs ────────────────────────────────────────
   const xfsM  = sx.match(/<cellXfs count="(\d+)">/);
   const xfN   = xfsM ? parseInt(xfsM[1]) : 1;
-  // Reutilizar borderId del xf[0] para mantener bordes consistentes
-  const xf0M  = sx.match(/<cellXfs[^>]*>([\s\S]*?)<\/cellXfs>/);
-  const bId   = xf0M ? (xf0M[1].match(/borderId="(\d+)"/) || [,"0"])[1] : "0";
 
   const align    = `<alignment horizontal="center" vertical="center" wrapText="1"/>`;
-  // xfBold   → encabezados col 1+2: blanco + negrita + centrado
-  // xfNormal → encabezados col 3-5: blanco + normal + centrado
-  // xfData   → celdas de datos rows 5+: blanco + normal + sin alignment forzado
-  const xfBold   = `<xf numFmtId="0" fontId="${boldFontId}" fillId="${whiteFillId}" borderId="${bId}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">${align}</xf>`;
-  const xfNormal = `<xf numFmtId="0" fontId="0" fillId="${whiteFillId}" borderId="${bId}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">${align}</xf>`;
-  const xfData   = `<xf numFmtId="0" fontId="0" fillId="${whiteFillId}" borderId="${bId}" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>`;
+  // xfBold   → encabezados col 1+2: blanco + negrita + centrado + borde
+  // xfNormal → encabezados col 3-5: blanco + normal + centrado + borde
+  // xfData   → celdas de datos rows 5+: blanco + normal + borde (sin alignment forzado)
+  const xfBold   = `<xf numFmtId="0" fontId="${boldFontId}" fillId="${whiteFillId}" borderId="${thinBorderId}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">${align}</xf>`;
+  const xfNormal = `<xf numFmtId="0" fontId="0" fillId="${whiteFillId}" borderId="${thinBorderId}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">${align}</xf>`;
+  const xfData   = `<xf numFmtId="0" fontId="0" fillId="${whiteFillId}" borderId="${thinBorderId}" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>`;
   sx = sx.replace('</cellXfs>', xfBold + xfNormal + xfData + '</cellXfs>');
   if (xfsM) sx = sx.replace(`<cellXfs count="${xfN}">`, `<cellXfs count="${xfN+3}">`);
 
@@ -326,9 +337,9 @@ async function addNextMonth(buffer, dryRun) {
   xml=insertInRow(xml,3,[
     `<c r="${nMes}3"${a(sM)}><v>${nextSerial}</v></c>`,
     `<c r="${nGc}3" s="${boldIdx}" t="inlineStr"><is><t>GC</t></is></c>`,
-    `<c r="${nCom}3" s="${normalIdx}" t="inlineStr"><is><t>Comentarios</t></is></c>`,
-    `<c r="${nCorr}3" s="${normalIdx}" t="inlineStr"><is><t>Correo Enviado</t></is></c>`,
-    `<c r="${nPag}3" s="${normalIdx}" t="inlineStr"><is><t>Pagado</t></is></c>`,
+    `<c r="${nCom}3" s="${boldIdx}" t="inlineStr"><is><t>Comentarios</t></is></c>`,
+    `<c r="${nCorr}3" s="${boldIdx}" t="inlineStr"><is><t>Correo Enviado</t></is></c>`,
+    `<c r="${nPag}3" s="${boldIdx}" t="inlineStr"><is><t>Pagado</t></is></c>`,
   ].join(""));
   // Fila 4: ambas U.F. con negrita+blanco (las 2 primeras columnas)
   xml=insertInRow(xml,4,[
