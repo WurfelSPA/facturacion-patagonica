@@ -308,6 +308,13 @@ export default async function handler(req, res) {
 
   // ── GET ?addMonth=1 ───────────────────────────────────────────────────────
   if (req.method === "GET" && req.query.addMonth === "1") {
+    const cronSecret = process.env.CRON_SECRET || "";
+    if (cronSecret) {
+      const bearer = (req.headers.authorization || "").replace("Bearer ", "");
+      const query  = req.query.secret || "";
+      if (bearer !== cronSecret && query !== cronSecret)
+        return res.status(401).json({ error: "Unauthorized" });
+    }
     const dryRun = req.query.dry === "1";
     try {
       const token  = await getAccessToken(sa);
