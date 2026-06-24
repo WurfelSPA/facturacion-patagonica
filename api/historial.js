@@ -773,6 +773,62 @@ export default async function handler(req, res) {
       });
     }
 
+    // ── GET ?buildMes=01 ── reconstruye JSON de UN mes desde PISA ZIP (usa Buffer.from) ─
+    if (req.method === "GET" && req.query.buildMes) {
+      const mesBM = req.query.buildMes.padStart(2,"0");
+      const files = await driveFiles(token, FACT_FOLDER_ID);
+      const allZ = files.filter(f => f.name.match(/Facturas XML_PISA_/i));
+      const zf = allZ.find(f => { const m = f.name.match(/PISA[_-](\d{4})[_-](\d{2})\.zip$/i); return m && m[2] === mesBM; });
+      if (!zf) return res.status(200).json({ error:"ZIP no encontrado", mes:mesBM, available:allZ.map(f=>f.name) });
+      const m2 = zf.name.match(/PISA[_-](\d{4})[_-](\d{2})\.zip$/i);
+      const anio = m2[1], mesNum = m2[2];
+      const periodo = `${MES_NOM[mesNum]} ${anio}`;
+      const rz = await fetch(`https://www.googleapis.com/drive/v3/files/${zf.id}?alt=media`,
+        { headers: { Authorization:`Bearer ${token}` } });
+      if (!rz.ok) return res.status(200).json({ error:`Drive ${rz.status}` });
+      const zip = await JSZip.loadAsync(Buffer.from(await rz.arrayBuffer()));
+      const xmlNames = Object.keys(zip.files).filter(n => n.match(/\.xml$/i));
+      const result = {}, errs = [];
+      let totalXml=0, kept=0;
+      for (const xmlName of xmlNames) {
+        totalXml++;
+        try {
+          const xml = await zip.files[xmlName].async("string");
+          const tipoDTE = (xml.match(/<TipoDTE>([^<]+)<\/TipoDTE>/) || [])[1];
+          const isNC = tipoDTE === "61";
+          const rznRaw = (xml.match(/<RznSocRecep>([^<]+)<\/RznSocRecep>/) || [])[1];
+          if (!rznRaw) continue;
+          const nombre = rznRaw.trim();
+          const dte = parseXmlDTE(xml);
+          if (!dte.total || dte.total <= 0) continue;
+          if (!result[anio]) result[anio] = {};
+          if (!result[anio][periodo]) result[anio][periodo] = {};
+          if (!result[anio][periodo][nombre]) result[anio][periodo][nombre] = {};
+          const cs = result[anio][periodo][nombre];
+          if (isNC) {
+            if (!cs["default"]) cs["default"] = {};
+            cs["default"][`NC-${dte.folio}`] = { nro:`NC-${dte.folio}`, uf:null, total:-dte.total };
+            kept++; continue;
+          }
+          const seen = new Set(); let added = false;
+          for (const item of dte.items) {
+            const tipo = _detectTipoFromNmb(item.nmb);
+            if (!tipo) continue;
+            const sitio = (tipo==="arriendo" && item.cod) ? _normCod(item.cod) : "default";
+            const k = `${sitio}|${tipo}`;
+            if (seen.has(k)) continue;
+            seen.add(k);
+            if (!cs[sitio]) cs[sitio] = {};
+            if (!cs[sitio][tipo]) { cs[sitio][tipo] = { nro:`${tipo==="servAdm"?"FEE":"F"}-${dte.folio}`, uf:_ufFromXmlItem(item)||null, total:dte.total }; added=true; }
+          }
+          if (!added) { if (!cs["default"]) cs["default"] = {}; cs["default"][`F${dte.folio}`] = { nro:`F-${dte.folio}`, uf:null, total:dte.total }; }
+          kept++;
+        } catch(e) { errs.push(`${xmlName}: ${e.message}`); }
+      }
+      res.setHeader("Cache-Control","no-store");
+      return res.status(200).json({ json:result, stats:{totalXml,kept}, zipFile:zf.name, periodo, errors:errs });
+    }
+
     // ── GET ?findNC=1[&mes=01] ── encuentra notas de crédito en PISA ZIPs ─
     if (req.method === "GET" && req.query.findNC === "1") {
       const notas = [];
