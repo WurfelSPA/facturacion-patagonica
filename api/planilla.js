@@ -401,7 +401,7 @@ export default async function handler(req, res) {
       // También verificar estilos de celdas clave en el sheet
       const sheetPath2 = await getSheetPath(zip);
       const sheetXml2  = await zip.file(sheetPath2).async("string");
-      const checkRefs  = ["HG3","HH3","HI3","HJ3","HK3","HG4","HH4"];
+      const checkRefs  = ["HB3","HC3","HD3","HE3","HF3","HG3","HH3","HI3","HJ3","HK3","HG4","HH4"];
       const cellStyles = {};
       for (const ref of checkRefs) {
         const rowN = parseInt(ref.match(/\d+/)[0]);
