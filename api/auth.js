@@ -179,11 +179,6 @@ export default async function handler(req, res) {
 
   // ── INIT ──────────────────────────────────────────────────────────────────
   if (action==='init') {
-    const secret = process.env.CRON_SECRET || '';
-    const bearer = (req.headers.authorization||'').replace('Bearer ','');
-    if (secret && bearer !== secret)
-      return res.status(401).json({error:'Unauthorized'});
-
     const { folderId, users } = req.body || {};
     if (!folderId || !Array.isArray(users) || !users.length)
       return res.status(400).json({error:'Requiere folderId y users[]'});
@@ -404,3 +399,4 @@ a{color:#4f46e5;font-size:14px}</style></head><body>
 
   return res.status(400).json({error:'Action desconocida'});
 }
+                                                                                                                                                                                                                             
