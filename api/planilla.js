@@ -398,6 +398,22 @@ export default async function handler(req, res) {
       const lastXfs = allXf.slice(-3);
       // Primeros 200 chars de styles.xml para ver el namespace
       const header = sx.slice(0, 300);
+      // También verificar estilos de celdas clave en el sheet
+      const sheetPath2 = await getSheetPath(zip);
+      const sheetXml2  = await zip.file(sheetPath2).async("string");
+      const checkRefs  = ["HG3","HH3","HI3","HJ3","HK3","HG4","HH4"];
+      const cellStyles = {};
+      for (const ref of checkRefs) {
+        const rowN = parseInt(ref.match(/\d+/)[0]);
+        const rowM = sheetXml2.match(new RegExp(`<row r="${rowN}"(?:\\s[^>]*)?>([\\s\\S]*?)<\\/row>`));
+        if (rowM) {
+          const cellRx = new RegExp(`<c r="${ref}"([^>]*)>`);
+          const cm = rowM[1].match(cellRx);
+          cellStyles[ref] = cm ? (cm[1].match(/s="(\d+)"/) || [,null])[1] : "NOT_FOUND";
+        } else {
+          cellStyles[ref] = "ROW_NOT_FOUND";
+        }
+      }
       return res.status(200).json({
         fillsCount: fillsM ? fillsM[1] : null,
         fontsCount: fontsM ? fontsM[1] : null,
@@ -407,6 +423,7 @@ export default async function handler(req, res) {
         hasClosingCellXfs: hasCellXfs,
         lastXfs,
         header,
+        cellStyles,
       });
     } catch(e) {
       return res.status(500).json({ error: e.message });
