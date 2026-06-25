@@ -3741,6 +3741,8 @@ function App(){
     var savingS=React.useState(false); var setSaving=savingS[1]; var saving=savingS[0];
     var msgS=React.useState(null); var setMsg=msgS[1]; var msg=msgS[0];
     var readOnlyS=React.useState(false); var setReadOnly=readOnlyS[1]; var readOnly=readOnlyS[0];
+    var sortS=React.useState({col:null,dir:"asc"}); var setSort=sortS[1]; var sort=sortS[0];
+    var searchS=React.useState(""); var setSearch=searchS[1]; var search=searchS[0];
 
     React.useEffect(function(){
       if(!planillaFile)return;
@@ -3841,6 +3843,19 @@ function App(){
     var mesLabel=(periodo.split(" ")[0]||"").substring(0,3).toUpperCase()+" UF";
     function fmtUF(v){var n=parseFloat(v);if(isNaN(n)||n===0)return"—";return n.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2});}
 
+    function toggleSort(col){setSort(function(prev){return prev.col===col&&prev.dir==="asc"?{col:col,dir:"desc"}:{col:col,dir:"asc"};});}
+    function sortArrow(col){if(sort.col!==col)return" ↕";return sort.dir==="asc"?" ↑":" ↓";}
+    var displayed=rows.filter(function(r){
+      if(!search.trim())return true;
+      var q=search.toLowerCase().trim();
+      return r.cliente.toLowerCase().includes(q)||r.nombre.toLowerCase().includes(q)||r.rut.toLowerCase().replace(/\./g,"").includes(q.replace(/\./g,""));
+    });
+    if(sort.col){displayed=displayed.slice().sort(function(a,b){
+      var av=a[sort.col]||"",bv=b[sort.col]||"";
+      if(sort.col==="uf"||sort.col==="gc"){av=parseFloat(av)||0;bv=parseFloat(bv)||0;return sort.dir==="asc"?av-bv:bv-av;}
+      av=String(av).toLowerCase();bv=String(bv).toLowerCase();
+      return sort.dir==="asc"?av.localeCompare(bv,"es"):bv.localeCompare(av,"es");
+    });}
     if(loading)return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}},
       h("span",{style:{color:"var(--txm)",fontSize:13}},"Cargando planilla..."));
 
@@ -3852,6 +3867,13 @@ function App(){
           readOnly&&h("span",{style:{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,
             background:"var(--surf3)",color:"var(--txm)",letterSpacing:".04em"}},"SOLO LECTURA")
         ),
+        h("div",{style:{display:"flex",alignItems:"center",gap:6,marginLeft:24,flex:1,maxWidth:320}},
+          h("span",{style:{fontSize:13,color:"var(--txm)"}},"\ud83d\udd0d"),
+          h("input",{type:"text",placeholder:"Buscar por nombre o RUT...",value:search,
+            onChange:function(ev){setSearch(ev.target.value);},
+            style:{flex:1,padding:"5px 10px",borderRadius:8,border:"1px solid var(--bdr)",
+              background:"var(--surf2)",color:"var(--tx)",fontSize:12,fontFamily:"'DM Sans',sans-serif"}})
+        ),
         h("div",{style:{marginLeft:"auto",display:"flex",gap:8,alignItems:"center"}},
           msg&&h("span",{style:{fontSize:12,color:msg.type==="ok"?"var(--green)":"var(--red)"}},msg.text),
           h("button",{onClick:onBack,style:{fontSize:12,padding:"6px 14px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--txm)",cursor:"pointer"}},readOnly?"Cerrar":"Cancelar"),
@@ -3862,26 +3884,42 @@ function App(){
         h("table",{style:{width:"100%",borderCollapse:"collapse"}},
           h("thead",null,
             h("tr",null,
-              h("th",{rowSpan:2,style:{...thBase,background:"var(--surf2)",color:"var(--txm)",verticalAlign:"bottom"}},"Sociedad Arrendadora"),
+              h("th",{rowSpan:2,onClick:function(){toggleSort("nombre");},
+                style:{...thBase,background:"var(--surf2)",color:"var(--txm)",verticalAlign:"bottom",cursor:"pointer"}},
+                "Sociedad Arrendadora",h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,opacity:.7}},sortArrow("nombre"))),
               h("th",{colSpan:4,style:{...thBase,background:"var(--surf2)",color:"var(--txm)",textAlign:"center",borderBottom:"1px solid var(--bdr)"}},"Ubicación"),
               h("th",{colSpan:2,style:{...thBase,background:"var(--surf2)",color:"var(--txm)",textAlign:"center",borderBottom:"1px solid var(--bdr)"}},"Arrendatario"),
-              h("th",{rowSpan:2,style:{...thBase,background:"var(--acc)",color:"#fff",textAlign:"center"}},"jun-26​U.F."),
-              h("th",{rowSpan:2,style:{...thBase,background:"var(--acc)",color:"#fff",textAlign:"center"}},"GC​U.F."),
-              h("th",{rowSpan:2,style:{...thBase,background:"var(--surf2)",color:"var(--txm)"}},"Comentarios"),
-              h("th",{rowSpan:2,style:{...thBase,background:"var(--surf2)",color:"var(--txm)"}},"Correo Enviado"),
-              h("th",{rowSpan:2,style:{...thBase,background:"var(--surf2)",color:"var(--txm)"}},"Pagado")
+              h("th",{rowSpan:2,onClick:function(){toggleSort("uf");},
+                style:{...thBase,background:"var(--acc)",color:"#fff",textAlign:"center",cursor:"pointer"}},
+                "jun-26 U.F.",h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,opacity:.8}},sortArrow("uf"))),
+              h("th",{rowSpan:2,onClick:function(){toggleSort("gc");},
+                style:{...thBase,background:"var(--acc)",color:"#fff",textAlign:"center",cursor:"pointer"}},
+                "GC U.F.",h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,opacity:.8}},sortArrow("gc"))),
+              h("th",{rowSpan:2,onClick:function(){toggleSort("comentarios");},
+                style:{...thBase,background:"var(--surf2)",color:"var(--txm)",cursor:"pointer"}},
+                "Comentarios",h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,opacity:.7}},sortArrow("comentarios"))),
+              h("th",{rowSpan:2,onClick:function(){toggleSort("correoEnviado");},
+                style:{...thBase,background:"var(--surf2)",color:"var(--txm)",cursor:"pointer"}},
+                "Correo Enviado",h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,opacity:.7}},sortArrow("correoEnviado"))),
+              h("th",{rowSpan:2,onClick:function(){toggleSort("pagado");},
+                style:{...thBase,background:"var(--surf2)",color:"var(--txm)",cursor:"pointer"}},
+                "Pagado",h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,opacity:.7}},sortArrow("pagado")))
             ),
             h("tr",null,
-              h("th",{style:{...thBase,background:"var(--surf2)",color:"var(--txm)"}},"Sitios"),
-              h("th",{style:{...thBase,background:"var(--surf2)",color:"var(--txm)"}},"Edificios"),
-              h("th",{style:{...thBase,background:"var(--surf2)",color:"var(--txm)"}},"RUT"),
+              h("th",{onClick:function(){toggleSort("sitio");},style:{...thBase,background:"var(--surf2)",color:"var(--txm)",cursor:"pointer"}},
+                "Sitios",h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,opacity:.7}},sortArrow("sitio"))),
+              h("th",{onClick:function(){toggleSort("edificio");},style:{...thBase,background:"var(--surf2)",color:"var(--txm)",cursor:"pointer"}},
+                "Edificios",h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,opacity:.7}},sortArrow("edificio"))),
+              h("th",{onClick:function(){toggleSort("rut");},style:{...thBase,background:"var(--surf2)",color:"var(--txm)",cursor:"pointer"}},
+                "RUT",h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,opacity:.7}},sortArrow("rut"))),
               h("th",{style:{...thBase,background:"var(--surf2)",color:"var(--txm)",minWidth:130}},"Dir."),
-              h("th",{style:{...thBase,background:"var(--surf2)",color:"var(--txm)",minWidth:180}},"Nombre Cliente"),
+              h("th",{onClick:function(){toggleSort("cliente");},style:{...thBase,background:"var(--surf2)",color:"var(--txm)",minWidth:180,cursor:"pointer"}},
+                "Nombre Cliente",h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,opacity:.7}},sortArrow("cliente"))),
               h("th",{style:{...thBase,background:"var(--surf2)",color:"var(--txm)"}},"Correo")
             )
           ),
           h("tbody",null,
-            rows.map(function(row,i){
+            displayed.map(function(row,i){
               var e=edits[row.key]||{};
               var ufRaw=e.uf!==undefined?e.uf:row.uf;
               var gcRaw=e.gc!==undefined?e.gc:row.gc;
