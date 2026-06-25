@@ -3734,7 +3734,7 @@ function App(){
     );
   };
 
-  function LlenarPlanillaView({periodo,planillaFile,onBack}){
+  function LlenarPlanillaView({periodo,planillaFile,onBack,embedded}){
     var rowsS=React.useState([]); var setRows=rowsS[1]; var rows=rowsS[0];
     var editsS=React.useState({}); var setEdits=editsS[1]; var edits=editsS[0];
     var loadingS=React.useState(true); var setLoading=loadingS[1]; var loading=loadingS[0];
@@ -3856,18 +3856,20 @@ function App(){
       av=String(av).toLowerCase();bv=String(bv).toLowerCase();
       return sort.dir==="asc"?av.localeCompare(bv,"es"):bv.localeCompare(av,"es");
     });}
-    if(loading)return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}},
+    if(loading)return h(embedded?"div":"main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}},
       h("span",{style:{color:"var(--txm)",fontSize:13}},"Cargando planilla..."));
 
-    return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}},
-      h("div",{style:{display:"flex",alignItems:"center",gap:12,padding:"16px 28px",borderBottom:"1px solid var(--bdr)",flexShrink:0}},
-        h("button",{onClick:onBack,style:{background:"none",border:"none",cursor:"pointer",color:"var(--txm)",fontSize:20,lineHeight:1}},"←"),
-        h("div",{style:{display:"flex",alignItems:"center",gap:8}},
+    return h(embedded?"div":"main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0}},
+      h("div",{style:{display:"flex",alignItems:"center",gap:12,padding:embedded?"8px 20px":"16px 28px",borderBottom:"1px solid var(--bdr)",flexShrink:0}},
+        !embedded&&        h("button",{onClick:onBack,style:{background:"none",border:"none",cursor:"pointer",color:"var(--txm)",fontSize:20,lineHeight:1}},"←"),
+        !embedded&&h("div",{style:{display:"flex",alignItems:"center",gap:8}},
           h("span",{style:{fontWeight:700,fontSize:15}},"Llenar Planilla — "+periodo),
           readOnly&&h("span",{style:{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,
             background:"var(--surf3)",color:"var(--txm)",letterSpacing:".04em"}},"SOLO LECTURA")
         ),
-        h("div",{style:{display:"flex",alignItems:"center",gap:6,marginLeft:24,flex:1,maxWidth:320}},
+        embedded&&readOnly&&h("span",{style:{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,
+          background:"var(--surf3)",color:"var(--txm)",letterSpacing:".04em"}},"SOLO LECTURA"),
+        h("div",{style:{display:"flex",alignItems:"center",gap:6,marginLeft:embedded?0:24,flex:1,maxWidth:320}},
           h("span",{style:{fontSize:13,color:"var(--txm)"}},"\ud83d\udd0d"),
           h("input",{type:"text",placeholder:"Buscar por nombre o RUT...",value:search,
             onChange:function(ev){setSearch(ev.target.value);},
@@ -3876,7 +3878,7 @@ function App(){
         ),
         h("div",{style:{marginLeft:"auto",display:"flex",gap:8,alignItems:"center"}},
           msg&&h("span",{style:{fontSize:12,color:msg.type==="ok"?"var(--green)":"var(--red)"}},msg.text),
-          h("button",{onClick:onBack,style:{fontSize:12,padding:"6px 14px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--txm)",cursor:"pointer"}},readOnly?"Cerrar":"Cancelar"),
+          !embedded&&          h("button",{onClick:onBack,style:{fontSize:12,padding:"6px 14px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--txm)",cursor:"pointer"}},readOnly?"Cerrar":"Cancelar"),
           !readOnly&&h("button",{onClick:save,disabled:saving,className:"btn-primary",style:{fontSize:12,padding:"6px 18px",opacity:saving?0.6:1}},saving?"Guardando...":"Guardar")
         )
       ),
@@ -4208,113 +4210,50 @@ function App(){
     /* VIEWS */
     view==="dashboard"&&renderDashboard(dashSitio,dashMes,dashSearch),
 
-    view==="llenar"&&h(LlenarPlanillaView,{periodo,planillaFile:files.planilla,onBack:()=>setView("upload")}),
 
-    view==="upload"&&h("main",{style:{flex:1,display:"flex",alignItems:"flex-start",justifyContent:"center"},className:"fade-up"},
-      h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",gap:24,padding:"40px 40px 40px"}},
-
-        /* ── Pills: Llenar + Subir Planilla ── */
-        h("div",{style:{display:"flex",gap:10,justifyContent:"center"}},
-          h("button",{
-            style:{fontSize:12,fontWeight:600,padding:"7px 18px",borderRadius:20,border:"1px solid var(--bdr)",
-              background:"var(--surf)",color:"var(--txm)",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"},
-            onClick:()=>setView("llenar")
-          },"\u25cf Llenar Planilla "+periodo),
-          files.planilla&&h("button",{
-            disabled:true,
-            style:{fontSize:12,fontWeight:600,padding:"7px 18px",borderRadius:20,border:"1px solid var(--bdr)",
-              background:"var(--surf)",color:"var(--txm)",cursor:"not-allowed",opacity:0.45,fontFamily:"'DM Sans',sans-serif"},
-            onClick:async()=>{
-              try{
-                const token=await getToken();
-                notify("Leyendo comentarios de la planilla...","info");
-                const grupos=await extraerComentariosMes(files.planilla,periodo);
-                const sitiosConComentarios=Object.keys(grupos).filter(s=>grupos[s].length>0);
-                let bodyHtml=`<p>Estimados,</p><p>Adjunto planilla facturación <strong>${periodo}</strong></p>`;
-                if(sitiosConComentarios.length===0){
-                  bodyHtml+=`<p>Sin comentarios especiales para este período.</p>`;
-                } else {
-                  for(const sitio of sitiosConComentarios){
-                    bodyHtml+=`<p><strong>Sitio ${sitio}</strong></p><ul>`;
-                    for(const {edif,cliente,comentario} of grupos[sitio]){
-                      bodyHtml+=`<li><strong>${cliente}</strong>${edif?` ${edif}`:""}:&nbsp;${comentario}</li>`;
-                    }
-                    bodyHtml+=`</ul>`;
-                  }
-                }
-                bodyHtml+=`<br><p>Quedo atento a sus comentarios</p><p>Saludos</p>`;
-                bodyHtml+=`<br><hr><p style="color:#999;font-size:11px">Este correo fue generado automáticamente con apoyo de inteligencia artificial.</p>`;
-                const planBuf=await readFileAsBuffer(files.planilla);
-                const planBytes=new Uint8Array(planBuf);
-                let binary="";
-                for(let i=0;i<planBytes.length;i+=8192) binary+=String.fromCharCode(...planBytes.subarray(i,i+8192));
-                const planB64=btoa(binary);
-                const planNombre=`Planilla Facturación ${periodo}.xlsx`;
-                const subject=`Facturación ${periodo}`;
-                const TO="bpulgar@patagonica.cl,contabilidad@patagonica.cl";
-                const CC="mmunoz@patagonica.cl,alagies@patagonica.cl";
-                await sendGmail(token,TO,CC,REMITENTE,subject,bodyHtml,planB64,planNombre,
-                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-                notify(`\u2713 Planilla ${periodo} enviada`,"ok");
-              }catch(e){notify("Error: "+e.message,"err");}
-            }
-          },"\u25cf Subir Planilla "+periodo)
+    view==="upload"&&h("main",{style:{flex:1,display:"flex",flexDirection:"column"},className:"fade-up"},
+      h("div",{style:{display:"flex",alignItems:"center",gap:12,padding:"14px 28px",borderBottom:"1px solid var(--bdr)",flexShrink:0,flexWrap:"wrap"}},
+        h("select",{
+          value:periodo,
+          onChange:e=>{ const p=e.target.value; if(p!==periodo){ periodoActivado.current=false;autoProcesado.current=false;autoNuboxRef.current=false;setPeriodo(p);setZipStatus("idle");setData([]); } },
+          style:{fontSize:14,fontWeight:600,padding:"9px 14px",background:"var(--surf)",color:"var(--tx)",border:"1px solid var(--bdr)",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",minWidth:170}
+        },
+          [...PERIODOS].reverse().map(p=>h("option",{key:p,value:p},p))
         ),
-
-        /* ── Selector + Botón ── */
-        h("div",{style:{display:"flex",alignItems:"center",gap:12}},
-          h("select",{
-            value:periodo,
-            onChange:e=>{ const p=e.target.value; if(p!==periodo){ periodoActivado.current=false;autoProcesado.current=false;autoNuboxRef.current=false;setPeriodo(p);setZipStatus("idle");setData([]); } },
-            style:{fontSize:14,fontWeight:600,padding:"9px 14px",background:"var(--surf)",color:"var(--tx)",border:"1px solid var(--bdr)",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",minWidth:170}
-          },
-            [...PERIODOS].reverse().map(p=>h("option",{key:p,value:p},p))
-          ),
-          h("button",{
-            className:"btn-primary",
-            style:{fontSize:14,minWidth:190,opacity:(zipStatus==="loading"||zipStatus==="splitting"||splitLoading)?0.6:1},
-            disabled:zipStatus==="loading"||zipStatus==="splitting"||splitLoading,
-            onClick:()=>{
-              periodoActivado.current=true;autoProcesado.current=false;autoNuboxRef.current=false;
-              setZipStatus("idle");setData([]);
-              buscarZip(periodo);
-            }
-          },
-            zipStatus==="loading"||zipStatus==="splitting"||splitLoading
-              ?h("span",{style:{display:"flex",alignItems:"center",gap:6}},h("span",{className:"spin"},"⟳")," Procesando...")
-              :"▶ Procesar "+periodo
-          )
+        h("button",{
+          className:"btn-primary",
+          style:{fontSize:14,minWidth:190,opacity:(zipStatus==="loading"||zipStatus==="splitting"||splitLoading)?0.6:1},
+          disabled:zipStatus==="loading"||zipStatus==="splitting"||splitLoading,
+          onClick:()=>{
+            periodoActivado.current=true;autoProcesado.current=false;autoNuboxRef.current=false;
+            setZipStatus("idle");setData([]);
+            buscarZip(periodo);
+          }
+        },
+          zipStatus==="loading"||zipStatus==="splitting"||splitLoading
+            ?h("span",{style:{display:"flex",alignItems:"center",gap:6}},h("span",{className:"spin"},"⟳")," Procesando...")
+            :"▶ Procesar "+periodo
         ),
-
-        /* ── Estado / feedback ── */
-        (zipStatus==="loading"||zipStatus==="splitting"||splitLoading||zipStatus==="error"||zipStatus==="missing")&&
-        h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",gap:10,minWidth:320}},
-          /* Barra de progreso */
-          (zipStatus==="loading"||zipStatus==="splitting"||splitLoading)&&
-          h("div",{style:{width:320,height:3,background:"var(--surf3)",borderRadius:2,overflow:"hidden"}},
-            h("div",{style:{height:"100%",borderRadius:2,background:"linear-gradient(90deg,var(--acc),var(--acc2))",
-              width:zipStatus==="splitting"?"60%":zipStatus==="loading"?"35%":"20%",transition:"width .5s ease"}})
-          ),
-          /* Texto de estado */
-          h("div",{style:{fontSize:12,color:"var(--txd)",fontStyle:"italic"}},
-            zipStatus==="splitting"?"Separando facturas..."
-            :splitLoading?"Descargando desde Nubox..."
-            :zipStatus==="loading"?"Buscando PDFs en Drive..."
-            :zipStatus==="error"?h("span",{style:{color:"var(--red)",fontStyle:"normal"}},zipError||"Error al buscar PDFs")
-            :""
-          ),
-          /* Error — reintentar */
-          zipStatus==="error"&&h("button",{
-            onClick:()=>buscarZip(periodo),
-            style:{fontSize:11,padding:"4px 12px",borderRadius:7,border:"1px solid var(--rdim)",background:"transparent",color:"var(--red)",cursor:"pointer"}
-          },"↺ Reintentar"),
-          /* Fallback manual — cuando Nubox no responde */
-          zipStatus==="missing"&&!canGenerate&&!splitLoading&&
-          h("label",{
-            style:{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,padding:"6px 16px",borderRadius:8,
-              border:"1px solid var(--adim)",background:"var(--abg)",color:"var(--amber)",cursor:"pointer",fontWeight:600,marginTop:4}
-          },
-            h("input",{type:"file",accept:"application/pdf",style:{display:"none"},
+        h("button",{
+          disabled:true,
+          style:{fontSize:12,fontWeight:600,padding:"7px 18px",borderRadius:20,border:"1px solid var(--bdr)",
+            background:"var(--surf)",color:"var(--txm)",cursor:"not-allowed",opacity:0.45,fontFamily:"'DM Sans',sans-serif"}
+        },"\u25cf Subir Planilla "+periodo),
+        (zipStatus==="loading"||zipStatus==="splitting"||splitLoading)&&
+        h("span",{style:{fontSize:12,color:"var(--txd)",fontStyle:"italic",marginLeft:4}},
+          zipStatus==="splitting"?"Separando facturas...":splitLoading?"Descargando desde Nubox...":"Buscando PDFs en Drive..."
+        ),
+        zipStatus==="error"&&h("span",{style:{fontSize:12,color:"var(--red)",marginLeft:4}},zipError||"Error al buscar PDFs"),
+        zipStatus==="error"&&h("button",{
+          onClick:()=>buscarZip(periodo),
+          style:{fontSize:11,padding:"4px 12px",borderRadius:7,border:"1px solid var(--rdim)",background:"transparent",color:"var(--red)",cursor:"pointer"}
+        },"\u21ba Reintentar"),
+        zipStatus==="missing"&&!canGenerate&&!splitLoading&&
+        h("label",{
+          style:{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,padding:"6px 16px",borderRadius:8,
+            border:"1px solid var(--adim)",background:"var(--abg)",color:"var(--amber)",cursor:"pointer",fontWeight:600}
+        },
+          h("input",{type:"file",accept:"application/pdf",style:{display:"none"},
               onChange:async ev=>{
                 const file=ev.target.files[0]; if(!file)return;
                 setZipStatus("splitting");
@@ -4364,10 +4303,14 @@ function App(){
                 ev.target.value="";
               }
             }),
-            "📄 Subir PDF manualmente"
-          )
+          "📄 Subir PDF manualmente"
         )
-      )
+      ),
+      files.planilla
+        ?h(LlenarPlanillaView,{periodo,planillaFile:files.planilla,embedded:true})
+        :h("div",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--txd)",fontSize:13}},
+            "Carga la planilla en el Dashboard para visualizar los datos del período"
+          )
     ),
     view==="table"&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflowX:"hidden",background:"#eef4fd"},className:"fade-up"},
       h("div",{style:{display:"grid",gridTemplateColumns:"repeat(5,1fr)",borderBottom:"1px solid #b8d0ee",background:"#ddeaf8"}},
