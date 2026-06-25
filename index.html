@@ -3775,14 +3775,20 @@ function App(){
           var row=raw[ri];if(!row)continue;
           var cliente=row[5];
           if(!cliente||EXCL.includes(String(cliente).trim()))continue;
+          var nombre=String(row[0]||"").trim();
           var sitio=String(row[1]||"").trim();
           var edificio=String(row[2]||"").trim();
           var rut=String(row[3]||"").trim();
+          var dir=String(row[4]||"").trim();
           var clienteStr=String(cliente).trim();
+          var correo=String(row[6]||"").trim();
           var key=sitio+"|"+edificio+"|"+rut+"|"+clienteStr;
           var uf=colMes>=0?(parseFloat(row[colMes])||0):0;
           var gc=colGC>=0?(parseFloat(row[colGC])||0):0;
-          parsed.push({key,sitio,edificio,rut,cliente:clienteStr,uf,gc});
+          var comentarios=colMes>=0?String(row[colMes+2]||"").trim():"";
+          var correoEnviado=colMes>=0?String(row[colMes+3]||"").trim():"";
+          var pagado=colMes>=0?String(row[colMes+4]||"").trim():"";
+          parsed.push({key,nombre,sitio,edificio,rut,dir,cliente:clienteStr,correo,uf,gc,comentarios,correoEnviado,pagado});
         }
         if(!cancelled)setRows(parsed);
         if(!colExists){
@@ -3856,12 +3862,22 @@ function App(){
         h("table",{style:{width:"100%",borderCollapse:"collapse"}},
           h("thead",null,
             h("tr",null,
-              h("th",{style:{...thBase,background:"var(--surf2)",color:"var(--txm)"}},"Sitio"),
-              h("th",{style:{...thBase,background:"var(--surf2)",color:"var(--txm)"}},"Edificio"),
+              h("th",{rowSpan:2,style:{...thBase,background:"var(--surf2)",color:"var(--txm)",verticalAlign:"bottom"}},"Sociedad Arrendadora"),
+              h("th",{colSpan:4,style:{...thBase,background:"var(--surf2)",color:"var(--txm)",textAlign:"center",borderBottom:"1px solid var(--bdr)"}},"Ubicación"),
+              h("th",{colSpan:2,style:{...thBase,background:"var(--surf2)",color:"var(--txm)",textAlign:"center",borderBottom:"1px solid var(--bdr)"}},"Arrendatario"),
+              h("th",{rowSpan:2,style:{...thBase,background:"var(--acc)",color:"#fff",textAlign:"center"}},"jun-26​U.F."),
+              h("th",{rowSpan:2,style:{...thBase,background:"var(--acc)",color:"#fff",textAlign:"center"}},"GC​U.F."),
+              h("th",{rowSpan:2,style:{...thBase,background:"var(--surf2)",color:"var(--txm)"}},"Comentarios"),
+              h("th",{rowSpan:2,style:{...thBase,background:"var(--surf2)",color:"var(--txm)"}},"Correo Enviado"),
+              h("th",{rowSpan:2,style:{...thBase,background:"var(--surf2)",color:"var(--txm)"}},"Pagado")
+            ),
+            h("tr",null,
+              h("th",{style:{...thBase,background:"var(--surf2)",color:"var(--txm)"}},"Sitios"),
+              h("th",{style:{...thBase,background:"var(--surf2)",color:"var(--txm)"}},"Edificios"),
               h("th",{style:{...thBase,background:"var(--surf2)",color:"var(--txm)"}},"RUT"),
+              h("th",{style:{...thBase,background:"var(--surf2)",color:"var(--txm)",minWidth:130}},"Dir."),
               h("th",{style:{...thBase,background:"var(--surf2)",color:"var(--txm)",minWidth:180}},"Nombre Cliente"),
-              h("th",{style:{...thBase,background:"var(--acc)",color:"#fff",textAlign:"right"}},mesLabel),
-              h("th",{style:{...thBase,background:"var(--acc)",color:"#fff",textAlign:"right"}},"GC UF")
+              h("th",{style:{...thBase,background:"var(--surf2)",color:"var(--txm)"}},"Correo")
             )
           ),
           h("tbody",null,
@@ -3872,10 +3888,13 @@ function App(){
               var ufVal=ufRaw!==undefined&&ufRaw!==null&&ufRaw!==""?(parseFloat(ufRaw)||0).toFixed(4):"";
               var gcVal=gcRaw!==undefined&&gcRaw!==null&&gcRaw!==""?(parseFloat(gcRaw)||0).toFixed(4):"";
               return h("tr",{key:row.key,style:{background:i%2===0?"var(--surf)":"var(--surf2)"}},
+                h("td",{style:{...tdBase,whiteSpace:"nowrap"}},row.nombre),
                 h("td",{style:tdBase},row.sitio),
                 h("td",{style:tdBase},row.edificio),
                 h("td",{style:{...tdBase,fontFamily:"'DM Mono',monospace",fontSize:11}},row.rut),
-                h("td",{style:{...tdBase,maxWidth:220,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},row.cliente),
+                h("td",{style:{...tdBase,maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontSize:11}},row.dir),
+                h("td",{style:{...tdBase,maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},row.cliente),
+                h("td",{style:{...tdBase,fontSize:11,maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},row.correo),
                 h("td",{style:{...tdBase,textAlign:"right",fontFamily:"'DM Mono',monospace"}},
                   readOnly?h("span",null,fmtUF(ufVal)):h("input",{type:"number",step:"0.0001",min:"0",value:ufVal,
                     onChange:function(ev){setEdit(row.key,"uf",ev.target.value);},style:inputStyle})
@@ -3883,7 +3902,10 @@ function App(){
                 h("td",{style:{...tdBase,textAlign:"right",fontFamily:"'DM Mono',monospace"}},
                   readOnly?h("span",null,fmtUF(gcVal)):h("input",{type:"number",step:"0.0001",min:"0",value:gcVal,
                     onChange:function(ev){setEdit(row.key,"gc",ev.target.value);},style:inputStyle})
-                )
+                ),
+                h("td",{style:{...tdBase,fontSize:11,maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},row.comentarios||"—"),
+                h("td",{style:{...tdBase,textAlign:"center",fontSize:11}},row.correoEnviado||"—"),
+                h("td",{style:{...tdBase,textAlign:"center",fontSize:11}},row.pagado||"—")
               );
             })
           )
