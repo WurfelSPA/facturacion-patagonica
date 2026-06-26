@@ -1799,7 +1799,8 @@ function FactxCobrarView({notify}){
   }
 
   function parseSheetValues(values){
-    if(!values||values.length<2)throw new Error("Sin datos en la hoja Base");
+    if(!values||values.length<2)throw new Error("Sin datos ("+( values?values.length:0)+" filas)");
+    // Normalize headers: lowercase, strip spaces/newlines/underscores
     var hdr=values[0].map(function(h){return String(h||"").toLowerCase().replace(/[\r\n\s_]/g,"");});
     function fi(tests){
       for(var i=0;i<hdr.length;i++){for(var t=0;t<tests.length;t++){if(hdr[i].includes(tests[t]))return i;}}
@@ -1812,13 +1813,14 @@ function FactxCobrarView({notify}){
     var iGlosa=fi(["glosa"]); if(iGlosa<0)iGlosa=5;
     var iFolio=fi(["folio"]); if(iFolio<0)iFolio=8;
     var iVcto=fi(["vcto"]); if(iVcto<0)iVcto=9;
-    var iDiasDoc=fi(["diasdoc","ddoc","dias\ndoc"]); if(iDiasDoc<0)iDiasDoc=11;
-    var iMonto=fi(["montoc","monto\nc","c/d(ml)"]); if(iMonto<0)iMonto=13;
+    var iDiasDoc=fi(["diasdoc","ddoc","diaspag"]); if(iDiasDoc<0)iDiasDoc=11;
+    var iMonto=fi(["monto","c/d(ml)","c/d(m"]); if(iMonto<0)iMonto=13;
     var iSdo=fi(["sdo","vencido"]); if(iSdo<0)iSdo=14;
-    return values.slice(1).filter(function(r){
-      return r[iCliente]&&(r[iMonto]||r[iSdo]);
+    function n(v){return parseFloat(String(v||"0").replace(/[^0-9.\-]/g,""))||0;}
+    // Filter: row must have a client name and enough columns
+    var out=values.slice(1).filter(function(r){
+      return r.length>4 && String(r[iCliente]||"").trim()!=="" && String(r[iCliente]||"").trim()!=="Cliente";
     }).map(function(r){
-      function n(v){return parseFloat(String(v||"0").replace(/[^0-9.\-]/g,""))||0;}
       return{
         fecha:String(r[iFecha]||"").trim(),
         tipo:String(r[iTipo]||"").trim(),
@@ -1831,7 +1833,8 @@ function FactxCobrarView({notify}){
         monto:n(r[iMonto]),
         sdoVencido:n(r[iSdo]),
       };
-    });
+    }).filter(function(r){return r.monto>0||r.sdoVencido>0;});
+    return out;
   }
 
   function loadFromDrive(){
@@ -1844,11 +1847,16 @@ function FactxCobrarView({notify}){
       })
       .then(function(buf){
         var wb=XLSX.read(new Uint8Array(buf),{type:"array"});
-        var ws=wb.Sheets["Base"];
-        if(!ws)throw new Error("No se encontró la hoja 'Base' en el archivo");
-        var raw=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:""});
+        // Try sheet names in order of preference
+        var sheetNames=wb.SheetNames||[];
+        var ws=wb.Sheets["Base"]||wb.Sheets["base"]||wb.Sheets["BASE"]||wb.Sheets[sheetNames[0]];
+        if(!ws)throw new Error("No se encontró hoja. Hojas disponibles: "+sheetNames.join(", "));
+        var raw=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
+        if(raw.length<2)throw new Error("Hoja vacía ("+raw.length+" filas). Hojas: "+sheetNames.join(", "));
         var parsed=parseSheetValues(raw);
+        if(parsed.length===0)throw new Error("0 filas con datos. Hojas: "+sheetNames.join(", ")+". Headers: "+JSON.stringify(raw[0]).slice(0,150));
         setRows(parsed); setLoading(false);
+        if(notify)notify(parsed.length+" documentos cargados desde Drive","ok");
       })
       .catch(function(e){setError(e.message); setLoading(false);});
   }
