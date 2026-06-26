@@ -1766,14 +1766,15 @@ async function generarBorradorNuevaDenominacion(c, pdfTexto){
 ═══════════════════════════════════ */
 function FactxCobrarView({notify}){
   var rowsS=React.useState([]); var rows=rowsS[0]; var setRows=rowsS[1];
-  var loadingS=React.useState(false); var loading=loadingS[0]; var setLoading=loadingS[1];
-  var fileNameS=React.useState(null); var fileName=fileNameS[0]; var setFileName=fileNameS[1];
+  var loadingS=React.useState(true); var loading=loadingS[0]; var setLoading=loadingS[1];
+  var errorS=React.useState(null); var error=errorS[0]; var setError=errorS[1];
   var searchS=React.useState(""); var search=searchS[0]; var setSearch=searchS[1];
   var filterBucketS=React.useState("all"); var filterBucket=filterBucketS[0]; var setFilterBucket=filterBucketS[1];
   var filterTipoS=React.useState("all"); var filterTipo=filterTipoS[0]; var setFilterTipo=filterTipoS[1];
   var sortS=React.useState({col:null,dir:"asc"}); var sort=sortS[0]; var setSort=sortS[1];
 
   function getBucket(d){
+    d=parseFloat(d)||0;
     if(d<=30)return"<=30";
     if(d<=60)return"31-60";
     if(d<=90)return"61-90";
@@ -1797,8 +1798,56 @@ function FactxCobrarView({notify}){
     return m[b]||"var(--bdr)";
   }
 
-  function parseFile(file){
-    setLoading(true);
+  function parseSheetValues(values){
+    if(!values||values.length<2)throw new Error("Sin datos en la hoja Base");
+    var hdr=values[0].map(function(h){return String(h||"").toLowerCase().replace(/[\r\n\s_]/g,"");});
+    function fi(tests){
+      for(var i=0;i<hdr.length;i++){for(var t=0;t<tests.length;t++){if(hdr[i].includes(tests[t]))return i;}}
+      return -1;
+    }
+    var iFecha=fi(["fecha"]); if(iFecha<0)iFecha=1;
+    var iTipo=fi(["tipo"]); if(iTipo<0)iTipo=2;
+    var iCod=fi(["cod"]); if(iCod<0)iCod=3;
+    var iCliente=fi(["cliente"]); if(iCliente<0)iCliente=4;
+    var iGlosa=fi(["glosa"]); if(iGlosa<0)iGlosa=5;
+    var iFolio=fi(["folio"]); if(iFolio<0)iFolio=8;
+    var iVcto=fi(["vcto"]); if(iVcto<0)iVcto=9;
+    var iDiasDoc=fi(["diasdoc","ddoc","dias\ndoc"]); if(iDiasDoc<0)iDiasDoc=11;
+    var iMonto=fi(["montoc","monto\nc","c/d(ml)"]); if(iMonto<0)iMonto=13;
+    var iSdo=fi(["sdo","vencido"]); if(iSdo<0)iSdo=14;
+    return values.slice(1).filter(function(r){
+      return r[iCliente]&&(r[iMonto]||r[iSdo]);
+    }).map(function(r){
+      function n(v){return parseFloat(String(v||"0").replace(/[^0-9.\-]/g,""))||0;}
+      return{
+        fecha:String(r[iFecha]||"").trim(),
+        tipo:String(r[iTipo]||"").trim(),
+        rut:String(r[iCod]||"").trim(),
+        cliente:String(r[iCliente]||"").trim(),
+        glosa:String(r[iGlosa]||"").trim(),
+        folio:String(r[iFolio]||"").trim(),
+        vcto:String(r[iVcto]||"").trim(),
+        diasDoc:n(r[iDiasDoc]),
+        monto:n(r[iMonto]),
+        sdoVencido:n(r[iSdo]),
+      };
+    });
+  }
+
+  function loadFromDrive(){
+    setLoading(true); setError(null);
+    fetch("/api/historial?fxc=1")
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(d.error)throw new Error(d.error);
+        var parsed=parseSheetValues(d.values||[]);
+        setRows(parsed); setLoading(false);
+      })
+      .catch(function(e){setError(e.message); setLoading(false);});
+  }
+
+  function loadFromFile(file){
+    setLoading(true); setError(null);
     var reader=new FileReader();
     reader.onload=function(ev){
       try{
@@ -1806,27 +1855,15 @@ function FactxCobrarView({notify}){
         var ws=wb.Sheets["Base"];
         if(!ws){throw new Error("No se encontró la hoja 'Base'");}
         var raw=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:""});
-        var parsed=raw.slice(1).filter(function(r){return r[4]&&r[13];}).map(function(r){
-          return{
-            fecha:String(r[1]||"").trim(),
-            tipo:String(r[2]||"").trim(),
-            rut:String(r[3]||"").trim(),
-            cliente:String(r[4]||"").trim(),
-            glosa:String(r[5]||"").trim(),
-            folio:String(r[8]||"").trim(),
-            vcto:String(r[9]||"").trim(),
-            diasPag:parseFloat(String(r[10]).replace(/[^0-9.\-]/g,""))||0,
-            diasDoc:parseFloat(String(r[11]).replace(/[^0-9.\-]/g,""))||0,
-            monto:parseFloat(String(r[13]).replace(/[^0-9.\-]/g,""))||0,
-            sdoVencido:parseFloat(String(r[14]).replace(/[^0-9.\-]/g,""))||0,
-          };
-        });
-        setRows(parsed);setFileName(file.name);setLoading(false);
+        var parsed=parseSheetValues(raw);
+        setRows(parsed); setLoading(false);
         if(notify)notify(parsed.length+" documentos cargados","ok");
-      }catch(e){if(notify)notify("Error: "+e.message,"err");setLoading(false);}
+      }catch(e){setError(e.message); setLoading(false);}
     };
     reader.readAsArrayBuffer(file);
   }
+
+  React.useEffect(function(){loadFromDrive();},[]);
 
   function toggleSort(col){
     setSort(function(prev){return prev.col===col&&prev.dir==="asc"?{col:col,dir:"desc"}:{col:col,dir:"asc"};});
@@ -1856,26 +1893,29 @@ function FactxCobrarView({notify}){
     return sort.dir==="asc"?av.localeCompare(bv,"es"):bv.localeCompare(av,"es");
   });}
 
-  if(!rows.length&&!loading){
-    return h("main",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:24},className:"fade-up"},
-      h("div",{style:{textAlign:"center",maxWidth:440}},
-        h("div",{style:{fontSize:48,marginBottom:12}},"💰"),
-        h("div",{style:{fontSize:20,fontWeight:700,color:"var(--tx)",marginBottom:8}},"Facturas x Cobrar"),
-        h("div",{style:{fontSize:13,color:"var(--txm)",marginBottom:28,lineHeight:1.6}},"Carga el archivo mensual para visualizar el estado de cuentas por cobrar de PISA"),
-        h("label",{style:{display:"inline-flex",alignItems:"center",gap:8,background:"linear-gradient(135deg,var(--acc),var(--acc2))",color:"#fff",borderRadius:10,padding:"11px 28px",fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}},
-          "📂 Cargar F x Cobrar Pisa.xlsx",
-          h("input",{type:"file",accept:".xlsx",style:{display:"none"},onChange:function(e){if(e.target.files[0])parseFile(e.target.files[0]);}})
-        ),
-        h("div",{style:{fontSize:11,color:"var(--txd)",marginTop:12}},"Archivo esperado: F x Cobrar Pisa.xlsx — hoja Base")
+  if(loading){
+    return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}},
+      h("div",{style:{textAlign:"center",color:"var(--txm)"}},
+        h("div",{style:{fontSize:28,marginBottom:12}},"⏳"),
+        h("div",{style:{fontSize:13,fontWeight:600}},"Cargando Facturas x Cobrar..."),
+        h("div",{style:{fontSize:11,color:"var(--txd)",marginTop:4}},"Leyendo desde Google Drive")
       )
     );
   }
 
-  if(loading){
-    return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}},
-      h("div",{style:{textAlign:"center",color:"var(--txm)"}},
-        h("div",{style:{fontSize:24,marginBottom:8}},"⟳"),
-        "Procesando archivo..."
+  if(error){
+    return h("main",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16},className:"fade-up"},
+      h("div",{style:{textAlign:"center",maxWidth:460}},
+        h("div",{style:{fontSize:34,marginBottom:10}},"⚠️"),
+        h("div",{style:{fontSize:15,fontWeight:700,color:"var(--tx)",marginBottom:6}},"No se pudo cargar desde Drive"),
+        h("div",{style:{fontSize:11,color:"#ef4444",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:8,padding:"10px 14px",marginBottom:16,fontFamily:"'DM Mono',monospace",wordBreak:"break-all",textAlign:"left"}},error),
+        h("div",{style:{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}},
+          h("button",{onClick:loadFromDrive,style:{padding:"9px 20px",background:"var(--acc)",color:"#fff",border:"none",borderRadius:9,fontSize:12,fontWeight:700,cursor:"pointer"}},"🔄 Reintentar"),
+          h("label",{style:{display:"inline-flex",alignItems:"center",gap:6,padding:"9px 20px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:9,fontSize:12,fontWeight:600,cursor:"pointer",color:"var(--txm)"}},
+            "📂 Cargar archivo manual",
+            h("input",{type:"file",accept:".xlsx",style:{display:"none"},onChange:function(e){if(e.target.files[0])loadFromFile(e.target.files[0]);}})
+          )
+        )
       )
     );
   }
@@ -1888,7 +1928,6 @@ function FactxCobrarView({notify}){
   var rightCols=new Set(["monto","sdoVencido","diasDoc"]);
 
   return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up"},
-    /* Toolbar */
     h("div",{style:{display:"flex",alignItems:"center",gap:10,padding:"10px 24px",borderBottom:"1px solid var(--bdr)",flexShrink:0,flexWrap:"wrap",background:"var(--surf)"}},
       h("input",{type:"text",placeholder:"Buscar cliente, RUT o folio...",value:search,
         onChange:function(e){setSearch(e.target.value);},
@@ -1901,17 +1940,18 @@ function FactxCobrarView({notify}){
       ),
       filterBucket!=="all"&&h("button",{onClick:function(){setFilterBucket("all");},
         style:{padding:"6px 12px",background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,fontSize:11,fontWeight:600,color:"#ef4444",cursor:"pointer"}},
-        "× Limitar filtro: "+bucketLabel(filterBucket)),
-      h("div",{style:{marginLeft:"auto",display:"flex",gap:6,alignItems:"center"}},
-        h("span",{style:{fontSize:11,color:"var(--txd)"}},(search||filterBucket!=="all"||filterTipo!=="all")?displayed.length+" de "+rows.length+" docs":rows.length+" docs"),
-        fileName&&h("span",{style:{fontSize:10,color:"var(--txd)",maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},fileName),
-        h("label",{style:{display:"inline-flex",alignItems:"center",gap:5,background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:8,padding:"5px 10px",fontSize:11,fontWeight:600,cursor:"pointer",color:"var(--txm)"}},
-          "🔄 Cambiar",
-          h("input",{type:"file",accept:".xlsx",style:{display:"none"},onChange:function(e){if(e.target.files[0])parseFile(e.target.files[0]);}})
+        "× Quitar filtro: "+bucketLabel(filterBucket)),
+      h("div",{style:{marginLeft:"auto",display:"flex",gap:8,alignItems:"center"}},
+        h("span",{style:{fontSize:11,color:"var(--txd)"}},
+          (search||filterBucket!=="all"||filterTipo!=="all")?displayed.length+" de "+rows.length+" docs":rows.length+" docs · "+totalClientes+" clientes"),
+        h("button",{onClick:loadFromDrive,title:"Recargar desde Drive",
+          style:{padding:"5px 10px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:8,fontSize:12,cursor:"pointer",color:"var(--txm)"}},"🔄"),
+        h("label",{title:"Cargar archivo manual",style:{display:"inline-flex",alignItems:"center",gap:5,background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:8,padding:"5px 10px",fontSize:11,fontWeight:600,cursor:"pointer",color:"var(--txm)"}},
+          "📂 Manual",
+          h("input",{type:"file",accept:".xlsx",style:{display:"none"},onChange:function(e){if(e.target.files[0])loadFromFile(e.target.files[0]);}})
         )
       )
     ),
-    /* Summary cards */
     h("div",{style:{display:"flex",gap:10,padding:"14px 24px",flexShrink:0,borderBottom:"1px solid var(--bdr)",background:"var(--surf2)",overflowX:"auto"}},
       h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,padding:"12px 18px",minWidth:170,flexShrink:0}},
         h("div",{style:{fontSize:10,color:"var(--txd)",fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",marginBottom:4}},"Total por Cobrar"),
@@ -1930,7 +1970,6 @@ function FactxCobrarView({notify}){
         );
       })
     ),
-    /* Table */
     h("div",{style:{flex:1,overflowY:"auto",overflowX:"auto",minHeight:0}},
       displayed.length===0
         ?h("div",{style:{padding:"60px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados para el filtro aplicado")

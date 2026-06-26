@@ -598,6 +598,21 @@ export default async function handler(req, res) {
   try {
     const token = await getToken(sa);
 
+    // ── GET ?fxc=1 ── Facturas x Cobrar desde Google Sheets ──────────────
+    if (req.method === "GET" && req.query.fxc === "1") {
+      const FXC_ID = "1otFPi_fUWBJNGVKAhG08sq46epibkvGA";
+      const range = "Base!A:P";
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${FXC_ID}/values/${encodeURIComponent(range)}`;
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (!r.ok) {
+        const err = await r.text();
+        return res.status(r.status).json({ error: `Sheets API ${r.status}: ${err.slice(0,300)}` });
+      }
+      const data = await r.json();
+      res.setHeader("Cache-Control", "private, max-age=300");
+      return res.status(200).json({ values: data.values || [] });
+    }
+
     // ── GET ?ls=FOLDER_ID ── lista carpeta Drive ───────────────────────────
     if (req.method === "GET" && req.query.ls) {
       const folderId = req.query.ls;
