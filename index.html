@@ -2004,34 +2004,55 @@ function FactxCobrarView({notify}){
               })
             )
           ),
-          h("tbody",null,
-            displayed.map(function(r,i){
-              var b=getBucket(r.diasDoc);
-              return h("tr",{key:i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"rgba(0,0,0,0.015)"}},
-                h("td",{style:{padding:"8px 12px",color:"var(--tx)",fontWeight:600,maxWidth:190,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},r.cliente),
-                h("td",{style:{padding:"8px 12px",color:"var(--txm)",fontFamily:"'DM Mono',monospace",fontSize:11}},r.rut),
-                h("td",{style:{padding:"8px 12px",color:"var(--txm)",fontFamily:"'DM Mono',monospace",fontSize:11}},r.folio),
-                h("td",{style:{padding:"8px 12px"}},
-                  h("span",{style:{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:8,
-                    background:r.tipo==="Fact_Bol"?"rgba(59,130,246,0.10)":"rgba(156,163,175,0.12)",
-                    color:r.tipo==="Fact_Bol"?"#3b82f6":"var(--txm)",
-                    border:r.tipo==="Fact_Bol"?"1px solid rgba(59,130,246,0.25)":"1px solid var(--bdr)"}},
-                    r.tipo==="Fact_Bol"?"Fact/Bol":"Movto")
-                ),
-                h("td",{style:{padding:"8px 12px",color:"var(--txm)",whiteSpace:"nowrap",fontSize:11}},r.fecha),
-                h("td",{style:{padding:"8px 12px",color:"var(--txm)",whiteSpace:"nowrap",fontSize:11}},r.vcto),
-                h("td",{style:{padding:"8px 12px",textAlign:"right"}},
-                  h("span",{style:{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:8,
-                    background:bucketBg(b),color:bucketColor(b),border:"1px solid "+bucketBorder(b),fontFamily:"'DM Mono',monospace"}},
-                    r.diasDoc)
-                ),
-                h("td",{style:{padding:"8px 12px",textAlign:"right",fontFamily:"'DM Mono',monospace",color:"var(--tx)",fontWeight:600,fontSize:12}},fmtCLP(r.monto)),
-                h("td",{style:{padding:"8px 12px",textAlign:"right",fontFamily:"'DM Mono',monospace",
-                  color:r.sdoVencido>0?"#ef4444":"var(--txd)",fontWeight:r.sdoVencido>0?700:400,fontSize:12}},
-                  r.sdoVencido>0?fmtCLP(r.sdoVencido):"—")
-              );
-            })
-          )
+          h("tbody",null,(function(){
+            // Agrupar por cliente manteniendo el orden del sort
+            var groups=[],gmap={};
+            displayed.forEach(function(r){
+              if(!gmap[r.cliente]){gmap[r.cliente]={rows:[],monto:0,sdo:0};groups.push({key:r.cliente,g:gmap[r.cliente]});}
+              gmap[r.cliente].rows.push(r);
+              gmap[r.cliente].monto+=r.monto;
+              gmap[r.cliente].sdo+=r.sdoVencido;
+            });
+            var els=[];
+            groups.forEach(function(grp){
+              grp.g.rows.forEach(function(r,i){
+                var b=getBucket(r.diasDoc);
+                els.push(h("tr",{key:grp.key+"-"+i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"rgba(0,0,0,0.015)"}},
+                  h("td",{style:{padding:"8px 12px",color:"var(--tx)",fontWeight:600,maxWidth:190,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},r.cliente),
+                  h("td",{style:{padding:"8px 12px",color:"var(--txm)",fontFamily:"'DM Mono',monospace",fontSize:11}},r.rut),
+                  h("td",{style:{padding:"8px 12px",color:"var(--txm)",fontFamily:"'DM Mono',monospace",fontSize:11}},r.folio),
+                  h("td",{style:{padding:"8px 12px"}},
+                    h("span",{style:{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:8,
+                      background:r.tipo==="Fact_Bol"?"rgba(59,130,246,0.10)":"rgba(156,163,175,0.12)",
+                      color:r.tipo==="Fact_Bol"?"#3b82f6":"var(--txm)",
+                      border:r.tipo==="Fact_Bol"?"1px solid rgba(59,130,246,0.25)":"1px solid var(--bdr)"}},
+                      r.tipo==="Fact_Bol"?"Fact/Bol":"Movto")
+                  ),
+                  h("td",{style:{padding:"8px 12px",color:"var(--txm)",whiteSpace:"nowrap",fontSize:11}},r.fecha),
+                  h("td",{style:{padding:"8px 12px",color:"var(--txm)",whiteSpace:"nowrap",fontSize:11}},r.vcto),
+                  h("td",{style:{padding:"8px 12px",textAlign:"right"}},
+                    h("span",{style:{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:8,
+                      background:bucketBg(b),color:bucketColor(b),border:"1px solid "+bucketBorder(b),fontFamily:"'DM Mono',monospace"}},
+                      r.diasDoc)
+                  ),
+                  h("td",{style:{padding:"8px 12px",textAlign:"right",fontFamily:"'DM Mono',monospace",color:"var(--tx)",fontWeight:600,fontSize:12}},fmtCLP(r.monto)),
+                  h("td",{style:{padding:"8px 12px",textAlign:"right",fontFamily:"'DM Mono',monospace",
+                    color:r.sdoVencido>0?"#ef4444":"var(--txd)",fontWeight:r.sdoVencido>0?700:400,fontSize:12}},
+                    r.sdoVencido>0?fmtCLP(r.sdoVencido):"—")
+                ));
+              });
+              // Fila de subtotal por cliente (solo si tiene >1 doc O hay múltiples clientes)
+              if(grp.g.rows.length>1||groups.length>1){
+                els.push(h("tr",{key:grp.key+"-sub",style:{background:"rgba(59,130,246,0.05)",borderTop:"1px solid rgba(59,130,246,0.15)",borderBottom:"2px solid rgba(59,130,246,0.2)"}},
+                  h("td",{colSpan:7,style:{padding:"6px 12px",fontSize:11,fontWeight:700,color:"var(--txm)",letterSpacing:".03em"}},
+                    "Total "+grp.key+" · "+grp.g.rows.length+" doc"+(grp.g.rows.length!==1?"s":"")),
+                  h("td",{style:{padding:"6px 12px",textAlign:"right",fontFamily:"'DM Mono',monospace",color:"var(--acc)",fontWeight:800,fontSize:12}},fmtCLP(grp.g.monto)),
+                  h("td",{style:{padding:"6px 12px",textAlign:"right",fontFamily:"'DM Mono',monospace",color:grp.g.sdo>0?"#ef4444":"var(--txd)",fontWeight:grp.g.sdo>0?800:400,fontSize:12}},grp.g.sdo>0?fmtCLP(grp.g.sdo):"—")
+                ));
+              }
+            });
+            return els;
+          })())
         )
     )
   );
