@@ -4239,9 +4239,45 @@ function App(){
             :"▶ Procesar "+periodo
         ),
         h("button",{
-          disabled:true,
+          disabled:!files.planilla,
           style:{fontSize:12,fontWeight:600,padding:"7px 18px",borderRadius:20,border:"1px solid var(--bdr)",
-            background:"var(--surf)",color:"var(--txm)",cursor:"not-allowed",opacity:0.45,fontFamily:"'DM Sans',sans-serif"}
+            background:files.planilla?"var(--surf)":"var(--surf)",
+            color:files.planilla?"var(--tx)":"var(--txm)",
+            cursor:files.planilla?"pointer":"not-allowed",
+            opacity:files.planilla?1:0.45,fontFamily:"'DM Sans',sans-serif"},
+          onClick:async()=>{
+            if(!files.planilla)return;
+            try{
+              const token=await getToken();
+              notify("Leyendo comentarios de la planilla...","info");
+              const grupos=await extraerComentariosMes(files.planilla,periodo);
+              const sitiosConComentarios=Object.keys(grupos).filter(s=>grupos[s].length>0);
+              let bodyHtml=`<p>Estimados,</p><p>Adjunto planilla facturaci\u00f3n <strong>${periodo}</strong></p>`;
+              if(sitiosConComentarios.length===0){
+                bodyHtml+=`<p>Sin comentarios especiales para este per\u00edodo.</p>`;
+              } else {
+                for(const sitio of sitiosConComentarios){
+                  bodyHtml+=`<p><strong>Sitio ${sitio}</strong></p><ul>`;
+                  for(const {edif,cliente,comentario} of grupos[sitio]){
+                    bodyHtml+=`<li><strong>${cliente}</strong>${edif?` ${edif}`:""}:&nbsp;${comentario}</li>`;
+                  }
+                  bodyHtml+=`</ul>`;
+                }
+              }
+              bodyHtml+=`<br><p>Quedo atento a sus comentarios</p><p>Saludos</p>`;
+              bodyHtml+=`<br><hr><p style="color:#999;font-size:11px">Correo de revisi\u00f3n previo al env\u00edo definitivo.</p>`;
+              const planBuf=await readFileAsBuffer(files.planilla);
+              const planBytes=new Uint8Array(planBuf);
+              let binary="";
+              for(let i=0;i<planBytes.length;i+=8192) binary+=String.fromCharCode(...planBytes.subarray(i,i+8192));
+              const planB64=btoa(binary);
+              const planNombre=`Planilla Facturaci\u00f3n ${periodo}.xlsx`;
+              const subject=`[REVISI\u00d3N] Facturaci\u00f3n ${periodo}`;
+              await sendGmail(token,"amelendez@patagonica.cl","",REMITENTE,subject,bodyHtml,planB64,planNombre,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+              notify("\u2713 Planilla enviada a amelendez@patagonica.cl para revisi\u00f3n","ok");
+            }catch(e){notify("Error: "+e.message,"err");}
+          }
         },"\u25cf Subir Planilla "+periodo),
         (zipStatus==="loading"||zipStatus==="splitting"||splitLoading)&&
         h("span",{style:{fontSize:12,color:"var(--txd)",fontStyle:"italic",marginLeft:4}},
