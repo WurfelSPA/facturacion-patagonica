@@ -1760,6 +1760,228 @@ async function generarBorradorNuevaDenominacion(c, pdfTexto){
   setTimeout(()=>URL.revokeObjectURL(url),5000);
 }
 
+
+/* ═══════════════════════════════════
+   VISTA FACTURAS x COBRAR
+═══════════════════════════════════ */
+function FactxCobrarView({notify}){
+  var rowsS=React.useState([]); var rows=rowsS[0]; var setRows=rowsS[1];
+  var loadingS=React.useState(false); var loading=loadingS[0]; var setLoading=loadingS[1];
+  var fileNameS=React.useState(null); var fileName=fileNameS[0]; var setFileName=fileNameS[1];
+  var searchS=React.useState(""); var search=searchS[0]; var setSearch=searchS[1];
+  var filterBucketS=React.useState("all"); var filterBucket=filterBucketS[0]; var setFilterBucket=filterBucketS[1];
+  var filterTipoS=React.useState("all"); var filterTipo=filterTipoS[0]; var setFilterTipo=filterTipoS[1];
+  var sortS=React.useState({col:null,dir:"asc"}); var sort=sortS[0]; var setSort=sortS[1];
+
+  function getBucket(d){
+    if(d<=30)return"<=30";
+    if(d<=60)return"31-60";
+    if(d<=90)return"61-90";
+    if(d<=365)return"91-365";
+    return"+365";
+  }
+  function bucketLabel(b){
+    var m={"<=30":"≤ 30 días","31-60":"31-60 días","61-90":"61-90 días","91-365":"91-365 días","+365":"+ 365 días"};
+    return m[b]||b;
+  }
+  function bucketBg(b){
+    var m={"<=30":"rgba(16,185,129,0.12)","31-60":"rgba(245,158,11,0.12)","61-90":"rgba(249,115,22,0.12)","91-365":"rgba(239,68,68,0.12)","+365":"rgba(124,58,237,0.12)"};
+    return m[b]||"var(--surf2)";
+  }
+  function bucketColor(b){
+    var m={"<=30":"var(--green)","31-60":"#f59e0b","61-90":"#f97316","91-365":"#ef4444","+365":"#7c3aed"};
+    return m[b]||"var(--tx)";
+  }
+  function bucketBorder(b){
+    var m={"<=30":"rgba(16,185,129,0.3)","31-60":"rgba(245,158,11,0.3)","61-90":"rgba(249,115,22,0.3)","91-365":"rgba(239,68,68,0.3)","+365":"rgba(124,58,237,0.3)"};
+    return m[b]||"var(--bdr)";
+  }
+
+  function parseFile(file){
+    setLoading(true);
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      try{
+        var wb=XLSX.read(ev.target.result,{type:"array",cellDates:true});
+        var ws=wb.Sheets["Base"];
+        if(!ws){throw new Error("No se encontró la hoja 'Base'");}
+        var raw=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:""});
+        var parsed=raw.slice(1).filter(function(r){return r[4]&&r[13];}).map(function(r){
+          return{
+            fecha:String(r[1]||"").trim(),
+            tipo:String(r[2]||"").trim(),
+            rut:String(r[3]||"").trim(),
+            cliente:String(r[4]||"").trim(),
+            glosa:String(r[5]||"").trim(),
+            folio:String(r[8]||"").trim(),
+            vcto:String(r[9]||"").trim(),
+            diasPag:parseFloat(String(r[10]).replace(/[^0-9.\-]/g,""))||0,
+            diasDoc:parseFloat(String(r[11]).replace(/[^0-9.\-]/g,""))||0,
+            monto:parseFloat(String(r[13]).replace(/[^0-9.\-]/g,""))||0,
+            sdoVencido:parseFloat(String(r[14]).replace(/[^0-9.\-]/g,""))||0,
+          };
+        });
+        setRows(parsed);setFileName(file.name);setLoading(false);
+        if(notify)notify(parsed.length+" documentos cargados","ok");
+      }catch(e){if(notify)notify("Error: "+e.message,"err");setLoading(false);}
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function toggleSort(col){
+    setSort(function(prev){return prev.col===col&&prev.dir==="asc"?{col:col,dir:"desc"}:{col:col,dir:"asc"};});
+  }
+  function sortArrow(col){if(sort.col!==col)return" ↕";return sort.dir==="asc"?" ↑":" ↓";}
+
+  var totalMonto=rows.reduce(function(a,r){return a+r.monto;},0);
+  var totalClientes=new Set(rows.map(function(r){return r.rut;})).size;
+  var BUCKETS=["<=30","31-60","61-90","91-365","+365"];
+  var bTotals={};
+  BUCKETS.forEach(function(b){bTotals[b]={monto:0,count:0};});
+  rows.forEach(function(r){var b=getBucket(r.diasDoc);bTotals[b].monto+=r.monto;bTotals[b].count++;});
+
+  var displayed=rows.filter(function(r){
+    if(filterTipo!=="all"&&r.tipo!==filterTipo)return false;
+    if(filterBucket!=="all"&&getBucket(r.diasDoc)!==filterBucket)return false;
+    if(search.trim()){
+      var q=search.toLowerCase().trim();
+      if(!r.cliente.toLowerCase().includes(q)&&!r.rut.toLowerCase().includes(q)&&!r.folio.toLowerCase().includes(q))return false;
+    }
+    return true;
+  });
+  if(sort.col){displayed=displayed.slice().sort(function(a,b){
+    var av=a[sort.col],bv=b[sort.col];
+    if(sort.col==="monto"||sort.col==="diasDoc"||sort.col==="sdoVencido"){av=parseFloat(av)||0;bv=parseFloat(bv)||0;return sort.dir==="asc"?av-bv:bv-av;}
+    av=String(av).toLowerCase();bv=String(bv).toLowerCase();
+    return sort.dir==="asc"?av.localeCompare(bv,"es"):bv.localeCompare(av,"es");
+  });}
+
+  if(!rows.length&&!loading){
+    return h("main",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:24},className:"fade-up"},
+      h("div",{style:{textAlign:"center",maxWidth:440}},
+        h("div",{style:{fontSize:48,marginBottom:12}},"💰"),
+        h("div",{style:{fontSize:20,fontWeight:700,color:"var(--tx)",marginBottom:8}},"Facturas x Cobrar"),
+        h("div",{style:{fontSize:13,color:"var(--txm)",marginBottom:28,lineHeight:1.6}},"Carga el archivo mensual para visualizar el estado de cuentas por cobrar de PISA"),
+        h("label",{style:{display:"inline-flex",alignItems:"center",gap:8,background:"linear-gradient(135deg,var(--acc),var(--acc2))",color:"#fff",borderRadius:10,padding:"11px 28px",fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}},
+          "📂 Cargar F x Cobrar Pisa.xlsx",
+          h("input",{type:"file",accept:".xlsx",style:{display:"none"},onChange:function(e){if(e.target.files[0])parseFile(e.target.files[0]);}})
+        ),
+        h("div",{style:{fontSize:11,color:"var(--txd)",marginTop:12}},"Archivo esperado: F x Cobrar Pisa.xlsx — hoja Base")
+      )
+    );
+  }
+
+  if(loading){
+    return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}},
+      h("div",{style:{textAlign:"center",color:"var(--txm)"}},
+        h("div",{style:{fontSize:24,marginBottom:8}},"⟳"),
+        "Procesando archivo..."
+      )
+    );
+  }
+
+  var COLS=[
+    ["cliente","Cliente"],["rut","RUT"],["folio","Folio"],["tipo","Tipo"],
+    ["fecha","Emisión"],["vcto","Vto."],["diasDoc","Días"],
+    ["monto","Monto"],["sdoVencido","Sdo. Vencido"]
+  ];
+  var rightCols=new Set(["monto","sdoVencido","diasDoc"]);
+
+  return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up"},
+    /* Toolbar */
+    h("div",{style:{display:"flex",alignItems:"center",gap:10,padding:"10px 24px",borderBottom:"1px solid var(--bdr)",flexShrink:0,flexWrap:"wrap",background:"var(--surf)"}},
+      h("input",{type:"text",placeholder:"Buscar cliente, RUT o folio...",value:search,
+        onChange:function(e){setSearch(e.target.value);},
+        style:{padding:"7px 12px",border:"1px solid var(--bdr)",borderRadius:8,fontSize:12,background:"var(--surf2)",color:"var(--tx)",width:230,outline:"none"}}),
+      h("select",{value:filterTipo,onChange:function(e){setFilterTipo(e.target.value);},
+        style:{padding:"6px 10px",border:"1px solid var(--bdr)",borderRadius:8,fontSize:12,background:"var(--surf2)",color:"var(--tx)",cursor:"pointer"}},
+        h("option",{value:"all"},"Todos los tipos"),
+        h("option",{value:"Fact_Bol"},"Facturas / Boletas"),
+        h("option",{value:"Movto"},"Movimientos")
+      ),
+      filterBucket!=="all"&&h("button",{onClick:function(){setFilterBucket("all");},
+        style:{padding:"6px 12px",background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,fontSize:11,fontWeight:600,color:"#ef4444",cursor:"pointer"}},
+        "× Limitar filtro: "+bucketLabel(filterBucket)),
+      h("div",{style:{marginLeft:"auto",display:"flex",gap:6,alignItems:"center"}},
+        h("span",{style:{fontSize:11,color:"var(--txd)"}},(search||filterBucket!=="all"||filterTipo!=="all")?displayed.length+" de "+rows.length+" docs":rows.length+" docs"),
+        fileName&&h("span",{style:{fontSize:10,color:"var(--txd)",maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},fileName),
+        h("label",{style:{display:"inline-flex",alignItems:"center",gap:5,background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:8,padding:"5px 10px",fontSize:11,fontWeight:600,cursor:"pointer",color:"var(--txm)"}},
+          "🔄 Cambiar",
+          h("input",{type:"file",accept:".xlsx",style:{display:"none"},onChange:function(e){if(e.target.files[0])parseFile(e.target.files[0]);}})
+        )
+      )
+    ),
+    /* Summary cards */
+    h("div",{style:{display:"flex",gap:10,padding:"14px 24px",flexShrink:0,borderBottom:"1px solid var(--bdr)",background:"var(--surf2)",overflowX:"auto"}},
+      h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,padding:"12px 18px",minWidth:170,flexShrink:0}},
+        h("div",{style:{fontSize:10,color:"var(--txd)",fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",marginBottom:4}},"Total por Cobrar"),
+        h("div",{style:{fontSize:19,fontWeight:800,color:"var(--tx)",letterSpacing:"-0.5px",fontFamily:"'DM Mono',monospace"}},fmtCLP(totalMonto)),
+        h("div",{style:{fontSize:10,color:"var(--txm)",marginTop:3}},rows.length+" docs · "+totalClientes+" clientes")
+      ),
+      BUCKETS.map(function(b){
+        var active=filterBucket===b;
+        return h("button",{key:b,onClick:function(){setFilterBucket(active?"all":b);},
+          style:{background:active?bucketBg(b):"var(--surf)",border:"1px solid "+(active?bucketBorder(b):"var(--bdr)"),
+            borderRadius:12,padding:"12px 16px",cursor:"pointer",textAlign:"left",minWidth:130,
+            flexShrink:0,transition:"all .15s",outline:"none"}},
+          h("div",{style:{fontSize:9,color:bucketColor(b),fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",marginBottom:4}},bucketLabel(b)),
+          h("div",{style:{fontSize:16,fontWeight:800,color:"var(--tx)",letterSpacing:"-0.3px",fontFamily:"'DM Mono',monospace"}},fmtCLP(bTotals[b].monto)),
+          h("div",{style:{fontSize:10,color:"var(--txm)",marginTop:3}},bTotals[b].count+" docs")
+        );
+      })
+    ),
+    /* Table */
+    h("div",{style:{flex:1,overflowY:"auto",overflowX:"auto",minHeight:0}},
+      displayed.length===0
+        ?h("div",{style:{padding:"60px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados para el filtro aplicado")
+        :h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:12}},
+          h("thead",null,
+            h("tr",{style:{background:"var(--surf)",position:"sticky",top:0,zIndex:2}},
+              COLS.map(function(col){
+                return h("th",{key:col[0],onClick:function(){toggleSort(col[0]);},
+                  style:{padding:"9px 12px",textAlign:rightCols.has(col[0])?"right":"left",
+                    fontWeight:700,color:"var(--txm)",borderBottom:"2px solid var(--bdr)",
+                    fontSize:10,letterSpacing:".07em",textTransform:"uppercase",
+                    cursor:"pointer",whiteSpace:"nowrap",userSelect:"none",
+                    background:"var(--surf)"}},
+                  col[1]+sortArrow(col[0])
+                );
+              })
+            )
+          ),
+          h("tbody",null,
+            displayed.map(function(r,i){
+              var b=getBucket(r.diasDoc);
+              return h("tr",{key:i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"rgba(0,0,0,0.015)"}},
+                h("td",{style:{padding:"8px 12px",color:"var(--tx)",fontWeight:600,maxWidth:190,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},r.cliente),
+                h("td",{style:{padding:"8px 12px",color:"var(--txm)",fontFamily:"'DM Mono',monospace",fontSize:11}},r.rut),
+                h("td",{style:{padding:"8px 12px",color:"var(--txm)",fontFamily:"'DM Mono',monospace",fontSize:11}},r.folio),
+                h("td",{style:{padding:"8px 12px"}},
+                  h("span",{style:{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:8,
+                    background:r.tipo==="Fact_Bol"?"rgba(59,130,246,0.10)":"rgba(156,163,175,0.12)",
+                    color:r.tipo==="Fact_Bol"?"#3b82f6":"var(--txm)",
+                    border:r.tipo==="Fact_Bol"?"1px solid rgba(59,130,246,0.25)":"1px solid var(--bdr)"}},
+                    r.tipo==="Fact_Bol"?"Fact/Bol":"Movto")
+                ),
+                h("td",{style:{padding:"8px 12px",color:"var(--txm)",whiteSpace:"nowrap",fontSize:11}},r.fecha),
+                h("td",{style:{padding:"8px 12px",color:"var(--txm)",whiteSpace:"nowrap",fontSize:11}},r.vcto),
+                h("td",{style:{padding:"8px 12px",textAlign:"right"}},
+                  h("span",{style:{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:8,
+                    background:bucketBg(b),color:bucketColor(b),border:"1px solid "+bucketBorder(b),fontFamily:"'DM Mono',monospace"}},
+                    r.diasDoc)
+                ),
+                h("td",{style:{padding:"8px 12px",textAlign:"right",fontFamily:"'DM Mono',monospace",color:"var(--tx)",fontWeight:600,fontSize:12}},fmtCLP(r.monto)),
+                h("td",{style:{padding:"8px 12px",textAlign:"right",fontFamily:"'DM Mono',monospace",
+                  color:r.sdoVencido>0?"#ef4444":"var(--txd)",fontWeight:r.sdoVencido>0?700:400,fontSize:12}},
+                  r.sdoVencido>0?fmtCLP(r.sdoVencido):"—")
+              );
+            })
+          )
+        )
+    )
+  );
+}
+
 /* ═══════════════════════════════════
    VISTA CONTRATOS
 ═══════════════════════════════════ */
@@ -2785,6 +3007,7 @@ function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlo
     {id:"ventas",    icon:"📈", label:"Detalles Ventas"},
     {id:"factura",   icon:"📋", label:"Facturación"},
     {id:"historial-fact", icon:"📂", label:"Historial Facturación"},
+    {id:"fact-cobrar", icon:"💰", label:"Facturas x Cobrar"},
     {id:"contratos", icon:"📄", label:"Contratos"},
   ];
   const isActive = id => id==="factura" ? (view==="table"||view==="upload") : view===id;
@@ -4189,7 +4412,7 @@ function App(){
     h("header",{style:{background:view==="table"?"#1e3a5f":"var(--surf)",borderBottom:view==="table"?"1px solid #152d4a":"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:49,gap:10}},
       h("div",{style:{display:"flex",alignItems:"center",gap:10}},
         h("div",{style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px",color:view==="table"?"#fff":"var(--tx)"}},
-          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":"📋 Facturación"
+          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="fact-cobrar"?"💰 Facturas x Cobrar":"📋 Facturación"
         ),
         view==="table"&&h("span",{style:{fontSize:14,fontWeight:600,color:"#93b5d4",marginLeft:6}},periodo)
       ),
@@ -4545,6 +4768,7 @@ function App(){
       )
     )
     ,view==="ventas"&&h(VentasView,{periodo})
+    ,view==="fact-cobrar"&&h(FactxCobrarView,{notify})
     ,view==="contratos"&&h(ContratosView,{dashData,driveLoading})
     ,view==="historial-fact"&&h(HistorialFactView,{dashData,driveLoading,notify})
   ));
