@@ -1948,7 +1948,7 @@ function FactxCobrarView({notify}){
   }
 
   var COLS=[
-    ["cliente","Cliente"],["rut","RUT"],["folio","Folio"],["tipo","Tipo"],
+    ["rut","RUT"],["cliente","Cliente"],["folio","Folio"],["tipo","Tipo"],
     ["monto","Monto"]
   ];
   var rightCols=new Set(["monto"]);
@@ -2023,8 +2023,8 @@ function FactxCobrarView({notify}){
             groups.forEach(function(grp){
               grp.g.rows.forEach(function(r,i){
                 els.push(h("tr",{key:grp.key+"-"+i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"rgba(0,0,0,0.015)"}},
-                  h("td",{style:{padding:"8px 12px",color:"var(--tx)",fontWeight:600,maxWidth:190,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},r.cliente),
                   h("td",{style:{padding:"8px 12px",color:"var(--txm)",fontFamily:"'DM Mono',monospace",fontSize:11}},r.rut),
+                  h("td",{style:{padding:"8px 12px",color:"var(--tx)",fontWeight:600,maxWidth:190,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},r.cliente),
                   h("td",{style:{padding:"8px 12px"}},
                     r.folio
                       ?h("button",{onClick:function(){verFactura(r.folio);},title:"Ver detalle DTE",
