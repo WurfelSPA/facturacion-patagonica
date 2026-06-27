@@ -613,6 +613,39 @@ export default async function handler(req, res) {
       return res.status(200).json({ values: data.values || [] });
     }
 
+    // ── GET ?folioPdf=XXXX ── busca DTE en ZIPs de Drive por folio ───────────
+    if (req.method === "GET" && req.query.folioPdf) {
+      const folioTarget = String(req.query.folioPdf).replace(/[^0-9]/g, "");
+      if (!folioTarget) return res.status(400).json({ found: false, message: "Folio inválido" });
+      const files = await driveFiles(token, FACT_FOLDER_ID);
+      // Ordenar ZIPs de más reciente a más antiguo para encontrar antes
+      const pisaZips = files
+        .filter(f => f.name.match(/Facturas XML_PISA_/i))
+        .sort((a, b) => b.name.localeCompare(a.name));
+      for (const f of pisaZips) {
+        try {
+          const rz = await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`,
+            { headers: { Authorization: `Bearer ${token}` } });
+          if (!rz.ok) continue;
+          const zip = await JSZip.loadAsync(Buffer.from(await rz.arrayBuffer()));
+          for (const xmlName of Object.keys(zip.files)) {
+            if (!xmlName.match(/\.xml$/i)) continue;
+            const xml = await zip.files[xmlName].async("string");
+            const dte = parseXmlDTE(xml);
+            if (dte.folio === folioTarget) {
+              res.setHeader("Cache-Control", "private, max-age=3600");
+              return res.status(200).json({
+                found: true, folio: dte.folio, tipoDTE: dte.tipoDTE,
+                rut: dte.rut, total: dte.total, items: dte.items,
+                xmlFile: xmlName, zipFile: f.name,
+              });
+            }
+          }
+        } catch (_) { /* continuar con siguiente ZIP */ }
+      }
+      return res.status(200).json({ found: false, message: "Folio "+folioTarget+" no encontrado en los ZIPs de Drive" });
+    }
+
     // ── GET ?ls=FOLDER_ID ── lista carpeta Drive ───────────────────────────
     if (req.method === "GET" && req.query.ls) {
       const folderId = req.query.ls;
@@ -1372,48 +1405,4 @@ export default async function handler(req, res) {
       const text = await downloadFile(token, fileId);
       const data = text ? JSON.parse(text) : {};
       const anio = req.query.anio;
-      return res.status(200).json(anio ? (data[anio] || {}) : data);
-    }
-
-    // ── POST ── guarda/fusiona período ─────────────────────────────────────
-    if (req.method === "POST") {
-      const { anio, periodo, data: periodoData } = req.body || {};
-      if (!anio || !periodo || !periodoData)
-        return res.status(400).json({ error:"Se requiere anio, periodo y data" });
-      if (!PDF_FOLDER)
-        return res.status(500).json({ error:"DRIVE_PDF_FACTURAS_ID no configurada" });
-
-      let historial = {};
-      const fileId = await findFile(token, HIST_NAME, PDF_FOLDER);
-      if (fileId) {
-        const text = await downloadFile(token, fileId);
-        if (text) historial = JSON.parse(text);
-      }
-
-      if (!historial[anio]) historial[anio] = {};
-      historial[anio][periodo] = { ...(historial[anio][periodo] || {}), ...periodoData };
-
-      const content = JSON.stringify(historial, null, 2);
-      if (fileId) await updateJsonFile(token, fileId, content);
-      else await createJsonFile(token, HIST_NAME, PDF_FOLDER, content);
-
-      return res.status(200).json({ ok:true, anio, periodo, clientes: Object.keys(periodoData).length });
-    }
-
-    return res.status(405).json({ error:"Method not allowed" });
-  } catch (e) {
-    console.error("historial:", e.message);
-    return res.status(500).json({ error: e.message });
-  }
-}
-
-export {
-  normRut, norm, clienteMatch, detectTipo,
-  _pickByUF, _resolveFacturas,
-  _buildXmlFacturas, parseXmlDTE,
-  extractFacturasForRut, extractText,
-  _extractUF, _extractTotal, _derivarUFdePrecio,
-  extractClienteFromText, extractRutFromText,
-  getToken, driveFiles, downloadFile, findFile, createJsonFile, updateJsonFile,
-  FACT_FOLDER_ID,
-};
+      return res.status(200).json(anio ? (dat
