@@ -1405,4 +1405,48 @@ export default async function handler(req, res) {
       const text = await downloadFile(token, fileId);
       const data = text ? JSON.parse(text) : {};
       const anio = req.query.anio;
-      return res.status(200).json(anio ? (dat
+      return res.status(200).json(anio ? (data[anio] || {}) : data);
+    }
+
+    // ── POST ── guarda/fusiona período ─────────────────────────────────────
+    if (req.method === "POST") {
+      const { anio, periodo, data: periodoData } = req.body || {};
+      if (!anio || !periodo || !periodoData)
+        return res.status(400).json({ error:"Se requiere anio, periodo y data" });
+      if (!PDF_FOLDER)
+        return res.status(500).json({ error:"DRIVE_PDF_FACTURAS_ID no configurada" });
+
+      let historial = {};
+      const fileId = await findFile(token, HIST_NAME, PDF_FOLDER);
+      if (fileId) {
+        const text = await downloadFile(token, fileId);
+        if (text) historial = JSON.parse(text);
+      }
+
+      if (!historial[anio]) historial[anio] = {};
+      historial[anio][periodo] = { ...(historial[anio][periodo] || {}), ...periodoData };
+
+      const content = JSON.stringify(historial, null, 2);
+      if (fileId) await updateJsonFile(token, fileId, content);
+      else await createJsonFile(token, HIST_NAME, PDF_FOLDER, content);
+
+      return res.status(200).json({ ok:true, anio, periodo, clientes: Object.keys(periodoData).length });
+    }
+
+    return res.status(405).json({ error:"Method not allowed" });
+  } catch (e) {
+    console.error("historial:", e.message);
+    return res.status(500).json({ error: e.message });
+  }
+}
+
+export {
+  normRut, norm, clienteMatch, detectTipo,
+  _pickByUF, _resolveFacturas,
+  _buildXmlFacturas, parseXmlDTE,
+  extractFacturasForRut, extractText,
+  _extractUF, _extractTotal, _derivarUFdePrecio,
+  extractClienteFromText, extractRutFromText,
+  getToken, driveFiles, downloadFile, findFile, createJsonFile, updateJsonFile,
+  FACT_FOLDER_ID,
+};
