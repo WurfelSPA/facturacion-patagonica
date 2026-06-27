@@ -217,7 +217,7 @@ export default async function handler(req, res) {
       const token = await saToken();
       creds = await readCredentials(token);
     } catch(e) {
-      return res.status(500).json({error:'Error leyendo credenciales'});
+      return res.status(500).json({error:'Error leyendo credenciales: '+e.message});
     }
 
     const user = creds[email.toLowerCase()];
@@ -409,7 +409,4 @@ a{color:#4f46e5;font-size:14px}</style></head><body>
   return res.status(400).json({error:'Action desconocida'});
   } catch(e) {
     console.error('auth error:', e);
-    return res.status(500).json({error: String(e.message||e), stack: e.stack});
-  }
-}
-
+    return res.status(500).json({error: String(e.message||e), stack: e.stac
