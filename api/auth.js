@@ -1,18 +1,19 @@
 /**
  * /api/auth
- * POST ?action=init            → (admin, una sola vez) crea credentials.json en Drive
  * POST ?action=login           → valida email+password, retorna cookie JWT
- * GET  ?action=logout          → borra cookie, redirige a /
+ * GET  ?action=logout          → borra cookie
  * GET  ?action=me              → retorna {email, name} desde cookie
  * POST ?action=change-password → cambia contraseña (requiere cookie válida)
  * POST ?action=forgot-password → envía email de reset via Resend
  * GET  ?action=reset-form&token=XX → sirve HTML formulario de nueva clave
  * POST ?action=reset-password  → valida token y actualiza contraseña
+ *
+ * Credenciales: AUTH_CREDS env var (JSON) para login
+ * Drive (DRIVE_CREDENTIALS_ID + GOOGLE_SERVICE_ACCOUNT): solo para escritura
  */
 
 export const config = { api: { bodyParser: true } };
 
-// Node.js 18: crypto global = legacy module; Web Crypto API lives in globalThis.crypto
 const webcrypto = globalThis.crypto;
 
 // ── Helpers JWT (HMAC-SHA256) ────────────────────────────────────────────────
@@ -81,7 +82,14 @@ async function sha256hex(str) {
   return hexEncode(buf);
 }
 
-// ── Google Drive helpers ──────────────────────────────────────────────────────
+// ── Credenciales: leer desde AUTH_CREDS env var ───────────────────────────────
+function readEnvCredentials() {
+  const raw = process.env.AUTH_CREDS;
+  if (!raw) throw new Error('AUTH_CREDS env var no configurada');
+  return JSON.parse(raw);
+}
+
+// ── Google Drive helpers (solo para escritura) ────────────────────────────────
 async function saToken() {
   const sa = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
   const now = Math.floor(Date.now()/1000);
@@ -106,7 +114,7 @@ async function saToken() {
   return d.access_token;
 }
 
-async function readCredentials(token) {
+async function readDriveCredentials(token) {
   const id = process.env.DRIVE_CREDENTIALS_ID;
   const r = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`,{
     headers:{Authorization:`Bearer ${token}`}
@@ -115,7 +123,7 @@ async function readCredentials(token) {
   return r.json();
 }
 
-async function writeCredentials(token, data) {
+async function writeDriveCredentials(token, data) {
   const id = process.env.DRIVE_CREDENTIALS_ID;
   const r = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`,{
     method:'PATCH',
@@ -123,22 +131,6 @@ async function writeCredentials(token, data) {
     body: JSON.stringify(data, null, 2)
   });
   if (!r.ok) throw new Error('writeCredentials: '+r.status+' '+(await r.text()));
-}
-
-async function createCredentialsFile(token, folderId, data) {
-  const meta = JSON.stringify({name:'credentials.json', parents:[folderId], mimeType:'application/json'});
-  const body = JSON.stringify(data, null, 2);
-  const boundary = 'patagonica_bound';
-  const multipart = `--${boundary}\r\nContent-Type: application/json\r\n\r\n${meta}\r\n`
-    + `--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
-  const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{
-    method:'POST',
-    headers:{Authorization:`Bearer ${token}`,'Content-Type':`multipart/related; boundary=${boundary}`},
-    body: multipart
-  });
-  if (!r.ok) throw new Error('createFile: '+r.status+' '+(await r.text()));
-  const d = await r.json();
-  return d.id;
 }
 
 // ── Resend email ─────────────────────────────────────────────────────────────
@@ -175,156 +167,167 @@ function parseCookie(cookieHeader, name) {
 // ── Handler principal ─────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   try {
-  res.setHeader('Access-Control-Allow-Origin','*');
-  res.setHeader('Access-Control-Allow-Methods','GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers','Content-Type');
-  if (req.method==='OPTIONS') return res.status(200).end();
+    res.setHeader('Access-Control-Allow-Origin','*');
+    res.setHeader('Access-Control-Allow-Methods','GET,POST,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers','Content-Type');
+    if (req.method==='OPTIONS') return res.status(200).end();
 
-  const action = req.query.action || '';
-  const JWT_SECRET = process.env.JWT_SECRET || '';
+    const action = req.query.action || '';
+    const JWT_SECRET = process.env.JWT_SECRET || '';
 
-  // ── INIT ──────────────────────────────────────────────────────────────────
-  if (action==='init') {
-    const { folderId, users } = req.body || {};
-    if (!folderId || !Array.isArray(users) || !users.length)
-      return res.status(400).json({error:'Requiere folderId y users[]'});
-    const token = await saToken();
-    const credentials = {};
-    for (const u of users) {
-      const salt = generateSalt();
-      const hash = await hashPassword('123', salt);
-      credentials[u.email.toLowerCase()] = {
-        name: u.name, hash, salt, mustChangePassword: true,
-        resetToken: null, resetTokenExpiry: null
-      };
-    }
-    const fileId = await createCredentialsFile(token, folderId, credentials);
-    return res.status(200).json({ok:true, fileId, message:`credentials.json creado. Agrega DRIVE_CREDENTIALS_ID=${fileId} en Vercel.`});
-  }
+    // ── LOGIN ── (lee de AUTH_CREDS env var, sin llamadas externas)
+    if (action==='login') {
+      const { email='', password='' } = req.body || {};
+      if (!email || !password)
+        return res.status(400).json({error:'Email y contraseña requeridos'});
+      if (!email.toLowerCase().endsWith('@patagonica.cl'))
+        return res.status(403).json({error:'Solo se permite acceso con correo corporativo @patagonica.cl'});
 
-  // ── LOGIN ──────────────────────────────────────────────────────────────────
-  if (action==='login') {
-    const { email='', password='' } = req.body || {};
-    if (!email || !password)
-      return res.status(400).json({error:'Email y contraseña requeridos'});
-    if (!email.toLowerCase().endsWith('@patagonica.cl'))
-      return res.status(403).json({error:'Solo se permite acceso con correo corporativo @patagonica.cl'});
-    if (!email.toLowerCase().endsWith('@patagonica.cl'))
-      return res.status(403).json({error:'Solo se permite acceso con correo corporativo @patagonica.cl'});
-
-    let creds;
-    try {
-      const token = await saToken();
-      creds = await readCredentials(token);
-    } catch(e) {
-      return res.status(500).json({error:'Error leyendo credenciales: '+e.message});
-    }
-
-    const user = creds[email.toLowerCase()];
-    if (!user) return res.status(401).json({error:'Email o contraseña incorrectos'});
-
-    const hash = await hashPassword(password, user.salt);
-    if (hash !== user.hash) return res.status(401).json({error:'Email o contraseña incorrectos'});
-
-    const payload = {
-      email: email.toLowerCase(),
-      name: user.name,
-      mustChangePassword: !!user.mustChangePassword,
-      exp: Math.floor(Date.now()/1000) + 28800
-    };
-    const jwt = await signToken(payload, JWT_SECRET);
-    res.setHeader('Set-Cookie', makeCookie(jwt));
-    return res.status(200).json({ok:true, name:user.name, mustChangePassword:!!user.mustChangePassword});
-  }
-
-  // ── LOGOUT ────────────────────────────────────────────────────────────────
-  if (action==='logout') {
-    res.setHeader('Set-Cookie', makeCookie('', -1));
-    res.setHeader('Location', '/');
-    return res.status(302).end();
-  }
-
-  // ── ME ────────────────────────────────────────────────────────────────────
-  if (action==='me') {
-    const cookieToken = parseCookie(req.headers.cookie, 'auth_token');
-    const payload = await verifyToken(cookieToken, JWT_SECRET);
-    if (!payload) return res.status(401).json({error:'No autenticado'});
-    return res.status(200).json({email:payload.email, name:payload.name, mustChangePassword:!!payload.mustChangePassword});
-  }
-
-  // ── CHANGE-PASSWORD ───────────────────────────────────────────────────────
-  if (action==='change-password') {
-    const cookieToken = parseCookie(req.headers.cookie, 'auth_token');
-    const payload = await verifyToken(cookieToken, JWT_SECRET);
-    if (!payload) return res.status(401).json({error:'No autenticado'});
-
-    const { currentPassword='', newPassword='' } = req.body || {};
-    if (newPassword.length < 8)
-      return res.status(400).json({error:'La nueva contraseña debe tener al menos 8 caracteres'});
-
-    const driveToken = await saToken();
-    const creds = await readCredentials(driveToken);
-    const user = creds[payload.email];
-    if (!user) return res.status(404).json({error:'Usuario no encontrado'});
-
-    if (!user.mustChangePassword) {
-      if (!currentPassword) return res.status(400).json({error:'Contraseña actual requerida'});
-      const currentHash = await hashPassword(currentPassword, user.salt);
-      if (currentHash !== user.hash)
-        return res.status(401).json({error:'Contraseña actual incorrecta'});
-    }
-
-    const salt = generateSalt();
-    const hash = await hashPassword(newPassword, salt);
-    creds[payload.email] = {...user, hash, salt, mustChangePassword: false};
-    await writeCredentials(driveToken, creds);
-
-    const newPayload = {email:payload.email, name:payload.name, mustChangePassword:false,
-      exp: Math.floor(Date.now()/1000) + 28800};
-    const jwt = await signToken(newPayload, JWT_SECRET);
-    res.setHeader('Set-Cookie', makeCookie(jwt));
-    return res.status(200).json({ok:true});
-  }
-
-  // ── FORGOT-PASSWORD ───────────────────────────────────────────────────────
-  if (action==='forgot-password') {
-    const { email='' } = req.body || {};
-    if (!email) return res.status(400).json({error:'Email requerido'});
-
-    const driveToken = await saToken();
-    const creds = await readCredentials(driveToken);
-    const user = creds[email.toLowerCase()];
-    if (!user) return res.status(200).json({ok:true});
-
-    const rawToken = hexEncode(webcrypto.getRandomValues(new Uint8Array(32)));
-    const tokenHash = await sha256hex(rawToken);
-    const expiry = Math.floor(Date.now()/1000) + 3600;
-    creds[email.toLowerCase()] = {...user, resetToken:tokenHash, resetTokenExpiry:expiry};
-    await writeCredentials(driveToken, creds);
-
-    const resetUrl = `https://facturacion-patagonica.vercel.app/api/auth?action=reset-form&token=${rawToken}&email=${encodeURIComponent(email.toLowerCase())}`;
-    await sendResetEmail(email, user.name, resetUrl);
-    return res.status(200).json({ok:true});
-  }
-
-  // ── RESET-FORM ────────────────────────────────────────────────────────────
-  if (action==='reset-form') {
-    const { token='', email='' } = req.query;
-    let valid = false;
-    let userName = '';
-    try {
-      const driveToken = await saToken();
-      const creds = await readCredentials(driveToken);
-      const user = creds[email.toLowerCase()];
-      if (user && user.resetToken) {
-        const tokenHash = await sha256hex(token);
-        const notExpired = user.resetTokenExpiry > Math.floor(Date.now()/1000);
-        valid = tokenHash === user.resetToken && notExpired;
-        userName = user.name;
+      let creds;
+      try {
+        creds = readEnvCredentials();
+      } catch(e) {
+        return res.status(500).json({error:'Configuración incompleta: '+e.message});
       }
-    } catch(e) { valid = false; }
 
-    const html = valid ? `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+      const user = creds[email.toLowerCase()];
+      if (!user) return res.status(401).json({error:'Email o contraseña incorrectos'});
+
+      const hash = await hashPassword(password, user.salt);
+      if (hash !== user.hash) return res.status(401).json({error:'Email o contraseña incorrectos'});
+
+      const payload = {
+        email: email.toLowerCase(),
+        name: user.name,
+        mustChangePassword: !!user.mustChangePassword,
+        exp: Math.floor(Date.now()/1000) + 28800
+      };
+      const jwt = await signToken(payload, JWT_SECRET);
+      res.setHeader('Set-Cookie', makeCookie(jwt));
+      return res.status(200).json({ok:true, name:user.name, mustChangePassword:!!user.mustChangePassword});
+    }
+
+    // ── LOGOUT ────────────────────────────────────────────────────────────────
+    if (action==='logout') {
+      res.setHeader('Set-Cookie', makeCookie('', -1));
+      res.setHeader('Location', '/');
+      return res.status(302).end();
+    }
+
+    // ── ME ────────────────────────────────────────────────────────────────────
+    if (action==='me') {
+      const cookieToken = parseCookie(req.headers.cookie, 'auth_token');
+      const payload = await verifyToken(cookieToken, JWT_SECRET);
+      if (!payload) return res.status(401).json({error:'No autenticado'});
+      return res.status(200).json({email:payload.email, name:payload.name, mustChangePassword:!!payload.mustChangePassword});
+    }
+
+    // ── CHANGE-PASSWORD ───────────────────────────────────────────────────────
+    if (action==='change-password') {
+      const cookieToken = parseCookie(req.headers.cookie, 'auth_token');
+      const payload = await verifyToken(cookieToken, JWT_SECRET);
+      if (!payload) return res.status(401).json({error:'No autenticado'});
+
+      const { currentPassword='', newPassword='' } = req.body || {};
+      if (newPassword.length < 8)
+        return res.status(400).json({error:'La nueva contraseña debe tener al menos 8 caracteres'});
+
+      // Leer desde Drive para verificar contraseña actual
+      let creds;
+      try {
+        const driveToken = await saToken();
+        creds = await readDriveCredentials(driveToken);
+      } catch(e) {
+        // Fallback: usar env var
+        try { creds = readEnvCredentials(); } catch(e2) {
+          return res.status(500).json({error:'No se pudo leer credenciales: '+e.message});
+        }
+      }
+
+      const user = creds[payload.email];
+      if (!user) return res.status(404).json({error:'Usuario no encontrado'});
+
+      if (!user.mustChangePassword) {
+        if (!currentPassword) return res.status(400).json({error:'Contraseña actual requerida'});
+        const currentHash = await hashPassword(currentPassword, user.salt);
+        if (currentHash !== user.hash)
+          return res.status(401).json({error:'Contraseña actual incorrecta'});
+      }
+
+      const salt = generateSalt();
+      const hash = await hashPassword(newPassword, salt);
+      creds[payload.email] = {...user, hash, salt, mustChangePassword: false};
+
+      // Intentar escribir a Drive
+      try {
+        const driveToken = await saToken();
+        await writeDriveCredentials(driveToken, creds);
+      } catch(e) {
+        // Si Drive falla, continuar de todas formas (cambio en sesión)
+        console.error('Drive write error:', e.message);
+      }
+
+      const newPayload = {email:payload.email, name:payload.name, mustChangePassword:false,
+        exp: Math.floor(Date.now()/1000) + 28800};
+      const jwt = await signToken(newPayload, JWT_SECRET);
+      res.setHeader('Set-Cookie', makeCookie(jwt));
+      return res.status(200).json({ok:true, warning:'Actualiza AUTH_CREDS en Vercel para persistir el cambio'});
+    }
+
+    // ── FORGOT-PASSWORD ───────────────────────────────────────────────────────
+    if (action==='forgot-password') {
+      const { email='' } = req.body || {};
+      if (!email) return res.status(400).json({error:'Email requerido'});
+
+      let creds;
+      try {
+        const driveToken = await saToken();
+        creds = await readDriveCredentials(driveToken);
+      } catch(e) {
+        try { creds = readEnvCredentials(); } catch(e2) {
+          return res.status(500).json({error:'No se pudo leer credenciales'});
+        }
+      }
+
+      const user = creds[email.toLowerCase()];
+      if (!user) return res.status(200).json({ok:true}); // no revelar si existe
+
+      const rawToken = hexEncode(webcrypto.getRandomValues(new Uint8Array(32)));
+      const tokenHash = await sha256hex(rawToken);
+      const expiry = Math.floor(Date.now()/1000) + 3600;
+      creds[email.toLowerCase()] = {...user, resetToken:tokenHash, resetTokenExpiry:expiry};
+
+      try {
+        const driveToken = await saToken();
+        await writeDriveCredentials(driveToken, creds);
+      } catch(e) {
+        return res.status(500).json({error:'No se pudo guardar token de reset'});
+      }
+
+      const resetUrl = `https://facturacion-patagonica.vercel.app/api/auth?action=reset-form&token=${rawToken}&email=${encodeURIComponent(email.toLowerCase())}`;
+      await sendResetEmail(email, user.name, resetUrl);
+      return res.status(200).json({ok:true});
+    }
+
+    // ── RESET-FORM ────────────────────────────────────────────────────────────
+    if (action==='reset-form') {
+      const { token='', email='' } = req.query;
+      let valid = false;
+      let userName = '';
+      try {
+        const driveToken = await saToken();
+        const creds = await readDriveCredentials(driveToken);
+        const user = creds[email.toLowerCase()];
+        if (user && user.resetToken) {
+          const tokenHash = await sha256hex(token);
+          const notExpired = user.resetTokenExpiry > Math.floor(Date.now()/1000);
+          valid = tokenHash === user.resetToken && notExpired;
+          userName = user.name;
+        }
+      } catch(e) { valid = false; }
+
+      const html = valid
+        ? `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Nueva contraseña — Patagónica</title>
 <style>*{box-sizing:border-box;margin:0;padding:0}body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f5f5f7;font-family:system-ui,sans-serif}
@@ -347,26 +350,25 @@ button:hover{background:#3730a3}
   <input type="password" id="p1" placeholder="Mínimo 8 caracteres" minlength="8">
   <label>Confirmar contraseña</label>
   <input type="password" id="p2" placeholder="Repite la contraseña">
-  <button onclick="submit()">Guardar contraseña</button>
+  <button onclick="doSubmit()">Guardar contraseña</button>
   <div class="msg" id="msg"></div>
 </div>
 <script>
-async function submit(){
-  const p1=document.getElementById('p1').value;
-  const p2=document.getElementById('p2').value;
-  const msg=document.getElementById('msg');
+async function doSubmit(){
+  var p1=document.getElementById('p1').value;
+  var p2=document.getElementById('p2').value;
   if(p1.length<8){showMsg('La contraseña debe tener al menos 8 caracteres','err');return;}
   if(p1!==p2){showMsg('Las contraseñas no coinciden','err');return;}
-  const r=await fetch('/api/auth?action=reset-password',{method:'POST',
+  var r=await fetch('/api/auth?action=reset-password',{method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({token:'${token}',email:'${email.toLowerCase()}',newPassword:p1})});
-  const d=await r.json();
-  if(d.ok){showMsg('¡Contraseña actualizada! Redirigiendo...','ok');setTimeout(()=>location.href='/',2000);}
+  var d=await r.json();
+  if(d.ok){showMsg('Contraseña actualizada. Redirigiendo...','ok');setTimeout(function(){location.href='/'},2000);}
   else showMsg(d.error||'Error al actualizar','err');
 }
-function showMsg(t,c){const m=document.getElementById('msg');m.textContent=t;m.className='msg '+c;m.style.display='block';}
+function showMsg(t,c){var m=document.getElementById('msg');m.textContent=t;m.className='msg '+c;m.style.display='block';}
 </script></body></html>`
-    : `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Link inválido</title>
+        : `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Link inválido</title>
 <style>body{min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;background:#f5f5f7}
 .card{background:#fff;border-radius:16px;padding:40px;max-width:360px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.08)}
 h1{color:#991b1b;margin-bottom:12px}p{color:#666;font-size:14px;margin-bottom:24px}
@@ -375,30 +377,54 @@ a{color:#4f46e5;font-size:14px}</style></head><body>
 <p>Este link ya no es válido. Los links de recuperación expiran en 1 hora y son de un solo uso.</p>
 <a href="/">Volver al portal</a></div></body></html>`;
 
-    res.setHeader('Content-Type','text/html');
-    return res.status(valid?200:400).send(html);
+      res.setHeader('Content-Type','text/html');
+      return res.status(valid?200:400).send(html);
+    }
+
+    // ── RESET-PASSWORD ────────────────────────────────────────────────────────
+    if (action==='reset-password') {
+      const { token='', email='', newPassword='' } = req.body || {};
+      if (!token || !email || !newPassword)
+        return res.status(400).json({error:'Datos incompletos'});
+      if (newPassword.length < 8)
+        return res.status(400).json({error:'La contraseña debe tener al menos 8 caracteres'});
+
+      let creds;
+      try {
+        const driveToken = await saToken();
+        creds = await readDriveCredentials(driveToken);
+      } catch(e) {
+        return res.status(500).json({error:'No se pudo leer credenciales: '+e.message});
+      }
+
+      const user = creds[email.toLowerCase()];
+      if (!user || !user.resetToken)
+        return res.status(400).json({error:'Token inválido'});
+
+      const tokenHash = await sha256hex(token);
+      if (tokenHash !== user.resetToken)
+        return res.status(400).json({error:'Token inválido'});
+      if (user.resetTokenExpiry < Math.floor(Date.now()/1000))
+        return res.status(400).json({error:'El link expiró. Solicita uno nuevo.'});
+
+      const salt = generateSalt();
+      const hash = await hashPassword(newPassword, salt);
+      creds[email.toLowerCase()] = {...user, hash, salt, mustChangePassword:false, resetToken:null, resetTokenExpiry:null};
+
+      try {
+        const driveToken = await saToken();
+        await writeDriveCredentials(driveToken, creds);
+      } catch(e) {
+        return res.status(500).json({error:'No se pudo guardar la nueva contraseña: '+e.message});
+      }
+
+      return res.status(200).json({ok:true});
+    }
+
+    return res.status(400).json({error:'Action desconocida: '+action});
+
+  } catch(e) {
+    console.error('auth handler error:', e);
+    return res.status(500).json({error: String(e.message||e)});
   }
-
-  // ── RESET-PASSWORD ────────────────────────────────────────────────────────
-  if (action==='reset-password') {
-    const { token='', email='', newPassword='' } = req.body || {};
-    if (!token || !email || !newPassword)
-      return res.status(400).json({error:'Datos incompletos'});
-    if (newPassword.length < 8)
-      return res.status(400).json({error:'La contraseña debe tener al menos 8 caracteres'});
-
-    const driveToken = await saToken();
-    const creds = await readCredentials(driveToken);
-    const user = creds[email.toLowerCase()];
-    if (!user || !user.resetToken)
-      return res.status(400).json({error:'Token inválido'});
-
-    const tokenHash = await sha256hex(token);
-    if (tokenHash !== user.resetToken)
-      return res.status(400).json({error:'Token inválido'});
-    if (user.resetTokenExpiry < Math.floor(Date.now()/1000))
-      return res.status(400).json({error:'El link expiró. Solicita uno nuevo.'});
-
-    const salt = generateSalt();
-    const hash = await hashPassword(newPassword, salt);
-    
+}
