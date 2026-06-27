@@ -71,7 +71,7 @@ async function hashPassword(password, salt) {
   const enc = new TextEncoder();
   const key = await webcrypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
   const bits = await webcrypto.subtle.deriveBits(
-    {name:'PBKDF2', salt:enc.encode(salt), iterations:100000, hash:'SHA-256'},
+    {name:'PBKDF2', salt:enc.encode(salt), iterations:10000, hash:'SHA-256'},
     key, 256
   );
   return hexEncode(bits);
@@ -401,12 +401,4 @@ a{color:#4f46e5;font-size:14px}</style></head><body>
 
     const salt = generateSalt();
     const hash = await hashPassword(newPassword, salt);
-    creds[email.toLowerCase()] = {...user, hash, salt, mustChangePassword:false, resetToken:null, resetTokenExpiry:null};
-    await writeCredentials(driveToken, creds);
-    return res.status(200).json({ok:true});
-  }
-
-  return res.status(400).json({error:'Action desconocida'});
-  } catch(e) {
-    console.error('auth error:', e);
-    return res.status(500).json({error: String(e.message||e), stack: e.stac
+    
