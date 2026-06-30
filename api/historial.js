@@ -1055,14 +1055,24 @@ export default async function handler(req, res) {
                 if (dbg) dbgInfo.excel0_sitioData = sitioData;
                 if (sitioData) {
                   const facturas = {};
+                  // "default" contiene conceptos no ligados a sitio (servAdm, habilitacion, etc.)
+                  // Se fusiona siempre, con menor prioridad que los datos específicos del sitio.
+                  const defData = sitios["default"] || {};
                   if (sitioQ) {
                     // Lookup directo por sitio: devolver TODOS los tipos del JSON
                     // (arriendo, servAdm, habilitacion, servCont, asesoria, etc.)
-                    Object.assign(facturas, sitioData);
+                    // Primero "default" (prioridad baja), luego sitioData lo puede sobrescribir
+                    Object.assign(facturas, defData, sitioData);
                   } else {
                     // Sin sitio especificado: usar ufArr/ufSrv para desambiguar conceptos
                     if (ufArr > 0 && sitioData.arriendo) facturas.arriendo = sitioData.arriendo;
-                    if (ufSrv > 0 && sitioData.servAdm)  facturas.servAdm  = sitioData.servAdm;
+                    // servAdm: primero en sitioData, si no está buscar en "default"
+                    const servAdmSrc = sitioData.servAdm || defData.servAdm;
+                    if (ufSrv > 0 && servAdmSrc) facturas.servAdm = servAdmSrc;
+                    // habilitacion y otros no-UF desde "default" (si aplica para este sitio)
+                    for (const [k, v] of Object.entries(defData)) {
+                      if (k !== 'arriendo' && k !== 'servAdm' && !(k in facturas)) facturas[k] = v;
+                    }
                   }
                   if (dbg) dbgInfo.excel0_facturas = facturas;
                   if (Object.keys(facturas).length > 0) {
@@ -1427,26 +1437,4 @@ export default async function handler(req, res) {
       historial[anio][periodo] = { ...(historial[anio][periodo] || {}), ...periodoData };
 
       const content = JSON.stringify(historial, null, 2);
-      if (fileId) await updateJsonFile(token, fileId, content);
-      else await createJsonFile(token, HIST_NAME, PDF_FOLDER, content);
-
-      return res.status(200).json({ ok:true, anio, periodo, clientes: Object.keys(periodoData).length });
-    }
-
-    return res.status(405).json({ error:"Method not allowed" });
-  } catch (e) {
-    console.error("historial:", e.message);
-    return res.status(500).json({ error: e.message });
-  }
-}
-
-export {
-  normRut, norm, clienteMatch, detectTipo,
-  _pickByUF, _resolveFacturas,
-  _buildXmlFacturas, parseXmlDTE,
-  extractFacturasForRut, extractText,
-  _extractUF, _extractTotal, _derivarUFdePrecio,
-  extractClienteFromText, extractRutFromText,
-  getToken, driveFiles, downloadFile, findFile, createJsonFile, updateJsonFile,
-  FACT_FOLDER_ID,
-};
+      i
