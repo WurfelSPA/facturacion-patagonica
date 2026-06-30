@@ -953,6 +953,25 @@ export default async function handler(req, res) {
       return res.status(200).json({ clientes });
     }
 
+    // ── GET ?batchPeriodo=1&periodo=X ── todas las facturas del período (desde JSON embebido) ─
+    // Devuelve { clientes: { [stripNombre]: { nombre, sitios: {[sitio]:{tipo:{nro,uf,total}}} } } }
+    // Usado por LlenarPlanillaView para mostrar Nro. Factura sin 60 llamadas individuales.
+    if (req.method === "GET" && req.query.batchPeriodo === "1") {
+      const periodo = req.query.periodo || "";
+      const [mesNom, anioStr] = periodo.split(" ");
+      const strip = s => (s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
+      const periodoData = _EXCEL_EMBEDDED?.[anioStr]?.[periodo];
+      if (!periodoData) {
+        return res.status(200).json({ periodo, clientes: {}, loaded: !!_EXCEL_EMBEDDED });
+      }
+      const clientes = {};
+      for (const [nom, sitios] of Object.entries(periodoData)) {
+        clientes[strip(nom)] = { nombre: nom, sitios };
+      }
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(200).json({ periodo, clientes });
+    }
+
     // ── GET ?listPeriodos=1 ── períodos disponibles en carpeta facturación ─
     if (req.method === "GET" && req.query.listPeriodos === "1") {
       const periodoSet = new Set();
@@ -1430,33 +1449,4 @@ export default async function handler(req, res) {
       const fileId = await findFile(token, HIST_NAME, PDF_FOLDER);
       if (fileId) {
         const text = await downloadFile(token, fileId);
-        if (text) historial = JSON.parse(text);
-      }
-
-      if (!historial[anio]) historial[anio] = {};
-      historial[anio][periodo] = { ...(historial[anio][periodo] || {}), ...periodoData };
-
-      const content = JSON.stringify(historial, null, 2);
-      if (fileId) await updateJsonFile(token, fileId, content);
-      else await createJsonFile(token, HIST_NAME, PDF_FOLDER, content);
-
-      return res.status(200).json({ ok:true, anio, periodo, clientes: Object.keys(periodoData).length });
-    }
-
-    return res.status(405).json({ error:"Method not allowed" });
-  } catch (e) {
-    console.error("historial:", e.message);
-    return res.status(500).json({ error: e.message });
-  }
-}
-
-export {
-  normRut, norm, clienteMatch, detectTipo,
-  _pickByUF, _resolveFacturas,
-  _buildXmlFacturas, parseXmlDTE,
-  extractFacturasForRut, extractText,
-  _extractUF, _extractTotal, _derivarUFdePrecio,
-  extractClienteFromText, extractRutFromText,
-  getToken, driveFiles, downloadFile, findFile, createJsonFile, updateJsonFile,
-  FACT_FOLDER_ID,
-};
+   
