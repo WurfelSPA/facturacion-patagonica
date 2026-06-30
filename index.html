@@ -381,7 +381,7 @@ async function generarExcelResumen(xlsxFile,periodo){
   const outRows=[HEADERS];
   for(let r=4;r<rows.length;r++){
     const row=rows[r];if(!row)continue;
-    if(!row[7]&&!row[11])continue; // saltar filas sin sitio ni cliente
+    const clienteVal=row[11]!=null?String(row[11]).trim():"";if(!clienteVal||clienteVal.toUpperCase()==="VACANTE")continue;
     outRows.push(COLS.map(c=>row[c]!=null?row[c]:""));
   }
   const newWb=XLSX.utils.book_new();
