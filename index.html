@@ -388,8 +388,11 @@ async function generarExcelResumen(xlsxFile,periodo){
   const newWs=XLSX.utils.aoa_to_sheet(outRows);
   // Ancho de columnas
   newWs["!cols"]=[{wch:8},{wch:12},{wch:14},{wch:30},{wch:28},{wch:10},{wch:14},{wch:14},{wch:40}];
+  // Estilo encabezado: fondo azul celeste oscuro, texto blanco, centrado
+  const hStyle={fill:{patternType:"solid",fgColor:{rgb:"0277BD"}},font:{bold:true,color:{rgb:"FFFFFF"}},alignment:{horizontal:"center",vertical:"center"}};
+  for(let c=0;c<HEADERS.length;c++){const addr=XLSX.utils.encode_cell({r:0,c});if(newWs[addr])newWs[addr].s=hStyle;}
   XLSX.utils.book_append_sheet(newWb,newWs,"Resumen");
-  const xlsxBuf=XLSX.write(newWb,{type:"array",bookType:"xlsx"});
+  const xlsxBuf=XLSX.write(newWb,{type:"array",bookType:"xlsx",cellStyles:true});
   const bytes=new Uint8Array(xlsxBuf);
   let bin="";
   for(let i=0;i<bytes.length;i+=8192)bin+=String.fromCharCode(...bytes.subarray(i,i+8192));
