@@ -42,7 +42,7 @@ async function getAccessToken(serviceAccount) {
 
 async function driveList(token, folderId) {
   const q = `'${folderId}' in parents and trashed=false`;
-  const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType)&pageSize=100`;
+  const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType)&pageSize=100&orderBy=modifiedTime%20desc`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   const data = await res.json();
   if (!res.ok) throw new Error("Drive list error: " + JSON.stringify(data));
