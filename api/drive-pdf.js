@@ -12,7 +12,7 @@
 
 import JSZip from "jszip";
 
-export const config = { api: { bodyParser: false, responseLimit: "15mb" } };
+export const config = { api: { bodyParser: false, responseLimit: "50mb" } };
 
 const FACT_FOLDER_ID = "1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u";
 
@@ -77,10 +77,17 @@ async function driveGet(token, url) {
 
 async function findFileInFolder(token, folderId, name) {
   const q = encodeURIComponent(`'${folderId}' in parents and name='${name}' and trashed=false`);
-  const d = await driveGet(token,
-    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,size)&pageSize=5`
-    + `&orderBy=modifiedTime+desc&supportsAllDrives=true&includeItemsFromAllDrives=true`);
-  return d.files?.[0] || null;
+  // Intento 1: con ordenamiento por fecha (obtiene el más reciente si hay duplicados)
+  try {
+    const d = await driveGet(token,
+      `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,size)&pageSize=5`
+      + `&orderBy=modifiedTime%20desc&supportsAllDrives=true&includeItemsFromAllDrives=true`);
+    if (d.files?.length) return d.files[0];
+  } catch (_) { /* Drive rechazó los parámetros extra — intentar query básica */ }
+  // Intento 2: query mínima sin ordenamiento (siempre compatibe)
+  const d2 = await driveGet(token,
+    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,size)&pageSize=5`);
+  return d2.files?.[0] || null;
 }
 
 async function downloadFileBuffer(token, fileId) {
@@ -167,11 +174,4 @@ export default async function handler(req, res) {
           res.setHeader("Content-Disposition", `inline; filename="F-${folio}.pdf"`);
           res.setHeader("Cache-Control", "public, max-age=86400");
           return res.send(pdfBuf);
-        }
-        // ZIP encontrado pero folio no está dentro → incluir lista en 404
-        return res.status(404).json({
-          error: `PDF para folio ${folio} no encontrado en ZIP`,
-          zipName,
-          totalFiles: zipFiles.length,
-          sampleFiles: zipFiles.filter(f=>f.endsWith(".pdf")).slice(0, 20),
-          hint: "El folio no está en el ZIP del período. Puede que el PDF consolidado no incluyera esta factura."
+       
