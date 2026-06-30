@@ -4240,7 +4240,7 @@ function App(){
               h("th",{colSpan:2,style:{...thBase,background:"var(--surf2)",color:"var(--txm)",textAlign:"center",borderBottom:"1px solid var(--bdr)"}},"Arrendatario"),
               h("th",{rowSpan:2,onClick:function(){toggleSort("uf");},
                 style:{...thBase,background:"var(--acc)",color:"#fff",textAlign:"center",cursor:"pointer"}},
-                "jun-26 U.F.",h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,opacity:.8}},sortArrow("uf"))),
+                mesLabel,h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,opacity:.8}},sortArrow("uf"))),
               h("th",{rowSpan:2,onClick:function(){toggleSort("gc");},
                 style:{...thBase,background:"var(--acc)",color:"#fff",textAlign:"center",cursor:"pointer"}},
                 "GC U.F.",h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,opacity:.8}},sortArrow("gc"))),
