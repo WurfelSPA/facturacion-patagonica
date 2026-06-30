@@ -530,16 +530,8 @@ export default async function handler(req, res) {
           try {
             const bnd = "ind_pdf_boundary";
             const meta = JSON.stringify({ name: fname, mimeType: "application/pdf", parents: [destFolderId] });
-            const metaPart = Buffer.from(`--${bnd}
-Content-Type: application/json; charset=UTF-8
-
-${meta}
---${bnd}
-Content-Type: application/pdf
-
-`);
-            const endPart = Buffer.from(`
---${bnd}--`);
+            const metaPart = Buffer.from(`--${bnd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${bnd}\r\nContent-Type: application/pdf\r\n\r\n`);
+            const endPart = Buffer.from(`\r\n--${bnd}--`);
             const body = Buffer.concat([metaPart, buf, endPart]);
             const r = await fetch(
               "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
@@ -567,6 +559,4 @@ Content-Type: application/pdf
 
   } catch (e) {
     console.error("split-pdf:", e);
-    return res.status(500).json({ error: e.message, stack: e.stack?.slice(0,300) });
-  }
-}
+    return res.status(500).json({ error: e.message, stack: e.stack?.slice(0

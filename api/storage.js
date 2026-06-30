@@ -198,16 +198,8 @@ async function handlePost(req, res) {
             const pdfBuf = Buffer.from(await entry.async('nodebuffer'));
             const bnd = 'exp_pdf_bnd';
             const meta = JSON.stringify({ name: fname, mimeType: 'application/pdf', parents: [FACTURACION_FOLDER_ID] });
-            const metaPart = Buffer.from(`--${bnd}
-Content-Type: application/json; charset=UTF-8
-
-${meta}
---${bnd}
-Content-Type: application/pdf
-
-`);
-            const endPart = Buffer.from(`
---${bnd}--`);
+            const metaPart = Buffer.from(`--${bnd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${bnd}\r\nContent-Type: application/pdf\r\n\r\n`);
+            const endPart = Buffer.from(`\r\n--${bnd}--`);
             const body = Buffer.concat([metaPart, pdfBuf, endPart]);
             const r = await fetch(
               'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
@@ -290,5 +282,4 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method === "GET")  return handleGet(req, res);
   if (req.method === "POST") return handlePost(req, res);
-  return res.status(405).json({ error: "Método no permitido" });
-}
+  return res.status(405).json({ error: "Método no p
