@@ -138,9 +138,11 @@ export default async function handler(req, res) {
 
         // Buscar F-{folio}*.pdf en cualquier subcarpeta del ZIP
         let pdfEntry = null;
+        const zipFiles = [];
         zip.forEach((relativePath, file) => {
           if (file.dir) return;
           const fname = relativePath.split("/").pop();
+          zipFiles.push(fname);
           if (fname.startsWith(`F-${folio} `) || fname.startsWith(`F-${folio}.`) || fname === `F-${folio}.pdf`) {
             pdfEntry = file;
           }
@@ -153,7 +155,14 @@ export default async function handler(req, res) {
           res.setHeader("Cache-Control", "public, max-age=86400");
           return res.send(pdfBuf);
         }
-        // ZIP encontrado pero folio no está dentro → continuar al fallback
+        // ZIP encontrado pero folio no está dentro → incluir lista en 404
+        return res.status(404).json({
+          error: `PDF para folio ${folio} no encontrado en ZIP`,
+          zipName,
+          totalFiles: zipFiles.length,
+          sampleFiles: zipFiles.filter(f=>f.endsWith(".pdf")).slice(0, 20),
+          hint: "El folio no está en el ZIP del período. Puede que el PDF consolidado no incluyera esta factura."
+        });
       }
     } catch (e) {
       // Log pero no falla — intenta fallback
