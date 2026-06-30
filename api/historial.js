@@ -958,18 +958,31 @@ export default async function handler(req, res) {
     // Usado por LlenarPlanillaView para mostrar Nro. Factura sin 60 llamadas individuales.
     if (req.method === "GET" && req.query.batchPeriodo === "1") {
       const periodo = req.query.periodo || "";
-      const [mesNom, anioStr] = periodo.split(" ");
+      const [, anioStr] = periodo.split(" ");
+      // strip: normaliza NFD y elimina todo lo que no sea alfanumérico (igual que clienteMatch)
       const strip = s => (s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
-      const periodoData = _EXCEL_EMBEDDED?.[anioStr]?.[periodo];
+      // Usar _loadExcelCache para tener fallback a Drive si _EXCEL_EMBEDDED no cargó
+      const excelData = await _loadExcelCache(token);
+      const periodoData = excelData?.[anioStr]?.[periodo];
+      const debug = req.query.debug === "1";
       if (!periodoData) {
-        return res.status(200).json({ periodo, clientes: {}, loaded: !!_EXCEL_EMBEDDED });
+        return res.status(200).json({
+          periodo, clientes: {},
+          ...(debug ? { loaded: !!excelData, embeddedPath: _EXCEL_EMBEDDED_PATH, years: excelData ? Object.keys(excelData) : [] } : {})
+        });
       }
       const clientes = {};
       for (const [nom, sitios] of Object.entries(periodoData)) {
-        clientes[strip(nom)] = { nombre: nom, sitios };
+        const key = strip(nom);
+        // También indexar por nombre normalizado individual para mejorar el match
+        clientes[key] = { nombre: nom, sitios };
       }
       res.setHeader("Cache-Control", "no-store");
-      return res.status(200).json({ periodo, clientes });
+      return res.status(200).json({
+        periodo,
+        clientes,
+        ...(debug ? { total: Object.keys(clientes).length, sampleKeys: Object.keys(clientes).slice(0,5) } : {})
+      });
     }
 
     // ── GET ?listPeriodos=1 ── períodos disponibles en carpeta facturación ─
@@ -1437,16 +1450,4 @@ export default async function handler(req, res) {
       return res.status(200).json(anio ? (data[anio] || {}) : data);
     }
 
-    // ── POST ── guarda/fusiona período ─────────────────────────────────────
-    if (req.method === "POST") {
-      const { anio, periodo, data: periodoData } = req.body || {};
-      if (!anio || !periodo || !periodoData)
-        return res.status(400).json({ error:"Se requiere anio, periodo y data" });
-      if (!PDF_FOLDER)
-        return res.status(500).json({ error:"DRIVE_PDF_FACTURAS_ID no configurada" });
-
-      let historial = {};
-      const fileId = await findFile(token, HIST_NAME, PDF_FOLDER);
-      if (fileId) {
-        const text = await downloadFile(token, fileId);
-   
+    // ── POST ── gua
