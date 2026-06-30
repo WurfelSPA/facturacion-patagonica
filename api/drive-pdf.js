@@ -157,13 +157,15 @@ export default async function handler(req, res) {
         const zip = await JSZip.loadAsync(zipBuf);
 
         // Buscar F-{folio}*.pdf en cualquier subcarpeta del ZIP
+        // Acepta: "F-14548 Cliente.pdf", "FEE-14548 Cliente.pdf", "F-14548.pdf"
         let pdfEntry = null;
         const zipFiles = [];
+        const folioRe = new RegExp(`(?:F(?:EE)?-)${folio}[\\s.]`, "i");
         zip.forEach((relativePath, file) => {
           if (file.dir) return;
           const fname = relativePath.split("/").pop();
           zipFiles.push(fname);
-          if (fname.startsWith(`F-${folio} `) || fname.startsWith(`F-${folio}.`) || fname === `F-${folio}.pdf`) {
+          if (folioRe.test(fname) || fname === `F-${folio}.pdf` || fname.toLowerCase() === `fee-${folio}.pdf`) {
             pdfEntry = file;
           }
         });
@@ -171,7 +173,4 @@ export default async function handler(req, res) {
         if (pdfEntry) {
           const pdfBuf = await pdfEntry.async("nodebuffer");
           res.setHeader("Content-Type", "application/pdf");
-          res.setHeader("Content-Disposition", `inline; filename="F-${folio}.pdf"`);
-          res.setHeader("Cache-Control", "public, max-age=86400");
-          return res.send(pdfBuf);
-       
+          res.setHeader("Content-Dispositi

@@ -340,9 +340,14 @@ function detectCod(text) {
   return COD_MAP[m[1].trim().replace(/-$/,"").toUpperCase()] || null;
 }
 function detectNro(text) {
-  /* Tolerante con variantes del carácter º (º, °, o, ø) y con o sin espacio */
-  const m = text.match(/N[\xBA\xB0o\u00BA\u00B0]?[\s°º]*\s*(\d+)/i)
-    || text.match(/N[^a-z\d]{0,3}(\d{2,6})/i);
+  /* Tolerante con variantes del carácter º (º, °, o, ø) y con o sin espacio.
+     Prioridades:
+     1. "N° 14548" / "Nº14548" (patrón clásico Nubox)
+     2. "F-14548" / "FEE-14548" en el texto del PDF (referencia del documento)
+     3. Fallback genérico: N + hasta 4 no-alfanuméricos + 4-6 dígitos */
+  const m = text.match(/N[\xBA\xB0o\u00BA\u00B0]?[\s°º]*\s*(\d{4,6})/i)
+    || text.match(/F(?:EE)?-\s*(\d{4,6})/i)
+    || text.match(/N[^a-zA-Z\d]{0,4}(\d{4,6})/);
   return m ? m[1] : null;
 }
 function detectCliente(text) {
