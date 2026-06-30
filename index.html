@@ -384,19 +384,56 @@ async function generarExcelResumen(xlsxFile,periodo){
     const clienteVal=row[11]!=null?String(row[11]).trim():"";if(!clienteVal||clienteVal.toUpperCase()==="VACANTE")continue;
     outRows.push(COLS.map(c=>row[c]!=null?row[c]:""));
   }
-  const newWb=XLSX.utils.book_new();
-  const newWs=XLSX.utils.aoa_to_sheet(outRows);
-  // Ancho de columnas
-  newWs["!cols"]=[{wch:8},{wch:12},{wch:14},{wch:30},{wch:28},{wch:10},{wch:14},{wch:14},{wch:40}];
-  // Estilo encabezado: fondo azul celeste oscuro, texto blanco, centrado
-  const hStyle={fill:{patternType:"solid",fgColor:{rgb:"0277BD"}},font:{bold:true,color:{rgb:"FFFFFF"}},alignment:{horizontal:"center",vertical:"center"}};
-  for(let c=0;c<HEADERS.length;c++){const addr=XLSX.utils.encode_cell({r:0,c});if(newWs[addr])newWs[addr].s=hStyle;}
-  XLSX.utils.book_append_sheet(newWb,newWs,"Resumen");
-  const xlsxBuf=XLSX.write(newWb,{type:"array",bookType:"xlsx",cellStyles:true});
-  const bytes=new Uint8Array(xlsxBuf);
-  let bin="";
-  for(let i=0;i<bytes.length;i+=8192)bin+=String.fromCharCode(...bytes.subarray(i,i+8192));
-  return btoa(bin);
+  // ── Construir XLSX con estilos usando JSZip + XML puro ──────────────────
+  // SheetJS 0.18 CE no soporta cell styles → generamos el ZIP manualmente.
+  function xlCol(idx){let r='',n=idx+1;while(n>0){const rem=(n-1)%26;r=String.fromCharCode(65+rem)+r;n=Math.floor((n-1)/26);}return r;}
+  function xlEsc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  // Shared strings
+  const ss=[],ssMap=new Map();
+  function ssIdx(v){const s=String(v);if(ssMap.has(s))return ssMap.get(s);const i=ss.length;ss.push(s);ssMap.set(s,i);return i;}
+  // Ancho de columnas (caracteres)
+  const COL_W=[8,12,14,30,28,10,14,14,40];
+  // Índices 0-based de columnas con formato 2 decimales: Arriendo(6) y GC(7)
+  const DEC_COLS=new Set([6,7]);
+  // Construir XML de filas
+  let rowsXml='';
+  // Fila 1: encabezados con estilo 1 (azul oscuro, negrita, centrado)
+  let hCells='';
+  outRows[0].forEach((h,c)=>{hCells+=`<c r="${xlCol(c)}1" t="s" s="1"><v>${ssIdx(h)}</v></c>`;});
+  rowsXml+=`<row r="1" ht="18" customHeight="1">${hCells}</row>`;
+  // Filas de datos desde índice 1
+  for(let ri=1;ri<outRows.length;ri++){
+    const rowNum=ri+1;
+    let cells='';
+    outRows[ri].forEach((val,c)=>{
+      const addr=`${xlCol(c)}${rowNum}`;
+      if(val===null||val===undefined||val===''){cells+=`<c r="${addr}" s="0"/>`;return;}
+      if(typeof val==='number'){
+        const sIdx=DEC_COLS.has(c)?'2':'0';
+        cells+=`<c r="${addr}" t="n" s="${sIdx}"><v>${val}</v></c>`;
+      } else {
+        cells+=`<c r="${addr}" t="s" s="0"><v>${ssIdx(val)}</v></c>`;
+      }
+    });
+    rowsXml+=`<row r="${rowNum}">${cells}</row>`;
+  }
+  const colsXml=COL_W.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('');
+  const sheetXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols>${colsXml}</cols><sheetData>${rowsXml}</sheetData></worksheet>`;
+  const ssXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${ss.length}" uniqueCount="${ss.length}">${ss.map(s=>`<si><t xml:space="preserve">${xlEsc(s)}</t></si>`).join('')}</sst>`;
+  const stylesXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="0.00"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0277BD"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs></styleSheet>`;
+  const wbXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Resumen" sheetId="1" r:id="rId1"/></sheets></workbook>`;
+  const relsXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
+  const wbRelsXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`;
+  const ctXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`;
+  const zipOut=new JSZip();
+  zipOut.file('[Content_Types].xml',ctXml);
+  zipOut.file('_rels/.rels',relsXml);
+  zipOut.file('xl/workbook.xml',wbXml);
+  zipOut.file('xl/_rels/workbook.xml.rels',wbRelsXml);
+  zipOut.file('xl/styles.xml',stylesXml);
+  zipOut.file('xl/sharedStrings.xml',ssXml);
+  zipOut.file('xl/worksheets/sheet1.xml',sheetXml);
+  return await zipOut.generateAsync({type:'base64'});
 }
 async function sendGmail(token,to,cco,from,subject,htmlBody,pdfBase64,pdfName,attachMime){
   const raw=makeEmail(to,cco,from,subject,htmlBody,pdfBase64,pdfName,attachMime);
