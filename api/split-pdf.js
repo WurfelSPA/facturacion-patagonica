@@ -379,19 +379,29 @@ export default async function handler(req, res) {
     const pdfBuf = await driveDownload(token, pdfFileId);
     console.log(`PDF: ${pdfBuf.length} bytes`);
 
-    // 2. Separar páginas con pdf-lib
+    // 2. Separar páginas — splitPDFPages crea PDFs mínimos (~50-100 KB c/u)
+    //    pdf-lib se carga SOLO para extracción de texto (CMap/streams)
+    //    Usar pdf-lib copyPages generaría PDFs de 5-10 MB cada uno (hereda
+    //    todos los recursos del doc completo) → ZIPs de 500+ MB → timeout.
     const srcDoc = await PDFDocument.load(pdfBuf, { ignoreEncryption: true });
     const totalPages = srcDoc.getPageCount();
     console.log(`Páginas a separar: ${totalPages}`);
-    const pageBufs = [];
-    for (let i = 0; i < totalPages; i++) {
-      const singleDoc = await PDFDocument.create();
-      const [copiedPage] = await singleDoc.copyPages(srcDoc, [i]);
-      singleDoc.addPage(copiedPage);
-      pageBufs.push(Buffer.from(await singleDoc.save()));
+    let usedCustomSplit = true;
+    let pageBufs = splitPDFPages(pdfBuf);
+    if (!pageBufs || pageBufs.length === 0) {
+      // Fallback a pdf-lib si el parser mínimo falla (PDF no estándar)
+      console.log("splitPDFPages sin resultado, fallback a pdf-lib");
+      usedCustomSplit = false;
+      pageBufs = [];
+      for (let i = 0; i < totalPages; i++) {
+        const singleDoc = await PDFDocument.create();
+        const [copiedPage] = await singleDoc.copyPages(srcDoc, [i]);
+        singleDoc.addPage(copiedPage);
+        pageBufs.push(Buffer.from(await singleDoc.save()));
+      }
     }
     if (pageBufs.length === 0) throw new Error("No se pudieron separar las páginas del PDF");
-    console.log(`Páginas separadas: ${pageBufs.length}`);
+    console.log(`Páginas separadas: ${pageBufs.length} (método: ${usedCustomSplit ? "custom-minimal" : "pdf-lib-fallback"})`);
 
     // 3. CMap desde el PDF ya parseado (sin regex sobre bytes crudos — rápido)
     const globalCMap = buildCMapFromDoc(srcDoc);
