@@ -133,6 +133,19 @@ export default async function handler(req, res) {
       const zipFile = await findFileInFolder(token, FACT_FOLDER_ID, zipName);
 
       if (zipFile) {
+        // Guard: si el ZIP es > 80 MB probablemente contiene el PDF consolidado
+        // sin separar (pdf-lib replica todos los recursos → 5-10 MB por página).
+        // Descargar un ZIP de 300+ MB causaría timeout (FUNCTION_INVOCATION_FAILED).
+        const zipSizeMB = zipFile.size ? Math.round(zipFile.size / 1024 / 1024) : null;
+        if (zipSizeMB !== null && zipSizeMB > 80) {
+          console.warn(`ZIP ${zipName} demasiado grande: ${zipSizeMB} MB — requiere re-separar`);
+          return res.status(404).json({
+            error: `ZIP del período demasiado grande (${zipSizeMB} MB) — requiere re-separación`,
+            zipName,
+            hint: "El ZIP contiene PDFs sin optimizar. Use 'Re-separar PDFs' en la vista de Facturación para regenerarlo.",
+            needsResplit: true,
+          });
+        }
         const zipBuf = await downloadFileBuffer(token, zipFile.id);
         const zip = await JSZip.loadAsync(zipBuf);
 
@@ -162,26 +175,3 @@ export default async function handler(req, res) {
           totalFiles: zipFiles.length,
           sampleFiles: zipFiles.filter(f=>f.endsWith(".pdf")).slice(0, 20),
           hint: "El folio no está en el ZIP del período. Puede que el PDF consolidado no incluyera esta factura."
-        });
-      }
-    } catch (e) {
-      // Log pero no falla — intenta fallback
-      console.error("ZIP extraction error:", e.message);
-    }
-  }
-
-  // ── Ruta 2: Fallback — buscar PDF suelto en Drive ────────────────────────────
-  try {
-    const file = await findPdfGlobal(token, folio);
-    if (file) {
-      res.setHeader("Cache-Control", "public, max-age=3600");
-      return res.redirect(302, `https://drive.google.com/file/d/${file.id}/view`);
-    }
-  } catch (e) {
-    return res.status(500).json({ error: "Error buscando en Drive: " + e.message });
-  }
-
-  return res.status(404).json({
-    error: `PDF para folio ${folio} no encontrado`,
-    periodo: periodo || "no especificado",
-    hint: "Verifica que el ZIP del período esté en Drive y el SA tenga acces
