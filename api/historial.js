@@ -953,35 +953,31 @@ export default async function handler(req, res) {
       return res.status(200).json({ clientes });
     }
 
-    // ── GET ?batchPeriodo=1&periodo=X ── todas las facturas del período (desde JSON embebido) ─
-    // Devuelve { clientes: { [stripNombre]: { nombre, sitios: {[sitio]:{tipo:{nro,uf,total}}} } } }
-    // Usado por LlenarPlanillaView para mostrar Nro. Factura sin 60 llamadas individuales.
+    // ── GET ?batchPeriodo=1&periodo=X ── todas las facturas del período ─────────
+    // Devuelve { clientes: { [stripNom]: { nombre, sitios } } }
+    // Un solo call desde LlenarPlanillaView para mostrar Nro. Factura en la tabla.
     if (req.method === "GET" && req.query.batchPeriodo === "1") {
       const periodo = req.query.periodo || "";
       const [, anioStr] = periodo.split(" ");
-      // strip: normaliza NFD y elimina todo lo que no sea alfanumérico (igual que clienteMatch)
-      const strip = s => (s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
-      // Usar _loadExcelCache para tener fallback a Drive si _EXCEL_EMBEDDED no cargó
+      const stripB = s => (s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
+      // Usa _loadExcelCache para tener fallback a Drive si _EXCEL_EMBEDDED no cargó
       const excelData = await _loadExcelCache(token);
       const periodoData = excelData?.[anioStr]?.[periodo];
-      const debug = req.query.debug === "1";
+      const dbgB = req.query.debug === "1";
       if (!periodoData) {
         return res.status(200).json({
           periodo, clientes: {},
-          ...(debug ? { loaded: !!excelData, embeddedPath: _EXCEL_EMBEDDED_PATH, years: excelData ? Object.keys(excelData) : [] } : {})
+          ...(dbgB ? { loaded: !!excelData, embeddedPath: _EXCEL_EMBEDDED_PATH || null } : {})
         });
       }
       const clientes = {};
       for (const [nom, sitios] of Object.entries(periodoData)) {
-        const key = strip(nom);
-        // También indexar por nombre normalizado individual para mejorar el match
-        clientes[key] = { nombre: nom, sitios };
+        clientes[stripB(nom)] = { nombre: nom, sitios };
       }
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({
-        periodo,
-        clientes,
-        ...(debug ? { total: Object.keys(clientes).length, sampleKeys: Object.keys(clientes).slice(0,5) } : {})
+        periodo, clientes,
+        ...(dbgB ? { total: Object.keys(clientes).length, sampleKeys: Object.keys(clientes).slice(0,5) } : {})
       });
     }
 
@@ -1450,4 +1446,45 @@ export default async function handler(req, res) {
       return res.status(200).json(anio ? (data[anio] || {}) : data);
     }
 
-    // ── POST ── gua
+    // ── POST ── guarda/fusiona período ─────────────────────────────────────
+    if (req.method === "POST") {
+      const { anio, periodo, data: periodoData } = req.body || {};
+      if (!anio || !periodo || !periodoData)
+        return res.status(400).json({ error:"Se requiere anio, periodo y data" });
+      if (!PDF_FOLDER)
+        return res.status(500).json({ error:"DRIVE_PDF_FACTURAS_ID no configurada" });
+
+      let historial = {};
+      const fileId = await findFile(token, HIST_NAME, PDF_FOLDER);
+      if (fileId) {
+        const text = await downloadFile(token, fileId);
+        if (text) historial = JSON.parse(text);
+      }
+
+      if (!historial[anio]) historial[anio] = {};
+      historial[anio][periodo] = { ...(historial[anio][periodo] || {}), ...periodoData };
+
+      const content = JSON.stringify(historial, null, 2);
+      if (fileId) await updateJsonFile(token, fileId, content);
+      else await createJsonFile(token, HIST_NAME, PDF_FOLDER, content);
+
+      return res.status(200).json({ ok:true, anio, periodo, clientes: Object.keys(periodoData).length });
+    }
+
+    return res.status(405).json({ error:"Method not allowed" });
+  } catch (e) {
+    console.error("historial:", e.message);
+    return res.status(500).json({ error: e.message });
+  }
+}
+
+export {
+  normRut, norm, clienteMatch, detectTipo,
+  _pickByUF, _resolveFacturas,
+  _buildXmlFacturas, parseXmlDTE,
+  extractFacturasForRut, extractText,
+  _extractUF, _extractTotal, _derivarUFdePrecio,
+  extractClienteFromText, extractRutFromText,
+  getToken, driveFiles, downloadFile, findFile, createJsonFile, updateJsonFile,
+  FACT_FOLDER_ID,
+};
