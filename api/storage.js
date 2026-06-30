@@ -150,6 +150,80 @@ async function handleGet(req, res) {
 // ── Handler POST (ex /api/drive) ─────────────────────────────────────────────
 async function handlePost(req, res) {
   const { action, filename, mimeType, folderId, base64 } = req.body || {};
+
+  // Acción: expandir ZIP existente a archivos individuales en Drive
+  if (action === 'expand-zip') {
+    const { periodo } = req.body || {};
+    if (!periodo) return res.status(400).json({ error: 'Falta periodo' });
+    const parts = periodo.split(" ");
+    const mesNombre = parts[0];
+    const anio = parts[1];
+    const mesNum = MES_NUM[mesNombre];
+    if (!mesNum || !anio) return res.status(400).json({ error: 'Periodo invalido' });
+    const zipName = `${anio}-${mesNum}.zip`;
+    try {
+      const token = await getSAToken();
+      // Buscar ZIP
+      const files = await driveList(token, FACTURACION_FOLDER_ID);
+      const zipFile = files.find(f => f.name.toLowerCase() === zipName.toLowerCase());
+      if (!zipFile) return res.status(404).json({ error: `ZIP ${zipName} no encontrado` });
+      // Verificar tamaño (no bajar ZIPs > 80MB)
+      const sizeMB = zipFile.size ? Math.round(parseInt(zipFile.size) / 1024 / 1024) : 0;
+      if (sizeMB > 80) return res.status(400).json({ error: `ZIP demasiado grande (${sizeMB}MB). Re-separar primero.` });
+      // Descargar ZIP
+      const zipRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${zipFile.id}?alt=media`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!zipRes.ok) return res.status(502).json({ error: `Error descargando ZIP: ${zipRes.status}` });
+      const zipBuf = Buffer.from(await zipRes.arrayBuffer());
+      // Extraer y subir PDFs individuales
+      const JSZipLib = (await import('jszip')).default;
+      const zip = await JSZipLib.loadAsync(zipBuf);
+      let uploaded = 0, skipped = 0;
+      const errors = [];
+      const uploadTasks = [];
+      zip.forEach((path, entry) => {
+        if (entry.dir) return;
+        const fname = path.split('/').pop();
+        if (!fname.endsWith('.pdf') || !fname.startsWith('F-')) { skipped++; return; }
+        uploadTasks.push({ fname, entry });
+      });
+      // Lotes de 5
+      const BATCH = 5;
+      for (let b = 0; b < uploadTasks.length; b += BATCH) {
+        const batch = uploadTasks.slice(b, b + BATCH);
+        await Promise.all(batch.map(async ({ fname, entry }) => {
+          try {
+            const pdfBuf = Buffer.from(await entry.async('nodebuffer'));
+            const bnd = 'exp_pdf_bnd';
+            const meta = JSON.stringify({ name: fname, mimeType: 'application/pdf', parents: [FACTURACION_FOLDER_ID] });
+            const metaPart = Buffer.from(`--${bnd}
+Content-Type: application/json; charset=UTF-8
+
+${meta}
+--${bnd}
+Content-Type: application/pdf
+
+`);
+            const endPart = Buffer.from(`
+--${bnd}--`);
+            const body = Buffer.concat([metaPart, pdfBuf, endPart]);
+            const r = await fetch(
+              'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+              { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${bnd}` }, body }
+            );
+            if (r.ok) uploaded++;
+            else { skipped++; errors.push(fname); }
+          } catch (e) { skipped++; errors.push(fname); }
+        }));
+      }
+      return res.status(200).json({ ok: true, periodo, zipName, uploaded, skipped, errors: errors.slice(0, 10) });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
   if (!filename || !folderId) return res.status(400).json({ error: 'Faltan filename o folderId' });
 
   try {

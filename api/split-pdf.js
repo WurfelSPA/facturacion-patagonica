@@ -507,9 +507,55 @@ export default async function handler(req, res) {
         uploadJson = await createRes.json();
       }
 
+      // 6. Subir PDFs individuales a Drive (acceso rápido sin descargar ZIP)
+      let indivUploaded = 0;
+      const indivErrors = [];
+      const filesToUpload = [];
+      // Reconstruir lista de archivos con nro válido
+      for (let i = 0; i < pageBufs.length; i++) {
+        const text = extractPageText(srcDoc, i, globalCMap);
+        const nro = detectNro(text);
+        if (!nro) continue; // sin nro → no podemos buscarlo por folio, skip
+        const cod = detectCod(text);
+        if (!cod) continue;
+        const cliente = detectCliente(text);
+        const fname = cliente ? `F-${nro} ${cliente}.pdf` : `F-${nro}.pdf`;
+        filesToUpload.push({ fname, buf: pageBufs[i] });
+      }
+      // Subir en lotes de 5 para no sobrecargar
+      const BATCH = 5;
+      for (let b = 0; b < filesToUpload.length; b += BATCH) {
+        const batch = filesToUpload.slice(b, b + BATCH);
+        await Promise.all(batch.map(async ({ fname, buf }) => {
+          try {
+            const bnd = "ind_pdf_boundary";
+            const meta = JSON.stringify({ name: fname, mimeType: "application/pdf", parents: [destFolderId] });
+            const metaPart = Buffer.from(`--${bnd}
+Content-Type: application/json; charset=UTF-8
+
+${meta}
+--${bnd}
+Content-Type: application/pdf
+
+`);
+            const endPart = Buffer.from(`
+--${bnd}--`);
+            const body = Buffer.concat([metaPart, buf, endPart]);
+            const r = await fetch(
+              "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+              { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/related; boundary=${bnd}` }, body }
+            );
+            if (r.ok) indivUploaded++;
+            else indivErrors.push(fname);
+          } catch { indivErrors.push(fname); }
+        }));
+      }
+      console.log(`PDFs individuales subidos: ${indivUploaded}/${filesToUpload.length}`);
+
       return res.status(200).json({
         ok: true, zipName, zipFileId: uploadJson.id, totalFacturas, sinCod,
         breakdown: Object.entries(breakdown).sort(([a],[b])=>a.localeCompare(b)),
+        indivUploaded, indivErrors: indivErrors.slice(0, 10),
       });
     }
 

@@ -4863,6 +4863,21 @@ function App(){
           title:"Volver a separar el PDF del per\u00edodo en facturas individuales y subir a Drive",
           style:{fontSize:11,padding:"4px 12px",borderRadius:7,border:"1px solid var(--bdr)",background:"transparent",color:"var(--txm)",cursor:"pointer",marginLeft:4}
         },"\ud83d\udd04 Re-separar PDFs"),
+        zipStatus==="ready"&&!splitLoading&&
+        h("button",{
+          onClick:async()=>{
+            try{
+              notify("Extrayendo PDFs individuales a Drive...","info");
+              const r=await fetch("/api/storage",{method:"POST",headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({action:"expand-zip",periodo})});
+              const d=await r.json();
+              if(!r.ok)throw new Error(d.error||"Error");
+              notify(`\u2713 ${d.uploaded} PDFs extra\u00eddos a Drive`,"ok");
+            }catch(e){notify("Error: "+e.message,"err");}
+          },
+          title:"Extraer PDFs individuales del ZIP a Drive para acceso r\u00e1pido",
+          style:{fontSize:11,padding:"4px 12px",borderRadius:7,border:"1px solid var(--bdr)",background:"transparent",color:"var(--txm)",cursor:"pointer",marginLeft:4}
+        },"\ud83d\udcc2 Extraer PDFs"),
         zipStatus==="missing"&&!canGenerate&&!splitLoading&&
         h("label",{
           style:{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,padding:"6px 16px",borderRadius:8,

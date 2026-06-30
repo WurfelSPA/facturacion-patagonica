@@ -133,6 +133,23 @@ export default async function handler(req, res) {
 
   const periodo = parsePeriodo(periodoRaw);
 
+  // ── Ruta 0: buscar PDF individual en Drive (sin descargar ZIP) ───────────────
+  if (periodo || folio) {
+    try {
+      const qInd = encodeURIComponent(
+        `'${FACT_FOLDER_ID}' in parents and mimeType='application/pdf' and trashed=false` +
+        ` and (name contains 'F-${folio} ' or name contains 'F-${folio}.' or name='F-${folio}.pdf'` +
+        ` or name contains 'FEE-${folio} ' or name contains 'FEE-${folio}.')`
+      );
+      const dInd = await driveGet(token,
+        `https://www.googleapis.com/drive/v3/files?q=${qInd}&fields=files(id,name)&pageSize=3`);
+      if (dInd.files?.length) {
+        res.setHeader("Cache-Control", "public, max-age=3600");
+        return res.redirect(302, `https://drive.google.com/file/d/${dInd.files[0].id}/view`);
+      }
+    } catch (_) { /* continuar con ZIP fallback */ }
+  }
+
   // ── Ruta 1: Extraer del ZIP del período ──────────────────────────────────────
   if (periodo) {
     try {
@@ -173,4 +190,32 @@ export default async function handler(req, res) {
         if (pdfEntry) {
           const pdfBuf = await pdfEntry.async("nodebuffer");
           res.setHeader("Content-Type", "application/pdf");
-          res.setHeader("Content-Dispositi
+          res.setHeader("Content-Disposition", `inline; filename="F-${folio}.pdf"`);
+          res.setHeader("Cache-Control", "public, max-age=86400");
+          return res.send(pdfBuf);
+        }
+        // ZIP encontrado pero folio no está dentro → continuar al fallback
+      }
+    } catch (e) {
+      // Log pero no falla — intenta fallback
+      console.error("ZIP extraction error:", e.message);
+    }
+  }
+
+  // ── Ruta 2: Fallback — buscar PDF suelto en Drive ────────────────────────────
+  try {
+    const file = await findPdfGlobal(token, folio);
+    if (file) {
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      return res.redirect(302, `https://drive.google.com/file/d/${file.id}/view`);
+    }
+  } catch (e) {
+    return res.status(500).json({ error: "Error buscando en Drive: " + e.message });
+  }
+
+  return res.status(404).json({
+    error: `PDF para folio ${folio} no encontrado`,
+    periodo: periodo || "no especificado",
+    hint: "Verifica que el ZIP del período esté en Drive y el SA tenga acceso a la carpeta.",
+  });
+}
