@@ -79,7 +79,7 @@ async function findFileInFolder(token, folderId, name) {
   const q = encodeURIComponent(`'${folderId}' in parents and name='${name}' and trashed=false`);
   const d = await driveGet(token,
     `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,size)&pageSize=5`
-    + `&supportsAllDrives=true&includeItemsFromAllDrives=true`);
+    + `&orderBy=modifiedTime+desc&supportsAllDrives=true&includeItemsFromAllDrives=true`);
   return d.files?.[0] || null;
 }
 
@@ -184,6 +184,4 @@ export default async function handler(req, res) {
   return res.status(404).json({
     error: `PDF para folio ${folio} no encontrado`,
     periodo: periodo || "no especificado",
-    hint: "Verifica que el ZIP del período esté en Drive y el SA tenga acceso a la carpeta.",
-  });
-}
+    hint: "Verifica que el ZIP del período esté en Drive y el SA tenga acces

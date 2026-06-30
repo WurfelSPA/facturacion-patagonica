@@ -451,10 +451,10 @@ export default async function handler(req, res) {
       const boundary = "split_zip_boundary";
       const endPart = Buffer.from(`\r\n--${boundary}--`);
 
-      // Buscar si ya existe un ZIP con ese nombre en la carpeta para actualizarlo en vez de duplicar
+      // Buscar si ya existe un ZIP con ese nombre — usar SA token (puede ver todos los archivos)
       const searchRes = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=name='${zipName}'+and+'${destFolderId}'+in+parents+and+trashed=false&fields=files(id)&pageSize=5`,
-        { headers: { Authorization: `Bearer ${uploadToken}` } }
+        `https://www.googleapis.com/drive/v3/files?q=name='${zipName}'+and+'${destFolderId}'+in+parents+and+trashed=false&fields=files(id)&pageSize=5&orderBy=modifiedTime+desc&supportsAllDrives=true&includeItemsFromAllDrives=true`,
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       const searchJson = searchRes.ok ? await searchRes.json() : { files: [] };
       const existingIds = (searchJson.files || []).map(f => f.id);
