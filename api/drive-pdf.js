@@ -10,8 +10,6 @@
  *   → Fallback: busca PDF suelto en Drive por nombre
  */
 
-import JSZip from "jszip";
-
 export const config = { api: { bodyParser: false, responseLimit: "50mb" } };
 
 const FACT_FOLDER_ID = "1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u";
@@ -152,55 +150,35 @@ export default async function handler(req, res) {
     } catch (_) { /* continuar con ZIP fallback */ }
   }
 
-  // ── Ruta 1: Extraer del ZIP del período ──────────────────────────────────────
+  // ── Ruta 1: PDF general del período (Facturas_PISA_YYYY-MM.pdf) ─────────────
+  // Cuando no hay PDF individual, redirigir al PDF general del mes en Drive.
+  // El usuario puede buscar el folio con Ctrl+F dentro del visor de Drive.
   if (periodo) {
     try {
-      const zipName = `${periodo}.zip`;
-      const zipFile = await findFileInFolder(token, FACT_FOLDER_ID, zipName);
-
-      if (zipFile) {
-        // Guard: si el ZIP es > 80 MB O Drive no devuelve size (null → tratar como 999 MB).
-        // Descargar un ZIP grande causaría timeout (FUNCTION_INVOCATION_FAILED).
-        const rawZipSize = zipFile.size ? parseInt(zipFile.size) : null;
-        const zipSizeMB = rawZipSize !== null ? Math.round(rawZipSize / 1024 / 1024) : 999;
-        if (zipSizeMB > 80) {
-          console.warn(`ZIP ${zipName} demasiado grande o sin size: ${zipSizeMB} MB`);
-          return res.status(404).json({
-            error: `ZIP del período demasiado grande — requiere re-separación`,
-            zipName,
-            hint: "Use el menú Facturación → Procesar para separar el PDF y generar los PDFs individuales.",
-            needsResplit: true,
-          });
-        }
-        const zipBuf = await downloadFileBuffer(token, zipFile.id);
-        const zip = await JSZip.loadAsync(zipBuf);
-
-        // Buscar F-{folio}*.pdf en cualquier subcarpeta del ZIP
-        // Acepta: "F-14548 Cliente.pdf", "FEE-14548 Cliente.pdf", "F-14548.pdf"
-        let pdfEntry = null;
-        const zipFiles = [];
-        const folioRe = new RegExp(`(?:F(?:EE)?-)${folio}[\\s.]`, "i");
-        zip.forEach((relativePath, file) => {
-          if (file.dir) return;
-          const fname = relativePath.split("/").pop();
-          zipFiles.push(fname);
-          if (folioRe.test(fname) || fname === `F-${folio}.pdf` || fname.toLowerCase() === `fee-${folio}.pdf`) {
-            pdfEntry = file;
-          }
-        });
-
-        if (pdfEntry) {
-          const pdfBuf = await pdfEntry.async("nodebuffer");
-          res.setHeader("Content-Type", "application/pdf");
-          res.setHeader("Content-Disposition", `inline; filename="F-${folio}.pdf"`);
-          res.setHeader("Cache-Control", "public, max-age=86400");
-          return res.send(pdfBuf);
-        }
-        // ZIP encontrado pero folio no está dentro → continuar al fallback
+      const [anio, mesNum] = periodo.split("-");
+      const q = encodeURIComponent(
+        `'${FACT_FOLDER_ID}' in parents and mimeType='application/pdf' and trashed=false`
+        + ` and name contains 'PISA'`
+      );
+      const dGen = await driveGet(token,
+        `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&pageSize=20`
+        + `&supportsAllDrives=true&includeItemsFromAllDrives=true`);
+      const allPdfs = dGen.files || [];
+      const pdfGen = allPdfs.find(f => {
+        const n = f.name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+        return n.endsWith(".pdf") && n.includes("pisa") && (
+          n.includes(`${anio}-${mesNum}`) || n.includes(`${mesNum}-${anio}`) ||
+          n.includes(`_${mesNum}_`) || n.includes(` ${mesNum} `)
+        );
+      });
+      if (pdfGen) {
+        console.log(`Ruta 1 → PDF general: ${pdfGen.name}`);
+        res.setHeader("Cache-Control", "no-store");
+        // /preview permite embedding en iframe; /view abre en Drive directamente
+        return res.redirect(302, `https://drive.google.com/file/d/${pdfGen.id}/preview`);
       }
     } catch (e) {
-      // Log pero no falla — intenta fallback
-      console.error("ZIP extraction error:", e.message);
+      console.error("PDF general search error:", e.message);
     }
   }
 
@@ -218,6 +196,7 @@ export default async function handler(req, res) {
   return res.status(404).json({
     error: `PDF para folio ${folio} no encontrado`,
     periodo: periodo || "no especificado",
-    hint: "Verifica que el ZIP del período esté en Drive y el SA tenga acceso a la carpeta.",
+    hint: "Verifica que el PDF general Facturas_PISA_YYYY-MM.pdf o un PDF individual F-{folio}.pdf estén en Drive.",
   });
 }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
