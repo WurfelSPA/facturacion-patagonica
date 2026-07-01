@@ -110,6 +110,18 @@ async function handleGet(req, res) {
     }
 
     if (zipFile) {
+      // Guard: no intentar descargar ZIPs grandes (causan timeout en Vercel)
+      const zipSizeMB = zipFile.size ? Math.round(parseInt(zipFile.size) / 1024 / 1024) : 0;
+      if (zipSizeMB > 30) {
+        // ZIP existe pero es demasiado grande — informar al frontend para que use PDFs individuales
+        return res.status(404).json({
+          error: "zip_too_large",
+          zipName, zipFileId: zipFile.id, zipSizeMB,
+          canGenerate: true,
+          pdfMaestroId: null,
+          mensaje: `ZIP ${zipName} (${zipSizeMB}MB) — use Re-separar para regenerarlo con PDFs individuales`
+        });
+      }
       const driveRes = await fetch(
         `https://www.googleapis.com/drive/v3/files/${zipFile.id}?alt=media`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -274,19 +286,4 @@ async function handlePost(req, res) {
     body.set(metaBytes, 0); body.set(fileBytes, metaBytes.length); body.set(endBytes, metaBytes.length + fileBytes.length);
     const uploadRes = await fetch(
       'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
-      { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` }, body: body.buffer }
-    );
-    if (!uploadRes.ok) {
-      const e = await uploadRes.text();
-      return res.status(502).json({ error: `Drive upload ${uploadRes.status}: ${e.slice(0,200)}` });
-    }
-    const data = await uploadRes.json();
-    return res.status(200).json({ id: data.id, name: data.name });
-
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-}
-
-// ── Router principal ─────────────────────────────────────────────────────────
-export default async function handler(r
+      { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` }, body: body.
