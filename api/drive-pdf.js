@@ -159,16 +159,16 @@ export default async function handler(req, res) {
       const zipFile = await findFileInFolder(token, FACT_FOLDER_ID, zipName);
 
       if (zipFile) {
-        // Guard: si el ZIP es > 80 MB probablemente contiene el PDF consolidado
-        // sin separar (pdf-lib replica todos los recursos → 5-10 MB por página).
-        // Descargar un ZIP de 300+ MB causaría timeout (FUNCTION_INVOCATION_FAILED).
-        const zipSizeMB = zipFile.size ? Math.round(zipFile.size / 1024 / 1024) : null;
-        if (zipSizeMB !== null && zipSizeMB > 80) {
-          console.warn(`ZIP ${zipName} demasiado grande: ${zipSizeMB} MB — requiere re-separar`);
+        // Guard: si el ZIP es > 80 MB O Drive no devuelve size (null → tratar como 999 MB).
+        // Descargar un ZIP grande causaría timeout (FUNCTION_INVOCATION_FAILED).
+        const rawZipSize = zipFile.size ? parseInt(zipFile.size) : null;
+        const zipSizeMB = rawZipSize !== null ? Math.round(rawZipSize / 1024 / 1024) : 999;
+        if (zipSizeMB > 80) {
+          console.warn(`ZIP ${zipName} demasiado grande o sin size: ${zipSizeMB} MB`);
           return res.status(404).json({
-            error: `ZIP del período demasiado grande (${zipSizeMB} MB) — requiere re-separación`,
+            error: `ZIP del período demasiado grande — requiere re-separación`,
             zipName,
-            hint: "El ZIP contiene PDFs sin optimizar. Use 'Re-separar PDFs' en la vista de Facturación para regenerarlo.",
+            hint: "Use el menú Facturación → Procesar para separar el PDF y generar los PDFs individuales.",
             needsResplit: true,
           });
         }
