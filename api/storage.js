@@ -102,6 +102,13 @@ async function handleGet(req, res) {
     const zipName = `${anio}-${mesNum}.zip`;
     const zipFile = files.find(f => f.name.toLowerCase() === zipName.toLowerCase());
 
+    // Modo ?check=1 — sólo verificar existencia, sin descargar el ZIP
+    if (req.query.check) {
+      if (!zipFile) return res.status(404).json({ error: `ZIP ${zipName} no encontrado` });
+      const sizeMB = zipFile.size ? Math.round(parseInt(zipFile.size) / 1024 / 1024) : null;
+      return res.status(200).json({ zipName, fileId: zipFile.id, sizeMB, exists: true });
+    }
+
     if (zipFile) {
       const driveRes = await fetch(
         `https://www.googleapis.com/drive/v3/files/${zipFile.id}?alt=media`,
@@ -282,4 +289,5 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method === "GET")  return handleGet(req, res);
   if (req.method === "POST") return handlePost(req, res);
-  return res.status(405).json({ error: "Método no p
+  return res.status(405).json({ error: "Método no permitido" });
+}
