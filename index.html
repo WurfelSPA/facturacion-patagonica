@@ -4318,7 +4318,10 @@ function App(){
       var siteData=siteKey?sitios[siteKey]:null;
       var defData=sitios["default"]||{};
       var arrNro=(siteData&&siteData.arriendo&&siteData.arriendo.nro)||null;
-      var srvNro=(defData.servAdm&&defData.servAdm.nro)||(siteData&&siteData.servAdm&&siteData.servAdm.nro)||null;
+      /* default.servAdm solo aplica si hay UN solo sitio (multi-sitio→GC es por edificio, no compartida) */
+      var nonDefCount=Object.keys(sitios).filter(function(k){return k!=="default";}).length;
+      var srvNro=(siteData&&siteData.servAdm&&siteData.servAdm.nro)||
+                 (nonDefCount<=1&&defData.servAdm?defData.servAdm.nro:null)||null;
       return{arrNro:arrNro,srvNro:srvNro};
     }
     function openPdfP(nro){
