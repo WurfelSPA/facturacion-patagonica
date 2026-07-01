@@ -4221,6 +4221,7 @@ function App(){
           var rut=String(row[9]||"").trim();
           var dir=String(row[10]||"").trim();
           var clienteStr=String(row[11]||"").trim();
+          if(EXCL.includes(clienteStr)||clienteStr.toUpperCase()==="VACANTE")continue;
           var correo=String(row[12]||"").trim();
           var key=sitio+"|"+edificio+"|"+rut+"|"+clienteStr;
           var uf=colMes>=0?(parseFloat(row[colMes])||0):0;
@@ -4341,6 +4342,7 @@ function App(){
     function toggleSort(col){setSort(function(prev){return prev.col===col&&prev.dir==="asc"?{col:col,dir:"desc"}:{col:col,dir:"asc"};});}
     function sortArrow(col){if(sort.col!==col)return" ↕";return sort.dir==="asc"?" ↑":" ↓";}
     var displayed=rows.filter(function(r){
+      if(r.cliente.toUpperCase()==="VACANTE"||r.nombre.toUpperCase()==="VACANTE")return false;
       if(!search.trim())return true;
       var q=search.toLowerCase().trim();
       return r.cliente.toLowerCase().includes(q)||r.nombre.toLowerCase().includes(q)||r.rut.toLowerCase().replace(/\./g,"").includes(q.replace(/\./g,""));
