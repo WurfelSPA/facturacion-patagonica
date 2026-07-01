@@ -3470,7 +3470,7 @@ function App(){
 
   /* Auto-descargar desde Nubox cuando no hay PDF — solo si el usuario activó el período */
   useEffect(()=>{
-    if(periodoActivado.current&&planillaStatus==="ok"&&zipStatus==="missing"&&!canGenerate&&!splitLoading&&!autoNuboxRef.current){
+    if(periodoActivado.current&&planillaStatus==="ok"&&zipStatus==="missing"&&!splitLoading&&!autoNuboxRef.current){
       autoNuboxRef.current=true;
       splitPDF();
     }
@@ -3825,6 +3825,7 @@ function App(){
         URL.revokeObjectURL(url);
       }
       notify("✓ "+data.zipName+" descargado ("+data.totalFacturas+" facturas)","ok");
+      buscarZip(periodo);
     }catch(e){
       setSplitResult({error:e.message});
       notify("Error: "+e.message,"err");

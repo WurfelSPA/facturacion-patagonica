@@ -110,16 +110,19 @@ async function handleGet(req, res) {
     }
 
     if (zipFile) {
-      // Guard: no intentar descargar ZIPs grandes (causan timeout en Vercel)
-      const zipSizeMB = zipFile.size ? Math.round(parseInt(zipFile.size) / 1024 / 1024) : 0;
+      // Guard: no intentar descargar ZIPs grandes (causan timeout en Vercel).
+      // Si Drive no devuelve size (null/undefined), tratar como grande (999 MB)
+      // para evitar intentar descargar un ZIP de tamaño desconocido.
+      const rawSize = zipFile.size ? parseInt(zipFile.size) : null;
+      const zipSizeMB = rawSize !== null ? Math.round(rawSize / 1024 / 1024) : 999;
       if (zipSizeMB > 30) {
-        // ZIP existe pero es demasiado grande — informar al frontend para que use PDFs individuales
+        // ZIP existe pero es demasiado grande (o tamaño desconocido) — informar al frontend
         return res.status(404).json({
           error: "zip_too_large",
-          zipName, zipFileId: zipFile.id, zipSizeMB,
+          zipName, zipFileId: zipFile.id, zipSizeMB: rawSize !== null ? zipSizeMB : null,
           canGenerate: true,
           pdfMaestroId: null,
-          mensaje: `ZIP ${zipName} (${zipSizeMB}MB) — use Re-separar para regenerarlo con PDFs individuales`
+          mensaje: `ZIP ${zipName} existe en Drive — los PDFs individuales estarán disponibles después de re-separar`
         });
       }
       const driveRes = await fetch(
@@ -284,6 +287,4 @@ async function handlePost(req, res) {
     const endBytes = new TextEncoder().encode(endPart);
     const body = new Uint8Array(metaBytes.length + fileBytes.length + endBytes.length);
     body.set(metaBytes, 0); body.set(fileBytes, metaBytes.length); body.set(endBytes, metaBytes.length + fileBytes.length);
-    const uploadRes = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
-      { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` }, body: body.
+  
