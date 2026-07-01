@@ -128,23 +128,38 @@ function splitPDFPages(buf) {
 
     const offsets = {};
 
-    // Escribir objetos de recursos (fonts, etc.)
+    // Helper: remap referencias SOLO en la parte diccionario, nunca dentro del stream binario.
+    // Aplicar regex sobre bytes comprimidos (FlateDecode) corrompería las fuentes.
+    function remapDictOnly(objText, mapFn) {
+      // Detectar inicio del stream (si existe)
+      const streamMatch = objText.match(/\bstream\s*\n/);
+      if (!streamMatch) {
+        // Sin stream: remap todo
+        return objText.replace(/(\d+)\s+0\s+R/g, mapFn);
+      }
+      const splitAt = objText.indexOf(streamMatch[0]);
+      const dictPart = objText.slice(0, splitAt);
+      const streamPart = objText.slice(splitAt); // incluye "stream\n...endstream\nendobj"
+      return dictPart.replace(/(\d+)\s+0\s+R/g, mapFn) + streamPart;
+    }
+
+    // Escribir objetos de recursos (fonts, XObjects, CMaps, etc.)
     const resourceObjs = neededArr.filter(n => n !== pageNum && n !== contentsNum);
     for (const oldNum of resourceObjs) {
       const newNum = mapping[oldNum];
       offsets[newNum] = newPdf.length;
       let o = getObj(oldNum);
-      // Remap references
-      o = o.replace(/(\d+)\s+0\s+R/g, (match, n) => {
+      // Remap referencias solo en el diccionario (no en streams binarios)
+      o = remapDictOnly(o, (match, n) => {
         const mapped = mapping[parseInt(n)];
         return mapped ? `${mapped} 0 R` : match;
       });
-      // Fix object number
+      // Fix object number en la primera línea
       o = o.replace(/^\d+\s+0\s+obj/, `${newNum} 0 obj`);
       newPdf += o + "\n";
     }
 
-    // Escribir stream de contenido
+    // Escribir stream de contenido (solo fix de número, sin remap — no tiene refs internas)
     if (contentsNum && contentsObj) {
       const newNum = mapping[contentsNum];
       offsets[newNum] = newPdf.length;
@@ -153,7 +168,7 @@ function splitPDFPages(buf) {
       newPdf += o + "\n";
     }
 
-    // Escribir objeto página (remap referencias)
+    // Escribir objeto página — las páginas son diccionarios puros (sin stream), remap seguro
     const pageNewNum = mapping[pageNum];
     offsets[pageNewNum] = newPdf.length;
     let pageObjNew = pageObj;
@@ -541,24 +556,4 @@ export default async function handler(req, res) {
             const metaPart = Buffer.from(`--${bnd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${bnd}\r\nContent-Type: application/pdf\r\n\r\n`);
             const endPart = Buffer.from(`\r\n--${bnd}--`);
             const body = Buffer.concat([metaPart, buf, endPart]);
-            const r = await fetch(
-              "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
-              { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/related; boundary=${bnd}` }, body }
-            );
-            if (r.ok) indivUploaded++;
-            else indivErrors.push(fname);
-          } catch { indivErrors.push(fname); }
-        }));
-      }
-      console.log(`PDFs individuales subidos: ${indivUploaded}/${filesToUpload.length}`);
-
-      return res.status(200).json({
-        ok: true, zipName, zipFileId: uploadJson.id, totalFacturas, sinCod,
-        breakdown: Object.entries(breakdown).sort(([a],[b])=>a.localeCompare(b)),
-        indivUploaded, indivErrors: indivErrors.slice(0, 10),
-      });
-    }
-
-    // Fallback: devolver base64 si no se pasó destFolderId
-    return res.status(200).json({
-      ok: true, zipName, zipBase64:
+        
