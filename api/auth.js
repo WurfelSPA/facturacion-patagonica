@@ -221,6 +221,19 @@ export default async function handler(req, res) {
         authenticated = true;
       }
 
+      // Fix: si el env var autenticó pero tiene mustChangePassword:true,
+      // verificar en Drive si el usuario ya cambió su contraseña allí.
+      // (el env var nunca se actualiza en runtime, puede quedar desactualizado)
+      if (authenticated && user.mustChangePassword) {
+        try {
+          const tok = await saToken();
+          const driveCreds = await readDriveCredentials(tok);
+          if (driveCreds[emailKey] && driveCreds[emailKey].mustChangePassword === false) {
+            user = { ...user, mustChangePassword: false };
+          }
+        } catch(e) { /* si Drive falla, respetar el env var */ }
+      }
+
       const payload = {
         email: emailKey, name: user.name,
         mustChangePassword: !!user.mustChangePassword,
@@ -259,16 +272,18 @@ export default async function handler(req, res) {
       if (newPassword.length < 8)
         return res.status(400).json({error:'La nueva contraseña debe tener al menos 8 caracteres'});
 
-      // Leer credenciales actuales
+      // Leer credenciales SIEMPRE desde Drive para no sobreescribir cambios de otros usuarios.
+      // (leer del env var y luego escribir a Drive revertiría los cambios de los demás)
       let creds;
-      const envCreds = readEnvCredentials();
-      if (envCreds) {
-        creds = envCreds;
-      } else {
-        try {
-          const tok = await saToken();
-          creds = await readDriveCredentials(tok);
-        } catch(e) {
+      try {
+        const tok = await saToken();
+        creds = await readDriveCredentials(tok);
+      } catch(e) {
+        // Solo fallback a env var si Drive no está disponible
+        const envCreds = readEnvCredentials();
+        if (envCreds) {
+          creds = envCreds;
+        } else {
           return res.status(500).json({error:'No se pudo leer credenciales'});
         }
       }
