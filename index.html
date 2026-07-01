@@ -4330,7 +4330,7 @@ function App(){
       var mesNum=MN[mes];
       var pCode=mesNum?(anio+"-"+mesNum):"";
       var url="/api/drive-pdf?folio="+encodeURIComponent(numPart)+(pCode?"&periodo="+pCode:"");
-      setPdfPrevP({url:url,nro:nro,periodo:periodo});
+      window.open(url,"_blank","noopener,noreferrer");
     }
 
     var thBase={textAlign:"left",padding:"8px 10px",borderBottom:"2px solid var(--bdr)",fontWeight:700,fontSize:11,whiteSpace:"nowrap"};

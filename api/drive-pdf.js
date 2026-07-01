@@ -10,7 +10,7 @@
  *   → Fallback: busca PDF suelto en Drive por nombre
  */
 
-export const config = { api: { bodyParser: false, responseLimit: "50mb" } };
+export const config = { api: { bodyParser: false } };
 
 const FACT_FOLDER_ID = "1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u";
 
@@ -215,4 +215,4 @@ async function handleRequest(req, res) {
     }
   }
 
-  // ── Ruta 2: Fallback — buscar PDF suelto en Drive ───────────────�
+  // ── Ruta 2: Fallback — buscar PDF suelto en Drive ───────────────────────
