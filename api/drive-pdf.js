@@ -110,9 +110,24 @@ async function findPdfGlobal(token, folio) {
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
+  // Guard global: cualquier excepción no capturada devuelve JSON en lugar de crashear
+  try {
+    return await handleRequest(req, res);
+  } catch (err) {
+    const msg = (err && err.stack) || (err && err.message) || String(err);
+    console.error("drive-pdf UNCAUGHT:", msg);
+    if (!res.headersSent) {
+      return res.status(500).json({ error: "Error interno inesperado", detail: String(err && err.message || err) });
+    }
+  }
+}
+
+async function handleRequest(req, res) {
   const { folio, periodo: periodoRaw } = req.query;
 
-  if (!folio || !/^\d+$/.test(folio)) {
+  // folio puede ser string o array si la URL tiene ?folio=x&folio=y
+  const folioStr = Array.isArray(folio) ? folio[0] : folio;
+  if (!folioStr || !/^\d+$/.test(String(folioStr))) {
     return res.status(400).json({ error: "Parámetro folio inválido. Ejemplo: ?folio=14670&periodo=2026-04" });
   }
 
@@ -126,36 +141,50 @@ export default async function handler(req, res) {
 
   let token;
   try { token = await getToken(sa); } catch (e) {
-    return res.status(500).json({ error: "Error de autenticación: " + e.message });
+    return res.status(500).json({ error: "Error de autenticación: " + (e && e.message) });
   }
 
-  const periodo = parsePeriodo(periodoRaw);
+  const periodo = parsePeriodo(Array.isArray(periodoRaw) ? periodoRaw[0] : periodoRaw);
 
-  // ── Ruta 0: buscar PDF individual en Drive (sin descargar ZIP) ───────────────
-  if (periodo || folio) {
+  // ── Ruta 0: buscar PDF individual en Drive ───────────────────────────────────
+  try {
+    const qInd = encodeURIComponent(
+      `'${FACT_FOLDER_ID}' in parents and mimeType='application/pdf' and trashed=false` +
+      ` and (name contains 'F-${folioStr} ' or name contains 'F-${folioStr}.' or name='F-${folioStr}.pdf'` +
+      ` or name contains 'FEE-${folioStr} ' or name contains 'FEE-${folioStr}.')`
+    );
+    const dInd = await driveGet(token,
+      `https://www.googleapis.com/drive/v3/files?q=${qInd}&fields=files(id,name,modifiedTime)&pageSize=10`
+      + `&orderBy=modifiedTime%20desc&supportsAllDrives=true&includeItemsFromAllDrives=true`);
+    const indFiles = (dInd && dInd.files) || [];
+    if (indFiles.length && indFiles[0].id) {
+      res.setHeader("Cache-Control", "no-store");
+      return res.redirect(302, `https://drive.google.com/file/d/${indFiles[0].id}/view`);
+    }
+  } catch (e0) {
+    // Drive rechazó orderBy con AllDrives → reintento sin orderBy
     try {
-      const qInd = encodeURIComponent(
+      const qInd2 = encodeURIComponent(
         `'${FACT_FOLDER_ID}' in parents and mimeType='application/pdf' and trashed=false` +
-        ` and (name contains 'F-${folio} ' or name contains 'F-${folio}.' or name='F-${folio}.pdf'` +
-        ` or name contains 'FEE-${folio} ' or name contains 'FEE-${folio}.')`
+        ` and (name contains 'F-${folioStr} ' or name contains 'F-${folioStr}.' or name='F-${folioStr}.pdf'` +
+        ` or name contains 'FEE-${folioStr} ' or name contains 'FEE-${folioStr}.')`
       );
-      const dInd = await driveGet(token,
-        `https://www.googleapis.com/drive/v3/files?q=${qInd}&fields=files(id,name,modifiedTime)&pageSize=10`
-        + `&orderBy=modifiedTime%20desc`);
-      if (dInd.files?.length) {
-        // Usar el más reciente (modifiedTime desc garantiza que sea el re-split nuevo)
-        res.setHeader("Cache-Control", "no-store"); // no cachear para reflejar re-splits
-        return res.redirect(302, `https://drive.google.com/file/d/${dInd.files[0].id}/view`);
+      const dInd2 = await driveGet(token,
+        `https://www.googleapis.com/drive/v3/files?q=${qInd2}&fields=files(id,name)&pageSize=10`);
+      const indFiles2 = (dInd2 && dInd2.files) || [];
+      if (indFiles2.length && indFiles2[0].id) {
+        res.setHeader("Cache-Control", "no-store");
+        return res.redirect(302, `https://drive.google.com/file/d/${indFiles2[0].id}/view`);
       }
-    } catch (_) { /* continuar con ZIP fallback */ }
+    } catch (_) { /* continuar */ }
   }
 
   // ── Ruta 1: PDF general del período (Facturas_PISA_YYYY-MM.pdf) ─────────────
-  // Cuando no hay PDF individual, redirigir al PDF general del mes en Drive.
-  // El usuario puede buscar el folio con Ctrl+F dentro del visor de Drive.
   if (periodo) {
     try {
-      const [anio, mesNum] = periodo.split("-");
+      const parts = periodo.split("-");
+      const anio = parts[0] || "";
+      const mesNum = parts[1] || "";
       const q = encodeURIComponent(
         `'${FACT_FOLDER_ID}' in parents and mimeType='application/pdf' and trashed=false`
         + ` and name contains 'PISA'`
@@ -163,40 +192,27 @@ export default async function handler(req, res) {
       const dGen = await driveGet(token,
         `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&pageSize=20`
         + `&supportsAllDrives=true&includeItemsFromAllDrives=true`);
-      const allPdfs = dGen.files || [];
+      const allPdfs = (dGen && dGen.files) || [];
+      // Matching simple sin normalize (evita posibles problemas con ICU en runtime)
       const pdfGen = allPdfs.find(f => {
-        const n = f.name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+        if (!f || !f.name || !f.id) return false;
+        const n = f.name.toLowerCase();
         return n.endsWith(".pdf") && n.includes("pisa") && (
-          n.includes(`${anio}-${mesNum}`) || n.includes(`${mesNum}-${anio}`) ||
-          n.includes(`_${mesNum}_`) || n.includes(` ${mesNum} `)
+          n.includes(`${anio}-${mesNum}`) ||
+          n.includes(`${mesNum}-${anio}`) ||
+          n.includes(`_${mesNum}_`) ||
+          n.includes(` ${mesNum} `) ||
+          n.includes(`-${mesNum}.pdf`)
         );
       });
-      if (pdfGen) {
-        console.log(`Ruta 1 → PDF general: ${pdfGen.name}`);
+      if (pdfGen && pdfGen.id) {
+        console.log(`drive-pdf Ruta 1 → PDF general: ${pdfGen.name}`);
         res.setHeader("Cache-Control", "no-store");
-        // /preview permite embedding en iframe; /view abre en Drive directamente
         return res.redirect(302, `https://drive.google.com/file/d/${pdfGen.id}/preview`);
       }
-    } catch (e) {
-      console.error("PDF general search error:", e.message);
+    } catch (e1) {
+      console.error("drive-pdf Ruta 1 error:", (e1 && e1.message) || String(e1));
     }
   }
 
-  // ── Ruta 2: Fallback — buscar PDF suelto en Drive ────────────────────────────
-  try {
-    const file = await findPdfGlobal(token, folio);
-    if (file) {
-      res.setHeader("Cache-Control", "public, max-age=3600");
-      return res.redirect(302, `https://drive.google.com/file/d/${file.id}/view`);
-    }
-  } catch (e) {
-    return res.status(500).json({ error: "Error buscando en Drive: " + e.message });
-  }
-
-  return res.status(404).json({
-    error: `PDF para folio ${folio} no encontrado`,
-    periodo: periodo || "no especificado",
-    hint: "Verifica que el PDF general Facturas_PISA_YYYY-MM.pdf o un PDF individual F-{folio}.pdf estén en Drive.",
-  });
-}
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+  // ── Ruta 2: Fallback — buscar PDF suelto en Drive ───────────────�
