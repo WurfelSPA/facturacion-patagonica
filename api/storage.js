@@ -111,12 +111,10 @@ async function handleGet(req, res) {
 
     if (zipFile) {
       // Guard: no intentar descargar ZIPs grandes (causan timeout en Vercel).
-      // Si Drive no devuelve size (null/undefined), tratar como grande (999 MB)
-      // para evitar intentar descargar un ZIP de tamaño desconocido.
+      // Si Drive no devuelve size (null/undefined), tratar como grande (999 MB).
       const rawSize = zipFile.size ? parseInt(zipFile.size) : null;
       const zipSizeMB = rawSize !== null ? Math.round(rawSize / 1024 / 1024) : 999;
       if (zipSizeMB > 30) {
-        // ZIP existe pero es demasiado grande (o tamaño desconocido) — informar al frontend
         return res.status(404).json({
           error: "zip_too_large",
           zipName, zipFileId: zipFile.id, zipSizeMB: rawSize !== null ? zipSizeMB : null,
@@ -287,4 +285,29 @@ async function handlePost(req, res) {
     const endBytes = new TextEncoder().encode(endPart);
     const body = new Uint8Array(metaBytes.length + fileBytes.length + endBytes.length);
     body.set(metaBytes, 0); body.set(fileBytes, metaBytes.length); body.set(endBytes, metaBytes.length + fileBytes.length);
-  
+    const uploadRes = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+      { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` }, body: body.buffer }
+    );
+    if (!uploadRes.ok) {
+      const e = await uploadRes.text();
+      return res.status(502).json({ error: `Drive upload ${uploadRes.status}: ${e.slice(0,200)}` });
+    }
+    const data = await uploadRes.json();
+    return res.status(200).json({ id: data.id, name: data.name });
+
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+// ── Router principal ─────────────────────────────────────────────────────────
+export default async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method === "GET")  return handleGet(req, res);
+  if (req.method === "POST") return handlePost(req, res);
+  return res.status(405).json({ error: "Método no permitido" });
+}
