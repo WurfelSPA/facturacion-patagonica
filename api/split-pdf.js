@@ -95,13 +95,21 @@ function splitPDFPages(buf) {
     const allRefs = [...pageObj.matchAll(/(\d+)\s+0\s+R/g)].map(r => parseInt(r[1]));
     for (const ref of allRefs) needed.add(ref);
 
-    // Recopilar objetos de recursos en 2 niveles de profundidad
-    const toProcess = [...needed];
-    for (const ref of toProcess) {
+    // BFS completo: seguir referencias transitivamente hasta agotar
+    // (necesario para incluir FontFile2, ToUnicode CMap, etc. que están a 3+ niveles)
+    const bfsQueue = [...needed];
+    const bfsVisited = new Set();
+    while (bfsQueue.length > 0) {
+      const ref = bfsQueue.shift();
+      if (bfsVisited.has(ref)) continue;
+      bfsVisited.add(ref);
       const o = getObj(ref);
-      const refs2 = [...o.matchAll(/(\d+)\s+0\s+R/g)].map(r => parseInt(r[1]));
-      for (const r2 of refs2) {
-        if (!needed.has(r2) && objOffsets[r2] != null) needed.add(r2);
+      const subRefs = [...o.matchAll(/(\d+)\s+0\s+R/g)].map(r => parseInt(r[1]));
+      for (const r2 of subRefs) {
+        if (!needed.has(r2) && objOffsets[r2] != null) {
+          needed.add(r2);
+          bfsQueue.push(r2);
+        }
       }
     }
 
@@ -553,10 +561,4 @@ export default async function handler(req, res) {
 
     // Fallback: devolver base64 si no se pasó destFolderId
     return res.status(200).json({
-      ok: true, zipName, zipBase64: zipBuf.toString("base64"), totalFacturas, sinCod,
-      breakdown: Object.entries(breakdown).sort(([a],[b])=>a.localeCompare(b)),
-    });
-
-  } catch (e) {
-    console.error("split-pdf:", e);
-    return res.status(500).json({ error: e.message, stack: e.stack?.slice(0
+      ok: true, zipName, zipBase64:
