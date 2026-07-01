@@ -4857,7 +4857,7 @@ function App(){
           onClick:()=>buscarZip(periodo),
           style:{fontSize:11,padding:"4px 12px",borderRadius:7,border:"1px solid var(--rdim)",background:"transparent",color:"var(--red)",cursor:"pointer"}
         },"\u21ba Reintentar"),
-        (zipStatus==="ready"||zipStatus==="error")&&!splitLoading&&
+        (zipStatus==="ready"||zipStatus==="error"||zipStatus==="missing")&&!splitLoading&&
         h("button",{
           onClick:splitPDF,
           title:"Volver a separar el PDF del per\u00edodo en facturas individuales y subir a Drive",
