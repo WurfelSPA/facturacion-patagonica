@@ -256,10 +256,11 @@ export default async function handler(req, res) {
             for (let i = pgCount - 1; i >= 0; i--) {
               if (i !== targetIdx) srcDoc.removePage(i);
             }
-            const outBytes = await srcDoc.save();
+            // useObjectStreams:false conserva encoding de fuentes original
+            const outBytes = await srcDoc.save({ useObjectStreams: false });
             res.setHeader("Content-Type","application/pdf");
             res.setHeader("Content-Disposition",`inline; filename="F-${folio}.pdf"`);
-            res.setHeader("Cache-Control","public, max-age=86400");
+            res.setHeader("Cache-Control","no-store");
             return res.send(Buffer.from(outBytes));
           } else {
             console.warn(`drive-pdf R1: folio ${folio} no encontrado en ${genFile.name}`);
