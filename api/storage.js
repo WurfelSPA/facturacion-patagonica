@@ -127,10 +127,17 @@ async function handleGet(req, res) {
     }
 
     // 2. ZIP no existe — buscar PDF maestro del mes
+    // Acepta: "Facturas_PISA_2026-06.pdf" (por número) O "Facturas_PISA_Junio_2026.pdf" (por nombre)
     const pdfMaestro = files.find(f => {
       const n = f.name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
       const mes = mesNombre.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
-      return n.endsWith(".pdf") && n.includes("pisa") && n.includes(mes);
+      const mesNumPadded = mesNum; // ya es "06", "05", etc.
+      return n.endsWith(".pdf") && n.includes("pisa") && (
+        n.includes(mes) ||                                  // "junio"
+        n.includes(`${anio}-${mesNumPadded}`) ||            // "2026-06"
+        n.includes(`_${mesNumPadded}_`) ||                  // "_06_"
+        n.includes(`${mesNumPadded}-${anio}`)               // "06-2026"
+      );
     });
 
     if (pdfMaestro) {
@@ -282,12 +289,4 @@ async function handlePost(req, res) {
 }
 
 // ── Router principal ─────────────────────────────────────────────────────────
-export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method === "GET")  return handleGet(req, res);
-  if (req.method === "POST") return handlePost(req, res);
-  return res.status(405).json({ error: "Método no permitido" });
-}
+export default async function handler(r
