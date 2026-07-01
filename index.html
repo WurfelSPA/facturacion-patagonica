@@ -1858,55 +1858,33 @@ function FactxCobrarView({notify}){
   var loadingS=React.useState(true); var loading=loadingS[0]; var setLoading=loadingS[1];
   var errorS=React.useState(null); var error=errorS[0]; var setError=errorS[1];
   var searchS=React.useState(""); var search=searchS[0]; var setSearch=searchS[1];
+  var selClientS=React.useState(null); var selClient=selClientS[0]; var setSelClient=selClientS[1];
   var filterBucketS=React.useState("all"); var filterBucket=filterBucketS[0]; var setFilterBucket=filterBucketS[1];
-  var filterTipoS=React.useState("all"); var filterTipo=filterTipoS[0]; var setFilterTipo=filterTipoS[1];
-  var sortS=React.useState({col:null,dir:"asc"}); var sort=sortS[0]; var setSort=sortS[1];
+  var sortS=React.useState({col:"monto",dir:"desc"}); var sort=sortS[0]; var setSort=sortS[1];
   var fxcModalS=React.useState(null); var fxcModal=fxcModalS[0]; var setFxcModal=fxcModalS[1];
-  var fxcLoadS=React.useState(false); var fxcLoad=fxcLoadS[0]; var setFxcLoad=fxcLoadS[1];
   function fmtCLP(v){return "$"+Math.round(v).toLocaleString("es-CL");}
 
   function verFactura(folio){
-    setFxcLoad(true); setFxcModal({folio,loading:true,data:null,error:null});
+    setFxcModal({folio,loading:true,data:null,error:null});
     fetch("/api/historial?folioPdf="+encodeURIComponent(folio))
       .then(function(r){return r.json();})
       .then(function(d){setFxcModal({folio,loading:false,data:d.found?d:null,error:d.found?null:d.message||"No encontrado"});})
-      .catch(function(e){setFxcModal({folio,loading:false,data:null,error:e.message});})
-      .finally(function(){setFxcLoad(false);});
+      .catch(function(e){setFxcModal({folio,loading:false,data:null,error:e.message});});
   }
 
   function getBucket(d){
     d=parseFloat(d)||0;
-    if(d<=30)return"<=30";
-    if(d<=60)return"31-60";
-    if(d<=90)return"61-90";
-    if(d<=365)return"91-365";
-    return"+365";
+    if(d<=30)return"<=30"; if(d<=60)return"31-60";
+    if(d<=90)return"61-90"; if(d<=365)return"91-365"; return"+365";
   }
-  function bucketLabel(b){
-    var m={"<=30":"≤ 30 días","31-60":"31-60 días","61-90":"61-90 días","91-365":"91-365 días","+365":"+ 365 días"};
-    return m[b]||b;
-  }
-  function bucketBg(b){
-    var m={"<=30":"rgba(16,185,129,0.12)","31-60":"rgba(245,158,11,0.12)","61-90":"rgba(249,115,22,0.12)","91-365":"rgba(239,68,68,0.12)","+365":"rgba(124,58,237,0.12)"};
-    return m[b]||"var(--surf2)";
-  }
-  function bucketColor(b){
-    var m={"<=30":"var(--green)","31-60":"#f59e0b","61-90":"#f97316","91-365":"#ef4444","+365":"#7c3aed"};
-    return m[b]||"var(--tx)";
-  }
-  function bucketBorder(b){
-    var m={"<=30":"rgba(16,185,129,0.3)","31-60":"rgba(245,158,11,0.3)","61-90":"rgba(249,115,22,0.3)","91-365":"rgba(239,68,68,0.3)","+365":"rgba(124,58,237,0.3)"};
-    return m[b]||"var(--bdr)";
-  }
+  function bucketLabel(b){return{"<=30":"≤ 30 días","31-60":"31-60 días","61-90":"61-90 días","91-365":"91-365 días","+365":"+ 365 días"}[b]||b;}
+  function bucketColor(b){return{"<=30":"#10b981","31-60":"#f59e0b","61-90":"#f97316","91-365":"#ef4444","+365":"#7c3aed"}[b]||"var(--txm)";}
+  function bucketBg(b){return{"<=30":"rgba(16,185,129,0.12)","31-60":"rgba(245,158,11,0.12)","61-90":"rgba(249,115,22,0.12)","91-365":"rgba(239,68,68,0.12)","+365":"rgba(124,58,237,0.12)"}[b]||"var(--surf2)";}
 
   function parseSheetValues(values){
     if(!values||values.length<2)throw new Error("Sin datos ("+( values?values.length:0)+" filas)");
-    // Normalize headers: lowercase, strip spaces/newlines/underscores
     var hdr=values[0].map(function(h){return String(h||"").toLowerCase().replace(/[\r\n\s_]/g,"");});
-    function fi(tests){
-      for(var i=0;i<hdr.length;i++){for(var t=0;t<tests.length;t++){if(hdr[i].includes(tests[t]))return i;}}
-      return -1;
-    }
+    function fi(tests){for(var i=0;i<hdr.length;i++){for(var t=0;t<tests.length;t++){if(hdr[i].includes(tests[t]))return i;}}return -1;}
     var iFecha=fi(["fecha"]); if(iFecha<0)iFecha=1;
     var iTipo=fi(["tipo"]); if(iTipo<0)iTipo=2;
     var iCod=fi(["cod"]); if(iCod<0)iCod=3;
@@ -1918,46 +1896,28 @@ function FactxCobrarView({notify}){
     var iMonto=fi(["monto","c/d(ml)","c/d(m"]); if(iMonto<0)iMonto=13;
     var iSdo=fi(["sdo","vencido"]); if(iSdo<0)iSdo=14;
     function n(v){return parseFloat(String(v||"0").replace(/[^0-9.\-]/g,""))||0;}
-    // Filter: row must have a client name and enough columns
-    var out=values.slice(1).filter(function(r){
-      return r.length>4 && String(r[iCliente]||"").trim()!=="" && String(r[iCliente]||"").trim()!=="Cliente";
+    return values.slice(1).filter(function(r){
+      return r.length>4&&String(r[iCliente]||"").trim()!==""&&String(r[iCliente]||"").trim()!=="Cliente";
     }).map(function(r){
-      return{
-        fecha:String(r[iFecha]||"").trim(),
-        tipo:String(r[iTipo]||"").trim(),
-        rut:String(r[iCod]||"").trim(),
-        cliente:String(r[iCliente]||"").trim(),
-        glosa:String(r[iGlosa]||"").trim(),
-        folio:String(r[iFolio]||"").trim(),
-        vcto:String(r[iVcto]||"").trim(),
-        diasDoc:n(r[iDiasDoc]),
-        monto:n(r[iMonto]),
-        sdoVencido:n(r[iSdo]),
-      };
+      return{fecha:String(r[iFecha]||"").trim(),tipo:String(r[iTipo]||"").trim(),rut:String(r[iCod]||"").trim(),
+        cliente:String(r[iCliente]||"").trim(),glosa:String(r[iGlosa]||"").trim(),folio:String(r[iFolio]||"").trim(),
+        vcto:String(r[iVcto]||"").trim(),diasDoc:n(r[iDiasDoc]),monto:n(r[iMonto]),sdoVencido:n(r[iSdo])};
     }).filter(function(r){return r.monto>0||r.sdoVencido>0;});
-    return out;
   }
 
   function loadFromDrive(){
-    setLoading(true); setError(null);
-    var FXC_ID="1otFPi_fUWBJNGVKAhG08sq46epibkvGA";
-    fetch("/api/historial?fileId="+FXC_ID)
-      .then(function(r){
-        if(!r.ok)throw new Error("Drive error "+r.status);
-        return r.arrayBuffer();
-      })
+    setLoading(true); setError(null); setSelClient(null);
+    fetch("/api/historial?fileId=1otFPi_fUWBJNGVKAhG08sq46epibkvGA")
+      .then(function(r){if(!r.ok)throw new Error("Drive error "+r.status);return r.arrayBuffer();})
       .then(function(buf){
         var wb=XLSX.read(new Uint8Array(buf),{type:"array"});
-        // Try sheet names in order of preference
-        var sheetNames=wb.SheetNames||[];
-        var ws=wb.Sheets["Base"]||wb.Sheets["base"]||wb.Sheets["BASE"]||wb.Sheets[sheetNames[0]];
-        if(!ws)throw new Error("No se encontró hoja. Hojas disponibles: "+sheetNames.join(", "));
+        var ws=wb.Sheets["Base"]||wb.Sheets["base"]||wb.Sheets["BASE"]||wb.Sheets[wb.SheetNames[0]];
+        if(!ws)throw new Error("No se encontró hoja. Hojas: "+wb.SheetNames.join(", "));
         var raw=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
-        if(raw.length<2)throw new Error("Hoja vacía ("+raw.length+" filas). Hojas: "+sheetNames.join(", "));
         var parsed=parseSheetValues(raw);
-        if(parsed.length===0)throw new Error("0 filas con datos. Hojas: "+sheetNames.join(", ")+". Headers: "+JSON.stringify(raw[0]).slice(0,150));
+        if(parsed.length===0)throw new Error("0 filas con datos. Headers: "+JSON.stringify(raw[0]).slice(0,150));
         setRows(parsed); setLoading(false);
-        if(notify)notify(parsed.length+" documentos cargados desde Drive","ok");
+        if(notify)notify(parsed.length+" documentos cargados","ok");
       })
       .catch(function(e){setError(e.message); setLoading(false);});
   }
@@ -1968,11 +1928,9 @@ function FactxCobrarView({notify}){
     reader.onload=function(ev){
       try{
         var wb=XLSX.read(ev.target.result,{type:"array",cellDates:true});
-        var ws=wb.Sheets["Base"];
-        if(!ws){throw new Error("No se encontró la hoja 'Base'");}
+        var ws=wb.Sheets["Base"]; if(!ws)throw new Error("No se encontró la hoja 'Base'");
         var raw=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:""});
-        var parsed=parseSheetValues(raw);
-        setRows(parsed); setLoading(false);
+        var parsed=parseSheetValues(raw); setRows(parsed); setLoading(false);
         if(notify)notify(parsed.length+" documentos cargados","ok");
       }catch(e){setError(e.message); setLoading(false);}
     };
@@ -1981,213 +1939,258 @@ function FactxCobrarView({notify}){
 
   React.useEffect(function(){loadFromDrive();},[]);
 
-  function toggleSort(col){
-    setSort(function(prev){return prev.col===col&&prev.dir==="asc"?{col:col,dir:"desc"}:{col:col,dir:"asc"};});
-  }
-  function sortArrow(col){if(sort.col!==col)return" ↕";return sort.dir==="asc"?" ↑":" ↓";}
+  // ── Agregar clientes (master) ────────────────────────────────
+  var clientMap={};
+  rows.forEach(function(r){
+    var k=r.rut||r.cliente;
+    if(!clientMap[k]){clientMap[k]={rut:r.rut,nombre:r.cliente,docs:[],total:0,maxDias:0};}
+    clientMap[k].docs.push(r);
+    clientMap[k].total+=r.monto;
+    if(r.diasDoc>clientMap[k].maxDias)clientMap[k].maxDias=r.diasDoc;
+  });
+  var clients=Object.values(clientMap);
 
-  var totalMonto=rows.reduce(function(a,r){return a+r.monto;},0);
-  var totalClientes=new Set(rows.map(function(r){return r.rut;})).size;
+  var totalGlobal=clients.reduce(function(s,c){return s+c.total;},0);
   var BUCKETS=["<=30","31-60","61-90","91-365","+365"];
-  var bTotals={};
-  BUCKETS.forEach(function(b){bTotals[b]={monto:0,count:0};});
-  rows.forEach(function(r){var b=getBucket(r.diasDoc);bTotals[b].monto+=r.monto;bTotals[b].count++;});
 
-  var displayed=rows.filter(function(r){
-    if(filterTipo!=="all"&&r.tipo!==filterTipo)return false;
-    if(filterBucket!=="all"&&getBucket(r.diasDoc)!==filterBucket)return false;
-    if(search.trim()){
-      var q=search.toLowerCase().trim();
-      if(!r.cliente.toLowerCase().includes(q)&&!r.rut.toLowerCase().includes(q)&&!r.folio.toLowerCase().includes(q))return false;
-    }
+  // ── Filtrar lista de clientes ────────────────────────────────
+  var normQ=function(s){return(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();};
+  var q=normQ(search);
+  var filteredClients=clients.filter(function(c){
+    if(filterBucket!=="all"&&getBucket(c.maxDias)!==filterBucket)return false;
+    if(q)return normQ(c.nombre).includes(q)||c.rut.replace(/\./g,"").includes(q.replace(/\./g,""));
     return true;
   });
-  if(sort.col){displayed=displayed.slice().sort(function(a,b){
-    var av=a[sort.col],bv=b[sort.col];
-    if(sort.col==="monto"||sort.col==="diasDoc"||sort.col==="sdoVencido"){av=parseFloat(av)||0;bv=parseFloat(bv)||0;return sort.dir==="asc"?av-bv:bv-av;}
-    av=String(av).toLowerCase();bv=String(bv).toLowerCase();
-    return sort.dir==="asc"?av.localeCompare(bv,"es"):bv.localeCompare(av,"es");
+  if(sort.col){filteredClients=filteredClients.slice().sort(function(a,b){
+    var av=sort.col==="total"?a.total:sort.col==="maxDias"?a.maxDias:sort.col==="docs"?a.docs.length:normQ(a.nombre);
+    var bv=sort.col==="total"?b.total:sort.col==="maxDias"?b.maxDias:sort.col==="docs"?b.docs.length:normQ(b.nombre);
+    return sort.dir==="asc"?(typeof av==="number"?av-bv:String(av).localeCompare(String(bv),"es")):(typeof bv==="number"?bv-av:String(bv).localeCompare(String(av),"es"));
   });}
 
-  if(loading){
-    return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}},
-      h("div",{style:{textAlign:"center",color:"var(--txm)"}},
-        h("div",{style:{fontSize:28,marginBottom:12}},"⏳"),
-        h("div",{style:{fontSize:13,fontWeight:600}},"Cargando Facturas x Cobrar..."),
-        h("div",{style:{fontSize:11,color:"var(--txd)",marginTop:4}},"Leyendo desde Google Drive")
-      )
-    );
-  }
+  if(loading){return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}},
+    h("div",{style:{textAlign:"center",color:"var(--txm)"}},
+      h("div",{style:{fontSize:28,marginBottom:12}},"⏳"),
+      h("div",{style:{fontSize:13,fontWeight:600}},"Cargando Facturas x Cobrar..."),
+      h("div",{style:{fontSize:11,color:"var(--txd)",marginTop:4}},"Leyendo desde Google Drive")
+    ));}
 
-  if(error){
-    return h("main",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16},className:"fade-up"},
-      h("div",{style:{textAlign:"center",maxWidth:460}},
-        h("div",{style:{fontSize:34,marginBottom:10}},"⚠️"),
-        h("div",{style:{fontSize:15,fontWeight:700,color:"var(--tx)",marginBottom:6}},"No se pudo cargar desde Drive"),
-        h("div",{style:{fontSize:11,color:"#ef4444",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:8,padding:"10px 14px",marginBottom:16,fontFamily:"'DM Mono',monospace",wordBreak:"break-all",textAlign:"left"}},error),
-        h("div",{style:{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}},
-          h("button",{onClick:loadFromDrive,style:{padding:"9px 20px",background:"var(--acc)",color:"#fff",border:"none",borderRadius:9,fontSize:12,fontWeight:700,cursor:"pointer"}},"🔄 Reintentar"),
-          h("label",{style:{display:"inline-flex",alignItems:"center",gap:6,padding:"9px 20px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:9,fontSize:12,fontWeight:600,cursor:"pointer",color:"var(--txm)"}},
-            "📂 Cargar archivo manual",
-            h("input",{type:"file",accept:".xlsx",style:{display:"none"},onChange:function(e){if(e.target.files[0])loadFromFile(e.target.files[0]);}})
+  if(error){return h("main",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16},className:"fade-up"},
+    h("div",{style:{textAlign:"center",maxWidth:460}},
+      h("div",{style:{fontSize:34,marginBottom:10}},"⚠️"),
+      h("div",{style:{fontSize:15,fontWeight:700,color:"var(--tx)",marginBottom:6}},"No se pudo cargar desde Drive"),
+      h("div",{style:{fontSize:11,color:"#ef4444",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:8,padding:"10px 14px",marginBottom:16,fontFamily:"'DM Mono',monospace",wordBreak:"break-all",textAlign:"left"}},error),
+      h("div",{style:{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}},
+        h("button",{onClick:loadFromDrive,style:{padding:"9px 20px",background:"var(--acc)",color:"#fff",border:"none",borderRadius:9,fontSize:12,fontWeight:700,cursor:"pointer"}},"🔄 Reintentar"),
+        h("label",{style:{display:"inline-flex",alignItems:"center",gap:6,padding:"9px 20px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:9,fontSize:12,fontWeight:600,cursor:"pointer",color:"var(--txm)"}},
+          "📂 Cargar archivo manual",
+          h("input",{type:"file",accept:".xlsx",style:{display:"none"},onChange:function(e){if(e.target.files[0])loadFromFile(e.target.files[0]);}})
+        )
+      )
+    ));}
+
+  /* ══════════════════════════════════════════
+     VISTA DETALLE — documentos de un cliente
+  ══════════════════════════════════════════ */
+  if(selClient){
+    var cli=selClient;
+    var bkt=getBucket(cli.maxDias);
+    var docsSorted=cli.docs.slice().sort(function(a,b){return b.diasDoc-a.diasDoc;});
+    return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up"},
+      /* Header detalle */
+      h("div",{style:{padding:"14px 24px",borderBottom:"1px solid var(--bdr)",background:"var(--surf)",display:"flex",alignItems:"center",gap:14,flexShrink:0}},
+        h("button",{onClick:function(){setSelClient(null);},
+          style:{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:9,fontSize:12,fontWeight:700,cursor:"pointer",color:"var(--txm)",flexShrink:0}},
+          "← Volver"),
+        h("div",{style:{flex:1,minWidth:0}},
+          h("div",{style:{fontSize:16,fontWeight:800,color:"var(--tx)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}},cli.nombre),
+          h("div",{style:{fontSize:11,color:"var(--txm)",fontFamily:"'DM Mono',monospace",marginTop:1}},cli.rut)
+        ),
+        h("div",{style:{display:"flex",gap:8,alignItems:"center",flexShrink:0}},
+          h("span",{style:{fontSize:10,fontWeight:700,padding:"3px 9px",borderRadius:20,background:bucketBg(bkt),color:bucketColor(bkt),border:"1px solid "+bucketColor(bkt)+"44"}},
+            "Vence: "+bucketLabel(bkt)),
+          h("div",{style:{textAlign:"right"}},
+            h("div",{style:{fontSize:18,fontWeight:900,color:"var(--tx)",fontFamily:"'DM Mono',monospace"}},fmtCLP(cli.total)),
+            h("div",{style:{fontSize:10,color:"var(--txd)",fontWeight:700,letterSpacing:".06em",textTransform:"uppercase"}},"Total por cobrar")
           )
+        )
+      ),
+      /* Tabla documentos */
+      h("div",{style:{flex:1,overflowY:"auto",overflowX:"auto",minHeight:0}},
+        h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:12}},
+          h("thead",null,
+            h("tr",{style:{background:"var(--surf)",position:"sticky",top:0,zIndex:2}},
+              ["Fecha","Tipo","Folio","Glosa","Vto.","Antigüedad","Monto"].map(function(lbl){
+                return h("th",{key:lbl,style:{padding:"10px 14px",textAlign:lbl==="Monto"?"right":"left",fontWeight:700,color:"var(--txm)",borderBottom:"2px solid var(--bdr)",fontSize:10,letterSpacing:".07em",textTransform:"uppercase",whiteSpace:"nowrap",background:"var(--surf)"}},lbl);
+              })
+            )
+          ),
+          h("tbody",null,docsSorted.map(function(r,i){
+            var bk=getBucket(r.diasDoc);
+            return h("tr",{key:i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"var(--surf2)"}},
+              h("td",{style:{padding:"10px 14px",color:"var(--txm)",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",fontSize:11}},r.fecha),
+              h("td",{style:{padding:"10px 14px"}},
+                h("span",{style:{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:8,
+                  background:r.tipo==="Fact_Bol"?"rgba(59,130,246,0.10)":"rgba(156,163,175,0.12)",
+                  color:r.tipo==="Fact_Bol"?"#3b82f6":"var(--txm)",
+                  border:r.tipo==="Fact_Bol"?"1px solid rgba(59,130,246,0.25)":"1px solid var(--bdr)"}},
+                  r.tipo==="Fact_Bol"?"Fact/Bol":"Movto")
+              ),
+              h("td",{style:{padding:"10px 14px"}},
+                r.folio
+                  ?h("button",{onClick:function(){verFactura(r.folio);},title:"Ver detalle DTE",
+                      style:{background:"none",border:"none",padding:0,cursor:"pointer",color:"var(--acc)",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,textDecoration:"underline",textUnderlineOffset:2}},
+                      r.folio)
+                  :h("span",{style:{color:"var(--txd)",fontSize:11}},"—")
+              ),
+              h("td",{style:{padding:"10px 14px",color:"var(--txm)",maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontSize:11}},r.glosa||"—"),
+              h("td",{style:{padding:"10px 14px",color:"var(--txm)",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",fontSize:11}},r.vcto||"—"),
+              h("td",{style:{padding:"10px 14px"}},
+                h("span",{style:{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,background:bucketBg(bk),color:bucketColor(bk),border:"1px solid "+bucketColor(bk)+"44",whiteSpace:"nowrap"}},
+                  r.diasDoc>0?r.diasDoc+" días":"—")
+              ),
+              h("td",{style:{padding:"10px 14px",textAlign:"right",fontFamily:"'DM Mono',monospace",color:"var(--tx)",fontWeight:700,fontSize:12}},fmtCLP(r.monto))
+            );
+          })),
+          h("tfoot",null,
+            h("tr",{style:{background:"rgba(34,197,94,0.08)",borderTop:"2px solid rgba(34,197,94,0.3)"}},
+              h("td",{colSpan:6,style:{padding:"10px 14px",fontWeight:800,fontSize:12,color:"#15803d"}},"Total — "+cli.docs.length+" documento"+(cli.docs.length!==1?"s":"")),
+              h("td",{style:{padding:"10px 14px",textAlign:"right",fontFamily:"'DM Mono',monospace",fontWeight:900,fontSize:14,color:"#15803d"}},fmtCLP(cli.total))
+            )
+          )
+        )
+      ),
+      /* Modal DTE */
+      fxcModal&&h("div",{onClick:function(e){if(e.target===e.currentTarget)setFxcModal(null);},
+        style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}},
+        h("div",{style:{background:"var(--surf)",borderRadius:16,boxShadow:"0 8px 40px rgba(0,0,0,0.25)",maxWidth:520,width:"100%",maxHeight:"85vh",overflow:"auto",padding:"24px 28px",position:"relative"}},
+          h("button",{onClick:function(){setFxcModal(null);},style:{position:"absolute",top:14,right:16,background:"none",border:"none",fontSize:20,cursor:"pointer",color:"var(--txm)",lineHeight:1}},"×"),
+          h("div",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".1em",textTransform:"uppercase",marginBottom:4}},"Detalle DTE"),
+          h("div",{style:{fontSize:22,fontWeight:800,color:"var(--tx)",fontFamily:"'DM Mono',monospace",marginBottom:16}},"Folio "+fxcModal.folio),
+          fxcModal.loading&&h("div",{style:{textAlign:"center",padding:"30px 0",color:"var(--txm)"}},h("div",{style:{fontSize:24,marginBottom:8}},"⏳"),h("div",{style:{fontSize:12}},"Buscando en Drive...")),
+          fxcModal.error&&h("div",{style:{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:10,padding:"14px 16px",color:"#ef4444",fontSize:12,fontFamily:"'DM Mono',monospace"}},"⚠️ "+fxcModal.error),
+          fxcModal.data&&(function(){
+            var d=fxcModal.data;
+            var TIPOS={"33":"Factura Electrónica","61":"Nota de Crédito","39":"Boleta Electrónica","56":"Nota de Débito","52":"Guía de Despacho"};
+            return h("div",null,
+              h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}},
+                h("div",{style:{background:"var(--surf2)",borderRadius:10,padding:"12px 14px"}},
+                  h("div",{style:{fontSize:10,color:"var(--txd)",fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",marginBottom:3}},"Tipo"),
+                  h("div",{style:{fontSize:13,fontWeight:700,color:"var(--tx)"}},TIPOS[d.tipoDTE]||"DTE tipo "+d.tipoDTE)
+                ),
+                h("div",{style:{background:"var(--surf2)",borderRadius:10,padding:"12px 14px"}},
+                  h("div",{style:{fontSize:10,color:"var(--txd)",fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",marginBottom:3}},"Receptor RUT"),
+                  h("div",{style:{fontSize:13,fontWeight:700,color:"var(--tx)",fontFamily:"'DM Mono',monospace"}},d.rut)
+                ),
+                h("div",{style:{background:"var(--surf2)",borderRadius:10,padding:"12px 14px",gridColumn:"1/-1"}},
+                  h("div",{style:{fontSize:10,color:"var(--txd)",fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",marginBottom:3}},"Archivo ZIP"),
+                  h("div",{style:{fontSize:11,color:"var(--txm)",fontFamily:"'DM Mono',monospace",wordBreak:"break-all"}},d.zipFile)
+                )
+              ),
+              d.items&&d.items.length>0&&h("div",{style:{marginBottom:16}},
+                h("div",{style:{fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:".08em",textTransform:"uppercase",marginBottom:8}},"Ítems"),
+                h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
+                  h("thead",null,h("tr",null,
+                    h("th",{style:{textAlign:"left",padding:"4px 6px",color:"var(--txd)",fontWeight:700,borderBottom:"1px solid var(--bdr)",fontSize:10}},"Descripción"),
+                    h("th",{style:{textAlign:"right",padding:"4px 6px",color:"var(--txd)",fontWeight:700,borderBottom:"1px solid var(--bdr)",fontSize:10}},"Qty"),
+                    h("th",{style:{textAlign:"right",padding:"4px 6px",color:"var(--txd)",fontWeight:700,borderBottom:"1px solid var(--bdr)",fontSize:10}},"UF")
+                  )),
+                  h("tbody",null,d.items.map(function(it,i){
+                    return h("tr",{key:i,style:{borderBottom:"1px solid var(--bdr)"}},
+                      h("td",{style:{padding:"5px 6px",color:"var(--tx)"}},(it.nmb||"")+(it.dsc?" — "+it.dsc.slice(0,60):"")),
+                      h("td",{style:{padding:"5px 6px",textAlign:"right",color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},it.qty||"—"),
+                      h("td",{style:{padding:"5px 6px",textAlign:"right",color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},it.umd==="UF"&&it.qty?it.qty+" UF":"—")
+                    );
+                  }))
+                )
+              )
+            );
+          })()
         )
       )
     );
   }
 
-  var COLS=[
-    ["rut","RUT"],["cliente","Cliente"],["folio","Folio"],["tipo","Tipo"],
-    ["monto","Monto"]
-  ];
-  var rightCols=new Set(["monto"]);
+  /* ══════════════════════════════════════════
+     VISTA MAESTRO — lista de clientes
+  ══════════════════════════════════════════ */
+  function toggleSort(col){setSort(function(p){return p.col===col&&p.dir==="desc"?{col:col,dir:"asc"}:{col:col,dir:"desc"};});}
+  function sortArrow(col){if(sort.col!==col)return" ↕";return sort.dir==="desc"?" ↓":" ↑";}
 
   return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up"},
-    h("div",{style:{flex:1,overflowY:"auto",overflowX:"auto",minHeight:0}},
-    h("div",{style:{display:"flex",alignItems:"center",gap:10,padding:"10px 24px",borderBottom:"1px solid var(--bdr)",flexShrink:0,flexWrap:"wrap",background:"var(--surf)",position:"sticky",top:0,zIndex:10}},
-      h("input",{type:"text",placeholder:"Buscar cliente, RUT o folio...",value:search,
+    /* Toolbar */
+    h("div",{style:{padding:"10px 24px",borderBottom:"1px solid var(--bdr)",background:"var(--surf)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",flexShrink:0}},
+      h("input",{type:"text",placeholder:"Buscar cliente o RUT...",value:search,
         onChange:function(e){setSearch(e.target.value);},
-        style:{padding:"7px 12px",border:"1px solid var(--bdr)",borderRadius:8,fontSize:12,background:"var(--surf2)",color:"var(--tx)",width:230,outline:"none"}}),
-      h("select",{value:filterTipo,onChange:function(e){setFilterTipo(e.target.value);},
-        style:{padding:"6px 10px",border:"1px solid var(--bdr)",borderRadius:8,fontSize:12,background:"var(--surf2)",color:"var(--tx)",cursor:"pointer"}},
-        h("option",{value:"all"},"Todos los tipos"),
-        h("option",{value:"Fact_Bol"},"Facturas / Boletas"),
-        h("option",{value:"Movto"},"Movimientos")
-      ),
-      filterBucket!=="all"&&h("button",{onClick:function(){setFilterBucket("all");},
-        style:{padding:"6px 12px",background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,fontSize:11,fontWeight:600,color:"#ef4444",cursor:"pointer"}},
-        "× Quitar filtro: "+bucketLabel(filterBucket)),
-      h("div",{style:{marginLeft:"auto",display:"flex",gap:8,alignItems:"center"}},
-        h("span",{style:{fontSize:11,color:"var(--txd)"}},
-          (search||filterBucket!=="all"||filterTipo!=="all")?displayed.length+" de "+rows.length+" docs":rows.length+" docs · "+totalClientes+" clientes"),
-        h("button",{onClick:loadFromDrive,title:"Recargar desde Drive",
-          style:{padding:"5px 14px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:8,fontSize:12,cursor:"pointer",color:"var(--txm)",fontWeight:600}},"🔄 Recargar")
+        style:{padding:"7px 12px",border:"1px solid var(--bdr)",borderRadius:8,fontSize:12,background:"var(--surf2)",color:"var(--tx)",width:220,outline:"none"}}),
+      BUCKETS.map(function(b){
+        var active=filterBucket===b;
+        return h("button",{key:b,onClick:function(){setFilterBucket(active?"all":b);},
+          style:{padding:"5px 12px",borderRadius:20,fontSize:11,fontWeight:700,cursor:"pointer",transition:"all .15s",
+            background:active?bucketBg(b):"var(--surf2)",
+            color:active?bucketColor(b):"var(--txm)",
+            border:"1px solid "+(active?bucketColor(b)+"55":"var(--bdr)")
+          }},bucketLabel(b));
+      }),
+      h("div",{style:{marginLeft:"auto",display:"flex",gap:10,alignItems:"center"}},
+        h("span",{style:{fontSize:11,color:"var(--txd)"}},filteredClients.length+" cliente"+(filteredClients.length!==1?"s":"")),
+        h("button",{onClick:loadFromDrive,title:"Recargar",
+          style:{padding:"5px 14px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:8,fontSize:12,cursor:"pointer",color:"var(--txm)",fontWeight:600}},"🔄")
       )
     ),
-    h("div",{style:{display:"flex",justifyContent:"flex-end",alignItems:"center",gap:16,padding:"6px 24px",flexShrink:0,borderBottom:"1px solid var(--bdr)",background:"var(--surf2)",position:"sticky",top:57,zIndex:9}},
-      h("span",{style:{fontSize:10,color:"var(--txm)"}},(rows.length+" docs · "+totalClientes+" clientes")),
-      h("span",{style:{fontSize:13,fontWeight:800,color:"var(--tx)",fontFamily:"'DM Mono',monospace"}},fmtCLP(totalMonto)),
-      h("span",{style:{fontSize:10,color:"var(--txd)",fontWeight:700,letterSpacing:".06em",textTransform:"uppercase"}},"Total por Cobrar")
+    /* Resumen total */
+    h("div",{style:{padding:"8px 24px",borderBottom:"1px solid var(--bdr)",background:"var(--surf2)",display:"flex",alignItems:"center",gap:16,flexShrink:0}},
+      h("span",{style:{fontSize:11,color:"var(--txm)"}},"Total por cobrar:"),
+      h("span",{style:{fontSize:15,fontWeight:900,color:"var(--tx)",fontFamily:"'DM Mono',monospace"}},fmtCLP(totalGlobal)),
+      h("span",{style:{fontSize:11,color:"var(--txd)","marginLeft":"auto"}},(rows.length+" documentos"))
     ),
-      displayed.length===0
-        ?h("div",{style:{padding:"60px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados para el filtro aplicado")
+    /* Tabla clientes */
+    h("div",{style:{flex:1,overflowY:"auto",overflowX:"auto",minHeight:0}},
+      filteredClients.length===0
+        ?h("div",{style:{padding:"60px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin clientes para el filtro aplicado")
         :h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:12}},
           h("thead",null,
-            h("tr",{style:{background:"var(--surf)",position:"sticky",top:89,zIndex:2}},
-              COLS.map(function(col){
+            h("tr",{style:{background:"var(--surf)",position:"sticky",top:0,zIndex:2}},
+              [["nombre","Cliente"],["rut","RUT"],["docs","Docs"],["maxDias","Antigüedad"],["total","Total"]].map(function(col){
                 return h("th",{key:col[0],onClick:function(){toggleSort(col[0]);},
-                  style:{padding:"9px 12px",textAlign:rightCols.has(col[0])?"right":"left",
-                    fontWeight:700,color:"var(--txm)",borderBottom:"2px solid var(--bdr)",
-                    fontSize:10,letterSpacing:".07em",textTransform:"uppercase",
-                    cursor:"pointer",whiteSpace:"nowrap",userSelect:"none",
-                    background:"var(--surf)"}},
+                  style:{padding:"10px 14px",textAlign:col[0]==="total"?"right":"left",fontWeight:700,color:"var(--txm)",
+                    borderBottom:"2px solid var(--bdr)",fontSize:10,letterSpacing:".07em",textTransform:"uppercase",
+                    cursor:"pointer",whiteSpace:"nowrap",userSelect:"none",background:"var(--surf)"}},
                   col[1]+sortArrow(col[0])
                 );
               })
             )
           ),
-          h("tbody",null,(function(){
-            // Agrupar por cliente manteniendo el orden del sort
-            var groups=[],gmap={};
-            displayed.forEach(function(r){
-              if(!gmap[r.cliente]){gmap[r.cliente]={rows:[],monto:0,sdo:0};groups.push({key:r.cliente,g:gmap[r.cliente]});}
-              gmap[r.cliente].rows.push(r);
-              gmap[r.cliente].monto+=r.monto;
-              gmap[r.cliente].sdo+=r.sdoVencido;
-            });
-            var els=[];
-            groups.forEach(function(grp){
-              grp.g.rows.forEach(function(r,i){
-                els.push(h("tr",{key:grp.key+"-"+i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"rgba(0,0,0,0.015)"}},
-                  h("td",{style:{padding:"8px 12px",color:"var(--txm)",fontFamily:"'DM Mono',monospace",fontSize:11}},r.rut),
-                  h("td",{style:{padding:"8px 12px",color:"var(--tx)",fontWeight:600,maxWidth:190,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},r.cliente),
-                  h("td",{style:{padding:"8px 12px"}},
-                    r.folio
-                      ?h("button",{onClick:function(){verFactura(r.folio);},title:"Ver detalle DTE",
-                          style:{background:"none",border:"none",padding:0,cursor:"pointer",color:"var(--acc)",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,textDecoration:"underline",textUnderlineOffset:2}},
-                          r.folio)
-                      :h("span",{style:{color:"var(--txd)",fontSize:11}},"—")
-                  ),
-                  h("td",{style:{padding:"8px 12px"}},
-                    h("span",{style:{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:8,
-                      background:r.tipo==="Fact_Bol"?"rgba(59,130,246,0.10)":"rgba(156,163,175,0.12)",
-                      color:r.tipo==="Fact_Bol"?"#3b82f6":"var(--txm)",
-                      border:r.tipo==="Fact_Bol"?"1px solid rgba(59,130,246,0.25)":"1px solid var(--bdr)"}},
-                      r.tipo==="Fact_Bol"?"Fact/Bol":"Movto")
-                  ),
-                  h("td",{style:{padding:"8px 12px",textAlign:"right",fontFamily:"'DM Mono',monospace",color:"var(--tx)",fontWeight:600,fontSize:12}},fmtCLP(r.monto))
-                ));
-              });
-              // Fila de subtotal por cliente (solo si tiene >1 doc O hay múltiples clientes)
-              if(grp.g.rows.length>1||groups.length>1){
-                els.push(h("tr",{key:grp.key+"-sub",style:{background:"rgba(34,197,94,0.07)",borderTop:"1px solid rgba(34,197,94,0.25)",borderBottom:"2px solid rgba(34,197,94,0.3)"}},
-                  h("td",{colSpan:4,style:{padding:"6px 12px",fontSize:11,fontWeight:700,color:"#15803d",letterSpacing:".03em"}},
-                    "Total "+grp.key+" · "+grp.g.rows.length+" doc"+(grp.g.rows.length!==1?"s":"")),
-                  h("td",{style:{padding:"6px 12px",textAlign:"right",fontFamily:"'DM Mono',monospace",color:"#15803d",fontWeight:800,fontSize:12}},fmtCLP(grp.g.monto))
-                ));
-              }
-            });
-            return els;
-          })())
+          h("tbody",null,filteredClients.map(function(cli,i){
+            var bk=getBucket(cli.maxDias);
+            return h("tr",{key:cli.rut+i,
+              onClick:function(){setSelClient(cli);},
+              style:{borderBottom:"1px solid var(--bdr)",cursor:"pointer",transition:"background .1s",
+                background:i%2===0?"var(--surf)":"var(--surf2)"},
+              onMouseEnter:function(e){e.currentTarget.style.background="rgba(79,70,229,0.06)";},
+              onMouseLeave:function(e){e.currentTarget.style.background=i%2===0?"var(--surf)":"var(--surf2)";}
+            },
+              h("td",{style:{padding:"12px 14px",fontWeight:700,color:"var(--tx)"}},
+                h("div",{style:{fontWeight:700,fontSize:13}},cli.nombre),
+              ),
+              h("td",{style:{padding:"12px 14px",color:"var(--txm)",fontFamily:"'DM Mono',monospace",fontSize:11,whiteSpace:"nowrap"}},cli.rut),
+              h("td",{style:{padding:"12px 14px",color:"var(--txm)",fontSize:12,textAlign:"center"}},
+                h("span",{style:{display:"inline-block",padding:"2px 8px",borderRadius:20,background:"rgba(79,70,229,0.08)",color:"var(--acc)",fontWeight:700,fontSize:11}},cli.docs.length)
+              ),
+              h("td",{style:{padding:"12px 14px"}},
+                h("span",{style:{fontSize:10,fontWeight:700,padding:"3px 9px",borderRadius:20,background:bucketBg(bk),color:bucketColor(bk),border:"1px solid "+bucketColor(bk)+"44",whiteSpace:"nowrap"}},
+                  cli.maxDias>0?cli.maxDias+" días":"—")
+              ),
+              h("td",{style:{padding:"12px 14px",textAlign:"right",fontFamily:"'DM Mono',monospace",fontWeight:800,fontSize:13,color:"var(--tx)"}},
+                fmtCLP(cli.total),
+                h("span",{style:{fontSize:9,color:"var(--txd)",marginLeft:6}})
+              )
+            );
+          }))
         )
-    ),
-    // ── Modal detalle DTE ──────────────────────────────────────────────
-    fxcModal&&h("div",{onClick:function(e){if(e.target===e.currentTarget)setFxcModal(null);},
-      style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}},
-      h("div",{style:{background:"var(--surf)",borderRadius:16,boxShadow:"0 8px 40px rgba(0,0,0,0.25)",maxWidth:520,width:"100%",maxHeight:"85vh",overflow:"auto",padding:"24px 28px",position:"relative"}},
-        h("button",{onClick:function(){setFxcModal(null);},style:{position:"absolute",top:14,right:16,background:"none",border:"none",fontSize:20,cursor:"pointer",color:"var(--txm)",lineHeight:1}},"×"),
-        h("div",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".1em",textTransform:"uppercase",marginBottom:4}},"Detalle DTE"),
-        h("div",{style:{fontSize:22,fontWeight:800,color:"var(--tx)",fontFamily:"'DM Mono',monospace",marginBottom:16}},"Folio "+fxcModal.folio),
-        fxcModal.loading&&h("div",{style:{textAlign:"center",padding:"30px 0",color:"var(--txm)"}},
-          h("div",{style:{fontSize:24,marginBottom:8}},"⏳"),
-          h("div",{style:{fontSize:12}},"Buscando en Drive...")),
-        fxcModal.error&&h("div",{style:{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:10,padding:"14px 16px",color:"#ef4444",fontSize:12,fontFamily:"'DM Mono',monospace"}},
-          "⚠️ "+fxcModal.error),
-        fxcModal.data&&(function(){
-          var d=fxcModal.data;
-          var TIPOS={"33":"Factura Electrónica","61":"Nota de Crédito","39":"Boleta Electrónica","56":"Nota de Débito","52":"Guía de Despacho"};
-          return h("div",null,
-            h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}},
-              h("div",{style:{background:"var(--surf2)",borderRadius:10,padding:"12px 14px"}},
-                h("div",{style:{fontSize:10,color:"var(--txd)",fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",marginBottom:3}},"Tipo"),
-                h("div",{style:{fontSize:13,fontWeight:700,color:"var(--tx)"}},TIPOS[d.tipoDTE]||"DTE tipo "+d.tipoDTE)
-              ),
-              h("div",{style:{background:"var(--surf2)",borderRadius:10,padding:"12px 14px"}},
-                h("div",{style:{fontSize:10,color:"var(--txd)",fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",marginBottom:3}},"Receptor RUT"),
-                h("div",{style:{fontSize:13,fontWeight:700,color:"var(--tx)",fontFamily:"'DM Mono',monospace"}},d.rut)
-              ),
-              h("div",{colSpan:2,style:{background:"var(--surf2)",borderRadius:10,padding:"12px 14px",gridColumn:"1/-1"}},
-                h("div",{style:{fontSize:10,color:"var(--txd)",fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",marginBottom:3}},"Archivo ZIP"),
-                h("div",{style:{fontSize:11,color:"var(--txm)",fontFamily:"'DM Mono',monospace",wordBreak:"break-all"}},d.zipFile)
-              )
-            ),
-            d.items&&d.items.length>0&&h("div",{style:{marginBottom:16}},
-              h("div",{style:{fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:".08em",textTransform:"uppercase",marginBottom:8}},"Ítems"),
-              h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
-                h("thead",null,h("tr",null,
-                  h("th",{style:{textAlign:"left",padding:"4px 6px",color:"var(--txd)",fontWeight:700,borderBottom:"1px solid var(--bdr)",fontSize:10}},"Descripción"),
-                  h("th",{style:{textAlign:"right",padding:"4px 6px",color:"var(--txd)",fontWeight:700,borderBottom:"1px solid var(--bdr)",fontSize:10}},"Qty"),
-                  h("th",{style:{textAlign:"right",padding:"4px 6px",color:"var(--txd)",fontWeight:700,borderBottom:"1px solid var(--bdr)",fontSize:10}},"UF")
-                )),
-                h("tbody",null,d.items.map(function(it,i){
-                  return h("tr",{key:i,style:{borderBottom:"1px solid var(--bdr)"}},
-                    h("td",{style:{padding:"5px 6px",color:"var(--tx)"}},(it.nmb||"")+(it.dsc?" — "+it.dsc.slice(0,60):"")),
-                    h("td",{style:{padding:"5px 6px",textAlign:"right",color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},it.qty||"—"),
-                    h("td",{style:{padding:"5px 6px",textAlign:"right",color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},it.umd==="UF"&&it.qty?it.qty+" UF":"—")
-                  );
-                }))
-              )
-            ),
-            h("div",{style:{background:"rgba(59,130,246,0.07)",border:"1px solid rgba(59,130,246,0.2)",borderRadius:10,padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}},
-              h("div",{style:{fontSize:12,fontWeight:700,color:"var(--txm)"}},"Monto Total"),
-              h("div",{style:{fontSize:20,fontWeight:800,color:"var(--acc)",fontFamily:"'DM Mono',monospace"}},d.total?fmtCLP(d.total):"—")
-            )
-          );
-        })()
-      )
     )
   );
 }
+
 
 /* ═══════════════════════════════════
    VISTA CONTRATOS
