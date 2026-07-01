@@ -250,10 +250,13 @@ export default async function handler(req, res) {
           }
 
           if (targetIdx >= 0) {
-            const outDoc = await PDFDocument.create();
-            const [copied] = await outDoc.copyPages(srcDoc, [targetIdx]);
-            outDoc.addPage(copied);
-            const outBytes = await outDoc.save();
+            // Eliminar todas las páginas excepto la del folio
+            // (más robusto que copyPages: conserva fuentes/recursos heredados)
+            const pgCount = srcDoc.getPageCount();
+            for (let i = pgCount - 1; i >= 0; i--) {
+              if (i !== targetIdx) srcDoc.removePage(i);
+            }
+            const outBytes = await srcDoc.save();
             res.setHeader("Content-Type","application/pdf");
             res.setHeader("Content-Disposition",`inline; filename="F-${folio}.pdf"`);
             res.setHeader("Cache-Control","public, max-age=86400");
