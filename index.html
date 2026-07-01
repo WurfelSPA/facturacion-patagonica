@@ -4330,7 +4330,23 @@ function App(){
       var mesNum=MN[mes];
       var pCode=mesNum?(anio+"-"+mesNum):"";
       var url="/api/drive-pdf?folio="+encodeURIComponent(numPart)+(pCode?"&periodo="+pCode:"");
-      setPdfPrevP({url:url,nro:nro,periodo:periodo});
+      setPdfPrevP({url:null,nro:nro,periodo:periodo,loading:true,blobUrl:null});
+      fetch(url).then(function(r){
+        var pg=parseInt(r.headers.get("X-Pdf-Page")||"1",10)||1;
+        if((r.headers.get("content-type")||"").includes("application/pdf")){
+          return r.blob().then(function(b){
+            var bUrl=URL.createObjectURL(b);
+            setPdfPrevP({url:bUrl+"#page="+pg,nro:nro,periodo:periodo,loading:false,blobUrl:bUrl});
+          });
+        }
+        setPdfPrevP({url:url,nro:nro,periodo:periodo,loading:false,blobUrl:null});
+      }).catch(function(){
+        setPdfPrevP({url:url,nro:nro,periodo:periodo,loading:false,blobUrl:null});
+      });
+    }
+    function closePdfP(){
+      if(pdfPrevP&&pdfPrevP.blobUrl)URL.revokeObjectURL(pdfPrevP.blobUrl);
+      setPdfPrevP(null);
     }
 
     var thBase={textAlign:"left",padding:"8px 10px",borderBottom:"2px solid var(--bdr)",fontWeight:700,fontSize:11,whiteSpace:"nowrap"};
@@ -4461,16 +4477,20 @@ function App(){
           )
         )
       ),
-      pdfPrevP&&h("div",{className:"overlay",onClick:function(e){if(e.target===e.currentTarget)setPdfPrevP(null);}},
+      pdfPrevP&&h("div",{className:"overlay",onClick:function(e){if(e.target===e.currentTarget)closePdfP();}},
         h("div",{style:{background:"var(--surf)",borderRadius:14,width:"88vw",height:"92vh",display:"flex",flexDirection:"column",overflow:"hidden"}},
           h("div",{style:{padding:"12px 18px",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",
             gap:10,background:"var(--surf2)",flexShrink:0}},
             h("span",{style:{fontWeight:700,fontSize:13,fontFamily:"'DM Mono',monospace",color:"var(--blue,#1a5fa8)"}},pdfPrevP.nro),
             h("span",{style:{fontSize:12,color:"var(--txm)"}},"· "+pdfPrevP.periodo),
-            h("button",{onClick:function(){setPdfPrevP(null);},style:{marginLeft:"auto",background:"none",border:"1px solid var(--bdr)",
+            h("button",{onClick:closePdfP,style:{marginLeft:"auto",background:"none",border:"1px solid var(--bdr)",
               borderRadius:7,padding:"4px 14px",cursor:"pointer",fontSize:12,color:"var(--txm)"}},"✕ Cerrar")
           ),
-          h("iframe",{src:pdfPrevP.url,style:{flex:1,border:"none",width:"100%"},title:pdfPrevP.nro})
+          pdfPrevP.loading
+            ?h("div",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",
+                color:"var(--txm)",fontSize:14,gap:8}},
+              h("span",{style:{fontSize:20}},"⏳"),"Cargando factura…")
+            :h("iframe",{src:pdfPrevP.url||"",style:{flex:1,border:"none",width:"100%"},title:pdfPrevP.nro})
         )
       )
     );

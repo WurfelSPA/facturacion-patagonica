@@ -169,6 +169,7 @@ function extractPageText(srcDoc, pageIndex, mapping) {
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
+  const CORS = "X-Pdf-Page, Content-Type";
   try {
     const folioRaw = Array.isArray(req.query.folio) ? req.query.folio[0] : req.query.folio;
     const folio = String(folioRaw || "").trim();
@@ -190,6 +191,16 @@ export default async function handler(req, res) {
     const periodoRaw = Array.isArray(req.query.periodo) ? req.query.periodo[0] : req.query.periodo;
     const periodo = parsePeriodo(periodoRaw);
 
+    // Helper: enviar PDF binario con pista de página
+    function sendPdf(buf, page) {
+      res.setHeader("Access-Control-Expose-Headers", CORS);
+      res.setHeader("Content-Type","application/pdf");
+      res.setHeader("Content-Disposition",`inline; filename="F-${folio}.pdf"`);
+      res.setHeader("Cache-Control","no-store");
+      res.setHeader("X-Pdf-Page", String(page));
+      return res.send(Buffer.from(buf));
+    }
+
     // ── Ruta 0: PDF individual pre-split en carpeta ──────────────────────────
     try {
       const q0 = encodeURIComponent(
@@ -202,17 +213,15 @@ export default async function handler(req, res) {
         `&supportsAllDrives=true&includeItemsFromAllDrives=true`);
       const f0 = ((d0 && d0.files) || []).find(f => f && f.id);
       if (f0) {
-        res.setHeader("Cache-Control","no-store");
-        return res.redirect(302, `https://drive.google.com/file/d/${f0.id}/view`);
+        console.log(`drive-pdf R0: sirviendo ${f0.name}`);
+        return sendPdf(await driveDownload(token, f0.id), 1);
       }
     } catch (e0) { console.warn("drive-pdf R0:", e0 && e0.message); }
 
-    // ── Ruta 1: extraer página exacta del PDF general ────────────────────────
+    // ── Ruta 1: buscar folio en PDF general → servir PDF completo + X-Pdf-Page
     if (periodo) {
       try {
-        const parts = periodo.split("-");
-        const anio = parts[0] || "";
-        const mesNum = parts[1] || "";
+        const [anio, mesNum] = periodo.split("-");
         const q1 = encodeURIComponent(
           `'${FACT_FOLDER_ID}' in parents and mimeType='application/pdf'` +
           ` and trashed=false and name contains 'PISA'`
@@ -235,33 +244,18 @@ export default async function handler(req, res) {
           const pdfBuf = await driveDownload(token, genFile.id);
           const srcDoc = await PDFDocument.load(pdfBuf, { ignoreEncryption:true });
           const totalPages = srcDoc.getPageCount();
-          console.log(`drive-pdf R1: ${totalPages} páginas, buscando folio ${folio}`);
+          console.log(`drive-pdf R1: ${totalPages} págs, buscando folio ${folio}`);
 
           const mapping = buildCMapFromDoc(srcDoc);
           let targetIdx = -1;
           for (let i = 0; i < totalPages; i++) {
             const text = extractPageText(srcDoc, i, mapping);
-            // Buscar el número de folio en el texto de la página
-            if (text.includes(folio)) {
-              targetIdx = i;
-              console.log(`drive-pdf R1: folio ${folio} encontrado en página ${i}`);
-              break;
-            }
+            if (text.includes(folio)) { targetIdx = i; break; }
           }
 
           if (targetIdx >= 0) {
-            // Eliminar todas las páginas excepto la del folio
-            // (más robusto que copyPages: conserva fuentes/recursos heredados)
-            const pgCount = srcDoc.getPageCount();
-            for (let i = pgCount - 1; i >= 0; i--) {
-              if (i !== targetIdx) srcDoc.removePage(i);
-            }
-            // useObjectStreams:false conserva encoding de fuentes original
-            const outBytes = await srcDoc.save({ useObjectStreams: false });
-            res.setHeader("Content-Type","application/pdf");
-            res.setHeader("Content-Disposition",`inline; filename="F-${folio}.pdf"`);
-            res.setHeader("Cache-Control","no-store");
-            return res.send(Buffer.from(outBytes));
+            console.log(`drive-pdf R1: folio ${folio} en página ${targetIdx+1} → sirviendo PDF completo`);
+            return sendPdf(pdfBuf, targetIdx + 1); // PDF original sin modificar + pista de página
           } else {
             console.warn(`drive-pdf R1: folio ${folio} no encontrado en ${genFile.name}`);
           }
@@ -273,11 +267,12 @@ export default async function handler(req, res) {
     try {
       const f2 = await findPdfGlobal(token, folio);
       if (f2 && f2.id) {
-        res.setHeader("Cache-Control","public, max-age=3600");
-        return res.redirect(302, `https://drive.google.com/file/d/${f2.id}/view`);
+        console.log(`drive-pdf R2: sirviendo ${f2.name}`);
+        return sendPdf(await driveDownload(token, f2.id), 1);
       }
     } catch (e2) { console.warn("drive-pdf R2:", e2 && e2.message); }
 
+    res.setHeader("Access-Control-Expose-Headers", CORS);
     return res.status(404).json({
       error:`PDF para folio ${folio} no encontrado`,
       periodo: periodo || "no especificado",
