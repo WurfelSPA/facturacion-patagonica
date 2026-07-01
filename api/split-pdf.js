@@ -545,15 +545,15 @@ export default async function handler(req, res) {
         const fname = cliente ? `F-${nro} ${cliente}.pdf` : `F-${nro}.pdf`;
         filesToUpload.push({ fname, buf: pageBufs[i] });
       }
-      // Subir en lotes de 5 para no sobrecargar
+      // Subir en lotes de 5 — para cada archivo, PATCH si existe, POST si es nuevo
+      // Esto evita acumular duplicados en Drive que confunden la búsqueda
       const BATCH = 5;
       for (let b = 0; b < filesToUpload.length; b += BATCH) {
         const batch = filesToUpload.slice(b, b + BATCH);
         await Promise.all(batch.map(async ({ fname, buf }) => {
           try {
-            const bnd = "ind_pdf_boundary";
-            const meta = JSON.stringify({ name: fname, mimeType: "application/pdf", parents: [destFolderId] });
-            const metaPart = Buffer.from(`--${bnd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${bnd}\r\nContent-Type: application/pdf\r\n\r\n`);
-            const endPart = Buffer.from(`\r\n--${bnd}--`);
-            const body = Buffer.concat([metaPart, buf, endPart]);
-        
+            // Buscar si ya existe un archivo con ese nombre en la carpeta
+            const qExist = encodeURIComponent(`'${destFolderId}' in parents and name='${fname}' and trashed=false`);
+            const existRes = await fetch(
+              `https://www.googleapis.com/drive/v3/files?q=${qExist}&fields=files(id)&pageSize=5`,
+              

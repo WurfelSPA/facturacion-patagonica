@@ -142,9 +142,11 @@ export default async function handler(req, res) {
         ` or name contains 'FEE-${folio} ' or name contains 'FEE-${folio}.')`
       );
       const dInd = await driveGet(token,
-        `https://www.googleapis.com/drive/v3/files?q=${qInd}&fields=files(id,name)&pageSize=3`);
+        `https://www.googleapis.com/drive/v3/files?q=${qInd}&fields=files(id,name,modifiedTime)&pageSize=10`
+        + `&orderBy=modifiedTime%20desc`);
       if (dInd.files?.length) {
-        res.setHeader("Cache-Control", "public, max-age=3600");
+        // Usar el más reciente (modifiedTime desc garantiza que sea el re-split nuevo)
+        res.setHeader("Cache-Control", "no-store"); // no cachear para reflejar re-splits
         return res.redirect(302, `https://drive.google.com/file/d/${dInd.files[0].id}/view`);
       }
     } catch (_) { /* continuar con ZIP fallback */ }
