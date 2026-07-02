@@ -91,6 +91,16 @@ async function loginNubox() {
   const result = await resp.json();
   if (result.error) throw new Error('Browserless script error: ' + result.error);
 
+  // Si viene en modo debug, exponer la info para diagnóstico
+  if (result.debug) {
+    throw new Error('DEBUG_NUBOX:' + JSON.stringify({
+      url:     result.url,
+      title:   result.title,
+      inputs:  result.inputs,
+      body:    (result.bodySnippet || '').slice(0, 800),
+    }));
+  }
+
   // v2 devuelve el objeto directamente (sin wrapper { data: ... })
   const { cookies, token: nuboxToken, funcionarioId, finalUrl } = result;
 
