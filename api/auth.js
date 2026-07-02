@@ -291,7 +291,9 @@ export default async function handler(req, res) {
       const user = creds[payload.email];
       if (!user) return res.status(404).json({error:'Usuario no encontrado'});
 
-      if (!user.mustChangePassword) {
+      // Saltar verificación si JWT o Drive indican mustChangePassword
+      const skipCurrentCheck = !!payload.mustChangePassword || !!user.mustChangePassword;
+      if (!skipCurrentCheck) {
         if (!currentPassword) return res.status(400).json({error:'Contraseña actual requerida'});
         const currentHash = await hashPassword(currentPassword, user.salt);
         if (currentHash !== user.hash)
