@@ -44,14 +44,29 @@ export default async ({ page }) => {
     await diagThrow('form-not-found');
   }
 
-  // ── Paso 3: Llenar y enviar formulario ───────────────────────────────────
+  // ── Paso 3: Llenar formulario con React-friendly events ─────────────────
   try {
-    await page.click('input[placeholder="Ingresa tu rut"]', { clickCount: 3 });
-    await page.keyboard.type(rut);
-    await page.click('input[placeholder="Ingresa tu contraseña"]', { clickCount: 3 });
-    await page.keyboard.type(password);
-    await new Promise(r => setTimeout(r, 800));
+    // Usar native value setter para que React detecte el cambio
+    await page.evaluate((r, p) => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+      const rutEl  = document.querySelector('input[placeholder="Ingresa tu rut"]');
+      const pwEl   = document.querySelector('input[placeholder="Ingresa tu contraseña"]');
+      setter.call(rutEl, r);
+      rutEl.dispatchEvent(new Event('input',  { bubbles: true }));
+      rutEl.dispatchEvent(new Event('change', { bubbles: true }));
+      setter.call(pwEl, p);
+      pwEl.dispatchEvent(new Event('input',  { bubbles: true }));
+      pwEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }, rut, password);
 
+    // Esperar a que reCAPTCHA v3 llene el gToken (hasta 10s)
+    const gTokenOk = await page.waitForFunction(
+      () => { const el = document.getElementById('gToken'); return el && el.value && el.value.length > 10; },
+      { timeout: 10000 }
+    ).then(() => true).catch(() => false);
+    console.log('[browser] gToken listo:', gTokenOk);
+
+    // Enviar formulario
     const nav1 = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 25000 });
     const method = await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll('button, [role="button"]'));
@@ -63,12 +78,17 @@ export default async ({ page }) => {
       if (form) { form.submit(); return 'form'; }
       return null;
     });
-    if (!method) {
-      await page.keyboard.press('Enter');
-    }
+    if (!method) await page.keyboard.press('Enter');
     await nav1;
+
+    // Verificar que no volvimos al login (error de credenciales o captcha)
+    const postUrl = page.url();
+    if (postUrl.includes('/Login/')) {
+      await diagThrow('login-rejected:postUrl=' + postUrl + ':gTokenOk=' + gTokenOk);
+    }
   } catch (e) {
-    await diagThrow('submit-failed:' + e.message.slice(0, 80));
+    if (e.message.startsWith('DIAG[')) throw e;
+    await diagThrow('submit-failed:' + e.message.slice(0, 100));
   }
 
   // ── Paso 4: Seleccionar Factura Electrónica ──────────────────────────────
