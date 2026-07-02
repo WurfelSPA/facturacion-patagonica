@@ -542,6 +542,7 @@ async function parsePlanillaParaDashboard(file){
       arrendadora:String(row[5]||"").trim(),
       sitio:String(row[7]||"").replace(/\s+/g," ").trim(),
       edificio:String(row[8]||"").trim(),
+      dir:String(row[10]||"").trim(),
       email:String(row[12]||"").trim(),
       termContrato:serialToDate(row[14]),   /* Col O: Fecha Inicio Contrato */
       termTermino:serialToDate(row[15]),    /* Col P: Fecha Término Contrato */
@@ -2377,49 +2378,46 @@ function CuentasServiciosView({dashData,driveLoading}){
     normQ(c.nombre).includes(q)||normQ(c.sitio).includes(q)||normQ(c.edificio).includes(q)||
     (c.rut&&c.rut.replace(/[.\-]/g,"").includes(q.replace(/[.\-]/g,"")))
   );
-  if(!dashData)return h("main",{style:{flex:1,minHeight:0,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12}},
+  if(!dashData)return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,overflow:"hidden",minHeight:0}},
     driveLoading
       ?h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},h("span",{className:"spin",style:{fontSize:18}},"\u29B3"),"Cargando planilla desde Drive...")
-      :h("div",{style:{fontSize:13,color:"var(--txd)"}},"Sin datos \u2014 carga la planilla de facturación")
+      :h("div",{style:{fontSize:13,color:"var(--txd)"}},"Sin datos \u2014 carga la planilla de facturac\u00e9n")
   );
-  const COLS=["Sitio","Edificio","RUT","Cliente","Direcci\u00f3n","ID Aguas Andinas","N\u00b0 Medidor AA","ID Enel","N\u00b0 Medidor Enel","Observaciones"];
-  return h("main",{style:{flex:1,minHeight:0,overflowY:"auto",padding:"20px 24px",display:"flex",flexDirection:"column",gap:16},className:"fade-up"},
-    h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}},
+  const COLS=["Sitio","Edificio","RUT","Cliente","Direcci\u00f3n","ID Aguas Andinas","N\u00b0 Medidor AA","ID Enel","N\u00b0 Medidor Enel"];
+  return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up"},
+    h("div",{style:{padding:"14px 24px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,flexShrink:0,borderBottom:"1px solid var(--bdr)"}},
       h("div",{style:{display:"flex",alignItems:"center",gap:8}},
         h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"\uD83D\uDD0C CUENTAS DE SERVICIOS"),
         h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},filtered.length+" / "+clientes.length)
       ),
       h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente, sitio, RUT...",style:{width:240}})
     ),
-    h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden",marginBottom:4}},
+    h("div",{style:{flex:1,overflowY:"auto",overflowX:"auto",minHeight:0}},
       filtered.length===0&&!search
         ?h("div",{style:{padding:"40px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin clientes en la planilla")
         :filtered.length===0
           ?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:12}},"Sin resultados para \""+search+"\"")
-          :h("div",{style:{overflowX:"auto"}},
-              h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
-                h("thead",null,
-                  h("tr",{style:{background:"#f0f4f8",position:"sticky",top:0}},
-                    COLS.map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap",background:"#f0f4f8"}},col.toUpperCase()))
-                  )
-                ),
-                h("tbody",null,
-                  filtered.map((c,i)=>{
-                    const sCol=SITIO_C[c.sitio]||"#888";
-                    return h("tr",{key:c.rut+"|"+c.sitio+"|"+c.edificio+i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"var(--surf2)"}},
-                      h("td",{style:{padding:"9px 12px"}},h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},c.sitio||"\u2014")),
-                      h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)"}},c.edificio||"\u2014"),
-                      h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txd)"}},c.rut||"\u2014"),
-                      h("td",{style:{padding:"9px 12px",fontWeight:600,fontSize:11,maxWidth:220}},c.nombre),
-                      h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},"\u2014"),
-                      h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},"\u2014"),
-                      h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},"\u2014"),
-                      h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},"\u2014"),
-                      h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},"\u2014"),
-                      h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},"\u2014")
-                    );
-                  })
+          :h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
+              h("thead",null,
+                h("tr",{style:{background:"#f0f4f8",position:"sticky",top:0,zIndex:2}},
+                  COLS.map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap",background:"#f0f4f8"}},col.toUpperCase()))
                 )
+              ),
+              h("tbody",null,
+                filtered.map((c,i)=>{
+                  const sCol=SITIO_C[c.sitio]||"#888";
+                  return h("tr",{key:c.rut+"|"+c.sitio+"|"+c.edificio+i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"var(--surf2)"}},
+                    h("td",{style:{padding:"9px 12px"}},h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},c.sitio||"\u2014")),
+                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)"}},c.edificio||"\u2014"),
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txd)"}},c.rut||"\u2014"),
+                    h("td",{style:{padding:"9px 12px",fontWeight:600,fontSize:11,maxWidth:200}},c.nombre),
+                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",maxWidth:220}},c.dir||"\u2014"),
+                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},"\u2014"),
+                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},"\u2014"),
+                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},"\u2014"),
+                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},"\u2014")
+                  );
+                })
               )
             )
     )
