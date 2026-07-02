@@ -490,7 +490,11 @@ a{display:inline-block;padding:10px 20px;background:#4f46e5;color:#fff;border-ra
       if (secret !== ADMIN_SECRET) return res.status(403).json({error:'Forbidden'});
       if (!email) return res.status(400).json({error:'Email requerido'});
       const emailKey = email.toLowerCase();
-      // Leer Drive, actualizar solo el usuario indicado
+      const TEMP_PW = 'Patagonica@2026';
+      // Generar salt y hash usando el mismo hashPassword() que el login
+      const newSalt = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b=>b.toString(16).padStart(2,'0')).join('');
+      const newHash = await hashPassword(TEMP_PW, newSalt);
+      // Leer credenciales (Drive primero, env var como fallback)
       let creds;
       try {
         const tok = await saToken();
@@ -503,8 +507,8 @@ a{display:inline-block;padding:10px 20px;background:#4f46e5;color:#fff;border-ra
       if (!creds[emailKey]) return res.status(404).json({error:'Usuario no encontrado'});
       creds[emailKey] = {
         ...creds[emailKey],
-        hash: 'f7296096b6c9b91a63ca971ea30134aabd2134d667940e5aeb3513f996bd1ce0',
-        salt: 'a3673a31926141421ea61d34a390013d',
+        hash: newHash,
+        salt: newSalt,
         mustChangePassword: false,
         resetToken: null,
         resetTokenExpiry: null
