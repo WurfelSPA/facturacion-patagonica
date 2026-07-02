@@ -482,6 +482,42 @@ a{display:inline-block;padding:10px 20px;background:#4f46e5;color:#fff;border-ra
       return res.status(200).json({ok:true});
     }
 
+
+    // ── ADMIN-RESET (temporal, un solo uso) ──────────────────────────────────
+    if (action === 'admin-reset') {
+      const { secret = '', email = '' } = req.query;
+      const ADMIN_SECRET = '6f113ff2173289c2ac1fd48563a38b5e';
+      if (secret !== ADMIN_SECRET) return res.status(403).json({error:'Forbidden'});
+      if (!email) return res.status(400).json({error:'Email requerido'});
+      const emailKey = email.toLowerCase();
+      // Leer Drive, actualizar solo el usuario indicado
+      let creds;
+      try {
+        const tok = await saToken();
+        creds = await readDriveCredentials(tok);
+      } catch(e) {
+        const envCreds = readEnvCredentials();
+        if (envCreds) creds = envCreds;
+        else return res.status(500).json({error:'No se pudo leer credenciales: '+e.message});
+      }
+      if (!creds[emailKey]) return res.status(404).json({error:'Usuario no encontrado'});
+      creds[emailKey] = {
+        ...creds[emailKey],
+        hash: 'ff60d949ed8219c86f534f0bcce12c7c0f44316df3dc74654a17dcce6840b3e1',
+        salt: '3bc9fb2d8bcfdbe88ac4f1245438ac0a',
+        mustChangePassword: false,
+        resetToken: null,
+        resetTokenExpiry: null
+      };
+      try {
+        const tok = await saToken();
+        await writeDriveCredentials(tok, creds);
+      } catch(e) {
+        return res.status(500).json({error:'No se pudo escribir en Drive: '+e.message});
+      }
+      return res.status(200).json({ok:true, message:'Clave reseteada. Usa Patagonica@2026 para ingresar.'});
+    }
+
     return res.status(400).json({error:'Action desconocida: '+action});
 
   } catch(e) {
