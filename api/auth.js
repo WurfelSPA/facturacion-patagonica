@@ -503,8 +503,8 @@ a{display:inline-block;padding:10px 20px;background:#4f46e5;color:#fff;border-ra
       if (!creds[emailKey]) return res.status(404).json({error:'Usuario no encontrado'});
       creds[emailKey] = {
         ...creds[emailKey],
-        hash: 'ff60d949ed8219c86f534f0bcce12c7c0f44316df3dc74654a17dcce6840b3e1',
-        salt: '3bc9fb2d8bcfdbe88ac4f1245438ac0a',
+        hash: 'f7296096b6c9b91a63ca971ea30134aabd2134d667940e5aeb3513f996bd1ce0',
+        salt: 'a3673a31926141421ea61d34a390013d',
         mustChangePassword: false,
         resetToken: null,
         resetTokenExpiry: null
