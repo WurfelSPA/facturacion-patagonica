@@ -1881,7 +1881,7 @@ function FactxCobrarView({notify}){
   var searchS=React.useState(""); var search=searchS[0]; var setSearch=searchS[1];
   var selClientS=React.useState(null); var selClient=selClientS[0]; var setSelClient=selClientS[1];
   var filterBucketS=React.useState("all"); var filterBucket=filterBucketS[0]; var setFilterBucket=filterBucketS[1];
-  var sortS=React.useState({col:"monto",dir:"desc"}); var sort=sortS[0]; var setSort=sortS[1];
+  var sortS=React.useState({col:"nombre",dir:"asc"}); var sort=sortS[0]; var setSort=sortS[1];
   var fxcModalS=React.useState(null); var fxcModal=fxcModalS[0]; var setFxcModal=fxcModalS[1];
   function fmtCLP(v){return "$"+Math.round(v).toLocaleString("es-CL");}
 
