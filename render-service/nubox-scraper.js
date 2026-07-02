@@ -1,6 +1,6 @@
 /**
  * nubox-scraper.js
- * Browserless → Dashboard.aspx con UTN → intercepta respuesta Excel via page.on('response')
+ * Browserless → Dashboard.aspx con UTN → fetch desde browser context → base64
  */
 const fetch = require('node-fetch');
 
@@ -17,9 +17,9 @@ async function descargarExcelViaBrowserless(utn) {
 export default async ({ page }) => {
   const dashUrl = ${JSON.stringify(dashUrl)};
 
-  // 1. Navegar a Dashboard directo con UTN
+  // 1. Navegar a Dashboard con UTN
   await page.goto(dashUrl, { waitUntil: 'domcontentloaded', timeout: 25000 });
-  await new Promise(r => setTimeout(r, 2000));
+  await new Promise(r => setTimeout(r, 3000));
 
   const url = page.url();
   if (url.includes('/Login/') || url.includes('/Account/')) {
@@ -30,57 +30,61 @@ export default async ({ page }) => {
     document.body.innerText.includes('Resumen de Ventas')
   ).catch(() => false);
   if (!hasResumen) {
-    const body = await page.evaluate(() => document.body.innerText.slice(0, 200)).catch(() => '');
+    const body = await page.evaluate(() => document.body.innerText.slice(0, 300)).catch(() => '');
     throw new Error('RESUMEN_NO_CARGADO: url=' + url + ' | ' + body);
   }
 
-  // Esperar que el boton sea visible (ReportViewer puede tardar)
-  try {
-    await page.waitForSelector('#btnImprimirXLS', { visible: true, timeout: 10000 });
-  } catch (_) {}
-  const btn = await page.$('#btnImprimirXLS');
-  if (!btn) throw new Error('BOTON_XLS_NO_ENCONTRADO: url=' + url);
+  // 2. Hacer el POST desde el browser context (tiene cookies de sesion)
+  const result = await page.evaluate(async () => {
+    const form = document.getElementById('form1');
+    if (!form) return { ok: false, error: 'form1 no encontrado' };
 
-  // 2. Interceptar respuesta Excel ANTES de hacer click
-  const excelPromise = new Promise((resolve, reject) => {
-    const timeout = setTimeout(
-      () => reject(new Error('EXCEL_TIMEOUT: 30s sin respuesta Excel')),
-      30000
-    );
+    const params = new URLSearchParams();
+    for (const [k, v] of new FormData(form)) params.set(k, v);
+    params.set('btnImprimirXLS', 'Exportar');
+    params.set('selector', '0');
 
-    page.on('response', async (response) => {
-      const ct = response.headers()['content-type'] || '';
-      const cd = response.headers()['content-disposition'] || '';
-      if (
-        ct.includes('excel') || ct.includes('octet-stream') ||
-        ct.includes('spreadsheet') || cd.includes('.xls')
-      ) {
-        clearTimeout(timeout);
-        try {
-          const buffer = await response.buffer();
-          const b64    = buffer.toString('base64');
-          resolve({ b64, ct, size: buffer.length });
-        } catch (e) {
-          reject(new Error('BUFFER_ERROR: ' + e.message));
-        }
-      }
-    });
+    let r;
+    try {
+      r = await fetch(form.action, {
+        method:      'POST',
+        headers:     { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body:        params.toString(),
+        credentials: 'include',
+      });
+    } catch (e) {
+      return { ok: false, error: 'FETCH_ERROR: ' + e.message };
+    }
+
+    const ct = r.headers.get('content-type') || '';
+    const cd = r.headers.get('content-disposition') || '';
+
+    if (!ct.includes('excel') && !ct.includes('octet-stream') &&
+        !ct.includes('spreadsheet') && !cd.includes('.xls')) {
+      const txt = await r.text().catch(() => '');
+      return { ok: false, status: r.status, ct, cd, txt: txt.slice(0, 400) };
+    }
+
+    // Convertir a base64 en el browser
+    const ab = await r.arrayBuffer();
+    const u8 = new Uint8Array(ab);
+    let binary = '';
+    const chunk = 8192;
+    for (let i = 0; i < u8.length; i += chunk) {
+      binary += String.fromCharCode(...u8.subarray(i, i + chunk));
+    }
+    return { ok: true, b64: btoa(binary), ct, size: ab.byteLength };
   });
 
-  // 3. Click Exportar — usar evaluate para evitar problema de clickability
-  await page.evaluate(() => {
-    const b = document.getElementById('btnImprimirXLS');
-    if (b) b.click();
-    else { const f = document.getElementById('form1'); if (f) { const inp = document.createElement('input'); inp.name='btnImprimirXLS'; inp.value='Exportar'; f.appendChild(inp); f.submit(); } }
-  });
+  if (!result || !result.ok) {
+    throw new Error('EXCEL_FETCH_FAILED: ' + JSON.stringify(result).slice(0, 400));
+  }
 
-  // 4. Esperar la respuesta
-  const { b64, ct, size } = await excelPromise;
-  return Response.json({ b64, ct, size });
+  return Response.json({ b64: result.b64, ct: result.ct, size: result.size });
 };
 `;
 
-  console.log('[scraper] Browserless → Dashboard.aspx con UTN...');
+  console.log('[scraper] Browserless → Dashboard.aspx + fetch Excel desde browser...');
   const resp = await fetch(
     `${BROWSERLESS_BASE}/chromium/function?token=${bToken}&stealth=true`,
     { method: 'POST', headers: { 'Content-Type': 'application/javascript' }, body: script }
@@ -93,7 +97,7 @@ export default async ({ page }) => {
 
   const result = await resp.json();
   if (!result.b64) {
-    throw new Error('Browserless: sin Excel. Respuesta: ' + JSON.stringify(result).slice(0, 300));
+    throw new Error('Browserless: sin Excel b64. Respuesta: ' + JSON.stringify(result).slice(0, 400));
   }
 
   const buf = Buffer.from(result.b64, 'base64');
