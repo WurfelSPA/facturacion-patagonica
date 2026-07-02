@@ -31,87 +31,32 @@ export default async ({ page }) => {
   const rut      = ${JSON.stringify(rut)};
   const password = ${JSON.stringify(password)};
 
-  // 1. Ir al login
+  // MODO DEBUG: ver qué muestra Nubox al headless browser
   await page.goto('https://app.nubox.com/Account/LogIn', {
-    waitUntil: 'networkidle2', timeout: 30000
+    waitUntil: 'domcontentloaded', timeout: 30000
   });
 
-  // 2. Aceptar cookies si aparece el banner
-  try {
-    await page.click('[id*="accept"], [class*="accept-cookie"], button[aria-label*="Accept"]');
-    await new Promise(r => setTimeout(r, 1000));
-  } catch(_) {}
+  // Esperar 3s para que cargue JS
+  await new Promise(r => setTimeout(r, 3000));
 
-  // 3. Esperar a que haya al menos un input visible
-  await page.waitForSelector('input', { timeout: 15000 });
+  const debugUrl   = page.url();
+  const debugTitle = await page.title();
+  const screenshot = await page.screenshot({ encoding: 'base64', type: 'jpeg', quality: 60 });
+  const bodyHtml   = await page.evaluate(() => document.body?.innerHTML?.slice(0, 2000) || '(vacío)');
+  const allInputs  = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('input')).map(i => ({
+      name: i.name, id: i.id, type: i.type, placeholder: i.placeholder
+    }))
+  );
 
-  // 4. Llenar formulario via evaluate (no depende de selectores específicos)
-  await page.evaluate((r, p) => {
-    // Buscar campo RUT: primer input type=text o input sin type
-    const inputs = Array.from(document.querySelectorAll('input'));
-    const rutField = inputs.find(i =>
-      /rut|user|login|nombre|email/i.test(i.name + i.id + i.placeholder + i.className)
-    ) || inputs.find(i => i.type === 'text' || i.type === '' || !i.type);
-    if (rutField) {
-      rutField.focus();
-      rutField.value = r;
-      rutField.dispatchEvent(new Event('input', { bubbles: true }));
-      rutField.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-    // Buscar campo password
-    const pwField = inputs.find(i => i.type === 'password');
-    if (pwField) {
-      pwField.focus();
-      pwField.value = p;
-      pwField.dispatchEvent(new Event('input', { bubbles: true }));
-      pwField.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-  }, rut, password);
-
-  await new Promise(r => setTimeout(r, 500));
-
-  // 5. Submit: buscar botón o presionar Enter
-  await Promise.all([
-    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }),
-    page.evaluate(() => {
-      const btn = document.querySelector('button[type="submit"], input[type="submit"], button');
-      if (btn) btn.click();
-    }),
-  ]).catch(async () => {
-    // Fallback: Enter en el campo password
-    await page.keyboard.press('Enter');
-    await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {});
+  return Response.json({
+    debug: true,
+    url: debugUrl,
+    title: debugTitle,
+    inputs: allInputs,
+    bodySnippet: bodyHtml,
+    screenshot: 'data:image/jpeg;base64,' + screenshot,
   });
-
-  // 6. Verificar login exitoso
-  const url = page.url();
-  if (url.includes('LogIn') || url.includes('login')) {
-    const errorEl = await page.$('.validation-summary-errors, .alert-danger, [class*="error"]');
-    const errorText = errorEl ? await page.evaluate(el => el.innerText, errorEl) : 'Credenciales incorrectas';
-    throw new Error('Login fallido: ' + errorText.trim());
-  }
-
-  // 7. Navegar a la página DTE
-  await page.goto('https://app.nubox.com/ServiFactura/paginas/dteDocumentosTributarios.aspx', {
-    waitUntil: 'networkidle2', timeout: 30000
-  });
-
-  // 8. Extraer token del HTML
-  const pageContent = await page.content();
-  const tokenMatch = pageContent.match(/var\s+token\s*=\s*["']([A-Za-z0-9+\/=]{20,})["']/)
-    || pageContent.match(/"token"\s*:\s*"([A-Za-z0-9+\/=]{20,})"/)
-    || pageContent.match(/token\s*=\s*["']([A-Za-z0-9+\/=]{20,})["']/);
-  const funcMatch = pageContent.match(/funcionarioId\s*[=:]\s*["']?(\d{4,})["']?/)
-    || pageContent.match(/"funcionarioId"\s*:\s*"(\d+)"/);
-
-  const token = tokenMatch ? tokenMatch[1] : null;
-  const funcionarioId = funcMatch ? funcMatch[1] : null;
-
-  // 9. Obtener cookies
-  const cookies = await page.cookies();
-  const cookieHeader = cookies.map(c => c.name + '=' + c.value).join('; ');
-
-  return Response.json({ cookies: cookieHeader, token, funcionarioId, finalUrl: url });
 };
 `;
 }
