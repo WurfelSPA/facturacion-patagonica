@@ -42,23 +42,46 @@ export default async ({ page }) => {
     await new Promise(r => setTimeout(r, 1000));
   } catch(_) {}
 
-  // 3. Llenar RUT
-  await page.waitForSelector('input[name="Rut"], #Rut, input[id*="rut" i], input[placeholder*="rut" i]', { timeout: 10000 });
-  const rutInput = await page.$('input[name="Rut"]') || await page.$('#Rut') || await page.$('input[type="text"]');
-  await rutInput.click({ clickCount: 3 });
-  await rutInput.type(rut, { delay: 50 });
+  // 3. Esperar a que haya al menos un input visible
+  await page.waitForSelector('input', { timeout: 15000 });
 
-  // 4. Llenar password
-  await page.waitForSelector('input[type="password"]', { timeout: 5000 });
-  const pwInput = await page.$('input[type="password"]');
-  await pwInput.click({ clickCount: 3 });
-  await pwInput.type(password, { delay: 50 });
+  // 4. Llenar formulario via evaluate (no depende de selectores específicos)
+  await page.evaluate((r, p) => {
+    // Buscar campo RUT: primer input type=text o input sin type
+    const inputs = Array.from(document.querySelectorAll('input'));
+    const rutField = inputs.find(i =>
+      /rut|user|login|nombre|email/i.test(i.name + i.id + i.placeholder + i.className)
+    ) || inputs.find(i => i.type === 'text' || i.type === '' || !i.type);
+    if (rutField) {
+      rutField.focus();
+      rutField.value = r;
+      rutField.dispatchEvent(new Event('input', { bubbles: true }));
+      rutField.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    // Buscar campo password
+    const pwField = inputs.find(i => i.type === 'password');
+    if (pwField) {
+      pwField.focus();
+      pwField.value = p;
+      pwField.dispatchEvent(new Event('input', { bubbles: true }));
+      pwField.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }, rut, password);
 
-  // 5. Submit
+  await new Promise(r => setTimeout(r, 500));
+
+  // 5. Submit: buscar botón o presionar Enter
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }),
-    page.keyboard.press('Enter'),
-  ]);
+    page.evaluate(() => {
+      const btn = document.querySelector('button[type="submit"], input[type="submit"], button');
+      if (btn) btn.click();
+    }),
+  ]).catch(async () => {
+    // Fallback: Enter en el campo password
+    await page.keyboard.press('Enter');
+    await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {});
+  });
 
   // 6. Verificar login exitoso
   const url = page.url();
