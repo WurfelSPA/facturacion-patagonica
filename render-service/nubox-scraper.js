@@ -149,6 +149,16 @@ export default async ({ page }) => {
 }
 
 async function loginNubox() {
+  // ── Opción A: Cookies de sesión ya almacenadas (sin Browserless) ──────────
+  const storedCookies = process.env.NUBOX_SESSION_COOKIES;
+  const storedUtn     = process.env.NUBOX_UTN;
+
+  if (storedCookies && storedUtn) {
+    console.log('[scraper] Usando cookies de sesión almacenadas (sin Browserless)');
+    return { cookies: storedCookies, utn: storedUtn };
+  }
+
+  // ── Opción B: Login automático via Browserless ────────────────────────────
   const bToken   = process.env.BROWSERLESS_TOKEN;
   const rut      = process.env.NUBOX_RUT;
   const password = process.env.NUBOX_PASSWORD;
