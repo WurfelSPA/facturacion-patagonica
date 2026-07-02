@@ -1,0 +1,247 @@
+{
+  "name": "Nubox Sync — Día 10 de cada mes",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 10 * *"
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Cron — día 10 a las 9:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.RENDER_SERVICE_URL }}/sync-nubox/status",
+        "method": "GET",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "health-check",
+      "name": "Health check Render",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [250, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.ready }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-ready",
+      "name": "¿Render listo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [500, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.RENDER_SERVICE_URL }}/sync-nubox",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "secret",
+              "value": "={{ $env.SYNC_SECRET }}"
+            },
+            {
+              "name": "mes",
+              "value": "={{ $now.minus({months: 1}).toFormat('yyyy-MM') }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "call-sync",
+      "name": "POST /sync-nubox",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [750, -100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.body.ok }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-ok",
+      "name": "¿Sync exitoso?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1000, -100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construir mensaje de éxito\nconst b = $input.first().json.body;\nreturn [{\n  json: {\n    title: '✅ Nubox Sync OK',\n    message: [\n      `Período: ${b.periodo}`,\n      `Clientes: ${b.stats?.totalClientes ?? '?'}`,\n      `Facturas: ${b.stats?.totalRegistros ?? '?'}`,\n      `Fuente: ${b.stats?.fuente ?? '?'}`,\n      `Tiempo: ${((b.elapsed ?? 0)/1000).toFixed(1)}s`,\n    ].join('\\n'),\n  }\n}];"
+      },
+      "id": "format-success",
+      "name": "Formatear mensaje éxito",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, -200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construir mensaje de error\nconst b = $input.first().json.body ?? {};\nconst status = $input.first().json.statusCode;\nreturn [{\n  json: {\n    title: '❌ Nubox Sync FALLÓ',\n    message: [\n      `Status HTTP: ${status}`,\n      `Error: ${b.error ?? b.warning ?? 'desconocido'}`,\n      `Período: ${b.periodo ?? b.mes ?? '?'}`,\n      `Clientes: ${b.stats?.totalClientes ?? '?'}`,\n    ].join('\\n'),\n  }\n}];"
+      },
+      "id": "format-error",
+      "name": "Formatear mensaje error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    title: '⚠️ Render no disponible',\n    message: 'El servicio Render no respondió al health check. Revisar si el servicio está activo.',\n  }\n}];"
+      },
+      "id": "format-offline",
+      "name": "Render offline",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 100]
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "url": "={{ $env.SLACK_WEBHOOK_URL }}",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "=*{{ $json.title }}*\n{{ $json.message }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "notify-success",
+      "name": "Notificar Slack (éxito)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1500, -200],
+      "notes": "Opcional — solo si tienes SLACK_WEBHOOK_URL configurado"
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "url": "={{ $env.SLACK_WEBHOOK_URL }}",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "=*{{ $json.title }}*\n{{ $json.message }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "notify-error",
+      "name": "Notificar Slack (error)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1500, 50],
+      "notes": "Opcional — solo si tienes SLACK_WEBHOOK_URL configurado"
+    }
+  ],
+  "connections": {
+    "Cron — día 10 a las 9:00": {
+      "main": [
+        [{ "node": "Health check Render", "type": "main", "index": 0 }]
+      ]
+    },
+    "Health check Render": {
+      "main": [
+        [{ "node": "¿Render listo?", "type": "main", "index": 0 }]
+      ]
+    },
+    "¿Render listo?": {
+      "main": [
+        [{ "node": "POST /sync-nubox", "type": "main", "index": 0 }],
+        [{ "node": "Render offline", "type": "main", "index": 0 }]
+      ]
+    },
+    "POST /sync-nubox": {
+      "main": [
+        [{ "node": "¿Sync exitoso?", "type": "main", "index": 0 }]
+      ]
+    },
+    "¿Sync exitoso?": {
+      "main": [
+        [{ "node": "Formatear mensaje éxito", "type": "main", "index": 0 }],
+        [{ "node": "Formatear mensaje error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Formatear mensaje éxito": {
+      "main": [
+        [{ "node": "Notificar Slack (éxito)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Formatear mensaje error": {
+      "main": [
+        [{ "node": "Notificar Slack (error)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Render offline": {
+      "main": [
+        [{ "node": "Notificar Slack (error)", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "_readme": {
+    "variables_de_entorno_en_n8n": [
+      "RENDER_SERVICE_URL — URL de tu servicio en Render, ej: https://nubox-sync.onrender.com",
+      "SYNC_SECRET       — mismo valor que en Render (SYNC_SECRET env var)",
+      "SLACK_WEBHOOK_URL — (opcional) webhook de Slack para notificaciones"
+    ],
+    "cron": "0 9 10 * * → día 10 de cada mes a las 9:00 AM (hora del servidor n8n)",
+    "timeout_sync": "300s (5 min) — Browserless + scraping puede tardar hasta 2-3 min",
+    "mes_calculado": "$now.minus({months: 1}) → el mes ANTERIOR al día 10 (ej: el 10 de Julio sincroniza Junio)"
+  }
+}
