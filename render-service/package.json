@@ -1,7 +1,7 @@
 {
   "name": "nubox-sync-service",
-  "version": "1.0.0",
-  "description": "Servicio Render — sincronización automática historial Nubox",
+  "version": "2.0.0",
+  "description": "Servicio Render — sincronización automática historial Nubox vía Puppeteer",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
@@ -10,10 +10,8 @@
   },
   "dependencies": {
     "express": "^4.18.2",
-    "xlsx": "^0.18.5",
-    "node-fetch": "^2.7.0"
+    "node-fetch": "^2.7.0",
+    "puppeteer": "^22.0.0"
   },
   "engines": {
-    "node": ">=18"
-  }
-}
+    "

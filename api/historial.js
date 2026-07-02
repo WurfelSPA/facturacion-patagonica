@@ -588,7 +588,7 @@ async function _loadExcelCache(token) {
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin","*");
   res.setHeader("Access-Control-Allow-Methods","GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers","Content-Type");
+  res.setHeader("Access-Control-Allow-Headers","Content-Type,x-sync-secret");
   if (req.method === "OPTIONS") return res.status(200).end();
 
   const saJson = process.env.GOOGLE_SERVICE_ACCOUNT;
@@ -919,10 +919,33 @@ export default async function handler(req, res) {
       return res.status(200).json({ count: notas.length, notas, pisaZipsFound: pisaZipsNC.map(f=>f.name) });
     }
 
-    // ── GET ?resumen=1 ── resumen de ventas por cliente desde JSON embebido ──
+    // ── GET ?resumen=1 ── resumen de ventas por cliente ──────────────────────
+    // Prioridad 1: archivo auto-sync desde Render (historial-resumen-nubox.json en Drive)
+    // Prioridad 2: JSON embebido en el bundle (historial-excel-2026.json, datos manuales)
     if (req.method === "GET" && req.query.resumen === "1") {
+      // 1. Intentar cargar el archivo de auto-sync desde Drive
+      try {
+        const resumenId = await findFile(token, "historial-resumen-nubox.json", FACT_FOLDER_ID);
+        if (resumenId) {
+          const text = await downloadFile(token, resumenId);
+          if (text) {
+            const data = JSON.parse(text);
+            if (data._fuente === "nubox-resumen-dom" && Array.isArray(data.clientes)) {
+              res.setHeader("Cache-Control", "private, max-age=3600");
+              return res.status(200).json({
+                clientes:   data.clientes,
+                _generado:  data._generado,
+                _columnas:  data._columnas,
+                _fuente:    "nubox-auto",
+              });
+            }
+          }
+        }
+      } catch(_) { /* Drive no disponible — caer al embebido */ }
+
+      // 2. Fallback: JSON embebido (historial-excel-2026.json con datos por folio)
       if (!_EXCEL_EMBEDDED) {
-        return res.status(503).json({ error: "JSON embebido no disponible" });
+        return res.status(503).json({ error: "JSON de resumen no disponible" });
       }
       // Agregar totales por (cliente, periodo) sumando todos los sitios y tipos.
       // Deduplicar por folio para evitar doble conteo en facturas con múltiples ítems.
@@ -950,7 +973,7 @@ export default async function handler(req, res) {
       }
       const clientes = Object.values(clientMap).sort((a, b) => b.total - a.total);
       res.setHeader("Cache-Control", "no-store");
-      return res.status(200).json({ clientes });
+      return res.status(200).json({ clientes, _fuente: "embedded" });
     }
 
     // ── GET ?batchPeriodo=1&periodo=X ── todas las facturas del período ─────────
@@ -1446,45 +1469,11 @@ export default async function handler(req, res) {
       return res.status(200).json(anio ? (data[anio] || {}) : data);
     }
 
-    // ── POST ── guarda/fusiona período ─────────────────────────────────────
-    if (req.method === "POST") {
-      const { anio, periodo, data: periodoData } = req.body || {};
-      if (!anio || !periodo || !periodoData)
-        return res.status(400).json({ error:"Se requiere anio, periodo y data" });
-      if (!PDF_FOLDER)
-        return res.status(500).json({ error:"DRIVE_PDF_FACTURAS_ID no configurada" });
-
-      let historial = {};
-      const fileId = await findFile(token, HIST_NAME, PDF_FOLDER);
-      if (fileId) {
-        const text = await downloadFile(token, fileId);
-        if (text) historial = JSON.parse(text);
-      }
-
-      if (!historial[anio]) historial[anio] = {};
-      historial[anio][periodo] = { ...(historial[anio][periodo] || {}), ...periodoData };
-
-      const content = JSON.stringify(historial, null, 2);
-      if (fileId) await updateJsonFile(token, fileId, content);
-      else await createJsonFile(token, HIST_NAME, PDF_FOLDER, content);
-
-      return res.status(200).json({ ok:true, anio, periodo, clientes: Object.keys(periodoData).length });
-    }
-
-    return res.status(405).json({ error:"Method not allowed" });
-  } catch (e) {
-    console.error("historial:", e.message);
-    return res.status(500).json({ error: e.message });
-  }
-}
-
-export {
-  normRut, norm, clienteMatch, detectTipo,
-  _pickByUF, _resolveFacturas,
-  _buildXmlFacturas, parseXmlDTE,
-  extractFacturasForRut, extractText,
-  _extractUF, _extractTotal, _derivarUFdePrecio,
-  extractClienteFromText, extractRutFromText,
-  getToken, driveFiles, downloadFile, findFile, createJsonFile, updateJsonFile,
-  FACT_FOLDER_ID,
-};
+    // ── POST ?syncResumen=1 ── guarda resumen auto-sync desde Render ─────────
+    // Llamado por el servicio Render después de hacer scraping del Resumen de Ventas.
+    // Guarda historial-resumen-nubox.json en la carpeta de facturación de Drive.
+    if (req.method === "POST" && req.query.syncResumen === "1") {
+      const syncSecret = req.headers["x-sync-secret"] || "";
+      const expectedSecret = process.env.SYNC_SECRET || "";
+      if (!expectedSecret || syncSecret !== expectedSecret) {
+        return res.st
