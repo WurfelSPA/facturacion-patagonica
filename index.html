@@ -3129,13 +3129,13 @@ function _HistorialPanel_REMOVED({files,data,pdfMap,filesZip,periodo,getToken,no
     if(pdfMap[facturaNum]&&filesZip){
       try{
         const z=await JSZip.loadAsync(await filesZip.arrayBuffer());
-        const _re1=new RegExp(facturaNum.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"(?![0-9])");const entry=Object.values(z.files).find(f=>_re1.test(f.name)&&!f.dir);
+        const _re1=new RegExp("(?<![0-9])"+facturaNum.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"(?![0-9])");const entry=Object.values(z.files).find(f=>_re1.test(f.name)&&!f.dir);
         if(entry){const d=await entry.async("uint8array");const b=new Blob([d],{type:"application/pdf"});setPreview({url:URL.createObjectURL(b),nombre:`${facturaNum}.pdf`});return;}
       }catch(e){}
     }
     /* Cargar desde Drive */
     const zip=await cargarZipMes(mes);if(!zip)return;
-    const _re2=new RegExp(facturaNum.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"(?![0-9])");const entry=Object.values(zip.files).find(f=>_re2.test(f.name)&&f.name.endsWith(".pdf")&&!f.dir);
+    const _re2=new RegExp("(?<![0-9])"+facturaNum.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"(?![0-9])");const entry=Object.values(zip.files).find(f=>_re2.test(f.name)&&f.name.endsWith(".pdf")&&!f.dir);
     if(!entry){notify(`PDF ${facturaNum} no encontrado en ZIP de ${mes}`,"warn");return;}
     const d=await entry.async("uint8array");
     setPreview({url:URL.createObjectURL(new Blob([d],{type:"application/pdf"})),nombre:`${facturaNum}.pdf`});
@@ -3161,7 +3161,7 @@ function _HistorialPanel_REMOVED({files,data,pdfMap,filesZip,periodo,getToken,no
           let zip=loadedZips[mes]||(filesZip&&periodo===`${mes} ${anio}`?await JSZip.loadAsync(await filesZip.arrayBuffer()):null);
           if(!zip)zip=await cargarZipMes(mes);
           if(zip){
-            const _re3=new RegExp(facNum.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"(?![0-9])");const entry=Object.values(zip.files).find(f=>_re3.test(f.name)&&!f.dir);
+            const _re3=new RegExp("(?<![0-9])"+facNum.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"(?![0-9])");const entry=Object.values(zip.files).find(f=>_re3.test(f.name)&&!f.dir);
             if(entry){const d=await entry.async("uint8array");pdfB64=btoa(String.fromCharCode(...d));pdfNombre=`${facNum}.pdf`;}
           }
         }catch(e){console.warn("adjuntar PDF:",e.message);}
