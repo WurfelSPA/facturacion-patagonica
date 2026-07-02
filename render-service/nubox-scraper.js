@@ -32,7 +32,29 @@ export default async ({ page }) => {
     waitUntil: 'domcontentloaded', timeout: 30000
   });
 
-  await page.waitForSelector('input[placeholder="Ingresa tu rut"]', { timeout: 15000 });
+  // Esperar el formulario — con diagnóstico si no aparece
+  let formReady = false;
+  try {
+    await page.waitForSelector('input[placeholder="Ingresa tu rut"]', { timeout: 20000 });
+    formReady = true;
+  } catch (_) {}
+
+  if (!formReady) {
+    // El formulario no cargó — capturar diagnóstico
+    const diagUrl    = page.url();
+    const diagTitle  = await page.title();
+    const diagInputs = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('input')).map(i =>
+        ({ type: i.type, placeholder: i.placeholder, id: i.id, name: i.name }))
+    );
+    const diagScr    = await page.screenshot({ encoding: 'base64', type: 'jpeg', quality: 40 });
+    return Response.json({
+      debug: true,
+      step: 'form-load',
+      url: diagUrl, title: diagTitle, inputs: diagInputs,
+      screenshot: 'data:image/jpeg;base64,' + diagScr,
+    });
+  }
   console.log('[browser] Formulario cargado');
 
   // Limpiar y llenar RUT
@@ -149,6 +171,13 @@ async function loginNubox() {
 
   const result = await resp.json();
   if (result.error) throw new Error('Browserless script error: ' + result.error);
+
+  // Si el script devolvió diagnóstico de debug, mostrarlo como error legible
+  if (result.debug) {
+    throw new Error('NUBOX_DEBUG step=' + result.step + ' | url=' + result.url +
+      ' | title=' + result.title +
+      ' | inputs=' + JSON.stringify(result.inputs));
+  }
 
   const { utn, cookies, finalUrl } = result;
   if (!utn) throw new Error('Login OK pero sin UTN. URL final: ' + finalUrl);
