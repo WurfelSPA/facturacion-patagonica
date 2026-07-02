@@ -2358,6 +2358,73 @@ function ContratosView({dashData,driveLoading}){
   );
 }
 
+/* ══════════════════════════════════════════════════════════
+   CUENTAS SERVICIOS
+══════════════════════════════════════════════════════════ */
+function CuentasServiciosView({dashData,driveLoading}){
+  const [search,setSearch]=useState("");
+  const normQ=s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g," ").trim();
+  const clientes=dashData
+    ?(()=>{
+        const seen=new Set();
+        return dashData.clients
+          .filter(c=>{const k=c.rut+"|"+c.sitio+"|"+c.edificio;if(seen.has(k))return false;seen.add(k);return true;})
+          .sort((a,b)=>(a.sitio||"").localeCompare(b.sitio||"")||(a.edificio||"").localeCompare(b.edificio||""));
+      })()
+    :[];
+  const q=normQ(search);
+  const filtered=!q?clientes:clientes.filter(c=>
+    normQ(c.nombre).includes(q)||normQ(c.sitio).includes(q)||normQ(c.edificio).includes(q)||
+    (c.rut&&c.rut.replace(/[.\-]/g,"").includes(q.replace(/[.\-]/g,"")))
+  );
+  if(!dashData)return h("main",{style:{flex:1,padding:"40px",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12}},
+    driveLoading
+      ?h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},h("span",{className:"spin",style:{fontSize:18}},"⟳"),"Cargando planilla desde Drive...")
+      :h("div",{style:{fontSize:13,color:"var(--txd)"}},"Sin datos — carga la planilla de facturación")
+  );
+  const COLS=["Sitio","Edificio","RUT","Cliente","Dirección","ID Aguas Andinas","N° Medidor AA","ID Enel","N° Medidor Enel","Observaciones"];
+  return h("main",{style:{flex:1,overflowY:"auto",padding:"20px 24px",display:"flex",flexDirection:"column",gap:16},className:"fade-up"},
+    h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}},
+      h("div",{style:{display:"flex",alignItems:"center",gap:8}},
+        h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"🔌 CUENTAS DE SERVICIOS"),
+        h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},filtered.length+" / "+clientes.length)
+      ),
+      h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente, sitio, RUT...",style:{width:240}})
+    ),
+    h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
+      filtered.length===0&&!search?h("div",{style:{padding:"40px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin clientes en la planilla"):null,
+      h("div",{style:{overflowX:"auto"}},
+        h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
+          h("thead",null,
+            h("tr",{style:{background:"#f0f4f8"}},
+              COLS.map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap"}},col.toUpperCase()))
+            )
+          ),
+          h("tbody",null,
+            filtered.length===0
+              ?h("tr",null,h("td",{colSpan:COLS.length,style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:12}},"No se encontraron resultados para \""+search+"\""))
+              :filtered.map((c,i)=>{
+                  const sCol=SITIO_C[c.sitio]||"#888";
+                  return h("tr",{key:c.rut+"|"+c.sitio+"|"+c.edificio+i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"var(--surf2)"}},
+                    h("td",{style:{padding:"9px 12px"}},h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},c.sitio||"—")),
+                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)"}},c.edificio||"—"),
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txd)"}},c.rut||"—"),
+                    h("td",{style:{padding:"9px 12px",fontWeight:600,fontSize:11,maxWidth:220}},c.nombre),
+                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},h("span",null,"—")),
+                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},h("span",null,"—")),
+                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},h("span",null,"—")),
+                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},h("span",null,"—")),
+                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},h("span",null,"—")),
+                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},h("span",null,"—"))
+                  );
+                })
+          )
+        )
+      )
+    )
+  );
+}
+
 /* ═══════════════════════════════════
    APP PRINCIPAL
 ═══════════════════════════════════ */
@@ -3219,6 +3286,7 @@ function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlo
     {id:"historial-fact", icon:"📂", label:"Historial Facturación"},
     {id:"fact-cobrar", icon:"💰", label:"Facturas x Cobrar"},
     {id:"contratos", icon:"📄", label:"Contratos"},
+    {id:"cuentas",   icon:"🔌", label:"Cuentas Servicios"},
   ];
   const isActive = id => id==="factura" ? (view==="table"||view==="upload") : view===id;
   const handleNav = id => {
@@ -4741,7 +4809,7 @@ function App(){
     h("header",{style:{background:view==="table"?"#1e3a5f":"var(--surf)",borderBottom:view==="table"?"1px solid #152d4a":"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:49,gap:10}},
       h("div",{style:{display:"flex",alignItems:"center",gap:10}},
         h("div",{style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px",color:view==="table"?"#fff":"var(--tx)"}},
-          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="fact-cobrar"?"💰 Facturas x Cobrar":"📋 Facturación"
+          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="cuentas"?"🔌 Cuentas Servicios":view==="fact-cobrar"?"💰 Facturas x Cobrar":"📋 Facturación"
         ),
         view==="table"&&h("span",{style:{fontSize:14,fontWeight:600,color:"#93b5d4",marginLeft:6}},periodo)
       ),
@@ -5114,6 +5182,7 @@ function App(){
     ,view==="ventas"&&h(VentasView,{periodo})
     ,view==="fact-cobrar"&&h(FactxCobrarView,{notify})
     ,view==="contratos"&&h(ContratosView,{dashData,driveLoading})
+    ,view==="cuentas"&&h(CuentasServiciosView,{dashData,driveLoading})
     ,view==="historial-fact"&&h(HistorialFactView,{dashData,driveLoading,notify})
   ));
 }
