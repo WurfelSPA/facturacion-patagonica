@@ -69,12 +69,12 @@ app.post('/sync-nubox', async (req, res) => {
   try {
     // 4. Scraping Nubox
     console.log(`[sync] Paso 1: scraping Nubox para mes ${mesTarget}`);
-    const { excelBuffer, documentos } = await scrapeNubox(mesTarget);
-    console.log(`[sync] Paso 1 OK -- docs: ${documentos.length}, excel: ${excelBuffer ? excelBuffer.length + ' bytes' : 'null'}`);
+    const { excelBuffer, pdfBuffer, tipo, documentos } = await scrapeNubox(mesTarget);
+    console.log(`[sync] Paso 1 OK -- tipo: ${tipo}, docs: ${documentos.length}, bytes: ${(excelBuffer || pdfBuffer || { length: 0 }).length}`);
 
     // 5. Parsear datos
     console.log('[sync] Paso 2: parseando datos');
-    const historial = procesarNuboxData({ excelBuffer, documentos, mes: mesTarget });
+    const historial = procesarNuboxData({ excelBuffer, pdfBuffer, tipo, documentos, mes: mesTarget });
     console.log(`[sync] Paso 2 OK -- ${historial.stats.totalClientes} clientes, ${historial.stats.totalRegistros} facturas`);
 
     if (historial.stats.totalClientes === 0) {
@@ -127,6 +127,32 @@ app.post('/sync-nubox', async (req, res) => {
   }
 });
 
+// -- GET /sync-nubox/debug-excel -- ver estructura cruda del Excel descargado
+app.get('/sync-nubox/debug-excel', async (req, res) => {
+  try {
+    const { scrapeNubox } = require('./nubox-scraper');
+    const XLSX = require('xlsx');
+    const utn = process.env.NUBOX_UTN;
+    if (!utn) return res.status(500).json({ error: 'Falta NUBOX_UTN' });
+
+    const { excelBuffer } = await scrapeNubox('debug');
+    if (!excelBuffer) return res.status(500).json({ error: 'Sin buffer Excel' });
+
+    const wb   = XLSX.read(excelBuffer, { type: 'buffer', cellDates: true });
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+    res.json({
+      bytes:    excelBuffer.length,
+      sheets:   wb.SheetNames,
+      totalRows: rows.length,
+      first20:  rows.slice(0, 20),
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // -- GET /sync-nubox/status --
 app.get('/sync-nubox/status', (req, res) => {
   const usaCookies     = !!(process.env.NUBOX_SESSION_COOKIES && process.env.NUBOX_UTN);
@@ -135,31 +161,4 @@ app.get('/sync-nubox/status', (req, res) => {
     ready:     usaCookies || usaBrowserless,
     auth_mode: usaCookies ? 'cookies' : (usaBrowserless ? 'browserless' : 'none'),
     env: {
-      session_cookies: !!process.env.NUBOX_SESSION_COOKIES,
-      nubox_utn:       !!process.env.NUBOX_UTN,
-      nubox_rut:       !!process.env.NUBOX_RUT,
-      nubox_password:  !!process.env.NUBOX_PASSWORD,
-      browserless:     !!process.env.BROWSERLESS_TOKEN,
-      vercel_url:      !!process.env.VERCEL_HISTORIAL_URL,
-      secret:          !!process.env.SYNC_SECRET,
-    },
-    ts: new Date().toISOString(),
-  });
-});
-
-// -- Helpers --
-function _mesAnterior() {
-  const d = new Date();
-  d.setDate(1);
-  d.setMonth(d.getMonth() - 1);
-  const anio = d.getFullYear();
-  const mes  = String(d.getMonth() + 1).padStart(2, '0');
-  return `${anio}-${mes}`;
-}
-
-// -- Arranque --
-app.listen(PORT, () => {
-  console.log(`[server] Nubox Sync Service corriendo en puerto ${PORT}`);
-  console.log(`[server] Vercel URL: ${process.env.VERCEL_HISTORIAL_URL || '(no configurado)'}`);
-  console.log(`[server] Secret: ${process.env.SYNC_SECRET ? 'configurado' : 'NO configurado'}`);
-});
+      session_co
