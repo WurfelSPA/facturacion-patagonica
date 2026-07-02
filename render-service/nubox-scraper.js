@@ -1,39 +1,62 @@
 /**
  * render-service/nubox-scraper.js
  *
- * Usa Puppeteer (Chromium headless) para navegar al Dashboard Nubox y
- * extraer los datos del "Resumen de Ventas" directamente desde el DOM.
+ * Usa puppeteer-core conectado a Browserless.io para navegar al Dashboard
+ * de Nubox y extraer los datos del "Resumen de Ventas" desde el DOM.
+ *
+ * Browserless.io corre Chrome en la nube — no se necesita Chrome local.
+ * La conexión se hace vía WebSocket usando BROWSERLESS_TOKEN.
  *
  * Flujo:
- *   1. Lanzar Chrome headless
+ *   1. Conectar a Browserless.io
  *   2. Navegar a Dashboard.aspx?action=Ventas&utn=TOKEN
- *   3. Esperar a que el ReportViewer cargue los datos (detectar celdas con RUT)
+ *   3. Esperar a que el ReportViewer cargue (aparecen celdas con RUT)
  *   4. Extraer meses dinámicamente del encabezado + valores por cliente
  *   5. Retornar { clientes, meses }
  */
 
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
 
 const DASHBOARD = 'https://app.nubox.com/ServiFactura/paginas/Dashboard.aspx?action=Ventas';
 
+// Endpoints de Browserless.io (probar SFO primero, LON como fallback)
+const BROWSERLESS_ENDPOINTS = [
+  'wss://production-sfo.browserless.io',
+  'wss://production-lon.browserless.io',
+];
+
 async function scrapeNuboxResumen() {
-  const utn = process.env.NUBOX_UTN;
-  if (!utn) throw new Error('Falta NUBOX_UTN en env vars');
+  const utn   = process.env.NUBOX_UTN;
+  const token = process.env.BROWSERLESS_TOKEN;
+
+  if (!utn)   throw new Error('Falta NUBOX_UTN en env vars');
+  if (!token) throw new Error('Falta BROWSERLESS_TOKEN en env vars');
 
   const url = `${DASHBOARD}&utn=${encodeURIComponent(utn)}`;
 
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--no-first-run',
-      '--no-zygote',
-      '--single-process',
-    ],
-  });
+  // Intentar cada endpoint de Browserless hasta que funcione
+  let browser = null;
+  let lastErr  = null;
+
+  for (const endpoint of BROWSERLESS_ENDPOINTS) {
+    try {
+      const wsEndpoint = `${endpoint}?token=${token}`;
+      console.log(`[scraper] Conectando a Browserless: ${endpoint}...`);
+      browser = await puppeteer.connect({
+        browserWSEndpoint: wsEndpoint,
+      });
+      console.log('[scraper] Conectado a Browserless OK');
+      break;
+    } catch (err) {
+      console.warn(`[scraper] ${endpoint} falló: ${err.message}`);
+      lastErr = err;
+      browser = null;
+    }
+  }
+
+  if (!browser) {
+    throw new Error('No se pudo conectar a Browserless.io: ' + (lastErr?.message || 'desconocido'));
+  }
 
   try {
     const page = await browser.newPage();
@@ -54,7 +77,6 @@ async function scrapeNuboxResumen() {
     console.log('[scraper] Página cargada, esperando tabla de reporte...');
 
     // Esperar hasta que aparezcan celdas con patrón RUT (XX.XXX.XXX-X)
-    // El ReportViewer de Nubox puede tardar hasta 30s en renderizar
     await page.waitForFunction(
       () => {
         const tds = document.querySelectorAll('td');
@@ -68,10 +90,9 @@ async function scrapeNuboxResumen() {
     console.log('[scraper] Tabla cargada, extrayendo datos...');
 
     const resultado = await page.evaluate(() => {
-      // 1. Detectar columnas de meses dinámicamente desde el encabezado
       const allTds = document.querySelectorAll('td');
 
-      // El encabezado tiene "Cliente", meses como "Ene-26", y "Total" en el mismo texto
+      // 1. Detectar columnas de meses dinámicamente desde el encabezado
       const headerCell = Array.from(allTds).find(td => {
         const text = td.innerText;
         return (
@@ -95,14 +116,14 @@ async function scrapeNuboxResumen() {
         };
       }
 
-      // 2. Extraer filas de clientes (celdas con patrón RUT)
+      // 2. Extraer filas de clientes
       const rutPattern = /^\d{1,2}\.\d{3}\.\d{3}-[\dkK]$/;
-      const rutCells = Array.from(allTds).filter(td =>
+      const rutCells   = Array.from(allTds).filter(td =>
         rutPattern.test(td.innerText.trim())
       );
 
       const results = [];
-      const seen = new Set();
+      const seen    = new Set();
 
       rutCells.forEach(rutCell => {
         const rut = rutCell.innerText.trim();
@@ -112,22 +133,4 @@ async function scrapeNuboxResumen() {
         const row = rutCell.closest('tr');
         if (!row) return;
 
-        // Estructura de la fila: [vacío, RUT, RUT, Nombre, Nombre, m1..m12, Total]
-        const cells = Array.from(row.querySelectorAll('td')).map(c =>
-          c.innerText.trim()
-        );
-        const rutIdx = cells.indexOf(rut);
-        if (rutIdx < 0) return;
-
-        // Nombre está 2 posiciones después (skip RUT duplicado)
-        const nombre = cells[rutIdx + 2] || cells[rutIdx + 1] || '';
-
-        // Los meses empiezan 4 posiciones después del RUT
-        const monthStart = rutIdx + 4;
-
-        const meses = {};
-        for (let i = 0; i < MESES.length; i++) {
-          const val = (cells[monthStart + i] || '').trim();
-          if (val !== '') {
-            const num = parseInt(val.replace(/\./g, ''), 10);
-            // L
+        // Estructura
