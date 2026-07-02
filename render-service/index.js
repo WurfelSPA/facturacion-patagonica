@@ -6,20 +6,16 @@
  *
  * Flujo:
  *   1. n8n llama POST /sync-nubox { mes: "YYYY-MM", secret: "..." }
- *   2. Scraper hace login en Nubox via Browserless.io -> obtiene cookies
- *   3. Intenta descargar Excel de reporteria del mes (o usa lista de docs como fallback)
- *   4. Parser convierte datos -> formato historial-facturas.json
+ *   2. Scraper hace GET Dashboard.aspx?utn=TOKEN → cookies + ViewState
+ *   3. POST con btnImprimirXLS → descarga Excel
+ *   4. Parser convierte datos → formato historial-facturas.json
  *   5. POST al endpoint Vercel /api/historial para guardar en Drive
  *   6. Responde con resultado { ok, stats }
  *
  * Variables de entorno (configurar en Render dashboard):
  *   PORT                  -- puerto (Render lo asigna automaticamente)
  *   SYNC_SECRET           -- token compartido para autenticar el trigger de n8n
- *   NUBOX_SESSION_COOKIES -- cookies de sesion Nubox (opcion A, recomendado)
- *   NUBOX_UTN             -- token UTN de sesion Nubox (opcion A, recomendado)
- *   NUBOX_RUT             -- RUT de login Nubox (opcion B, via Browserless)
- *   NUBOX_PASSWORD        -- Contrasena Nubox (opcion B, via Browserless)
- *   BROWSERLESS_TOKEN     -- API token de browserless.io (opcion B)
+ *   NUBOX_UTN             -- token UTN de sesion Nubox
  *   VERCEL_HISTORIAL_URL  -- URL completa del endpoint historial Vercel
  */
 
@@ -56,11 +52,9 @@ app.post('/sync-nubox', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'mes debe ser "YYYY-MM"' });
   }
 
-  // 3. Variables de entorno -- acepta cookies almacenadas O login via Browserless
-  const usaCookies     = !!(process.env.NUBOX_SESSION_COOKIES && process.env.NUBOX_UTN);
-  const usaBrowserless = !!(process.env.NUBOX_RUT && process.env.NUBOX_PASSWORD && process.env.BROWSERLESS_TOKEN);
-  if (!usaCookies && !usaBrowserless) {
-    return res.status(500).json({ ok: false, error: 'Faltan variables: configura NUBOX_SESSION_COOKIES + NUBOX_UTN o NUBOX_RUT + NUBOX_PASSWORD + BROWSERLESS_TOKEN' });
+  // 3. Variables de entorno
+  if (!process.env.NUBOX_UTN) {
+    return res.status(500).json({ ok: false, error: 'Falta NUBOX_UTN' });
   }
   if (!process.env.VERCEL_HISTORIAL_URL) {
     return res.status(500).json({ ok: false, error: 'Falta VERCEL_HISTORIAL_URL' });
@@ -69,13 +63,14 @@ app.post('/sync-nubox', async (req, res) => {
   try {
     // 4. Scraping Nubox
     console.log(`[sync] Paso 1: scraping Nubox para mes ${mesTarget}`);
-    const { excelBuffer, pdfBuffer, tipo, documentos } = await scrapeNubox(mesTarget);
-    console.log(`[sync] Paso 1 OK -- tipo: ${tipo}, docs: ${documentos.length}, bytes: ${(excelBuffer || pdfBuffer || { length: 0 }).length}`);
+    const { excelBuffer, documentos } = await scrapeNubox(mesTarget);
+    console.log(`[sync] Paso 1 OK — bytes: ${(excelBuffer || { length: 0 }).length}, docs: ${(documentos || []).length}`);
 
     // 5. Parsear datos
     console.log('[sync] Paso 2: parseando datos');
-    const historial = procesarNuboxData({ excelBuffer, pdfBuffer, tipo, documentos, mes: mesTarget });
-    console.log(`[sync] Paso 2 OK -- ${historial.stats.totalClientes} clientes, ${historial.stats.totalRegistros} facturas`);
+    const historial = procesarNuboxData({ excelBuffer, documentos, mes: mesTarget });
+    console.log(`[sync] Paso 2 OK — ${historial.stats.totalClientes} clientes, ${historial.stats.totalRegistros} facturas`);
+    console.log('[sync] diag:', JSON.stringify(historial.stats.diag));
 
     if (historial.stats.totalClientes === 0) {
       return res.status(200).json({
@@ -110,7 +105,7 @@ app.post('/sync-nubox', async (req, res) => {
       });
     }
 
-    console.log('[sync] Paso 3 OK -- historial guardado');
+    console.log('[sync] Paso 3 OK — historial guardado');
     res.json({
       ok: true,
       mes: mesTarget,
@@ -143,10 +138,10 @@ app.get('/sync-nubox/debug-excel', async (req, res) => {
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
     res.json({
-      bytes:    excelBuffer.length,
-      sheets:   wb.SheetNames,
+      bytes:     excelBuffer.length,
+      sheets:    wb.SheetNames,
       totalRows: rows.length,
-      first20:  rows.slice(0, 20),
+      first20:   rows.slice(0, 20),
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -155,10 +150,31 @@ app.get('/sync-nubox/debug-excel', async (req, res) => {
 
 // -- GET /sync-nubox/status --
 app.get('/sync-nubox/status', (req, res) => {
-  const usaCookies     = !!(process.env.NUBOX_SESSION_COOKIES && process.env.NUBOX_UTN);
-  const usaBrowserless = !!(process.env.NUBOX_RUT && process.env.NUBOX_PASSWORD && process.env.BROWSERLESS_TOKEN);
   res.json({
-    ready:     usaCookies || usaBrowserless,
-    auth_mode: usaCookies ? 'cookies' : (usaBrowserless ? 'browserless' : 'none'),
+    ready:    !!process.env.NUBOX_UTN,
     env: {
-      session_co
+      nubox_utn:    !!process.env.NUBOX_UTN,
+      vercel_url:   !!process.env.VERCEL_HISTORIAL_URL,
+      secret:       !!process.env.SYNC_SECRET,
+    },
+    ts: new Date().toISOString(),
+  });
+});
+
+// -- Helpers --
+function _mesAnterior() {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() - 1);
+  const anio = d.getFullYear();
+  const mes  = String(d.getMonth() + 1).padStart(2, '0');
+  return `${anio}-${mes}`;
+}
+
+// -- Arranque --
+app.listen(PORT, () => {
+  console.log(`[server] Nubox Sync Service corriendo en puerto ${PORT}`);
+  console.log(`[server] Vercel URL: ${process.env.VERCEL_HISTORIAL_URL || '(no configurado)'}`);
+  console.log(`[server] Secret: ${process.env.SYNC_SECRET ? 'configurado' : 'NO configurado'}`);
+  console.log(`[server] UTN: ${process.env.NUBOX_UTN ? 'configurado' : 'NO configurado'}`);
+});
