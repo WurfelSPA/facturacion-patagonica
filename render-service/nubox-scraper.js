@@ -32,7 +32,10 @@ async function descargarExcelDashboard(cookies, utn) {
   // Paso 1: GET para obtener ViewState fresco
   console.log('[scraper] GET Dashboard.aspx resumen de ventas...');
   const getResp = await fetch(urlConUtn, { headers: baseHeaders, redirect: 'follow' });
-  if (!getResp.ok) throw new Error(`Dashboard GET HTTP ${getResp.status}`);
+  if (!getResp.ok) {
+    const errTxt = await getResp.text();
+    throw new Error(`Dashboard GET HTTP ${getResp.status}: ${errTxt.slice(0, 400)}`);
+  }
   const html = await getResp.text();
 
   // Extraer campos hidden de ASP.NET
