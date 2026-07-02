@@ -514,16 +514,24 @@ async function parsePlanillaParaDashboard(file){
       }
     }
   }
-  const SKIP=/^(Total|VACANTE|Vacante|Area|Arrendado|En negociación|Para confirmar|#|\d+$)/;
+  const SKIP=/^(Total|Area|Arrendado|En negociación|Para confirmar|#|\d+$)/;
   const clients=[];
+  const vacantes=[];
   for(let ri=4;ri<raw.length;ri++){
     const row=raw[ri];
     if(!row)continue;
     const rut=row[9];
     const nombre=row[11]||row[10]; /* Col L o K según la fila */
-    if(!rut||!nombre||typeof rut!=="string")continue;
-    if(!rut.match(/\d+\.\d+/))continue;
+    if(!nombre)continue;
     const name=String(nombre).trim();
+    /* Capturar VACANTE separado para Cuentas Servicios */
+    if(/^(VACANTE|Vacante)/.test(name)){
+      const cta2=(()=>{const raw2=row[6]?String(row[6]):"";const o={idAgua:"",medAgua:"",idEnel:"",medEnel:""};if(!raw2)return o;const p=raw2.split("||").map(s=>s.trim());const lim=v=>{const t=(v||"").trim();return(!t||t==="?"||t==="-")?"":t;};if(p[0]){const[a,b]=p[0].split("/");o.idAgua=lim(a);o.medAgua=lim(b);}if(p[1]){const[a,b]=p[1].split("/");o.idEnel=lim(a);o.medEnel=lim(b);}return o;})();
+      vacantes.push({ri,isVacante:true,nombre:"VACANTE",rut:"",sitio:String(row[7]||"").replace(/\s+/g," ").trim(),edificio:String(row[8]||"").trim(),dir:String(row[10]||"").trim(),...cta2});
+      continue;
+    }
+    if(!rut||typeof rut!=="string")continue;
+    if(!rut.match(/\d+\.\d+/))continue;
     if(SKIP.test(name)||name.includes("Total")||name.startsWith("#")||name==="")continue;
     const ufArr=typeof row[47]==="number"?row[47]:0;
     const pctAdm=row[51];
@@ -617,7 +625,7 @@ async function parsePlanillaParaDashboard(file){
       month:mc.month,
     };
   }
-  return{clients,siteMap,monthTotals,monthCols};
+  return{clients,vacantes,siteMap,monthTotals,monthCols};
 }
 
 /* ═══════════════════════════════════
@@ -2380,8 +2388,8 @@ function CuentasServiciosView({dashData,driveLoading}){
   const clientes=dashData
     ?(()=>{
         const seen=new Set();
-        return dashData.clients
-          .filter(c=>{const k=c.rut+"|"+c.sitio+"|"+c.edificio;if(seen.has(k))return false;seen.add(k);return true;})
+        return [...(dashData.clients||[]),...(dashData.vacantes||[])]
+          .filter(c=>{const k=c.sitio+"|"+c.edificio;if(seen.has(k))return false;seen.add(k);return true;})
           .sort((a,b)=>a.ri-b.ri);
       })()
     :[];
@@ -2422,7 +2430,11 @@ function CuentasServiciosView({dashData,driveLoading}){
                     h("td",{style:{padding:"9px 12px"}},h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},c.sitio||"\u2014")),
                     h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)"}},c.edificio||"\u2014"),
                     h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txd)"}},c.rut||"\u2014"),
-                    h("td",{style:{padding:"9px 12px",fontWeight:600,fontSize:11,maxWidth:200}},c.nombre),
+                    h("td",{style:{padding:"9px 12px",fontWeight:600,fontSize:11,maxWidth:200}},
+                      c.isVacante
+                        ?h("span",{style:{padding:"2px 8px",borderRadius:6,fontSize:10,fontWeight:700,background:"var(--abg)",color:"var(--amber)",border:"1px solid var(--adim)"}},"VACANTE")
+                        :c.nombre
+                    ),
                     h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",maxWidth:220}},c.dir||"\u2014"),
                     h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:c.idAgua?"var(--tx)":"var(--bdr)"}},c.idAgua||"\u2014"),
                     h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:c.medAgua?"var(--tx)":"var(--bdr)"}},c.medAgua||"\u2014"),
