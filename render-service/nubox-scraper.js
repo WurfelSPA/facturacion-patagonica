@@ -33,7 +33,7 @@ export default async ({ page }) => {
   });
 
   await page.waitForSelector('input[placeholder="Ingresa tu rut"]', { timeout: 15000 });
-  console.log('[browser] Formulario de login cargado');
+  console.log('[browser] Formulario cargado');
 
   // Limpiar y llenar RUT
   await page.click('input[placeholder="Ingresa tu rut"]', { clickCount: 3 });
@@ -43,35 +43,50 @@ export default async ({ page }) => {
   await page.click('input[placeholder="Ingresa tu contraseña"]', { clickCount: 3 });
   await page.keyboard.type(password);
 
-  // Click Ingresar y esperar navegación
+  // Pequeña pausa para que React renderice el botón
+  await new Promise(r => setTimeout(r, 1000));
+
+  // Enviar formulario — 4 estrategias de fallback
   const nav1 = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 25000 });
-  await page.evaluate(() => {
-    const btn = Array.from(document.querySelectorAll('button'))
-      .find(b => b.textContent.trim() === 'Ingresar');
-    if (!btn) throw new Error('Botón Ingresar no encontrado');
-    btn.click();
+  const submitted = await page.evaluate(() => {
+    // 1. Botón con texto "ingresar" (case-insensitive)
+    const btns = Array.from(document.querySelectorAll('button, [role="button"]'));
+    const btn = btns.find(b => /ingresar/i.test(b.textContent));
+    if (btn) { btn.click(); return 'btn-text'; }
+    // 2. input[type=submit]
+    const sub = document.querySelector('input[type="submit"]');
+    if (sub) { sub.click(); return 'input-submit'; }
+    // 3. form.submit()
+    const form = document.querySelector('form');
+    if (form) { form.submit(); return 'form-submit'; }
+    return null;
   });
+  if (!submitted) {
+    // 4. Enter desde contraseña
+    await page.focus('input[placeholder="Ingresa tu contraseña"]');
+    await page.keyboard.press('Enter');
+    console.log('[browser] Submit via Enter');
+  } else {
+    console.log('[browser] Submit via:', submitted);
+  }
   await nav1;
   console.log('[browser] Post-login URL:', page.url());
 
   // ── Paso 2: Seleccionar Factura Electrónica ────────────────────────────────
   await new Promise(r => setTimeout(r, 2000));
 
-  // Esperar a que cargue la lista de productos
   await page.waitForFunction(
     () => document.body.innerText.includes('Factura Electrónica'),
     { timeout: 15000 }
   );
-  console.log('[browser] Página SistemaLogin cargada, buscando Factura Electrónica...');
+  console.log('[browser] SistemaLogin cargado, buscando Factura Electrónica...');
 
   const nav2 = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.evaluate(() => {
-    // Buscar elemento hoja con texto exacto "Factura Electrónica"
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     let node;
     while ((node = walker.nextNode())) {
       if (node.textContent.trim() === 'Factura Electrónica') {
-        // Subir al elemento clickeable
         let el = node.parentElement;
         while (el && !el.onclick && el.tagName !== 'A' && el.tagName !== 'BUTTON') {
           el = el.parentElement;
@@ -80,11 +95,9 @@ export default async ({ page }) => {
         return;
       }
     }
-    throw new Error('No se encontró Factura Electrónica en la lista de productos');
+    throw new Error('Factura Electrónica no encontrada en SistemaLogin');
   });
   await nav2;
-
-  console.log('[browser] URL final:', page.url());
 
   // ── Paso 3: Extraer UTN y cookies ─────────────────────────────────────────
   await new Promise(r => setTimeout(r, 1000));
@@ -94,7 +107,7 @@ export default async ({ page }) => {
   const utn      = utnMatch ? decodeURIComponent(utnMatch[1]) : null;
 
   if (!utn) {
-    const title = await page.title();
+    const title      = await page.title();
     const bodySnippet = await page.evaluate(() => document.body?.innerText?.slice(0, 500));
     throw new Error('UTN no encontrado — URL: ' + finalUrl + ' | Title: ' + title + ' | Body: ' + bodySnippet);
   }
@@ -102,9 +115,7 @@ export default async ({ page }) => {
   const cookiesArr = await page.cookies();
   const cookies    = cookiesArr.map(c => c.name + '=' + c.value).join('; ');
 
-  console.log('[browser] UTN extraído:', utn.slice(0, 10) + '...');
-  console.log('[browser] Cookies de sesión:', cookiesArr.length);
-
+  console.log('[browser] UTN extraído OK');
   return Response.json({ utn, cookies, finalUrl });
 };
 `;
@@ -140,14 +151,9 @@ async function loginNubox() {
   if (result.error) throw new Error('Browserless script error: ' + result.error);
 
   const { utn, cookies, finalUrl } = result;
+  if (!utn) throw new Error('Login OK pero sin UTN. URL final: ' + finalUrl);
 
-  if (!utn) {
-    throw new Error('Login OK pero sin UTN. URL final: ' + finalUrl);
-  }
-
-  console.log('[scraper] Login OK. UTN:', utn.slice(0, 10) + '...');
-  console.log('[scraper] URL final:', finalUrl);
-
+  console.log('[scraper] Login OK. URL final:', finalUrl);
   return { utn, cookies };
 }
 
@@ -194,7 +200,7 @@ async function obtenerDocumentosMes(cookies, utn, mes) {
   const inner = JSON.parse(outer.d);
   const docs  = inner.data || [];
 
-  console.log(`[scraper] ${docs.length} documentos encontrados para ${mes}`);
+  console.log(`[scraper] ${docs.length} documentos para ${mes}`);
   return docs;
 }
 
@@ -216,22 +222,12 @@ async function descargarExcelReporteria(cookies, utn, mes) {
     'Accept':           'application/vnd.ms-excel, application/octet-stream, */*',
   };
 
-  const exportEndpoints = [
-    `${DTE_PAGE}/ExportarExcel`,
-    `${DTE_PAGE}/ExportarReporte`,
-    `${DTE_PAGE}/Exportar`,
-  ];
-
-  for (const endpoint of exportEndpoints) {
+  for (const endpoint of [`${DTE_PAGE}/ExportarExcel`, `${DTE_PAGE}/ExportarReporte`, `${DTE_PAGE}/Exportar`]) {
     try {
       const resp = await fetch(endpoint, {
         method:  'POST',
         headers: H,
-        body: JSON.stringify({
-          token: utn, EstadoId: 3, estadoEnvio: 0,
-          fechaDesde, fechaHasta,
-          filtro: '<Terminos></Terminos>', folioDesde: 0, folioHasta: 0,
-        }),
+        body: JSON.stringify({ token: utn, EstadoId: 3, estadoEnvio: 0, fechaDesde, fechaHasta, filtro: '<Terminos></Terminos>', folioDesde: 0, folioHasta: 0 }),
       });
       if (resp.ok) {
         const ct = resp.headers.get('content-type') || '';
@@ -243,7 +239,7 @@ async function descargarExcelReporteria(cookies, utn, mes) {
     } catch (_) {}
   }
 
-  console.log('[scraper] Sin Excel disponible — se usará lista de documentos');
+  console.log('[scraper] Sin Excel — se usará lista de documentos');
   return null;
 }
 
@@ -252,10 +248,8 @@ async function descargarExcelReporteria(cookies, utn, mes) {
  */
 async function scrapeNubox(mes) {
   const { cookies, utn } = await loginNubox();
-
   const excelBuffer = await descargarExcelReporteria(cookies, utn, mes);
   const documentos  = await obtenerDocumentosMes(cookies, utn, mes);
-
   return { excelBuffer, documentos };
 }
 
