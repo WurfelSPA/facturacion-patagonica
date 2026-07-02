@@ -1,13 +1,13 @@
 /**
  * nubox-scraper.js
  *
- * Paso 1 — Login via Browserless.io:
+ * Paso 1 — Login via Browserless.io v2:
  *   Abre Chrome headless, hace login en app.nubox.com con RUT + password,
  *   extrae las cookies de sesión y las devuelve.
  *
  * Paso 2 — Descarga directa con cookies:
  *   Usa las cookies obtenidas para llamar directamente a los endpoints
- *   de Nubox (sin necesitar más browser) y descarga el Excel de reportería.
+ *   de Nubox y descarga la lista de documentos del mes.
  *
  * Variables de entorno requeridas:
  *   BROWSERLESS_TOKEN   — API token de browserless.io
@@ -17,14 +17,14 @@
 
 const fetch = require('node-fetch');
 
-const BROWSERLESS_URL = 'https://chrome.browserless.io/function';
-const NUBOX_BASE      = 'https://app.nubox.com';
-const DTE_PAGE        = `${NUBOX_BASE}/ServiFactura/paginas/dteDocumentosTributarios.aspx`;
+// Browserless v2: production-sfo.browserless.io/chromium/function
+const BROWSERLESS_BASE = 'https://production-sfo.browserless.io';
+const NUBOX_BASE       = 'https://app.nubox.com';
+const DTE_PAGE         = `${NUBOX_BASE}/ServiFactura/paginas/dteDocumentosTributarios.aspx`;
 
-// ── Script que corre DENTRO de Browserless (Chrome real) ─────────────────────
-// Recibe { rut, password } como context, devuelve { cookies, token, funcionarioId }
+// ── Script que corre DENTRO de Browserless v2 (ES modules) ───────────────────
 const BROWSER_LOGIN_SCRIPT = `
-module.exports = async ({ page, context }) => {
+export default async ({ page, context }) => {
   const { rut, password } = context;
 
   // 1. Ir al login
@@ -34,10 +34,11 @@ module.exports = async ({ page, context }) => {
 
   // 2. Aceptar cookies si aparece el banner
   try {
-    await page.click('[id*="accept"], [class*="accept-cookie"], button[aria-label*="Accept"]', { timeout: 3000 });
+    await page.click('[id*="accept"], [class*="accept-cookie"], button[aria-label*="Accept"]');
+    await new Promise(r => setTimeout(r, 1000));
   } catch(_) {}
 
-  // 3. Llenar RUT — Nubox usa el campo "Rut" (con R mayúscula)
+  // 3. Llenar RUT
   await page.waitForSelector('input[name="Rut"], #Rut, input[id*="rut" i], input[placeholder*="rut" i]', { timeout: 10000 });
   const rutInput = await page.$('input[name="Rut"]') || await page.$('#Rut') || await page.$('input[type="text"]');
   await rutInput.click({ clickCount: 3 });
@@ -63,51 +64,55 @@ module.exports = async ({ page, context }) => {
     throw new Error('Login fallido: ' + errorText.trim());
   }
 
-  // 7. Navegar a la página DTE para obtener el token de sesión
+  // 7. Navegar a la página DTE
   await page.goto('https://app.nubox.com/ServiFactura/paginas/dteDocumentosTributarios.aspx', {
     waitUntil: 'networkidle2', timeout: 30000
   });
 
-  // 8. Extraer token y funcionarioId del HTML de la página
+  // 8. Extraer token del HTML
   const pageContent = await page.content();
-  const tokenMatch = pageContent.match(/var\\s+token\\s*=\\s*["']([A-Za-z0-9+\\/=]{20,})["']/)
-    || pageContent.match(/"token"\\s*:\\s*"([A-Za-z0-9+\\/=]{20,})"/)
-    || pageContent.match(/token\\s*=\\s*["']([A-Za-z0-9+\\/=]{20,})["']/);
-  const funcMatch = pageContent.match(/funcionarioId\\s*[=:]\\s*["']?(\\d{4,})["']?/)
-    || pageContent.match(/"funcionarioId"\\s*:\\s*"(\\d+)"/);
+  const tokenMatch = pageContent.match(/var\s+token\s*=\s*["']([A-Za-z0-9+\/=]{20,})["']/)
+    || pageContent.match(/"token"\s*:\s*"([A-Za-z0-9+\/=]{20,})"/)
+    || pageContent.match(/token\s*=\s*["']([A-Za-z0-9+\/=]{20,})["']/);
+  const funcMatch = pageContent.match(/funcionarioId\s*[=:]\s*["']?(\d{4,})["']?/)
+    || pageContent.match(/"funcionarioId"\s*:\s*"(\d+)"/);
 
   const token = tokenMatch ? tokenMatch[1] : null;
   const funcionarioId = funcMatch ? funcMatch[1] : null;
 
-  // 9. Obtener cookies de la sesión
+  // 9. Obtener cookies
   const cookies = await page.cookies();
   const cookieHeader = cookies.map(c => c.name + '=' + c.value).join('; ');
 
-  return { data: { cookies: cookieHeader, token, funcionarioId, finalUrl: url } };
+  return Response.json({ cookies: cookieHeader, token, funcionarioId, finalUrl: url });
 };
 `;
 
 /**
- * loginNubox() — Llama a Browserless y obtiene cookies de sesión
- * @returns {Promise<{cookies: string, token: string|null, funcionarioId: string|null}>}
+ * loginNubox() — Llama a Browserless v2 y obtiene cookies de sesión
  */
 async function loginNubox() {
-  const token    = process.env.BROWSERLESS_TOKEN;
+  const bToken   = process.env.BROWSERLESS_TOKEN;
   const rut      = process.env.NUBOX_RUT;
   const password = process.env.NUBOX_PASSWORD;
 
-  if (!token)    throw new Error('Falta BROWSERLESS_TOKEN');
+  if (!bToken)   throw new Error('Falta BROWSERLESS_TOKEN');
   if (!rut)      throw new Error('Falta NUBOX_RUT');
   if (!password) throw new Error('Falta NUBOX_PASSWORD');
 
-  console.log('[scraper] Llamando a Browserless.io para login en Nubox...');
+  console.log('[scraper] Llamando a Browserless.io v2 para login en Nubox...');
 
-  const resp = await fetch(`${BROWSERLESS_URL}?token=${token}&stealth=true`, {
+  const resp = await fetch(`${BROWSERLESS_BASE}/chromium/function?token=${bToken}`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       code:    BROWSER_LOGIN_SCRIPT,
       context: { rut, password },
+      launch: {
+        stealth: true,
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      },
     }),
   });
 
@@ -117,10 +122,10 @@ async function loginNubox() {
   }
 
   const result = await resp.json();
-
   if (result.error) throw new Error('Browserless script error: ' + result.error);
 
-  const { cookies, token: nuboxToken, funcionarioId, finalUrl } = result.data || result;
+  // v2 devuelve el objeto directamente (sin wrapper { data: ... })
+  const { cookies, token: nuboxToken, funcionarioId, finalUrl } = result;
 
   console.log('[scraper] Login OK. URL final:', finalUrl);
   console.log('[scraper] Token DTE:', nuboxToken ? 'obtenido' : 'NO encontrado');
@@ -131,24 +136,20 @@ async function loginNubox() {
 
 /**
  * obtenerDocumentosMes() — Con las cookies de sesión, obtiene la lista de DTEs del mes
- * @param {string} cookies     — Cookie header de sesión
- * @param {string} nuboxToken  — Token de la página DTE
- * @param {string} mes         — "YYYY-MM"
- * @returns {Promise<Array>}   — Lista de documentos
  */
 async function obtenerDocumentosMes(cookies, nuboxToken, mes) {
   const [year, month] = mes.split('-');
-  const lastDay   = new Date(parseInt(year), parseInt(month), 0).getDate();
+  const lastDay    = new Date(parseInt(year), parseInt(month), 0).getDate();
   const fechaDesde = `01/${month}/${year}`;
   const fechaHasta = `${String(lastDay).padStart(2, '0')}/${month}/${year}`;
 
   console.log(`[scraper] Consultando DTEs: ${fechaDesde} → ${fechaHasta}`);
 
   const H = {
-    'Content-Type':   'application/json; charset=utf-8',
-    'Cookie':         cookies,
-    'Referer':        DTE_PAGE,
-    'User-Agent':     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'Content-Type':     'application/json; charset=utf-8',
+    'Cookie':           cookies,
+    'Referer':          DTE_PAGE,
+    'User-Agent':       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     'X-Requested-With': 'XMLHttpRequest',
   };
 
@@ -156,35 +157,34 @@ async function obtenerDocumentosMes(cookies, nuboxToken, mes) {
     method:  'POST',
     headers: H,
     body: JSON.stringify({
-      token:                      nuboxToken,
-      EstadoId:                   3,        // Aceptados
-      estadoEnvio:                0,
+      token:                       nuboxToken,
+      EstadoId:                    3,
+      estadoEnvio:                 0,
       fechaDesde,
       fechaHasta,
-      filtro:                     '<Terminos></Terminos>',
-      folioDesde:                 0,
-      folioHasta:                 0,
+      filtro:                      '<Terminos></Terminos>',
+      folioDesde:                  0,
+      folioHasta:                  0,
       usaFormatoImpresionEspecial: false,
     }),
   });
 
   if (!filtroResp.ok) throw new Error(`ObtenerPorFiltro ${filtroResp.status}`);
 
-  const outer   = await filtroResp.json();
-  const inner   = JSON.parse(outer.d);
-  const docs    = inner.data || [];
+  const outer = await filtroResp.json();
+  const inner = JSON.parse(outer.d);
+  const docs  = inner.data || [];
 
   console.log(`[scraper] ${docs.length} documentos encontrados para ${mes}`);
   return docs;
 }
 
 /**
- * descargarExcelReporteria() — Descarga el Excel de reportería del mes
- * Si el endpoint directo no existe, devuelve null y se usa el fallback de documentos.
+ * descargarExcelReporteria() — Intenta descargar el Excel del mes
  */
 async function descargarExcelReporteria(cookies, nuboxToken, mes) {
   const [year, month] = mes.split('-');
-  const lastDay   = new Date(parseInt(year), parseInt(month), 0).getDate();
+  const lastDay    = new Date(parseInt(year), parseInt(month), 0).getDate();
   const fechaDesde = `01/${month}/${year}`;
   const fechaHasta = `${String(lastDay).padStart(2, '0')}/${month}/${year}`;
 
@@ -197,12 +197,10 @@ async function descargarExcelReporteria(cookies, nuboxToken, mes) {
     'Accept':           'application/vnd.ms-excel, application/octet-stream, */*',
   };
 
-  // Intentar endpoint de exportar Excel (nombre probable — puede variar)
   const exportEndpoints = [
     `${DTE_PAGE}/ExportarExcel`,
     `${DTE_PAGE}/ExportarReporte`,
     `${DTE_PAGE}/Exportar`,
-    `${NUBOX_BASE}/ServiFactura/paginas/dteDocumentosTributarios.aspx/ExportarExcel`,
   ];
 
   for (const endpoint of exportEndpoints) {
@@ -210,21 +208,11 @@ async function descargarExcelReporteria(cookies, nuboxToken, mes) {
       const resp = await fetch(endpoint, {
         method:  'POST',
         headers: H,
-        body: JSON.stringify({
-          token: nuboxToken,
-          EstadoId: 3,
-          estadoEnvio: 0,
-          fechaDesde,
-          fechaHasta,
-          filtro: '<Terminos></Terminos>',
-          folioDesde: 0,
-          folioHasta: 0,
-        }),
+        body: JSON.stringify({ token: nuboxToken, EstadoId: 3, estadoEnvio: 0, fechaDesde, fechaHasta, filtro: '<Terminos></Terminos>', folioDesde: 0, folioHasta: 0 }),
       });
-
       if (resp.ok) {
-        const contentType = resp.headers.get('content-type') || '';
-        if (contentType.includes('excel') || contentType.includes('octet-stream') || contentType.includes('spreadsheet')) {
+        const ct = resp.headers.get('content-type') || '';
+        if (ct.includes('excel') || ct.includes('octet-stream') || ct.includes('spreadsheet')) {
           console.log(`[scraper] Excel descargado desde: ${endpoint}`);
           return await resp.buffer();
         }
@@ -232,31 +220,22 @@ async function descargarExcelReporteria(cookies, nuboxToken, mes) {
     } catch (_) {}
   }
 
-  console.log('[scraper] No se encontró endpoint Excel directo — usando lista de documentos como fallback');
+  console.log('[scraper] No se encontró endpoint Excel directo — usando lista de documentos');
   return null;
 }
 
 /**
  * scrapeNubox() — Función principal exportada
- * @param {string} mes — "YYYY-MM"
- * @returns {Promise<{excelBuffer: Buffer|null, documentos: Array}>}
  */
 async function scrapeNubox(mes) {
-  // 1. Login via browser real
   const { cookies, token, funcionarioId } = await loginNubox();
 
   if (!token) {
-    throw new Error(
-      'No se pudo extraer el token DTE de la página de Nubox. ' +
-      'Puede que el selector haya cambiado — revisar el script de Browserless.'
-    );
+    throw new Error('No se pudo extraer el token DTE. Revisar el script de Browserless.');
   }
 
-  // 2. Intentar descargar Excel de reportería
   const excelBuffer = await descargarExcelReporteria(cookies, token, mes);
-
-  // 3. Obtener lista de documentos (siempre, como respaldo)
-  const documentos = await obtenerDocumentosMes(cookies, token, mes);
+  const documentos  = await obtenerDocumentosMes(cookies, token, mes);
 
   return { excelBuffer, documentos };
 }
