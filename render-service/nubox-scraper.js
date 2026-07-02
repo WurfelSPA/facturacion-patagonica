@@ -102,17 +102,14 @@ async function loginNubox() {
 
   console.log('[scraper] Llamando a Browserless.io v2 para login en Nubox...');
 
-  const resp = await fetch(`${BROWSERLESS_BASE}/chromium/function?token=${bToken}`, {
+  // Browserless v2: solo acepta code + context (sin launch en el body)
+  // Stealth se activa por query param: ?stealth=true
+  const resp = await fetch(`${BROWSERLESS_BASE}/chromium/function?token=${bToken}&stealth=true`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       code:    BROWSER_LOGIN_SCRIPT,
       context: { rut, password },
-      launch: {
-        stealth: true,
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      },
     }),
   });
 
