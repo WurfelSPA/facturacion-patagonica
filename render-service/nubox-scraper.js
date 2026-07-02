@@ -22,10 +22,14 @@ const BROWSERLESS_BASE = 'https://production-sfo.browserless.io';
 const NUBOX_BASE       = 'https://app.nubox.com';
 const DTE_PAGE         = `${NUBOX_BASE}/ServiFactura/paginas/dteDocumentosTributarios.aspx`;
 
-// ── Script que corre DENTRO de Browserless v2 (ES modules) ───────────────────
-const BROWSER_LOGIN_SCRIPT = `
-export default async ({ page, context }) => {
-  const { rut, password } = context;
+// ── Genera el script para Browserless v2 con credenciales interpoladas ──────
+// Browserless v2 /chromium/function acepta raw JS (Content-Type: application/javascript)
+// Las credenciales se inyectan en el string antes de enviarlo — viajan por HTTPS.
+function buildLoginScript(rut, password) {
+  return `
+export default async ({ page }) => {
+  const rut      = ${JSON.stringify(rut)};
+  const password = ${JSON.stringify(password)};
 
   // 1. Ir al login
   await page.goto('https://app.nubox.com/Account/LogIn', {
@@ -87,6 +91,7 @@ export default async ({ page, context }) => {
   return Response.json({ cookies: cookieHeader, token, funcionarioId, finalUrl: url });
 };
 `;
+}
 
 /**
  * loginNubox() — Llama a Browserless v2 y obtiene cookies de sesión
@@ -102,15 +107,12 @@ async function loginNubox() {
 
   console.log('[scraper] Llamando a Browserless.io v2 para login en Nubox...');
 
-  // Browserless v2: solo acepta code + context (sin launch en el body)
-  // Stealth se activa por query param: ?stealth=true
+  // Browserless v2: raw JS como body (Content-Type: application/javascript)
+  const script = buildLoginScript(rut, password);
   const resp = await fetch(`${BROWSERLESS_BASE}/chromium/function?token=${bToken}&stealth=true`, {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      code:    BROWSER_LOGIN_SCRIPT,
-      context: { rut, password },
-    }),
+    headers: { 'Content-Type': 'application/javascript' },
+    body:    script,
   });
 
   if (!resp.ok) {
