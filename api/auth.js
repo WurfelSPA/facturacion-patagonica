@@ -485,31 +485,6 @@ a{display:inline-block;padding:10px 20px;background:#4f46e5;color:#fff;border-ra
     }
 
 
-    // ── ADMIN-RESET (temporal, un solo uso) ──────────────────────────────────
-    if (action === 'admin-reset') {
-      const { secret = '', email = '' } = req.query;
-      const ADMIN_SECRET = '6f113ff2173289c2ac1fd48563a38b5e';
-      if (secret !== ADMIN_SECRET) return res.status(403).json({error:'Forbidden'});
-      if (!email) return res.status(400).json({error:'Email requerido'});
-      const emailKey = email.toLowerCase();
-      // Buscar nombre del usuario
-      let userName = emailKey;
-      const envCreds = readEnvCredentials();
-      if (envCreds && envCreds[emailKey]) userName = envCreds[emailKey].name || emailKey;
-      // Crear JWT directamente (bypass password check) con mustChangePassword:true
-      // para que el usuario cambie su clave desde la app
-      const payload = {
-        email: emailKey,
-        name: userName,
-        mustChangePassword: true,
-        exp: Math.floor(Date.now()/1000) + 3600  // 1 hora
-      };
-      const jwt = await signToken(payload, JWT_SECRET);
-      res.setHeader('Set-Cookie', makeCookie(jwt));
-      // Redirigir al inicio de la app
-      res.setHeader('Location', '/');
-      return res.status(302).end();
-    }
 
     return res.status(400).json({error:'Action desconocida: '+action});
 
