@@ -290,13 +290,20 @@ function procesarNuboxData({ excelBuffer, documentos, mes }) {
   let fuente = 'ninguna';
 
   // Prioridad 1: Excel de Nubox
+  let rawDiag = null;
   if (excelBuffer && excelBuffer.length > 100) {
     try {
+      // Sin filtro de mes → ver cuántas filas hay en total
+      const sinFiltro = parseExcelNubox(excelBuffer, null);
+      // Con filtro de mes → resultado real
       registros = parseExcelNubox(excelBuffer, mes);
       fuente = 'excel';
-      console.log(`[parser] Excel Nubox: ${registros.length} facturas parseadas`);
+      rawDiag = { totalSinFiltro: sinFiltro.length, mesesEncontrados: [...new Set(sinFiltro.map(r => r.fechaEmision ? r.fechaEmision.slice(0,7) : 'sin-fecha'))].slice(0,6), primeraFila: sinFiltro[0] || null };
+      console.log(`[parser] Excel Nubox: ${registros.length} con filtro, ${sinFiltro.length} sin filtro`);
+      console.log('[parser] diag:', JSON.stringify(rawDiag));
     } catch (e) {
       console.error('[parser] Error parseando Excel:', e.message);
+      rawDiag = { error: e.message };
     }
   }
 
@@ -307,21 +314,4 @@ function procesarNuboxData({ excelBuffer, documentos, mes }) {
     console.log(`[parser] Documentos API: ${registros.length} facturas parseadas`);
   }
 
-  if (!registros.length) {
-    console.warn('[parser] No hay datos — verificar credenciales o período sin facturas');
-  }
-
-  const historial = buildHistorial(registros, mes);
-
-  const stats = {
-    fuente,
-    totalRegistros: registros.length,
-    totalClientes: Object.keys(historial.data).length,
-    periodo: historial.periodo,
-    folios: registros.map(r => r.folio).filter(Boolean),
-  };
-
-  return { ...historial, stats };
-}
-
-module.exports = { procesarNuboxData, parseExcelNubox, parseDocumentosJson, buildHistorial };
+  i
