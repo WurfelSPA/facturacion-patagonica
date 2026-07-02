@@ -13,22 +13,15 @@ export default async ({ page }) => {
   const rut      = ${JSON.stringify(rut)};
   const password = ${JSON.stringify(password)};
 
-  // Helper: devuelve info de diagnóstico sin romper el script
-  async function diag(step, extra) {
+  // Helper: lanza un error con diagnóstico (Browserless lo devuelve como 400)
+  async function diagThrow(step) {
     const url    = page.url();
     const title  = await page.title().catch(() => '?');
     const inputs = await page.evaluate(() =>
       Array.from(document.querySelectorAll('input')).map(i =>
         ({ type: i.type, placeholder: i.placeholder, id: i.id, name: i.name }))
     ).catch(() => []);
-    const scr = await page.screenshot({ encoding: 'base64', type: 'jpeg', quality: 40 })
-                          .catch(() => null);
-    return Response.json({
-      debug: true, step,
-      url, title, inputs,
-      screenshot: scr ? 'data:image/jpeg;base64,' + scr : null,
-      ...extra,
-    });
+    throw new Error('DIAG[' + step + '] url=' + url + ' | title=' + title + ' | inputs=' + JSON.stringify(inputs));
   }
 
   // ── Paso 1: Ir a login ────────────────────────────────────────────────────
@@ -37,7 +30,7 @@ export default async ({ page }) => {
       waitUntil: 'domcontentloaded', timeout: 30000
     });
   } catch (e) {
-    return diag('goto-failed', { error: e.message });
+    await diagThrow('goto-failed:' + e.message.slice(0, 80));
   }
 
   // ── Paso 2: Esperar formulario ────────────────────────────────────────────
@@ -48,7 +41,7 @@ export default async ({ page }) => {
   } catch (_) {}
 
   if (!formReady) {
-    return diag('form-not-found');
+    await diagThrow('form-not-found');
   }
 
   // ── Paso 3: Llenar y enviar formulario ───────────────────────────────────
@@ -75,7 +68,7 @@ export default async ({ page }) => {
     }
     await nav1;
   } catch (e) {
-    return diag('login-submit-failed', { error: e.message });
+    await diagThrow('submit-failed:' + e.message.slice(0, 80));
   }
 
   // ── Paso 4: Seleccionar Factura Electrónica ──────────────────────────────
@@ -91,7 +84,7 @@ export default async ({ page }) => {
   } catch (_) {}
 
   if (!sysLoginOk) {
-    return diag('sistemaLogin-not-found');
+    await diagThrow('sistemaLogin-not-found');
   }
 
   try {
@@ -109,11 +102,11 @@ export default async ({ page }) => {
           return;
         }
       }
-      throw new Error('texto Factura Electrónica no encontrado en DOM');
+      throw new Error('texto no encontrado');
     });
     await nav2;
   } catch (e) {
-    return diag('factura-click-failed', { error: e.message });
+    await diagThrow('factura-click-failed:' + e.message.slice(0, 80));
   }
 
   // ── Paso 5: Extraer UTN ──────────────────────────────────────────────────
@@ -124,7 +117,7 @@ export default async ({ page }) => {
   const utn      = utnMatch ? decodeURIComponent(utnMatch[1]) : null;
 
   if (!utn) {
-    return diag('utn-not-found');
+    await diagThrow('utn-not-found');
   }
 
   const cookiesArr = await page.cookies();
@@ -153,25 +146,17 @@ async function loginNubox() {
     body:    script,
   });
 
+  // Browserless devuelve 400 cuando el script lanza un error
   if (!resp.ok) {
     const body = await resp.text();
-    throw new Error(`Browserless error ${resp.status}: ${body.slice(0, 400)}`);
+    throw new Error(`Browserless error ${resp.status}: ${body.slice(0, 600)}`);
   }
 
   const result = await resp.json();
   if (result.error) throw new Error('Browserless script error: ' + result.error);
 
-  if (result.debug) {
-    throw new Error(
-      'NUBOX_DEBUG[' + result.step + '] url=' + result.url +
-      ' | title=' + result.title +
-      ' | inputs=' + JSON.stringify(result.inputs) +
-      (result.error ? ' | err=' + result.error : '')
-    );
-  }
-
   const { utn, cookies, finalUrl } = result;
-  if (!utn) throw new Error('Sin UTN. URL: ' + finalUrl);
+  if (!utn) throw new Error('Respuesta inesperada de Browserless: ' + JSON.stringify(result).slice(0, 200));
 
   console.log('[scraper] Login OK. URL:', finalUrl);
   return { utn, cookies };
