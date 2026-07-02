@@ -54,9 +54,11 @@ app.post('/sync-nubox', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'mes debe ser "YYYY-MM"' });
   }
 
-  // 3. Variables de entorno
-  if (!process.env.NUBOX_RUT || !process.env.NUBOX_PASSWORD || !process.env.BROWSERLESS_TOKEN) {
-    return res.status(500).json({ ok: false, error: 'Faltan variables de entorno: NUBOX_RUT, NUBOX_PASSWORD, BROWSERLESS_TOKEN' });
+  // 3. Variables de entorno — acepta cookies almacenadas O login via Browserless
+  const usaCookies = !!(process.env.NUBOX_SESSION_COOKIES && process.env.NUBOX_UTN);
+  const usaBrowserless = !!(process.env.NUBOX_RUT && process.env.NUBOX_PASSWORD && process.env.BROWSERLESS_TOKEN);
+  if (!usaCookies && !usaBrowserless) {
+    return res.status(500).json({ ok: false, error: 'Faltan variables de entorno: configura NUBOX_SESSION_COOKIES + NUBOX_UTN (recomendado) o NUBOX_RUT + NUBOX_PASSWORD + BROWSERLESS_TOKEN' });
   }
   if (!process.env.VERCEL_HISTORIAL_URL) {
     return res.status(500).json({ ok: false, error: 'Falta VERCEL_HISTORIAL_URL' });
@@ -141,14 +143,19 @@ app.post('/sync-nubox', async (req, res) => {
 // ── GET /sync-nubox/status ─────────────────────────────────────────────────────
 // Para verificar desde n8n que el servicio está vivo antes de ejecutar
 app.get('/sync-nubox/status', (req, res) => {
+  const usaCookies     = !!(process.env.NUBOX_SESSION_COOKIES && process.env.NUBOX_UTN);
+  const usaBrowserless = !!(process.env.NUBOX_RUT && process.env.NUBOX_PASSWORD && process.env.BROWSERLESS_TOKEN);
   res.json({
-    ready: true,
+    ready:      usaCookies || usaBrowserless,
+    auth_mode:  usaCookies ? 'cookies' : (usaBrowserless ? 'browserless' : 'none'),
     env: {
-      nubox_rut:      !!process.env.NUBOX_RUT,
-      nubox_password: !!process.env.NUBOX_PASSWORD,
-      browserless:    !!process.env.BROWSERLESS_TOKEN,
-      vercel_url:     !!process.env.VERCEL_HISTORIAL_URL,
-      secret:         !!process.env.SYNC_SECRET,
+      session_cookies: !!process.env.NUBOX_SESSION_COOKIES,
+      nubox_utn:       !!process.env.NUBOX_UTN,
+      nubox_rut:       !!process.env.NUBOX_RUT,
+      nubox_password:  !!process.env.NUBOX_PASSWORD,
+      browserless:     !!process.env.BROWSERLESS_TOKEN,
+      vercel_url:      !!process.env.VERCEL_HISTORIAL_URL,
+      secret:          !!process.env.SYNC_SECRET,
     },
     ts: new Date().toISOString(),
   });
@@ -159,16 +166,4 @@ app.get('/sync-nubox/status', (req, res) => {
 /** Devuelve el mes anterior en formato "YYYY-MM" */
 function _mesAnterior() {
   const d = new Date();
-  d.setDate(1);
-  d.setMonth(d.getMonth() - 1);
-  const anio = d.getFullYear();
-  const mes  = String(d.getMonth() + 1).padStart(2, '0');
-  return `${anio}-${mes}`;
-}
-
-// ── Arranque ──────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`[server] Nubox Sync Service corriendo en puerto ${PORT}`);
-  console.log(`[server] Vercel URL: ${process.env.VERCEL_HISTORIAL_URL || '(no configurado)'}`);
-  console.log(`[server] Secret: ${process.env.SYNC_SECRET ? '✓ configurado' : '✗ NO configurado'}`);
-});
+ 
