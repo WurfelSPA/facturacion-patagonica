@@ -1,102 +1,110 @@
 /**
  * nubox-scraper.js
- * Browserless v2 API: retorna { data: {...}, type: "application/json" }
- * NO usar Response.json() -- eso es v1 y devuelve {} silenciosamente
+ * Descarga directa sin Browserless:
+ *   1. GET Dashboard.aspx?utn=TOKEN  →  sesion creada en la IP de Render + ViewState
+ *   2. POST con btnImprimirXLS        →  misma IP → Excel descargado
  */
 const fetch = require('node-fetch');
 
-const BROWSERLESS_BASE = 'https://production-sfo.browserless.io';
-const NUBOX_APP = 'https://app.nubox.com';
-const DASHBOARD = `${NUBOX_APP}/ServiFactura/paginas/Dashboard.aspx?action=Ventas`;
+const NUBOX_APP  = 'https://app.nubox.com';
+const DASHBOARD  = `${NUBOX_APP}/ServiFactura/paginas/Dashboard.aspx?action=Ventas`;
 
-async function extraerTablaViaBrowserless(utn) {
-  const bToken = process.env.BROWSERLESS_TOKEN;
-  if (!bToken) throw new Error('Falta BROWSERLESS_TOKEN');
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
+function extraerHidden(html, name) {
+  const re = new RegExp('id="' + name + '" value="([^"]*)"|' +
+                        'name="' + name + '" value="([^"]*)"');
+  const m = html.match(re);
+  return m ? (m[1] || m[2] || '') : '';
+}
+
+function parsearCookies(headers) {
+  // node-fetch v2: headers.raw()['set-cookie'] devuelve array
+  const raw = headers.raw ? headers.raw()['set-cookie'] : null;
+  if (raw && raw.length) {
+    return raw.map(c => c.split(';')[0]).join('; ');
+  }
+  const single = headers.get('set-cookie');
+  if (single) return single.split(';')[0];
+  return '';
+}
+
+async function descargarExcelDirecto(utn) {
   const dashUrl = `${DASHBOARD}&utn=${encodeURIComponent(utn)}`;
 
-  const script = `
-export default async ({ page }) => {
-  const dashUrl = ${JSON.stringify(dashUrl)};
-
-  try {
-    await page.goto(dashUrl, { waitUntil: 'networkidle2', timeout: 50000 });
-  } catch (e) {
-    return { data: { ok: false, stage: 'goto', error: e.message }, type: 'application/json' };
-  }
-
-  const pageUrl   = page.url();
-  const pageTitle = await page.title().catch(() => '');
-
-  if (pageUrl.toLowerCase().includes('login') || pageUrl.toLowerCase().includes('account')) {
-    return { data: { ok: false, stage: 'auth', error: 'UTN_EXPIRED', pageUrl }, type: 'application/json' };
-  }
-
-  const pageData = await page.evaluate(() => {
-    var txt = (document.body && document.body.innerText) ? document.body.innerText.slice(0, 200) : '';
-    if (txt.indexOf('Resumen') === -1 && txt.indexOf('Ventas') === -1) {
-      return { ok: false, error: 'RESUMEN_NO_CARGADO', txt: txt };
-    }
-    var tables = [];
-    var allTables = document.querySelectorAll('table');
-    for (var ti = 0; ti < allTables.length; ti++) {
-      var tblRows = [];
-      var trs = allTables[ti].querySelectorAll('tr');
-      for (var ri = 0; ri < trs.length; ri++) {
-        var cells = [];
-        var tds = trs[ri].querySelectorAll('td, th');
-        for (var ci = 0; ci < tds.length; ci++) {
-          cells.push(tds[ci].innerText.trim());
-        }
-        if (cells.length > 0) tblRows.push(cells);
-      }
-      if (tblRows.length > 0) tables.push(tblRows);
-    }
-    return { ok: true, tables: tables, txt: txt };
-  }).catch(function(e) {
-    return { ok: false, error: 'EVAL_ERROR: ' + e.message };
+  // ── Paso 1: GET para obtener sesion + ViewState ──────────────────────────
+  console.log('[scraper] GET Dashboard.aspx con UTN...');
+  const getResp = await fetch(dashUrl, {
+    headers: {
+      'User-Agent':      UA,
+      'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'es-CL,es;q=0.9',
+    },
+    redirect: 'follow',
   });
 
-  return {
-    data: { ok: pageData.ok, pageUrl: pageUrl, pageTitle: pageTitle, pageData: pageData },
-    type: 'application/json'
-  };
-};
-`;
+  const cookies = parsearCookies(getResp.headers);
+  const html    = await getResp.text();
+  const finalUrl = getResp.url;
 
-  console.log('[scraper] Browserless v2 → Dashboard.aspx, extrayendo tabla...');
-  const resp = await fetch(
-    `${BROWSERLESS_BASE}/chromium/function?token=${bToken}&stealth=true`,
-    { method: 'POST', headers: { 'Content-Type': 'application/javascript' }, body: script }
-  );
+  console.log(`[scraper] GET → ${getResp.status} url=${finalUrl} cookies=${cookies.slice(0,60)}`);
 
-  if (!resp.ok) {
-    const txt = await resp.text();
-    throw new Error(`Browserless HTTP ${resp.status}: ${txt.slice(0, 400)}`);
+  if (finalUrl.toLowerCase().includes('login') || finalUrl.toLowerCase().includes('account')) {
+    throw new Error('UTN_EXPIRED: redirigido a ' + finalUrl);
+  }
+  if (!html.includes('Resumen') && !html.includes('btnImprimirXLS')) {
+    throw new Error('PAGINA_INESPERADA: no encontro Resumen ni boton XLS. url=' + finalUrl + ' | ' + html.slice(0, 200));
   }
 
-  // Browserless v2 envuelve en { data: {...}, type: "application/json" }
-  const raw = await resp.json();
-  const result = (raw && raw.data !== undefined) ? raw.data : raw;
-  console.log('[scraper] Browserless result:', JSON.stringify(result).slice(0, 500));
+  const viewState      = extraerHidden(html, '__VIEWSTATE');
+  const viewStateGen   = extraerHidden(html, '__VIEWSTATEGENERATOR');
+  const eventValid     = extraerHidden(html, '__EVENTVALIDATION');
 
-  if (!result || !result.ok) {
-    throw new Error('Browserless fallo: ' + JSON.stringify(result).slice(0, 500));
+  if (!viewState) {
+    throw new Error('VIEWSTATE_NO_ENCONTRADO: la pagina no tiene form ASP.NET. url=' + finalUrl);
+  }
+  console.log(`[scraper] ViewState OK (${viewState.length} chars)`);
+
+  // ── Paso 2: POST para exportar Excel ─────────────────────────────────────
+  const params = new URLSearchParams();
+  params.set('__VIEWSTATE',          viewState);
+  params.set('__VIEWSTATEGENERATOR', viewStateGen);
+  params.set('__EVENTVALIDATION',    eventValid);
+  params.set('btnImprimirXLS',       'Exportar');
+  params.set('selector',             '0');
+
+  console.log('[scraper] POST exportar Excel...');
+  const postResp = await fetch(DASHBOARD, {
+    method:  'POST',
+    headers: {
+      'User-Agent':   UA,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Cookie':       cookies,
+      'Referer':      dashUrl,
+    },
+    body: params.toString(),
+  });
+
+  const ct = postResp.headers.get('content-type') || '';
+  const cd = postResp.headers.get('content-disposition') || '';
+  console.log(`[scraper] POST → ${postResp.status} ct=${ct} cd=${cd}`);
+
+  if (ct.includes('excel') || ct.includes('spreadsheet') || ct.includes('octet-stream') || cd.includes('.xls')) {
+    const buf = await postResp.buffer();
+    console.log(`[scraper] Excel OK — ${buf.length} bytes`);
+    return buf;
   }
 
-  const tablas = (result.pageData && result.pageData.tables) || [];
-  if (!tablas.length) {
-    throw new Error('Sin tablas en DOM. pageUrl=' + result.pageUrl + ' | ' + (result.pageData && result.pageData.txt || ''));
-  }
-
-  console.log(`[scraper] Tablas OK — ${tablas.length} tabla(s), url: ${result.pageUrl}`);
-  return tablas;
+  // Si devolvio HTML, mostrar los primeros 300 chars para debug
+  const txt = await postResp.text();
+  throw new Error(`POST_DEVOLVIO_HTML: status=${postResp.status} ct=${ct} | ${txt.slice(0, 300)}`);
 }
 
 async function scrapeNubox(mes) {
   const utn = process.env.NUBOX_UTN;
   if (!utn) throw new Error('Falta NUBOX_UTN en env vars');
-  const tablas = await extraerTablaViaBrowserless(utn);
-  return { tablas, excelBuffer: null, documentos: [], fuente: 'dom-dashboard' };
+  const excelBuffer = await descargarExcelDirecto(utn);
+  return { excelBuffer, tablas: null, documentos: [], fuente: 'http-directo' };
 }
 
 module.exports = { scrapeNubox };
