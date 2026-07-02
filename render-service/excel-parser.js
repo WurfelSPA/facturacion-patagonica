@@ -298,10 +298,15 @@ function procesarNuboxData({ excelBuffer, documentos, mes }) {
       // Con filtro de mes → resultado real
       registros = parseExcelNubox(excelBuffer, mes);
       fuente = 'excel';
+      // Leer filas crudas para diagnóstico (siempre, cuesta poco)
+      const wb2   = XLSX.read(excelBuffer, { type: 'buffer' });
+      const ws2   = wb2.Sheets[wb2.Sheets[wb2.SheetNames[0]] ? wb2.SheetNames[0] : 0];
+      const rawR  = XLSX.utils.sheet_to_json(ws2 || wb2.Sheets[wb2.SheetNames[0]], { header: 1, defval: '' });
       rawDiag = {
         totalSinFiltro: sinFiltro.length,
         mesesEncontrados: [...new Set(sinFiltro.map(r => r.fechaEmision ? r.fechaEmision.slice(0, 7) : 'sin-fecha'))].slice(0, 6),
         primeraFila: sinFiltro[0] || null,
+        rawRows: rawR.slice(0, 15),
       };
       console.log(`[parser] Excel Nubox: ${registros.length} con filtro, ${sinFiltro.length} sin filtro`);
       console.log('[parser] diag:', JSON.stringify(rawDiag));

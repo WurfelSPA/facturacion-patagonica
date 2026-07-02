@@ -1,19 +1,18 @@
 /**
  * nubox-scraper.js
- * Descarga Excel desde dtePrincipal.aspx (resumen anual de DTEs Nubox)
- *   1. GET dtePrincipal.aspx?utn=TOKEN  →  sesion en la IP de Render + ViewState
- *   2. POST con botón de exportación XLS →  Excel con los DTEs del año
+ * Descarga directa sin Browserless:
+ *   1. GET Dashboard.aspx?action=Ventas&utn=TOKEN  →  sesión en la IP de Render + ViewState
+ *   2. POST con btnImprimirXLS                     →  Excel descargado
  */
 const fetch = require('node-fetch');
 
 const NUBOX_APP = 'https://app.nubox.com';
-const DTE_PAGE  = `${NUBOX_APP}/ServiFactura/paginas/dtePrincipal.aspx`;
+const DASHBOARD = `${NUBOX_APP}/ServiFactura/paginas/Dashboard.aspx?action=Ventas`;
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 function extraerHidden(html, name) {
-  const re = new RegExp('id="' + name + '" value="([^"]*)"|' +
-                        'name="' + name + '" value="([^"]*)"');
+  const re = new RegExp('id="' + name + '" value="([^"]*)"|name="' + name + '" value="([^"]*)"');
   const m = html.match(re);
   return m ? (m[1] || m[2] || '') : '';
 }
@@ -26,32 +25,12 @@ function parsearCookies(headers) {
   return '';
 }
 
-/**
- * Busca en el HTML botones (<input type="submit">, <button>) cuyo name/id/value
- * sugiera exportación Excel. Devuelve el primero encontrado o null.
- */
-function detectarBotonExport(html) {
-  // Orden de preferencia
-  const candidatos = [
-    'btnImprimirXLS', 'btnExportarXLS', 'btnExportXLS',
-    'btnExportExcel', 'btnExportarExcel', 'btnImprimirExcel',
-    'btnDescargaExcel', 'btnDownload', 'btnExportar',
-  ];
-  for (const nombre of candidatos) {
-    if (html.includes(nombre)) return nombre;
-  }
-  // Búsqueda genérica: input type=submit con name que contenga "xls" o "excel"
-  const m = html.match(/name="([^"]*(?:xls|excel|export|imprimir)[^"]*)"/i);
-  if (m) return m[1];
-  return null;
-}
-
 async function descargarExcelDirecto(utn) {
-  const pageUrl = `${DTE_PAGE}?utn=${encodeURIComponent(utn)}`;
+  const dashUrl = `${DASHBOARD}&utn=${encodeURIComponent(utn)}`;
 
-  // ── Paso 1: GET para obtener sesión + ViewState ──────────────────────────
-  console.log('[scraper] GET dtePrincipal.aspx con UTN...');
-  const getResp = await fetch(pageUrl, {
+  // ── Paso 1: GET para obtener sesión + ViewState ───────────────────────────
+  console.log('[scraper] GET Dashboard.aspx con UTN...');
+  const getResp = await fetch(dashUrl, {
     headers: {
       'User-Agent':      UA,
       'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -69,40 +48,35 @@ async function descargarExcelDirecto(utn) {
   if (finalUrl.toLowerCase().includes('login') || finalUrl.toLowerCase().includes('account')) {
     throw new Error('UTN_EXPIRED: redirigido a ' + finalUrl);
   }
+  if (html.toLowerCase().includes('nubox | error')) {
+    throw new Error('UTN_INVALID: Nubox devolvió página de error. url=' + finalUrl);
+  }
 
   const viewState    = extraerHidden(html, '__VIEWSTATE');
   const viewStateGen = extraerHidden(html, '__VIEWSTATEGENERATOR');
   const eventValid   = extraerHidden(html, '__EVENTVALIDATION');
 
   if (!viewState) {
-    throw new Error('VIEWSTATE_NO_ENCONTRADO: url=' + finalUrl + ' | html[:300]=' + html.slice(0, 300));
+    throw new Error('VIEWSTATE_NO_ENCONTRADO: url=' + finalUrl + ' html[:200]=' + html.slice(0, 200));
   }
-
-  // Detectar botón de exportación
-  const boton = detectarBotonExport(html);
-  if (!boton) {
-    // Loguear los primeros 500 chars del HTML para diagnóstico
-    throw new Error('BOTON_NO_ENCONTRADO: botones disponibles en html -> ' +
-      [...html.matchAll(/name="(btn[^"]+)"/gi)].map(m => m[1]).join(', ') +
-      ' | html[:400]=' + html.slice(0, 400));
-  }
-  console.log(`[scraper] ViewState OK (${viewState.length} chars) | botón: ${boton}`);
+  console.log(`[scraper] ViewState OK (${viewState.length} chars)`);
 
   // ── Paso 2: POST para exportar Excel ─────────────────────────────────────
   const params = new URLSearchParams();
   params.set('__VIEWSTATE',          viewState);
   params.set('__VIEWSTATEGENERATOR', viewStateGen);
   params.set('__EVENTVALIDATION',    eventValid);
-  params.set(boton,                  'Exportar');
+  params.set('btnImprimirXLS',       'Exportar');
+  params.set('selector',             '0');
 
   console.log('[scraper] POST exportar Excel...');
-  const postResp = await fetch(DTE_PAGE, {
-    method: 'POST',
+  const postResp = await fetch(DASHBOARD, {
+    method:  'POST',
     headers: {
       'User-Agent':   UA,
       'Content-Type': 'application/x-www-form-urlencoded',
       'Cookie':       cookies,
-      'Referer':      pageUrl,
+      'Referer':      dashUrl,
     },
     body: params.toString(),
   });
