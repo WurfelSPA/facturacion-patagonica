@@ -1,268 +1,157 @@
 /**
- * nubox-scraper.js — flujo Nubox confirmado julio 2026
+ * nubox-scraper.js
+ * Login via cookies almacenadas + descarga Excel desde Dashboard.aspx
  */
 const fetch = require('node-fetch');
 
-const BROWSERLESS_BASE = 'https://production-sfo.browserless.io';
-const NUBOX_BASE       = 'https://app.nubox.com';
-const DTE_PAGE         = `${NUBOX_BASE}/ServiFactura/paginas/dteDocumentosTributarios.aspx`;
+const NUBOX_APP  = 'https://app.nubox.com';
+const DASHBOARD  = `${NUBOX_APP}/ServiFactura/paginas/Dashboard.aspx?action=Ventas`;
+const PRINCIPAL  = `${NUBOX_APP}/ServiFactura/paginas/dtePrincipal.aspx`;
 
-function buildLoginScript(rut, password) {
-  return `
-export default async ({ page }) => {
-  const rut      = ${JSON.stringify(rut)};
-  const password = ${JSON.stringify(password)};
-
-  // Helper: lanza un error con diagnóstico (Browserless lo devuelve como 400)
-  async function diagThrow(step) {
-    const url    = page.url();
-    const title  = await page.title().catch(() => '?');
-    const inputs = await page.evaluate(() =>
-      Array.from(document.querySelectorAll('input')).map(i =>
-        ({ type: i.type, placeholder: i.placeholder, id: i.id, name: i.name }))
-    ).catch(() => []);
-    throw new Error('DIAG[' + step + '] url=' + url + ' | title=' + title + ' | inputs=' + JSON.stringify(inputs));
-  }
-
-  // ── Paso 1: Ir a login ────────────────────────────────────────────────────
-  try {
-    await page.goto('https://web.nubox.com/Login/Account/Login', {
-      waitUntil: 'domcontentloaded', timeout: 30000
-    });
-  } catch (e) {
-    await diagThrow('goto-failed:' + e.message.slice(0, 80));
-  }
-
-  // ── Paso 2: Esperar formulario ────────────────────────────────────────────
-  let formReady = false;
-  try {
-    await page.waitForSelector('input[placeholder="Ingresa tu rut"]', { timeout: 20000 });
-    formReady = true;
-  } catch (_) {}
-
-  if (!formReady) {
-    await diagThrow('form-not-found');
-  }
-
-  // ── Paso 3: Llenar formulario con React-friendly events ─────────────────
-  try {
-    // Usar native value setter para que React detecte el cambio
-    await page.evaluate((r, p) => {
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-      const rutEl  = document.querySelector('input[placeholder="Ingresa tu rut"]');
-      const pwEl   = document.querySelector('input[placeholder="Ingresa tu contraseña"]');
-      setter.call(rutEl, r);
-      rutEl.dispatchEvent(new Event('input',  { bubbles: true }));
-      rutEl.dispatchEvent(new Event('change', { bubbles: true }));
-      setter.call(pwEl, p);
-      pwEl.dispatchEvent(new Event('input',  { bubbles: true }));
-      pwEl.dispatchEvent(new Event('change', { bubbles: true }));
-    }, rut, password);
-
-    // Esperar a que reCAPTCHA v3 llene el gToken (hasta 10s)
-    const gTokenOk = await page.waitForFunction(
-      () => { const el = document.getElementById('gToken'); return el && el.value && el.value.length > 10; },
-      { timeout: 10000 }
-    ).then(() => true).catch(() => false);
-    console.log('[browser] gToken listo:', gTokenOk);
-
-    // Enviar formulario
-    const nav1 = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 25000 });
-    const method = await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll('button, [role="button"]'));
-      const btn = btns.find(b => /ingresar/i.test(b.textContent));
-      if (btn) { btn.click(); return 'btn'; }
-      const sub = document.querySelector('input[type="submit"]');
-      if (sub) { sub.click(); return 'submit'; }
-      const form = document.querySelector('form');
-      if (form) { form.submit(); return 'form'; }
-      return null;
-    });
-    if (!method) await page.keyboard.press('Enter');
-    await nav1;
-
-    // Verificar que no volvimos al login (error de credenciales o captcha)
-    const postUrl = page.url();
-    if (postUrl.includes('/Login/')) {
-      await diagThrow('login-rejected:postUrl=' + postUrl + ':gTokenOk=' + gTokenOk);
-    }
-  } catch (e) {
-    if (e.message.startsWith('DIAG[')) throw e;
-    await diagThrow('submit-failed:' + e.message.slice(0, 100));
-  }
-
-  // ── Paso 4: Seleccionar Factura Electrónica ──────────────────────────────
-  await new Promise(r => setTimeout(r, 2000));
-
-  let sysLoginOk = false;
-  try {
-    await page.waitForFunction(
-      () => document.body.innerText.includes('Factura Electrónica'),
-      { timeout: 15000 }
-    );
-    sysLoginOk = true;
-  } catch (_) {}
-
-  if (!sysLoginOk) {
-    await diagThrow('sistemaLogin-not-found');
-  }
-
-  try {
-    const nav2 = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.evaluate(() => {
-      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-      let node;
-      while ((node = walker.nextNode())) {
-        if (node.textContent.trim() === 'Factura Electrónica') {
-          let el = node.parentElement;
-          while (el && !el.onclick && el.tagName !== 'A' && el.tagName !== 'BUTTON') {
-            el = el.parentElement;
-          }
-          (el || node.parentElement).click();
-          return;
-        }
-      }
-      throw new Error('texto no encontrado');
-    });
-    await nav2;
-  } catch (e) {
-    await diagThrow('factura-click-failed:' + e.message.slice(0, 80));
-  }
-
-  // ── Paso 5: Extraer UTN ──────────────────────────────────────────────────
-  await new Promise(r => setTimeout(r, 1000));
-
-  const finalUrl = page.url();
-  const utnMatch = finalUrl.match(/[?&]utn=([^&]+)/);
-  const utn      = utnMatch ? decodeURIComponent(utnMatch[1]) : null;
-
-  if (!utn) {
-    await diagThrow('utn-not-found');
-  }
-
-  const cookiesArr = await page.cookies();
-  const cookies    = cookiesArr.map(c => c.name + '=' + c.value).join('; ');
-
-  return Response.json({ utn, cookies, finalUrl });
-};
-`;
-}
-
+// ── Opción A: cookies almacenadas ─────────────────────────────────────────────
 async function loginNubox() {
-  // ── Opción A: Cookies de sesión ya almacenadas (sin Browserless) ──────────
   const storedCookies = process.env.NUBOX_SESSION_COOKIES;
   const storedUtn     = process.env.NUBOX_UTN;
-
   if (storedCookies && storedUtn) {
-    console.log('[scraper] Usando cookies de sesión almacenadas (sin Browserless)');
+    console.log('[scraper] Usando cookies de sesion almacenadas');
     return { cookies: storedCookies, utn: storedUtn };
   }
-
-  // ── Opción B: Login automático via Browserless ────────────────────────────
-  const bToken   = process.env.BROWSERLESS_TOKEN;
-  const rut      = process.env.NUBOX_RUT;
-  const password = process.env.NUBOX_PASSWORD;
-
-  if (!bToken)   throw new Error('Falta BROWSERLESS_TOKEN');
-  if (!rut)      throw new Error('Falta NUBOX_RUT');
-  if (!password) throw new Error('Falta NUBOX_PASSWORD');
-
-  console.log('[scraper] Iniciando login Nubox via Browserless...');
-
-  const script = buildLoginScript(rut, password);
-  const resp = await fetch(`${BROWSERLESS_BASE}/chromium/function?token=${bToken}&stealth=true`, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/javascript' },
-    body:    script,
-  });
-
-  // Browserless devuelve 400 cuando el script lanza un error
-  if (!resp.ok) {
-    const body = await resp.text();
-    throw new Error(`Browserless error ${resp.status}: ${body.slice(0, 600)}`);
-  }
-
-  const result = await resp.json();
-  if (result.error) throw new Error('Browserless script error: ' + result.error);
-
-  const { utn, cookies, finalUrl } = result;
-  if (!utn) throw new Error('Respuesta inesperada de Browserless: ' + JSON.stringify(result).slice(0, 200));
-
-  console.log('[scraper] Login OK. URL:', finalUrl);
-  return { utn, cookies };
+  throw new Error('Faltan NUBOX_SESSION_COOKIES y NUBOX_UTN en env vars. Inicia sesion en Nubox y copia las cookies.');
 }
 
-async function obtenerDocumentosMes(cookies, utn, mes) {
-  const [year, month] = mes.split('-');
-  const lastDay    = new Date(parseInt(year), parseInt(month), 0).getDate();
-  const fechaDesde = `01/${month}/${year}`;
-  const fechaHasta = `${String(lastDay).padStart(2, '0')}/${month}/${year}`;
-
-  console.log(`[scraper] Consultando DTEs: ${fechaDesde} → ${fechaHasta}`);
-
-  const H = {
-    'Content-Type':     'application/json; charset=utf-8',
-    'Cookie':           cookies,
-    'Referer':          DTE_PAGE,
-    'User-Agent':       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    'X-Requested-With': 'XMLHttpRequest',
+// ── Descarga Excel desde Dashboard Resumen de Ventas ──────────────────────────
+async function descargarExcelDashboard(cookies, utn) {
+  const urlConUtn = `${DASHBOARD}&utn=${encodeURIComponent(utn)}`;
+  const baseHeaders = {
+    'Cookie'    : cookies,
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
+    'Referer'   : `${PRINCIPAL}?utn=${encodeURIComponent(utn)}`,
+    'Accept'    : 'text/html,application/xhtml+xml,*/*;q=0.8',
   };
 
-  const filtroResp = await fetch(`${DTE_PAGE}/ObtenerPorFiltro`, {
-    method:  'POST',
-    headers: H,
-    body: JSON.stringify({
-      token: utn, EstadoId: 3, estadoEnvio: 0,
-      fechaDesde, fechaHasta,
-      filtro: '<Terminos></Terminos>', folioDesde: 0, folioHasta: 0,
-      usaFormatoImpresionEspecial: false,
-    }),
+  // Paso 1: GET para obtener ViewState fresco
+  console.log('[scraper] GET Dashboard.aspx resumen de ventas...');
+  const getResp = await fetch(urlConUtn, { headers: baseHeaders, redirect: 'follow' });
+  if (!getResp.ok) throw new Error(`Dashboard GET HTTP ${getResp.status}`);
+  const html = await getResp.text();
+
+  // Extraer campos hidden de ASP.NET
+  function extractHidden(name) {
+    const patterns = [
+      new RegExp(`id="${name}"[^>]*value="([^"]*)"`, 'i'),
+      new RegExp(`name="${name}"[^>]*value="([^"]*)"`, 'i'),
+      new RegExp(`value="([^"]*)"[^>]*id="${name}"`, 'i'),
+      new RegExp(`value="([^"]*)"[^>]*name="${name}"`, 'i'),
+    ];
+    for (const re of patterns) {
+      const m = html.match(re);
+      if (m) return m[1];
+    }
+    console.warn(`[scraper] Campo ${name} no encontrado en HTML`);
+    return '';
+  }
+
+  const viewstate      = extractHidden('__VIEWSTATE');
+  const viewstateGen   = extractHidden('__VIEWSTATEGENERATOR');
+  const eventVal       = extractHidden('__EVENTVALIDATION');
+
+  if (!viewstate) {
+    const snippet = html.slice(0, 300);
+    throw new Error(`ViewState no encontrado — posible sesion expirada. HTML: ${snippet}`);
+  }
+
+  // Paso 2: POST con boton Exportar XLS
+  console.log('[scraper] POST Dashboard.aspx → Exportar XLS (Ultimos 12 meses)...');
+  const body = new URLSearchParams({
+    '__EVENTTARGET'     : '',
+    '__EVENTARGUMENT'   : '',
+    '__VIEWSTATE'       : viewstate,
+    '__VIEWSTATEGENERATOR': viewstateGen,
+    '__EVENTVALIDATION' : eventVal,
+    'mostrarPaginador'  : 'NO',
+    'hdnPeriodo'        : '',
+    'hdnVencimiento'    : '',
+    'hdnMesesMostrar'   : '0',
+    'hdnParametrosDrill': '',
+    'hdnRadiobutton'    : '',
+    'hdnFirstLoad'      : 'Resumen de Ventas',
+    'txtRutDiv'         : '',
+    'selector'          : '0',   // 0 = Ultimos 12 meses
+    'btnImprimirXLS'    : 'Exportar',
   });
 
-  if (!filtroResp.ok) throw new Error(`ObtenerPorFiltro HTTP ${filtroResp.status}`);
-  const outer = await filtroResp.json();
-  if (!outer.d) throw new Error('ObtenerPorFiltro: sin campo .d');
-  const inner = JSON.parse(outer.d);
-  const docs  = inner.data || [];
-  console.log(`[scraper] ${docs.length} documentos para ${mes}`);
-  return docs;
-}
+  const postResp = await fetch(DASHBOARD, {
+    method : 'POST',
+    headers: {
+      ...baseHeaders,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Accept'      : 'application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream,*/*',
+    },
+    body   : body.toString(),
+    redirect: 'follow',
+  });
 
-async function descargarExcelReporteria(cookies, utn, mes) {
-  const [year, month] = mes.split('-');
-  const lastDay    = new Date(parseInt(year), parseInt(month), 0).getDate();
-  const fechaDesde = `01/${month}/${year}`;
-  const fechaHasta = `${String(lastDay).padStart(2, '0')}/${month}/${year}`;
-  const H = {
-    'Content-Type': 'application/json; charset=utf-8',
-    'Cookie': cookies, 'Referer': DTE_PAGE,
-    'User-Agent': 'Mozilla/5.0',
-    'X-Requested-With': 'XMLHttpRequest',
-    'Accept': 'application/vnd.ms-excel, application/octet-stream, */*',
-  };
-  for (const ep of [`${DTE_PAGE}/ExportarExcel`, `${DTE_PAGE}/ExportarReporte`, `${DTE_PAGE}/Exportar`]) {
-    try {
-      const r = await fetch(ep, { method: 'POST', headers: H,
-        body: JSON.stringify({ token: utn, EstadoId: 3, estadoEnvio: 0, fechaDesde, fechaHasta,
-          filtro: '<Terminos></Terminos>', folioDesde: 0, folioHasta: 0 }) });
-      if (r.ok) {
-        const ct = r.headers.get('content-type') || '';
-        if (ct.includes('excel') || ct.includes('octet-stream') || ct.includes('spreadsheet')) {
-          console.log(`[scraper] Excel desde: ${ep}`);
-          return await r.buffer();
-        }
-      }
-    } catch (_) {}
+  const ct = postResp.headers.get('content-type') || '';
+  const cd = postResp.headers.get('content-disposition') || '';
+  console.log(`[scraper] Dashboard POST: HTTP ${postResp.status} | CT: ${ct} | CD: ${cd}`);
+
+  if (!postResp.ok) {
+    const txt = await postResp.text();
+    throw new Error(`Dashboard POST HTTP ${postResp.status}: ${txt.slice(0, 300)}`);
   }
-  console.log('[scraper] Sin Excel — se usa lista de documentos');
-  return null;
+
+  if (ct.includes('excel') || ct.includes('octet-stream') || ct.includes('spreadsheet') || cd.includes('.xls')) {
+    console.log('[scraper] Excel recibido OK');
+    return await postResp.buffer();
+  }
+
+  // Fallback: retornar HTML para parseo directo
+  console.log('[scraper] Respuesta no es Excel — CT:', ct, '— guardando HTML como fallback');
+  const postHtml = await postResp.text();
+  return { fallbackHtml: postHtml };
 }
 
+// ── Parsear tabla HTML del dashboard como fallback ────────────────────────────
+function parsearTablaHtml(html) {
+  const rows = [];
+  // Buscar filas de tabla con datos de clientes (RUT - Nombre - montos)
+  const trRe  = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  const tdRe  = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+  const strip = s => s.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+
+  let trMatch;
+  while ((trMatch = trRe.exec(html)) !== null) {
+    const cells = [];
+    let tdMatch;
+    const tdReCopy = new RegExp(tdRe.source, 'gi');
+    while ((tdMatch = tdReCopy.exec(trMatch[1])) !== null) {
+      cells.push(strip(tdMatch[1]));
+    }
+    if (cells.length >= 3 && /^\d{1,2}\.\d{3}\.\d{3}-[\dkK]$/.test(cells[0])) {
+      rows.push(cells);
+    }
+  }
+  return rows;
+}
+
+// ── Función principal ─────────────────────────────────────────────────────────
 async function scrapeNubox(mes) {
   const { cookies, utn } = await loginNubox();
-  const excelBuffer = await descargarExcelReporteria(cookies, utn, mes);
-  const documentos  = await obtenerDocumentosMes(cookies, utn, mes);
-  return { excelBuffer, documentos };
+  const result = await descargarExcelDashboard(cookies, utn);
+
+  if (Buffer.isBuffer(result)) {
+    console.log(`[scraper] Excel OK — ${result.length} bytes`);
+    return { excelBuffer: result, documentos: [], fuente: 'excel-dashboard' };
+  }
+
+  if (result && result.fallbackHtml) {
+    console.log('[scraper] Usando fallback HTML');
+    const rows = parsearTablaHtml(result.fallbackHtml);
+    console.log(`[scraper] Filas parseadas del HTML: ${rows.length}`);
+    return { excelBuffer: null, documentos: rows, fuente: 'html-dashboard' };
+  }
+
+  throw new Error('Sin Excel ni HTML del Dashboard');
 }
 
 module.exports = { scrapeNubox };
