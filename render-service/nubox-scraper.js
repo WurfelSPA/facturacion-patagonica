@@ -1,68 +1,117 @@
 /**
  * nubox-scraper.js
  *
- * Paso 1 — Login via Browserless.io v2:
- *   Abre Chrome headless, hace login en app.nubox.com con RUT + password,
- *   extrae las cookies de sesión y las devuelve.
+ * Flujo real de login Nubox (confirmado julio 2026):
+ *   1. POST login en web.nubox.com/Login/Account/Login
+ *   2. Seleccionar "Factura Electrónica" en web.nubox.com/SistemaLogin/
+ *   3. Redirect a app.nubox.com/ServiFactura/?utn=TOKEN
+ *   4. Usar utn + cookies para llamar a ObtenerPorFiltro
  *
- * Paso 2 — Descarga directa con cookies:
- *   Usa las cookies obtenidas para llamar directamente a los endpoints
- *   de Nubox y descarga la lista de documentos del mes.
- *
- * Variables de entorno requeridas:
+ * Variables de entorno:
  *   BROWSERLESS_TOKEN   — API token de browserless.io
- *   NUBOX_RUT           — RUT de login, ej: "12.345.678-9"
+ *   NUBOX_RUT           — RUT de login, ej: "9.562.956-3"
  *   NUBOX_PASSWORD      — Contraseña Nubox
  */
 
 const fetch = require('node-fetch');
 
-// Browserless v2: production-sfo.browserless.io/chromium/function
 const BROWSERLESS_BASE = 'https://production-sfo.browserless.io';
 const NUBOX_BASE       = 'https://app.nubox.com';
 const DTE_PAGE         = `${NUBOX_BASE}/ServiFactura/paginas/dteDocumentosTributarios.aspx`;
 
-// ── Genera el script para Browserless v2 con credenciales interpoladas ──────
-// Browserless v2 /chromium/function acepta raw JS (Content-Type: application/javascript)
-// Las credenciales se inyectan en el string antes de enviarlo — viajan por HTTPS.
+// ── Script Browserless v2 — login completo en 3 pasos ────────────────────────
 function buildLoginScript(rut, password) {
   return `
 export default async ({ page }) => {
   const rut      = ${JSON.stringify(rut)};
   const password = ${JSON.stringify(password)};
 
-  // MODO DEBUG: ver qué muestra Nubox al headless browser
-  await page.goto('https://app.nubox.com/Account/LogIn', {
+  // ── Paso 1: Login ──────────────────────────────────────────────────────────
+  console.log('[browser] Navegando a login...');
+  await page.goto('https://web.nubox.com/Login/Account/Login', {
     waitUntil: 'domcontentloaded', timeout: 30000
   });
 
-  // Esperar 3s para que cargue JS
-  await new Promise(r => setTimeout(r, 3000));
+  await page.waitForSelector('input[placeholder="Ingresa tu rut"]', { timeout: 15000 });
+  console.log('[browser] Formulario de login cargado');
 
-  const debugUrl   = page.url();
-  const debugTitle = await page.title();
-  const screenshot = await page.screenshot({ encoding: 'base64', type: 'jpeg', quality: 60 });
-  const bodyHtml   = await page.evaluate(() => document.body?.innerHTML?.slice(0, 2000) || '(vacío)');
-  const allInputs  = await page.evaluate(() =>
-    Array.from(document.querySelectorAll('input')).map(i => ({
-      name: i.name, id: i.id, type: i.type, placeholder: i.placeholder
-    }))
-  );
+  // Limpiar y llenar RUT
+  await page.click('input[placeholder="Ingresa tu rut"]', { clickCount: 3 });
+  await page.keyboard.type(rut);
 
-  return Response.json({
-    debug: true,
-    url: debugUrl,
-    title: debugTitle,
-    inputs: allInputs,
-    bodySnippet: bodyHtml,
-    screenshot: 'data:image/jpeg;base64,' + screenshot,
+  // Limpiar y llenar contraseña
+  await page.click('input[placeholder="Ingresa tu contraseña"]', { clickCount: 3 });
+  await page.keyboard.type(password);
+
+  // Click Ingresar y esperar navegación
+  const nav1 = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 25000 });
+  await page.evaluate(() => {
+    const btn = Array.from(document.querySelectorAll('button'))
+      .find(b => b.textContent.trim() === 'Ingresar');
+    if (!btn) throw new Error('Botón Ingresar no encontrado');
+    btn.click();
   });
+  await nav1;
+  console.log('[browser] Post-login URL:', page.url());
+
+  // ── Paso 2: Seleccionar Factura Electrónica ────────────────────────────────
+  await new Promise(r => setTimeout(r, 2000));
+
+  // Esperar a que cargue la lista de productos
+  await page.waitForFunction(
+    () => document.body.innerText.includes('Factura Electrónica'),
+    { timeout: 15000 }
+  );
+  console.log('[browser] Página SistemaLogin cargada, buscando Factura Electrónica...');
+
+  const nav2 = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.evaluate(() => {
+    // Buscar elemento hoja con texto exacto "Factura Electrónica"
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      if (node.textContent.trim() === 'Factura Electrónica') {
+        // Subir al elemento clickeable
+        let el = node.parentElement;
+        while (el && !el.onclick && el.tagName !== 'A' && el.tagName !== 'BUTTON') {
+          el = el.parentElement;
+        }
+        (el || node.parentElement).click();
+        return;
+      }
+    }
+    throw new Error('No se encontró Factura Electrónica en la lista de productos');
+  });
+  await nav2;
+
+  console.log('[browser] URL final:', page.url());
+
+  // ── Paso 3: Extraer UTN y cookies ─────────────────────────────────────────
+  await new Promise(r => setTimeout(r, 1000));
+
+  const finalUrl = page.url();
+  const utnMatch = finalUrl.match(/[?&]utn=([^&]+)/);
+  const utn      = utnMatch ? decodeURIComponent(utnMatch[1]) : null;
+
+  if (!utn) {
+    const title = await page.title();
+    const bodySnippet = await page.evaluate(() => document.body?.innerText?.slice(0, 500));
+    throw new Error('UTN no encontrado — URL: ' + finalUrl + ' | Title: ' + title + ' | Body: ' + bodySnippet);
+  }
+
+  const cookiesArr = await page.cookies();
+  const cookies    = cookiesArr.map(c => c.name + '=' + c.value).join('; ');
+
+  console.log('[browser] UTN extraído:', utn.slice(0, 10) + '...');
+  console.log('[browser] Cookies de sesión:', cookiesArr.length);
+
+  return Response.json({ utn, cookies, finalUrl });
 };
 `;
 }
 
 /**
- * loginNubox() — Llama a Browserless v2 y obtiene cookies de sesión
+ * loginNubox() — Llama a Browserless v2 y obtiene utn + cookies
  */
 async function loginNubox() {
   const bToken   = process.env.BROWSERLESS_TOKEN;
@@ -73,9 +122,8 @@ async function loginNubox() {
   if (!rut)      throw new Error('Falta NUBOX_RUT');
   if (!password) throw new Error('Falta NUBOX_PASSWORD');
 
-  console.log('[scraper] Llamando a Browserless.io v2 para login en Nubox...');
+  console.log('[scraper] Iniciando login Nubox via Browserless...');
 
-  // Browserless v2: raw JS como body (Content-Type: application/javascript)
   const script = buildLoginScript(rut, password);
   const resp = await fetch(`${BROWSERLESS_BASE}/chromium/function?token=${bToken}&stealth=true`, {
     method:  'POST',
@@ -85,36 +133,28 @@ async function loginNubox() {
 
   if (!resp.ok) {
     const body = await resp.text();
-    throw new Error(`Browserless error ${resp.status}: ${body.slice(0, 300)}`);
+    throw new Error(`Browserless error ${resp.status}: ${body.slice(0, 400)}`);
   }
 
   const result = await resp.json();
   if (result.error) throw new Error('Browserless script error: ' + result.error);
 
-  // Si viene en modo debug, exponer la info para diagnóstico
-  if (result.debug) {
-    throw new Error('DEBUG_NUBOX:' + JSON.stringify({
-      url:     result.url,
-      title:   result.title,
-      inputs:  result.inputs,
-      body:    (result.bodySnippet || '').slice(0, 800),
-    }));
+  const { utn, cookies, finalUrl } = result;
+
+  if (!utn) {
+    throw new Error('Login OK pero sin UTN. URL final: ' + finalUrl);
   }
 
-  // v2 devuelve el objeto directamente (sin wrapper { data: ... })
-  const { cookies, token: nuboxToken, funcionarioId, finalUrl } = result;
+  console.log('[scraper] Login OK. UTN:', utn.slice(0, 10) + '...');
+  console.log('[scraper] URL final:', finalUrl);
 
-  console.log('[scraper] Login OK. URL final:', finalUrl);
-  console.log('[scraper] Token DTE:', nuboxToken ? 'obtenido' : 'NO encontrado');
-  console.log('[scraper] FuncionarioId:', funcionarioId || 'NO encontrado');
-
-  return { cookies, token: nuboxToken, funcionarioId };
+  return { utn, cookies };
 }
 
 /**
- * obtenerDocumentosMes() — Con las cookies de sesión, obtiene la lista de DTEs del mes
+ * obtenerDocumentosMes() — Con utn + cookies, obtiene DTEs del mes via API
  */
-async function obtenerDocumentosMes(cookies, nuboxToken, mes) {
+async function obtenerDocumentosMes(cookies, utn, mes) {
   const [year, month] = mes.split('-');
   const lastDay    = new Date(parseInt(year), parseInt(month), 0).getDate();
   const fechaDesde = `01/${month}/${year}`;
@@ -134,7 +174,7 @@ async function obtenerDocumentosMes(cookies, nuboxToken, mes) {
     method:  'POST',
     headers: H,
     body: JSON.stringify({
-      token:                       nuboxToken,
+      token:                       utn,
       EstadoId:                    3,
       estadoEnvio:                 0,
       fechaDesde,
@@ -146,9 +186,11 @@ async function obtenerDocumentosMes(cookies, nuboxToken, mes) {
     }),
   });
 
-  if (!filtroResp.ok) throw new Error(`ObtenerPorFiltro ${filtroResp.status}`);
+  if (!filtroResp.ok) throw new Error(`ObtenerPorFiltro HTTP ${filtroResp.status}`);
 
   const outer = await filtroResp.json();
+  if (!outer.d) throw new Error('ObtenerPorFiltro: respuesta sin campo .d');
+
   const inner = JSON.parse(outer.d);
   const docs  = inner.data || [];
 
@@ -157,9 +199,9 @@ async function obtenerDocumentosMes(cookies, nuboxToken, mes) {
 }
 
 /**
- * descargarExcelReporteria() — Intenta descargar el Excel del mes
+ * descargarExcelReporteria() — Intenta descargar el Excel del mes (opcional)
  */
-async function descargarExcelReporteria(cookies, nuboxToken, mes) {
+async function descargarExcelReporteria(cookies, utn, mes) {
   const [year, month] = mes.split('-');
   const lastDay    = new Date(parseInt(year), parseInt(month), 0).getDate();
   const fechaDesde = `01/${month}/${year}`;
@@ -185,7 +227,11 @@ async function descargarExcelReporteria(cookies, nuboxToken, mes) {
       const resp = await fetch(endpoint, {
         method:  'POST',
         headers: H,
-        body: JSON.stringify({ token: nuboxToken, EstadoId: 3, estadoEnvio: 0, fechaDesde, fechaHasta, filtro: '<Terminos></Terminos>', folioDesde: 0, folioHasta: 0 }),
+        body: JSON.stringify({
+          token: utn, EstadoId: 3, estadoEnvio: 0,
+          fechaDesde, fechaHasta,
+          filtro: '<Terminos></Terminos>', folioDesde: 0, folioHasta: 0,
+        }),
       });
       if (resp.ok) {
         const ct = resp.headers.get('content-type') || '';
@@ -197,7 +243,7 @@ async function descargarExcelReporteria(cookies, nuboxToken, mes) {
     } catch (_) {}
   }
 
-  console.log('[scraper] No se encontró endpoint Excel directo — usando lista de documentos');
+  console.log('[scraper] Sin Excel disponible — se usará lista de documentos');
   return null;
 }
 
@@ -205,14 +251,10 @@ async function descargarExcelReporteria(cookies, nuboxToken, mes) {
  * scrapeNubox() — Función principal exportada
  */
 async function scrapeNubox(mes) {
-  const { cookies, token, funcionarioId } = await loginNubox();
+  const { cookies, utn } = await loginNubox();
 
-  if (!token) {
-    throw new Error('No se pudo extraer el token DTE. Revisar el script de Browserless.');
-  }
-
-  const excelBuffer = await descargarExcelReporteria(cookies, token, mes);
-  const documentos  = await obtenerDocumentosMes(cookies, token, mes);
+  const excelBuffer = await descargarExcelReporteria(cookies, utn, mes);
+  const documentos  = await obtenerDocumentosMes(cookies, utn, mes);
 
   return { excelBuffer, documentos };
 }
