@@ -490,36 +490,23 @@ a{display:inline-block;padding:10px 20px;background:#4f46e5;color:#fff;border-ra
       if (secret !== ADMIN_SECRET) return res.status(403).json({error:'Forbidden'});
       if (!email) return res.status(400).json({error:'Email requerido'});
       const emailKey = email.toLowerCase();
-      const TEMP_PW = 'Patagonica@2026';
-      // Generar salt y hash usando el mismo hashPassword() que el login
-      const newSalt = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b=>b.toString(16).padStart(2,'0')).join('');
-      const newHash = await hashPassword(TEMP_PW, newSalt);
-      // Leer credenciales (Drive primero, env var como fallback)
-      let creds;
-      try {
-        const tok = await saToken();
-        creds = await readDriveCredentials(tok);
-      } catch(e) {
-        const envCreds = readEnvCredentials();
-        if (envCreds) creds = envCreds;
-        else return res.status(500).json({error:'No se pudo leer credenciales: '+e.message});
-      }
-      if (!creds[emailKey]) return res.status(404).json({error:'Usuario no encontrado'});
-      creds[emailKey] = {
-        ...creds[emailKey],
-        hash: newHash,
-        salt: newSalt,
-        mustChangePassword: false,
-        resetToken: null,
-        resetTokenExpiry: null
+      // Buscar nombre del usuario
+      let userName = emailKey;
+      const envCreds = readEnvCredentials();
+      if (envCreds && envCreds[emailKey]) userName = envCreds[emailKey].name || emailKey;
+      // Crear JWT directamente (bypass password check) con mustChangePassword:true
+      // para que el usuario cambie su clave desde la app
+      const payload = {
+        email: emailKey,
+        name: userName,
+        mustChangePassword: true,
+        exp: Math.floor(Date.now()/1000) + 3600  // 1 hora
       };
-      try {
-        const tok = await saToken();
-        await writeDriveCredentials(tok, creds);
-      } catch(e) {
-        return res.status(500).json({error:'No se pudo escribir en Drive: '+e.message});
-      }
-      return res.status(200).json({ok:true, message:'Clave reseteada. Usa Patagonica@2026 para ingresar.'});
+      const jwt = await signToken(payload, JWT_SECRET);
+      res.setHeader('Set-Cookie', makeCookie(jwt));
+      // Redirigir al inicio de la app
+      res.setHeader('Location', '/');
+      return res.status(302).end();
     }
 
     return res.status(400).json({error:'Action desconocida: '+action});
