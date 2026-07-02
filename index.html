@@ -537,12 +537,24 @@ async function parsePlanillaParaDashboard(file){
     }
     /* Conversión serial Excel → fecha legible */
     function serialToDate(v){if(!v||typeof v!=="number")return"";try{const d=new Date(new Date(Date.UTC(1899,11,30)).getTime()+Math.round(v)*86400000);return`${d.getUTCDate().toString().padStart(2,"0")}/${(d.getUTCMonth()+1).toString().padStart(2,"0")}/${d.getUTCFullYear()}`;}catch(e){return"";}}
+    /* Col G (row[6]): "idAgua / medAgua || idEnel / medEnel" */
+    function parseCuenta(raw){
+      const out={idAgua:"",medAgua:"",idEnel:"",medEnel:""};
+      if(!raw||typeof raw!=="string")return out;
+      const partes=raw.split("||").map(s=>s.trim());
+      function limpiar(v){const t=(v||"").trim();return(!t||t==="?"||t==="-")?"":t;}
+      if(partes[0]){const[a,b]=partes[0].split("/");out.idAgua=limpiar(a);out.medAgua=limpiar(b);}
+      if(partes[1]){const[a,b]=partes[1].split("/");out.idEnel=limpiar(a);out.medEnel=limpiar(b);}
+      return out;
+    }
+    const cta=parseCuenta(row[6]?String(row[6]):"");
     clients.push({
       ri,nombre:name,rut:String(rut).trim(),
       arrendadora:String(row[5]||"").trim(),
       sitio:String(row[7]||"").replace(/\s+/g," ").trim(),
       edificio:String(row[8]||"").trim(),
       dir:String(row[10]||"").trim(),
+      idAgua:cta.idAgua,medAgua:cta.medAgua,idEnel:cta.idEnel,medEnel:cta.medEnel,
       email:String(row[12]||"").trim(),
       termContrato:serialToDate(row[14]),   /* Col O: Fecha Inicio Contrato */
       termTermino:serialToDate(row[15]),    /* Col P: Fecha Término Contrato */
@@ -2412,10 +2424,10 @@ function CuentasServiciosView({dashData,driveLoading}){
                     h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txd)"}},c.rut||"\u2014"),
                     h("td",{style:{padding:"9px 12px",fontWeight:600,fontSize:11,maxWidth:200}},c.nombre),
                     h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",maxWidth:220}},c.dir||"\u2014"),
-                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},"\u2014"),
-                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},"\u2014"),
-                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},"\u2014"),
-                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},"\u2014")
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:c.idAgua?"var(--tx)":"var(--bdr)"}},c.idAgua||"\u2014"),
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:c.medAgua?"var(--tx)":"var(--bdr)"}},c.medAgua||"\u2014"),
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:c.idEnel?"var(--tx)":"var(--bdr)"}},c.idEnel||"\u2014"),
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:c.medEnel?"var(--tx)":"var(--bdr)"}},c.medEnel||"\u2014")
                   );
                 })
               )
