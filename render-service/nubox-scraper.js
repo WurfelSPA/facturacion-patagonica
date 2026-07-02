@@ -34,6 +34,10 @@ export default async ({ page }) => {
     throw new Error('RESUMEN_NO_CARGADO: url=' + url + ' | ' + body);
   }
 
+  // Esperar que el boton sea visible (ReportViewer puede tardar)
+  try {
+    await page.waitForSelector('#btnImprimirXLS', { visible: true, timeout: 10000 });
+  } catch (_) {}
   const btn = await page.$('#btnImprimirXLS');
   if (!btn) throw new Error('BOTON_XLS_NO_ENCONTRADO: url=' + url);
 
@@ -63,8 +67,12 @@ export default async ({ page }) => {
     });
   });
 
-  // 3. Click Exportar
-  await btn.click();
+  // 3. Click Exportar — usar evaluate para evitar problema de clickability
+  await page.evaluate(() => {
+    const b = document.getElementById('btnImprimirXLS');
+    if (b) b.click();
+    else { const f = document.getElementById('form1'); if (f) { const inp = document.createElement('input'); inp.name='btnImprimirXLS'; inp.value='Exportar'; f.appendChild(inp); f.submit(); } }
+  });
 
   // 4. Esperar la respuesta
   const { b64, ct, size } = await excelPromise;
