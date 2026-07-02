@@ -1,6 +1,7 @@
 /**
  * nubox-scraper.js
- * Browserless → Dashboard.aspx con UTN → extrae tabla del DOM (sin descarga de archivo)
+ * Browserless v2 API: retorna { data: {...}, type: "application/json" }
+ * NO usar Response.json() -- eso es v1 y devuelve {} silenciosamente
  */
 const fetch = require('node-fetch');
 
@@ -13,9 +14,6 @@ async function extraerTablaViaBrowserless(utn) {
   if (!bToken) throw new Error('Falta BROWSERLESS_TOKEN');
   const dashUrl = `${DASHBOARD}&utn=${encodeURIComponent(utn)}`;
 
-  // IMPORTANTE: el script Browserless NO puede tener funciones async anidadas en page.evaluate.
-  // Usamos networkidle2 para esperar AJAX en vez de setTimeout.
-  // Extraemos la tabla directamente del DOM — sin descarga de archivo.
   const script = `
 export default async ({ page }) => {
   const dashUrl = ${JSON.stringify(dashUrl)};
@@ -23,29 +21,26 @@ export default async ({ page }) => {
   try {
     await page.goto(dashUrl, { waitUntil: 'networkidle2', timeout: 50000 });
   } catch (e) {
-    return Response.json({ ok: false, stage: 'goto', error: e.message });
+    return { data: { ok: false, stage: 'goto', error: e.message }, type: 'application/json' };
   }
 
   const pageUrl   = page.url();
   const pageTitle = await page.title().catch(() => '');
 
   if (pageUrl.toLowerCase().includes('login') || pageUrl.toLowerCase().includes('account')) {
-    return Response.json({ ok: false, stage: 'auth', error: 'UTN_EXPIRED', pageUrl });
+    return { data: { ok: false, stage: 'auth', error: 'UTN_EXPIRED', pageUrl }, type: 'application/json' };
   }
 
   const pageData = await page.evaluate(() => {
-    const txt = (document.body && document.body.innerText) ? document.body.innerText.slice(0, 200) : '';
-    if (!txt.includes('Resumen de Ventas') && !txt.includes('Resumen')) {
-      return { ok: false, error: 'RESUMEN_NO_CARGADO', txt };
+    var txt = (document.body && document.body.innerText) ? document.body.innerText.slice(0, 200) : '';
+    if (txt.indexOf('Resumen') === -1 && txt.indexOf('Ventas') === -1) {
+      return { ok: false, error: 'RESUMEN_NO_CARGADO', txt: txt };
     }
-
-    // Extraer TODAS las tablas de la pagina
     var tables = [];
     var allTables = document.querySelectorAll('table');
     for (var ti = 0; ti < allTables.length; ti++) {
-      var tbl = allTables[ti];
       var tblRows = [];
-      var trs = tbl.querySelectorAll('tr');
+      var trs = allTables[ti].querySelectorAll('tr');
       for (var ri = 0; ri < trs.length; ri++) {
         var cells = [];
         var tds = trs[ri].querySelectorAll('td, th');
@@ -56,19 +51,21 @@ export default async ({ page }) => {
       }
       if (tblRows.length > 0) tables.push(tblRows);
     }
-
     return { ok: true, tables: tables, txt: txt };
   }).catch(function(e) {
     return { ok: false, error: 'EVAL_ERROR: ' + e.message };
   });
 
-  return Response.json({ ok: pageData.ok, pageUrl: pageUrl, pageTitle: pageTitle, data: pageData });
+  return {
+    data: { ok: pageData.ok, pageUrl: pageUrl, pageTitle: pageTitle, pageData: pageData },
+    type: 'application/json'
+  };
 };
 `;
 
-  console.log('[scraper] Browserless → Dashboard.aspx extrayendo tabla DOM...');
+  console.log('[scraper] Browserless v2 → Dashboard.aspx, extrayendo tabla...');
   const resp = await fetch(
-    `${BROWSERLESS_BASE}/chromium/function?token=${bToken}&stealth=true&timeout=60000`,
+    `${BROWSERLESS_BASE}/chromium/function?token=${bToken}&stealth=true`,
     { method: 'POST', headers: { 'Content-Type': 'application/javascript' }, body: script }
   );
 
@@ -77,19 +74,21 @@ export default async ({ page }) => {
     throw new Error(`Browserless HTTP ${resp.status}: ${txt.slice(0, 400)}`);
   }
 
+  // Browserless v2 envuelve en { data: {...}, type: "application/json" }
   const raw = await resp.json();
-  console.log('[scraper] Browserless raw:', JSON.stringify(raw).slice(0, 500));
+  const result = (raw && raw.data !== undefined) ? raw.data : raw;
+  console.log('[scraper] Browserless result:', JSON.stringify(result).slice(0, 500));
 
-  if (!raw || !raw.ok) {
-    throw new Error('Browserless fallo: ' + JSON.stringify(raw).slice(0, 500));
+  if (!result || !result.ok) {
+    throw new Error('Browserless fallo: ' + JSON.stringify(result).slice(0, 500));
   }
 
-  const tablas = (raw.data && raw.data.tables) || [];
+  const tablas = (result.pageData && result.pageData.tables) || [];
   if (!tablas.length) {
-    throw new Error('Sin tablas en DOM. pageUrl=' + raw.pageUrl + ' | ' + (raw.data && raw.data.txt || ''));
+    throw new Error('Sin tablas en DOM. pageUrl=' + result.pageUrl + ' | ' + (result.pageData && result.pageData.txt || ''));
   }
 
-  console.log(`[scraper] DOM OK — ${tablas.length} tabla(s), url: ${raw.pageUrl}`);
+  console.log(`[scraper] Tablas OK — ${tablas.length} tabla(s), url: ${result.pageUrl}`);
   return tablas;
 }
 
