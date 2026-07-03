@@ -1,58 +1,52 @@
 export default async function({ page }) {
-  // networkidle2: espera a que SSRS cargue todos sus XHR (vista "Ultimos 12 meses")
-  // No necesitamos el postback — networkidle2 garantiza que los datos estan en el DOM
-  await page.goto('__NUBOX_URL__', { waitUntil: 'networkidle2', timeout: 55000 });
+  var capturedRequests = [];
 
-  const currentUrl = page.url();
+  // Interceptar todas las requests/responses para encontrar URLs SSRS
+  page.on('request', function(req) {
+    var u = req.url();
+    if (/Report|Viewer|Export|aspx|reporte|resumen/i.test(u) && !/\.js$|\.css$|\.png$|\.gif$/.test(u)) {
+      capturedRequests.push({ url: u, method: req.method() });
+    }
+  });
+
+  // Cargar la página (solo DOMContentLoaded para ser rápidos)
+  await page.goto('__NUBOX_URL__', { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+  var currentUrl = page.url();
   if (currentUrl.toLowerCase().includes('login') || currentUrl.toLowerCase().includes('account')) {
     return { error: 'UTN_EXPIRED: ' + currentUrl };
   }
 
-  // Extraer datos directamente del DOM ya renderizado
-  const jsonStr = await page.evaluate(
+  // Esperar 8s para capturar XHR iniciales de SSRS
+  await new Promise(function(resolve) { setTimeout(resolve, 8000); });
+
+  // Inspeccionar el DOM: iframes, formularios, inputs ocultos
+  var domStr = await page.evaluate(
     '(function(){' +
-    '  var allTds=Array.from(document.querySelectorAll("td"));' +
-    '  if(allTds.length<20)return JSON.stringify({error:"SSRS_NO_DATA",tds:allTds.length});' +
-    '  var headerCell=null;' +
-    '  for(var i=0;i<allTds.length;i++){' +
-    '    if(/[A-Z][a-z]{2}-\\d{2}/.test(allTds[i].innerText||"")){' +
-    '      headerCell=allTds[i];break;' +
-    '    }' +
-    '  }' +
-    '  if(!headerCell){' +
-    '    var sample=allTds.slice(0,8).map(function(t){return t.innerText.trim().slice(0,30);});' +
-    '    return JSON.stringify({error:"Sin header de meses",tdCount:allTds.length,sample:sample});' +
-    '  }' +
-    '  var MESES=[];' +
-    '  var mm=headerCell.innerText.matchAll(/([A-Z][a-z]{2}-\\d{2})/g);' +
-    '  var match=mm.next();while(!match.done){MESES.push(match.value[1]);match=mm.next();}' +
-    '  var rutPattern=/^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/;' +
-    '  var results=[];var seen={};' +
-    '  allTds.forEach(function(rutCell){' +
-    '    var rut=(rutCell.innerText||"").trim();' +
-    '    if(!rutPattern.test(rut)||seen[rut])return;' +
-    '    seen[rut]=true;' +
-    '    var row=rutCell.closest("tr");if(!row)return;' +
-    '    var cells=Array.from(row.querySelectorAll("td")).map(function(c){return c.innerText.trim();});' +
-    '    var rutIdx=cells.indexOf(rut);if(rutIdx<0)return;' +
-    '    var nombre=cells[rutIdx+2]||cells[rutIdx+1]||"";' +
-    '    var monthStart=rutIdx+4;' +
-    '    var meses={};' +
-    '    for(var j=0;j<MESES.length;j++){' +
-    '      var val=(cells[monthStart+j]||"").trim();' +
-    '      if(val){' +
-    '        var n=parseInt(val.replace(/\\./g,""),10);' +
-    '        if(!isNaN(n)&&n>0)meses[MESES[j]]=n*1000;' +
-    '      }' +
-    '    }' +
-    '    var total=parseInt((cells[cells.length-1]||"").replace(/\\./g,""),10)*1000||0;' +
-    '    results.push({rut:rut,nombre:nombre,meses:meses,total:total});' +
-    '  });' +
-    '  return JSON.stringify({clientes:results,MESES:MESES});' +
+    '  var iframes = Array.from(document.querySelectorAll("iframe")).map(function(f){return f.src||"(sin src)";});' +
+    '  var hidden = Array.from(document.querySelectorAll("input[type=hidden]"))' +
+    '    .filter(function(i){return /report|viewer|path|id/i.test(i.name||"");})' +
+    '    .map(function(i){return {name:i.name,value:(i.value||"").slice(0,100)};});' +
+    '  var forms = Array.from(document.querySelectorAll("form")).map(function(f){return {id:f.id,action:f.action};});' +
+    '  var frameUrls = [];' +
+    '  try { for(var i=0;i<window.frames.length;i++) { try { frameUrls.push(window.frames[i].location.href); } catch(e) { frameUrls.push("(cross-origin: "+e.message+")"); } } } catch(e) {}' +
+    '  return JSON.stringify({iframes:iframes, hidden:hidden, forms:forms, frameUrls:frameUrls, pageUrl:location.href});' +
     '})()'
   );
 
-  const data = JSON.parse(jsonStr);
-  if (data.error) return { error: 'EXTRACT_FAIL: ' + data.error, details: data };
-  return data;
+  var dom = JSON.parse(domStr);
+
+  // Verificar también los frames detectados por Puppeteer
+  var puppeteerFrames = [];
+  var frames = page.frames();
+  for (var i = 0; i < frames.length; i++) {
+    puppeteerFrames.push(frames[i].url());
+  }
+
+  return {
+    diagnostic: true,
+    capturedRequests: capturedRequests.slice(0, 30),
+    puppeteerFrames: puppeteerFrames,
+    dom: dom
+  };
 }
