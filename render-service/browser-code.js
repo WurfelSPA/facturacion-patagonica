@@ -6,8 +6,8 @@ export default async function({ page }) {
     return { error: 'UTN_EXPIRED: ' + currentUrl };
   }
 
-  // 3s para que los scripts Nubox se inicialicen tras domcontentloaded
-  await new Promise(r => setTimeout(r, 3000));
+  // 2s para que los scripts Nubox se inicialicen
+  await new Promise(r => setTimeout(r, 2000));
 
   // Cambiar a "Ano actual" — strings (no arrow fn: strict mode ES module)
   await page.evaluate(
@@ -23,12 +23,14 @@ export default async function({ page }) {
     '__doPostBack("ReportViewer1$ctl09$ReportControl$ctl00","");'
   );
 
-  // 10s para que la recarga complete y SSRS empiece a cargar
-  await new Promise(r => setTimeout(r, 10000));
+  // 3s para que arranque la navegacion (el try/catch del poll maneja el resto)
+  await new Promise(r => setTimeout(r, 3000));
 
-  // Polling manual: hasta 14x2s = 28s (sin waitForFunction — tambien falla en strict mode)
+  // Polling: 22x2s = 44s maximos. Los primeros ciclos pueden fallar
+  // mientras la pagina recarga (execution context destroyed) — el catch lo maneja.
+  // SSRS tarda ~25-35s en renderizar desde el postback.
   let ssrsReady = false;
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 22; i++) {
     try {
       const ok = await page.evaluate(
         'document.getElementById("hdnMesesMostrar") &&' +
@@ -43,7 +45,7 @@ export default async function({ page }) {
     await new Promise(r => setTimeout(r, 2000));
   }
 
-  if (!ssrsReady) return { error: 'SSRS_TIMEOUT: no cargo en 38s' };
+  if (!ssrsReady) return { error: 'SSRS_TIMEOUT: no cargo en 47s' };
 
   // Extraer datos (IIFE en string — sin funciones flecha)
   const jsonStr = await page.evaluate(
