@@ -1,7 +1,8 @@
 /**
- * render-service/nubox-scraper.js v23
- * Fase 1: Browserless (captura ControlID + cookies, ~12s)
- * Fase 2: Node.js fetch directo al endpoint SSRS CSV (sin limite de 60s)
+ * render-service/nubox-scraper.js v27
+ * Fase 1: Browserless captura ControlID + cookies + exportUrl del DOM (~12s)
+ * Fase 2: Node.js espera 50s
+ * Fase 3: Node.js fetch directo al endpoint SSRS CSV
  */
 
 const fetch = require('node-fetch');
@@ -26,9 +27,9 @@ async function callBrowserless(browserCode) {
     try {
       console.log('[scraper] POST ' + host + '/function ...');
       const resp = await fetch(host + '/function?token=' + token, {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/javascript' },
-        body: browserCode,
+        body:    browserCode,
         timeout: 30000,
       });
       if (!resp.ok) {
@@ -47,27 +48,10 @@ async function callBrowserless(browserCode) {
   throw new Error('Todos los endpoints Browserless fallaron: ' + lastErr.message);
 }
 
-async function exportSSRSCsv(controlId, cookies) {
-  // Usar URL exacta del browser si la encontro, o construir con LCID 13322
-  let exportUrl;
-  if (phase1.exportUrl && phase1.exportUrl.includes('Export')) {
-    exportUrl = phase1.exportUrl.startsWith('http')
-      ? phase1.exportUrl
-      : 'https://app.nubox.com/ServiFactura/' + phase1.exportUrl.replace(/^\//, '');
-    // Asegurar que pida CSV
-    if (!exportUrl.includes('Format=')) exportUrl += '&Format=CSV';
-    console.log('[scraper] Usando URL de exportacion del browser: ' + exportUrl.slice(0, 120));
-  } else {
-    exportUrl =
-      'https://app.nubox.com/ServiFactura/Reserved.ReportViewerWebControl.axd' +
-      '?OpType=Export&ControlID=' + controlId +
-      '&ReportStack=1&Culture=13322&UICulture=13322&Format=CSV&ContentDisposition=OnlyHtmlInline';
-    console.log('[scraper] Usando URL de exportacion construida (no encontrada en DOM)');
-  }
-
+// exportUrl se construye en scrapeNuboxResumen y se pasa aqui como parametro
+async function exportSSRSCsv(exportUrl, cookies) {
   const cookieStr = cookies.map(function(c) { return c.name + '=' + c.value; }).join('; ');
-
-  console.log('[scraper] Exportando CSV: ControlID=' + controlId);
+  console.log('[scraper] Exportando: ' + exportUrl.slice(0, 120));
 
   const resp = await fetch(exportUrl, {
     method:  'GET',
@@ -89,9 +73,8 @@ async function exportSSRSCsv(controlId, cookies) {
     throw new Error('CSV vacio: ' + text.slice(0, 100));
   }
   if (text.charCodeAt(0) === 60) { // '<' = HTML error
-    throw new Error('Export devolvio HTML (no CSV). Preview: ' + text.slice(0, 300));
+    throw new Error('Export devolvio HTML (no CSV). Titulo: ' + (text.match(/<title>([^<]*)<\/title>/) || [])[1]);
   }
-
   return text;
 }
 
@@ -99,11 +82,11 @@ async function scrapeNuboxResumen() {
   const utn = process.env.NUBOX_UTN;
   if (!utn) throw new Error('Falta NUBOX_UTN');
 
-  const targetUrl  = 'https://app.nubox.com/ServiFactura/paginas/Dashboard.aspx?action=Ventas&utn=' + encodeURIComponent(utn);
+  const targetUrl   = 'https://app.nubox.com/ServiFactura/paginas/Dashboard.aspx?action=Ventas&utn=' + encodeURIComponent(utn);
   const browserCode = buildBrowserCode(targetUrl);
 
-  // FASE 1: Browserless — cargar pagina, capturar ControlID + cookies (~12s)
-  console.log('[scraper] Fase 1: capturando ControlID via Browserless...');
+  // FASE 1: Capturar ControlID + cookies + exportUrl via Browserless (~12s)
+  console.log('[scraper] Fase 1: capturando session via Browserless...');
   const phase1 = await callBrowserless(browserCode);
 
   if (!phase1.phase1 || !phase1.controlId) {
@@ -111,21 +94,36 @@ async function scrapeNuboxResumen() {
   }
 
   const { controlId, cookies } = phase1;
-  if (phase1.exportUrl) console.log('[scraper] exportUrl del DOM:', phase1.exportUrl.slice(0, 150));
   console.log('[scraper] Fase 1 OK — ControlID=' + controlId + ', cookies=' + cookies.length);
 
+  // Construir URL de exportacion: usar la del DOM si existe, si no construir con LCID
+  let exportUrl;
+  if (phase1.exportUrl && phase1.exportUrl.includes('Export')) {
+    exportUrl = phase1.exportUrl.startsWith('http')
+      ? phase1.exportUrl
+      : 'https://app.nubox.com/ServiFactura/' + phase1.exportUrl.replace(/^\//, '');
+    if (!exportUrl.includes('Format=')) exportUrl += '&Format=CSV';
+    console.log('[scraper] exportUrl del DOM: ' + exportUrl.slice(0, 150));
+  } else {
+    exportUrl =
+      'https://app.nubox.com/ServiFactura/Reserved.ReportViewerWebControl.axd' +
+      '?OpType=Export&ControlID=' + controlId +
+      '&ReportStack=1&Culture=13322&UICulture=13322&Format=CSV&ContentDisposition=OnlyHtmlInline';
+    console.log('[scraper] exportUrl construida (no encontrada en DOM)');
+  }
+
   // FASE 2: Esperar 50s para que SSRS renderice el reporte en el servidor
-  console.log('[scraper] Fase 2: esperando 50s para que SSRS procese el reporte...');
+  console.log('[scraper] Fase 2: esperando 50s...');
   await new Promise(function(resolve) { setTimeout(resolve, 50000); });
 
   // FASE 3: Exportar CSV directamente (Node.js fetch, sin browser)
   console.log('[scraper] Fase 3: exportando CSV...');
   let csvText = null;
-  let lastErr  = null;
+  let lastErr = null;
 
   for (let intento = 0; intento < 3; intento++) {
     try {
-      csvText = await exportSSRSCsv(controlId, cookies);
+      csvText = await exportSSRSCsv(exportUrl, cookies);
       console.log('[scraper] CSV OK — ' + csvText.length + ' bytes, intento ' + intento);
       break;
     } catch(err) {
@@ -143,12 +141,11 @@ async function scrapeNuboxResumen() {
   const lines = csvText.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
   console.log('[scraper] CSV parseado: ' + lines.length + ' lineas');
 
-  // Devolver datos crudos para inspeccion del formato
   return {
-    _csvPreview: lines.slice(0, 8).join('\n'),
+    _csvPreview:  lines.slice(0, 8).join('\n'),
     _totalLineas: lines.length,
-    clientes: [],
-    MESES: [],
+    clientes:     [],
+    MESES:        [],
   };
 }
 
