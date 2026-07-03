@@ -125,6 +125,22 @@ app.post('/sync-nubox', async (req, res) => {
   }
 });
 
+// ── GET /diag — diagnóstico temporal sin auth (solo lectura) ──────────────
+app.get('/diag', async (_req, res) => {
+  const start = Date.now();
+  if (!process.env.NUBOX_UTN || !process.env.BROWSERLESS_TOKEN) {
+    return res.status(500).json({ ok: false, error: 'Faltan env vars NUBOX_UTN / BROWSERLESS_TOKEN' });
+  }
+  try {
+    const result = await scrapeNuboxResumen();
+    console.log('[diag] resultado:', JSON.stringify(result).slice(0, 3000));
+    return res.json({ ok: true, result, elapsed: Date.now() - start });
+  } catch (err) {
+    console.error('[diag] error:', err.message);
+    return res.status(500).json({ ok: false, error: err.message, elapsed: Date.now() - start });
+  }
+});
+
 app.listen(PORT, () =>
   console.log(`[sync] Servidor nubox-sync-v2 en puerto ${PORT}`)
 );

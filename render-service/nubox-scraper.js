@@ -58,6 +58,10 @@ async function scrapeNuboxResumen() {
         }
         throw new Error('Browser error: ' + result.error + (result.diag ? ' | diag=' + JSON.stringify(result.diag) : ''));
       }
+      if (result.diagnostic) {
+        console.log('[scraper] DIAGNOSTIC recibido:', JSON.stringify(result).slice(0, 3000));
+        return result;
+      }
       if (!Array.isArray(result.clientes)) throw new Error('Respuesta inesperada: ' + JSON.stringify(result).slice(0, 200));
 
       console.log('[scraper] OK - ' + result.clientes.length + ' clientes, meses: ' + (result.MESES || []).join(', '));
