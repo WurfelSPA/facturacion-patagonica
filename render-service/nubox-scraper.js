@@ -48,10 +48,22 @@ async function callBrowserless(browserCode) {
 }
 
 async function exportSSRSCsv(controlId, cookies) {
-  const exportUrl =
-    'https://app.nubox.com/ServiFactura/Reserved.ReportViewerWebControl.axd' +
-    '?OpType=Export&ControlID=' + controlId +
-    '&ReportStack=1&Culture=es-CL&UICulture=es&Format=CSV&ContentDisposition=AlwaysInline';
+  // Usar URL exacta del browser si la encontro, o construir con LCID 13322
+  let exportUrl;
+  if (phase1.exportUrl && phase1.exportUrl.includes('Export')) {
+    exportUrl = phase1.exportUrl.startsWith('http')
+      ? phase1.exportUrl
+      : 'https://app.nubox.com/ServiFactura/' + phase1.exportUrl.replace(/^\//, '');
+    // Asegurar que pida CSV
+    if (!exportUrl.includes('Format=')) exportUrl += '&Format=CSV';
+    console.log('[scraper] Usando URL de exportacion del browser: ' + exportUrl.slice(0, 120));
+  } else {
+    exportUrl =
+      'https://app.nubox.com/ServiFactura/Reserved.ReportViewerWebControl.axd' +
+      '?OpType=Export&ControlID=' + controlId +
+      '&ReportStack=1&Culture=13322&UICulture=13322&Format=CSV&ContentDisposition=OnlyHtmlInline';
+    console.log('[scraper] Usando URL de exportacion construida (no encontrada en DOM)');
+  }
 
   const cookieStr = cookies.map(function(c) { return c.name + '=' + c.value; }).join('; ');
 
@@ -99,6 +111,7 @@ async function scrapeNuboxResumen() {
   }
 
   const { controlId, cookies } = phase1;
+  if (phase1.exportUrl) console.log('[scraper] exportUrl del DOM:', phase1.exportUrl.slice(0, 150));
   console.log('[scraper] Fase 1 OK — ControlID=' + controlId + ', cookies=' + cookies.length);
 
   // FASE 2: Esperar 50s para que SSRS renderice el reporte en el servidor
