@@ -350,7 +350,7 @@ async function extraerComentariosMes(xlsxFile, periodo){
 }
 async function generarExcelResumen(xlsxFile,periodo){
   /* Genera un Excel reducido con solo las columnas relevantes para Contabilidad:
-     H(Sitio) I(Edificio) J(RUT) K(Dirección) L(Cliente) AA(Total m²)
+     H(Sitio) I(Edificio) J(RUT) K(Dirección) L(Cliente) AQ(Total m²)
      + columnas dinámicas del mes: Arriendo | GC | Comentarios */
   const MESES={Enero:0,Febrero:1,Marzo:2,Abril:3,Mayo:4,Junio:5,Julio:6,Agosto:7,Septiembre:8,Octubre:9,Noviembre:10,Diciembre:11};
   const[mesNombre,anio]=periodo.split(" ");
@@ -374,9 +374,9 @@ async function generarExcelResumen(xlsxFile,periodo){
     if(match){monthCol=c;break;}
   }
   if(monthCol===-1)throw new Error(`Columna del mes ${periodo} no encontrada en planilla`);
-  // Columnas fijas (índice 0-based): H=7 I=8 J=9 K=10 L=11 AA=26
+  // Columnas fijas (índice 0-based): H=7 I=8 J=9 K=10 L=11 AQ=42
   // Columnas dinámicas: monthCol=Arriendo  monthCol+2=GC  monthCol+4=Comentarios
-  const COLS=[7,8,9,10,11,26,monthCol,monthCol+2,monthCol+4];
+  const COLS=[7,8,9,10,11,42,monthCol,monthCol+2,monthCol+4];
   const HEADERS=["Sitio","Edificio","RUT","Direcci\u00f3n","Cliente","Total m\u00b2",`Arriendo ${periodo}`,"GC","Comentarios"];
   const outRows=[HEADERS];
   for(let r=4;r<rows.length;r++){
@@ -571,7 +571,7 @@ async function parsePlanillaParaDashboard(file){
       fechaReajuste:serialToDate(row[52]),  /* Col BA: Fecha Reajuste */
       pctReaj:row[53]!=null?String(row[53]):"",            /* Col BB: % Reajuste */
       cadaAnios:row[54]!=null?String(row[54]).trim():"",   /* Col BC: Cada cuántos años */
-      m2:row[26]!=null&&row[26]!==""?Number(row[26]):null,   /* Col AA: Metros cuadrados */
+      m2:row[42]!=null&&row[42]!==""?Number(row[42]):null,   /* Col AQ: Metros cuadrados */
       ufM2:row[47]!=null&&row[47]!==""?Number(row[47]):null, /* Col AV: UF x m2 */
       hist:(()=>{
         /* BN=65, cada mes ocupa 4 cols: UF planilla, Facturado, Diferencia, Comentarios */
