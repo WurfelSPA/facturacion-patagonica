@@ -1,8 +1,8 @@
 /**
- * render-service/nubox-scraper.js v27
- * Fase 1: Browserless captura ControlID + cookies + exportUrl del DOM (~12s)
+ * render-service/nubox-scraper.js v28
+ * Fase 1: Browserless captura ControlID + cookies (~12s)
  * Fase 2: Node.js espera 50s
- * Fase 3: Node.js fetch directo al endpoint SSRS CSV
+ * Fase 3: Browserless restaura sesion + extrae DOM (reporte deberia estar cacheado)
  */
 
 const fetch = require('node-fetch');
@@ -14,12 +14,19 @@ const BROWSERLESS_HOSTS = [
   'https://production-lon.browserless.io',
 ];
 
-function buildBrowserCode(targetUrl) {
+function buildBrowserCodeP1(targetUrl) {
   const template = fs.readFileSync(path.join(__dirname, 'browser-code.js'), 'utf8');
   return template.replace("'__NUBOX_URL__'", JSON.stringify(targetUrl));
 }
 
-async function callBrowserless(browserCode) {
+function buildBrowserCodeP2(targetUrl, cookies) {
+  const template = fs.readFileSync(path.join(__dirname, 'browser-code-p2.js'), 'utf8');
+  return template
+    .replace('__COOKIES_JSON__', JSON.stringify(cookies))
+    .replace('__TARGET_URL__', JSON.stringify(targetUrl));
+}
+
+async function callBrowserless(browserCode, timeoutMs) {
   const token = process.env.BROWSERLESS_TOKEN;
   if (!token) throw new Error('Falta BROWSERLESS_TOKEN');
   let lastErr = null;
@@ -30,7 +37,7 @@ async function callBrowserless(browserCode) {
         method:  'POST',
         headers: { 'Content-Type': 'application/javascript' },
         body:    browserCode,
-        timeout: 30000,
+        timeout: timeoutMs || 30000,
       });
       if (!resp.ok) {
         const t = await resp.text();
@@ -48,105 +55,35 @@ async function callBrowserless(browserCode) {
   throw new Error('Todos los endpoints Browserless fallaron: ' + lastErr.message);
 }
 
-// exportUrl se construye en scrapeNuboxResumen y se pasa aqui como parametro
-async function exportSSRSCsv(exportUrl, cookies) {
-  const cookieStr = cookies.map(function(c) { return c.name + '=' + c.value; }).join('; ');
-  console.log('[scraper] Exportando: ' + exportUrl.slice(0, 120));
-
-  const resp = await fetch(exportUrl, {
-    method:  'GET',
-    headers: {
-      'Cookie':     cookieStr,
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
-      'Referer':    'https://app.nubox.com/ServiFactura/paginas/Dashboard.aspx',
-      'Accept':     '*/*',
-    },
-    timeout: 30000,
-  });
-
-  const text = await resp.text();
-
-  if (!resp.ok) {
-    throw new Error('Export HTTP ' + resp.status + ': ' + text.slice(0, 300));
-  }
-  if (!text || text.length < 50) {
-    throw new Error('CSV vacio: ' + text.slice(0, 100));
-  }
-  if (text.charCodeAt(0) === 60) { // '<' = HTML error
-    throw new Error('Export devolvio HTML (no CSV). Titulo: ' + (text.match(/<title>([^<]*)<\/title>/) || [])[1]);
-  }
-  return text;
-}
-
 async function scrapeNuboxResumen() {
   const utn = process.env.NUBOX_UTN;
   if (!utn) throw new Error('Falta NUBOX_UTN');
 
-  const targetUrl   = 'https://app.nubox.com/ServiFactura/paginas/Dashboard.aspx?action=Ventas&utn=' + encodeURIComponent(utn);
-  const browserCode = buildBrowserCode(targetUrl);
+  const targetUrl = 'https://app.nubox.com/ServiFactura/paginas/Dashboard.aspx?action=Ventas&utn=' + encodeURIComponent(utn);
 
-  // FASE 1: Capturar ControlID + cookies + exportUrl via Browserless (~12s)
-  console.log('[scraper] Fase 1: capturando session via Browserless...');
-  const phase1 = await callBrowserless(browserCode);
-
+  // FASE 1: Capturar cookies y ControlID via Browserless (~12s)
+  console.log('[scraper] Fase 1: capturando sesion...');
+  const phase1 = await callBrowserless(buildBrowserCodeP1(targetUrl), 25000);
   if (!phase1.phase1 || !phase1.controlId) {
     throw new Error('Fase1 sin ControlID: ' + JSON.stringify(phase1).slice(0, 200));
   }
-
   const { controlId, cookies } = phase1;
   console.log('[scraper] Fase 1 OK — ControlID=' + controlId + ', cookies=' + cookies.length);
 
-  // Construir URL de exportacion: usar la del DOM si existe, si no construir con LCID
-  let exportUrl;
-  if (phase1.exportUrl && phase1.exportUrl.includes('Export')) {
-    exportUrl = phase1.exportUrl.startsWith('http')
-      ? phase1.exportUrl
-      : 'https://app.nubox.com/ServiFactura/' + phase1.exportUrl.replace(/^\//, '');
-    if (!exportUrl.includes('Format=')) exportUrl += '&Format=CSV';
-    console.log('[scraper] exportUrl del DOM: ' + exportUrl.slice(0, 150));
-  } else {
-    exportUrl =
-      'https://app.nubox.com/ServiFactura/Reserved.ReportViewerWebControl.axd' +
-      '?OpType=Export&ControlID=' + controlId +
-      '&ReportStack=1&Culture=13322&UICulture=13322&Format=CSV&ContentDisposition=OnlyHtmlInline';
-    console.log('[scraper] exportUrl construida (no encontrada en DOM)');
-  }
-
-  // FASE 2: Esperar 50s para que SSRS renderice el reporte en el servidor
-  console.log('[scraper] Fase 2: esperando 50s...');
+  // FASE 2: Esperar 50s para que el servidor SSRS renderice el reporte
+  console.log('[scraper] Fase 2: esperando 50s para que SSRS procese...');
   await new Promise(function(resolve) { setTimeout(resolve, 50000); });
 
-  // FASE 3: Exportar CSV directamente (Node.js fetch, sin browser)
-  console.log('[scraper] Fase 3: exportando CSV...');
-  let csvText = null;
-  let lastErr = null;
+  // FASE 3: Restaurar sesion + extraer DOM via Browserless (~20-60s)
+  console.log('[scraper] Fase 3: extrayendo datos del DOM con sesion restaurada...');
+  const result = await callBrowserless(buildBrowserCodeP2(targetUrl, cookies), 90000);
 
-  for (let intento = 0; intento < 3; intento++) {
-    try {
-      csvText = await exportSSRSCsv(exportUrl, cookies);
-      console.log('[scraper] CSV OK — ' + csvText.length + ' bytes, intento ' + intento);
-      break;
-    } catch(err) {
-      console.warn('[scraper] Export intento ' + intento + ' fallo: ' + err.message.slice(0, 200));
-      lastErr = err;
-      if (intento < 2) await new Promise(function(resolve) { setTimeout(resolve, 10000); });
-    }
+  if (!Array.isArray(result.clientes)) {
+    throw new Error('Fase3 respuesta inesperada: ' + JSON.stringify(result).slice(0, 300));
   }
 
-  if (!csvText) {
-    throw new Error('Export CSV fallo: ' + lastErr.message);
-  }
-
-  // FASE 4: Parsear CSV — retornar preview para verificar formato
-  const lines = csvText.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
-  console.log('[scraper] CSV parseado: ' + lines.length + ' lineas');
-
-  return {
-    _csvPreview:  lines.slice(0, 8).join('\n'),
-    _totalLineas: lines.length,
-    clientes:     [],
-    MESES:        [],
-  };
+  console.log('[scraper] OK — ' + result.clientes.length + ' clientes, meses: ' + (result.MESES || []).join(', '));
+  return { clientes: result.clientes, meses: result.MESES || [] };
 }
 
 module.exports = { scrapeNuboxResumen };
