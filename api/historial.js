@@ -1476,4 +1476,66 @@ export default async function handler(req, res) {
       const syncSecret = req.headers["x-sync-secret"] || "";
       const expectedSecret = process.env.SYNC_SECRET || "";
       if (!expectedSecret || syncSecret !== expectedSecret) {
-        return res.st
+        return res.status(401).json({ ok: false, error: "No autorizado" });
+      }
+      const { resumen } = req.body || {};
+      if (!resumen || resumen._fuente !== "nubox-resumen-dom" || !Array.isArray(resumen.clientes)) {
+        return res.status(400).json({ ok: false, error: "Payload inválido — se espera { resumen: { _fuente, clientes } }" });
+      }
+      const content = JSON.stringify(resumen, null, 2);
+      const existingId = await findFile(token, "historial-resumen-nubox.json", FACT_FOLDER_ID);
+      if (existingId) {
+        await updateJsonFile(token, existingId, content);
+      } else {
+        await createJsonFile(token, "historial-resumen-nubox.json", FACT_FOLDER_ID, content);
+      }
+      return res.status(200).json({
+        ok:        true,
+        clientes:  resumen.stats?.totalClientes,
+        generado:  resumen._generado,
+        columnas:  resumen._columnas,
+      });
+    }
+
+    // ── POST ── guarda/fusiona período ─────────────────────────────
+    if (req.method === "POST") {
+      const { anio, periodo, data: periodoData } = req.body || {};
+      if (!anio || !periodo || !periodoData)
+        return res.status(400).json({ error:"Se requiere anio, periodo y data" });
+      if (!PDF_FOLDER)
+        return res.status(500).json({ error:"DRIVE_PDF_FACTURAS_ID no configurada" });
+
+      let historial = {};
+      const fileId = await findFile(token, HIST_NAME, PDF_FOLDER);
+      if (fileId) {
+        const text = await downloadFile(token, fileId);
+        if (text) historial = JSON.parse(text);
+      }
+
+      if (!historial[anio]) historial[anio] = {};
+      historial[anio][periodo] = { ...(historial[anio][periodo] || {}), ...periodoData };
+
+      const content = JSON.stringify(historial, null, 2);
+      if (fileId) await updateJsonFile(token, fileId, content);
+      else await createJsonFile(token, HIST_NAME, PDF_FOLDER, content);
+
+      return res.status(200).json({ ok:true, anio, periodo, clientes: Object.keys(periodoData).length });
+    }
+
+    return res.status(405).json({ error:"Method not allowed" });
+  } catch (e) {
+    console.error("historial:", e.message);
+    return res.status(500).json({ error: e.message });
+  }
+}
+
+export {
+  normRut, norm, clienteMatch, detectTipo,
+  _pickByUF, _resolveFacturas,
+  _buildXmlFacturas, parseXmlDTE,
+  extractFacturasForRut, extractText,
+  _extractUF, _extractTotal, _derivarUFdePrecio,
+  extractClienteFromText, extractRutFromText,
+  getToken, driveFiles, downloadFile, findFile, createJsonFile, updateJsonFile,
+  FACT_FOLDER_ID,
+};
