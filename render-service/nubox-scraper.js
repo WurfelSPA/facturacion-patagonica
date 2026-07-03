@@ -1,8 +1,19 @@
 /**
  * render-service/nubox-scraper.js
  *
- * Fix v8: diagnóstico definitivo — captura el estado real del radio por defecto,
- * todos los 46 td texts, iframes, hidden inputs, y prueba clicar EL OTRO radio.
+ * Fix v9: basado en diagnóstico v8.
+ *
+ * HALLAZGOS:
+ * 1. El radio button (#s-option) está CSS-hidden; el elemento visible es div.check
+ *    → page.click('#s-option') no cambia el estado (0 dimensiones)
+ * 2. El primer td muestra "Loading..." → SSRS sigue cargando a los 6s
+ * 3. Hay un hidden input 'hdnPeriodo' que controla el período del reporte
+ * 4. Variables JS: rbUltimos, rbAnioActual → hay event listeners en ellas
+ *
+ * ESTRATEGIA:
+ * A. Esperar que "Loading..." desaparezca (SSRS termina de cargar el reporte default)
+ * B. Clicar div.check dentro del <li> de "Año actual" (el elemento VISIBLE)
+ * C. Si eso falla, capturar el script completo con hdnPeriodo para llamar la función
  */
 
 const fetch = require('node-fetch');
@@ -23,98 +34,130 @@ export default async function({ page }) {
     return { error: 'UTN_EXPIRED: ' + currentUrl };
   }
 
-  await new Promise(r => setTimeout(r, 6000));
-
-  // ── Captura estado inicial ─────────────────────────────────────────────────
-  const initial = await page.evaluate(() => {
-    const fOpt = document.getElementById('f-option');
-    const sOpt = document.getElementById('s-option');
-
-    // Todos los td texts
-    const allTdTexts = Array.from(document.querySelectorAll('td'))
-      .map(td => td.innerText.trim())
-      .filter(t => t.length > 0);
-
-    // Iframes
-    const iframes = Array.from(document.querySelectorAll('iframe'))
-      .map(f => ({ id: f.id, src: f.src.slice(0, 200), name: f.name }));
-
-    // Hidden inputs del form (SSRS params)
-    const hiddenInputs = Array.from(document.querySelectorAll('input[type="hidden"]'))
-      .map(i => ({ name: i.name, id: i.id, value: i.value.slice(0, 80) }))
-      .filter(i => i.name || i.id);
-
-    // Estado de radios
-    const radioState = {
-      fOption: { id: fOpt?.id, checked: fOpt?.checked, value: fOpt?.value },
-      sOption: { id: sOpt?.id, checked: sOpt?.checked, value: sOpt?.value },
-    };
-
-    // Buscar inputs tipo hidden del ReportViewer (parámetros SSRS)
-    const ssrsParams = Array.from(document.querySelectorAll('[id*="ReportViewer"]'))
-      .map(el => ({ tag: el.tagName, id: el.id, type: el.type, value: (el.value||'').slice(0,80) }))
-      .filter(el => el.value || el.type === 'hidden');
-
-    // Scripts buscando "selector" o "periodo"  
-    const scriptMatch = Array.from(document.querySelectorAll('script:not([src])'))
-      .map(s => s.textContent)
-      .join('\\n')
-      .split('\\n')
-      .filter(l => /selector|ulRB|s.option|f.option|periodo|Period|cargarReporte|loadReport|toggleView/i.test(l))
-      .join('\\n')
-      .slice(0, 2000);
-
-    return { allTdTexts, iframes, hiddenInputs, radioState, ssrsParams, scriptMatch };
-  });
-
-  // ── Decidir qué radio clicar ───────────────────────────────────────────────
-  // Si #s-option ya está checked por defecto, clicar #f-option (el opuesto)
-  const defaultIsS = initial.radioState.sOption.checked;
-  const targetSelector = defaultIsS ? '#f-option' : '#s-option';
-  const targetLabel    = defaultIsS ? 'label[for="f-option"]' : 'label[for="s-option"]';
-
-  // Monitorear requests después del click
-  const requestsAfterClick = [];
-  page.on('request', req => {
-    const url = req.url().replace(/utn=[^&]+/, 'utn=***');
-    requestsAfterClick.push({ url: url.slice(0, 200), method: req.method(), type: req.resourceType() });
-  });
-
-  // Clicar el radio OPUESTO al default (para forzar un cambio de estado)
-  let clickErr = null;
+  // ── A. Esperar que "Loading..." desaparezca (SSRS carga el reporte) ──────
+  // Máx 25s para que el reporte default (Últimos 12 meses) esté listo
+  let ssrsLoaded = false;
   try {
-    await page.click(targetSelector);
+    await page.waitForFunction(
+      () => {
+        // "Loading..." es el texto del primer <td> mientras SSRS carga
+        const firstTd = document.querySelector('td');
+        return firstTd && firstTd.innerText !== 'Loading...' && firstTd.innerText.trim() !== '';
+      },
+      { timeout: 25000 }
+    );
+    ssrsLoaded = true;
+  } catch(e) { ssrsLoaded = false; }
+
+  const tdBeforeClick = await page.evaluate(() => document.querySelectorAll('td').length);
+  const hdnBefore     = await page.evaluate(() => document.getElementById('hdnPeriodo')?.value || 'NOT_FOUND');
+  const radiosBefore  = await page.evaluate(() => ({
+    f: document.getElementById('f-option')?.checked,
+    s: document.getElementById('s-option')?.checked,
+  }));
+
+  // ── B. Capturar script completo con hdnPeriodo (para diagnóstico) ─────────
+  const scriptContext = await page.evaluate(() => {
+    const scripts = Array.from(document.querySelectorAll('script:not([src])'))
+      .map(s => s.textContent || '')
+      .join('\\n');
+
+    // Encontrar el contexto de 800 chars alrededor de hdnPeriodo
+    const idx = scripts.indexOf('hdnPeriodo');
+    const ctx = idx >= 0 ? scripts.slice(Math.max(0, idx - 400), idx + 400) : '(no encontrado)';
+
+    // También buscar la función que los radios llaman
+    const rbIdx = scripts.indexOf('rbAnioActual');
+    const rbCtx = rbIdx >= 0 ? scripts.slice(Math.max(0, rbIdx - 300), rbIdx + 300) : '(no encontrado)';
+
+    return { hdnPeriodoCtx: ctx, rbCtx };
+  });
+
+  // ── C. Clicar el div.check visible de "Año actual" ────────────────────────
+  // Estructura: <ul.ulRB> > <li> × 2, el 2do es #s-option
+  const requestsAfter = [];
+  page.on('request', req => {
+    if (req.resourceType() !== 'image' && req.resourceType() !== 'stylesheet' && req.resourceType() !== 'font') {
+      requestsAfter.push({ url: req.url().replace(/utn=[^&]+/, 'utn=***').slice(0,200), method: req.method(), type: req.resourceType() });
+    }
+  });
+
+  let checkClickErr = null;
+  // Intentar clicar el div.check del segundo <li> (Año actual)
+  try {
+    await page.click('ul.ulRB li:last-child div.check');
   } catch(e) {
-    clickErr = 'radio: ' + e.message;
-    try { await page.click(targetLabel); } catch(e2) { clickErr += ' | label: ' + e2.message; }
+    checkClickErr = 'div.check: ' + e.message;
+    try { await page.click('label[for="s-option"]'); }
+    catch(e2) { checkClickErr += ' | label: ' + e2.message; }
   }
 
-  await new Promise(r => setTimeout(r, 20000));
+  await new Promise(r => setTimeout(r, 15000));
 
-  const afterClick = await page.evaluate(() => {
-    const fOpt = document.getElementById('f-option');
-    const sOpt = document.getElementById('s-option');
-    const allTdTexts = Array.from(document.querySelectorAll('td'))
-      .map(td => td.innerText.trim())
-      .filter(t => t.length > 0);
-    const bodySnip = document.body.innerText.slice(0, 1200);
+  const state2 = await page.evaluate(() => {
     return {
       tdCount: document.querySelectorAll('td').length,
-      allTdTexts,
-      bodySnip,
-      fOptionChecked: fOpt?.checked,
-      sOptionChecked: sOpt?.checked,
+      hdnPeriodo: document.getElementById('hdnPeriodo')?.value || 'NOT_FOUND',
+      fChecked: document.getElementById('f-option')?.checked,
+      sChecked: document.getElementById('s-option')?.checked,
+      bodySnip: document.body.innerText.replace(/\\n+/g, ' ').slice(0, 600),
+      firstTdText: (document.querySelector('td')?.innerText || '').trim().slice(0, 50),
     };
   });
 
+  // ── D. Si tdCount cambió, intentar extraer datos ───────────────────────────
+  if (state2.tdCount > tdBeforeClick + 10) {
+    const resultado = await page.evaluate(() => {
+      const allTds = Array.from(document.querySelectorAll('td'));
+      const headerCell = allTds.find(td => {
+        const text = td.innerText || '';
+        return /[A-Z][a-z]{2}-\\d{2}/.test(text);
+      });
+      if (!headerCell) {
+        const rutPattern = /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/;
+        const rutCount = allTds.filter(td => rutPattern.test((td.innerText||'').trim())).length;
+        return { ok: false, reason: 'Sin header de meses', rutCount, first10: allTds.slice(0,10).map(td=>td.innerText.trim()) };
+      }
+      const MESES = [...headerCell.innerText.matchAll(/([A-Z][a-z]{2}-\\d{2})/g)].map(m => m[1]);
+      const rutPattern = /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/;
+      const rutCells = allTds.filter(td => rutPattern.test((td.innerText||'').trim()));
+      const results = [];
+      const seen = new Set();
+      rutCells.forEach(rutCell => {
+        const rut = rutCell.innerText.trim();
+        if (seen.has(rut)) return;
+        seen.add(rut);
+        const row = rutCell.closest('tr');
+        if (!row) return;
+        const cells = Array.from(row.querySelectorAll('td')).map(c => c.innerText.trim());
+        const rutIdx = cells.indexOf(rut);
+        if (rutIdx < 0) return;
+        const nombre = cells[rutIdx + 2] || cells[rutIdx + 1] || '';
+        const monthStart = rutIdx + 4;
+        const meses = {};
+        for (let i = 0; i < MESES.length; i++) {
+          const val = (cells[monthStart + i] || '').trim();
+          if (val) { const n = parseInt(val.replace(/\\./g,''),10); if(!isNaN(n)&&n>0) meses[MESES[i]]=n*1000; }
+        }
+        const total = parseInt((cells[cells.length-1]||'').replace(/\\./g,''),10)*1000||0;
+        results.push({ rut, nombre, meses, total });
+      });
+      return { ok: true, clientes: results, MESES };
+    });
+    if (resultado.ok && resultado.clientes.length > 0) return resultado;
+  }
+
+  // Retornar diagnóstico
   return {
-    error: 'DIAG_v8',
-    initial,
-    defaultIsS,
-    targetSelector,
-    clickErr,
-    afterClick,
-    requestsAfterClick: requestsAfterClick.filter(r => r.type !== 'image' && r.type !== 'stylesheet' && r.type !== 'font').slice(0, 20),
+    error: 'DIAG_v9',
+    ssrsLoaded,
+    tdBeforeClick,
+    hdnBefore,
+    radiosBefore,
+    scriptContext,
+    checkClickErr,
+    state2,
+    requestsAfter: requestsAfter.slice(0, 15),
   };
 }
 `;
@@ -141,20 +184,15 @@ async function scrapeNuboxResumen() {
       const raw    = await resp.json();
       const result = (raw && raw.data !== undefined) ? raw.data : raw;
 
-      if (result.error === 'DIAG_v8') {
-        const { initial, defaultIsS, targetSelector, clickErr, afterClick, requestsAfterClick } = result;
-        // Log en UNA SOLA LÍNEA para evitar contaminación del log viewer
-        console.warn('[v8-RADIO-DEFAULT]', JSON.stringify(initial.radioState));
-        console.warn('[v8-TDS-BEFORE]', JSON.stringify(initial.allTdTexts));
-        console.warn('[v8-IFRAMES]', JSON.stringify(initial.iframes));
-        console.warn('[v8-SSRS-PARAMS]', JSON.stringify(initial.ssrsParams));
-        console.warn('[v8-SCRIPT-MATCH]', initial.scriptMatch.slice(0, 500) || '(ninguno)');
-        console.warn('[v8-CLICKED]', targetSelector, '| err:', clickErr);
-        console.warn('[v8-AFTER-tdCount]', afterClick.tdCount, '| fChecked:', afterClick.fOptionChecked, '| sChecked:', afterClick.sOptionChecked);
-        console.warn('[v8-AFTER-TDS]', JSON.stringify(afterClick.allTdTexts));
-        console.warn('[v8-REQUESTS]', JSON.stringify(requestsAfterClick));
-        console.warn('[v8-BODY-AFTER]', afterClick.bodySnip.replace(/\n+/g, ' ').slice(0, 500));
-        throw new Error('DIAG_v8');
+      if (result.error === 'DIAG_v9') {
+        console.warn('[v9-ssrsLoaded]', result.ssrsLoaded, '| tdBefore:', result.tdBeforeClick, '| hdnBefore:', result.hdnBefore);
+        console.warn('[v9-radiosBefore]', JSON.stringify(result.radiosBefore));
+        console.warn('[v9-hdnPeriodoCtx]', result.scriptContext?.hdnPeriodoCtx?.replace(/\n/g,' ').slice(0,800));
+        console.warn('[v9-rbCtx]', result.scriptContext?.rbCtx?.replace(/\n/g,' ').slice(0,800));
+        console.warn('[v9-checkClickErr]', result.checkClickErr);
+        console.warn('[v9-state2]', JSON.stringify(result.state2));
+        console.warn('[v9-requests]', JSON.stringify(result.requestsAfter));
+        throw new Error('DIAG_v9');
       }
 
       if (result.error) throw new Error('Browser error: ' + result.error);
