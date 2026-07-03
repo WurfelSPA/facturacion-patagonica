@@ -1,5 +1,4 @@
 export default async function({ page }) {
-  // Carga inicial rapida (solo DOM, no esperar SSRS)
   await page.goto('__NUBOX_URL__', { waitUntil: 'domcontentloaded', timeout: 25000 });
 
   const currentUrl = page.url();
@@ -7,70 +6,74 @@ export default async function({ page }) {
     return { error: 'UTN_EXPIRED: ' + currentUrl };
   }
 
-  // Esperar que el elemento hdnMesesMostrar exista en el DOM
+  // Esperar que hdnMesesMostrar exista
   await page.waitForSelector('#hdnMesesMostrar', { timeout: 15000 });
 
-  // Cambiar a "Ano actual": set hdnMesesMostrar = "1" + llamar onclick
-  await page.evaluate(() => {
-    const hdnEl = document.getElementById('hdnMesesMostrar');
-    if (hdnEl) hdnEl.value = '1';
-    const sOpt = document.getElementById('s-option');
-    if (sOpt && typeof sOpt.onclick === 'function') sOpt.onclick.call(sOpt);
-  });
+  // Set hdnMesesMostrar="1" y llamar onclick (usando string para evitar strict-mode issue)
+  await page.evaluate(
+    'var h=document.getElementById("hdnMesesMostrar");if(h)h.value="1";' +
+    'var s=document.getElementById("s-option");if(s&&s.onclick)s.onclick.call(s);'
+  );
 
-  // Disparar el postback que recarga la pagina con "Ano actual"
-  // ReportViewer1$ctl09$ReportControl$ctl00 es el unico target que respeta hdnMesesMostrar
-  await Promise.all([
-    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }),
-    page.evaluate(() => {
-      if (typeof __doPostBack === 'function') {
-        __doPostBack('ReportViewer1$ctl09$ReportControl$ctl00', '');
-      }
-    }),
-  ]);
+  // Preparar listener de navegacion ANTES de disparar el postback
+  const navPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 });
 
-  // Esperar que SSRS renderice la vista mensual (Ano actual tiene mas de 60 tds y sin Loading)
+  // Disparar postback que recarga la pagina con "Ano actual"
+  await page.evaluate(
+    'if(typeof __doPostBack==="function")__doPostBack("ReportViewer1$ctl09$ReportControl$ctl00","")'
+  );
+
+  // Esperar recarga completa
+  await navPromise;
+
+  // Esperar que SSRS renderice la vista mensual (>60 tds, sin Loading)
   await page.waitForFunction(
-    () => {
-      const tds = document.querySelectorAll('td');
-      if (tds.length < 60) return false;
-      return !Array.from(tds).some(td => td.innerText.trim() === 'Loading...');
-    },
+    'var tds=document.querySelectorAll("td");' +
+    'if(tds.length<60)return false;' +
+    'return !Array.from(tds).some(function(td){return td.innerText.trim()==="Loading...";});',
     { timeout: 35000 }
   );
 
-  // Extraer datos de la vista mensual
-  const resultado = await page.evaluate(() => {
-    const allTds = Array.from(document.querySelectorAll('td'));
+  // Extraer datos
+  const resultado = await page.evaluate(function() {
+    var allTds = Array.from(document.querySelectorAll('td'));
 
-    // Buscar celda header con columnas de meses (Ene-26, Feb-26, ...)
-    const headerCell = allTds.find(td => /[A-Z][a-z]{2}-\d{2}/.test(td.innerText || ''));
+    var headerCell = null;
+    for (var i = 0; i < allTds.length; i++) {
+      if (/[A-Z][a-z]{2}-\d{2}/.test(allTds[i].innerText || '')) {
+        headerCell = allTds[i];
+        break;
+      }
+    }
     if (!headerCell) {
       return {
         error: 'Sin header de meses',
         tdCount: allTds.length,
-        first10Tds: allTds.slice(0, 10).map(td => td.innerText.trim().slice(0, 40)),
+        first10: allTds.slice(0, 10).map(function(td) { return td.innerText.trim().slice(0, 40); }),
       };
     }
 
-    const MESES = [...headerCell.innerText.matchAll(/([A-Z][a-z]{2}-\d{2})/g)].map(m => m[1]);
-    const rutPattern = /^\d{1,2}\.\d{3}\.\d{3}-[\dkK]$/;
-    const rutCells = allTds.filter(td => rutPattern.test((td.innerText || '').trim()));
+    var MESES = [];
+    var mm = headerCell.innerText.matchAll(/([A-Z][a-z]{2}-\d{2})/g);
+    var match = mm.next();
+    while (!match.done) { MESES.push(match.value[1]); match = mm.next(); }
 
-    const results = [];
-    const seen = new Set();
-    rutCells.forEach(rutCell => {
-      const rut = rutCell.innerText.trim();
-      if (seen.has(rut)) return;
-      seen.add(rut);
-      const row = rutCell.closest('tr');
+    var rutPattern = /^\d{1,2}\.\d{3}\.\d{3}-[\dkK]$/;
+    var results = [];
+    var seen = {};
+
+    allTds.forEach(function(rutCell) {
+      var rut = (rutCell.innerText || '').trim();
+      if (!rutPattern.test(rut) || seen[rut]) return;
+      seen[rut] = true;
+      var row = rutCell.closest('tr');
       if (!row) return;
-      const cells = Array.from(row.querySelectorAll('td')).map(c => c.innerText.trim());
-      const rutIdx = cells.indexOf(rut);
+      var cells = Array.from(row.querySelectorAll('td')).map(function(c) { return c.innerText.trim(); });
+      var rutIdx = cells.indexOf(rut);
       if (rutIdx < 0) return;
-      const nombre = cells[rutIdx + 2] || cells[rutIdx + 1] || '';
-      const monthStart = rutIdx + 4;
-      const meses = {};
+      var nombre = cells[rutIdx + 2] || cells[rutIdx + 1] || '';
+      var monthStart = rutIdx + 4;
+      var meses = {};
       for (var i = 0; i < MESES.length; i++) {
         var val = (cells[monthStart + i] || '').trim();
         if (val) {
