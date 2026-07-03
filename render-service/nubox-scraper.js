@@ -1,8 +1,6 @@
 /**
  * render-service/nubox-scraper.js
- *
- * Lee el browser code desde browser-code.js (archivo separado, sin escaping).
- * Sustituye '__NUBOX_URL__' con la URL real del dashboard.
+ * Lee browser-code.js separado y sustituye __NUBOX_URL__.
  */
 
 const fetch = require('node-fetch');
@@ -45,18 +43,13 @@ async function scrapeNuboxResumen() {
       const raw    = await resp.json();
       const result = (raw && raw.data !== undefined) ? raw.data : raw;
 
-      if (result.error === 'DIAG_v10') {
-        console.warn('[v10-ssrsLoaded]', result.ssrsLoaded);
-        console.warn('[v10-hdnMesesMostrar]', JSON.stringify(result.pageInfo && result.pageInfo.hdnMesesMostrar));
-        console.warn('[v10-fnCtx]', (result.pageInfo && result.pageInfo.fnCtx || '').replace(/\n/g, ' ').slice(0, 1500));
-        console.warn('[v10-pbTargets]', JSON.stringify(result.pageInfo && result.pageInfo.pbTargets));
-        console.warn('[v10-clickables]', JSON.stringify(result.pageInfo && result.pageInfo.clickables));
-        console.warn('[v10-aspNet]', JSON.stringify(result.pageInfo && result.pageInfo.aspNet));
-        console.warn('[v10-onclickResult]', JSON.stringify(result.onclickResult));
-        console.warn('[v10-triedTargets]', JSON.stringify(result.triedTargets));
-        console.warn('[v10-state2]', JSON.stringify(result.state2));
-        console.warn('[v10-reqLog]', JSON.stringify(result.reqLog));
-        throw new Error('DIAG_v10');
+      if (result.error && result.error.startsWith('DIAG_')) {
+        console.warn('[diag-ssrsLoaded]', result.ssrsLoaded);
+        console.warn('[diag-tdsBefore]', result.tdsBefore);
+        console.warn('[diag-step1]', JSON.stringify(result.step1));
+        console.warn('[diag-results]', JSON.stringify(result.results));
+        console.warn('[diag-reqLog]', JSON.stringify(result.reqLog));
+        throw new Error(result.error);
       }
 
       if (result.error) throw new Error('Browser error: ' + result.error);
