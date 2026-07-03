@@ -1,62 +1,28 @@
 export default async function({ page }) {
-  await page.goto('__NUBOX_URL__', { waitUntil: 'domcontentloaded', timeout: 25000 });
+  // networkidle2: espera a que SSRS cargue todos sus XHR (vista "Ultimos 12 meses")
+  // No necesitamos el postback — networkidle2 garantiza que los datos estan en el DOM
+  await page.goto('__NUBOX_URL__', { waitUntil: 'networkidle2', timeout: 55000 });
 
   const currentUrl = page.url();
   if (currentUrl.toLowerCase().includes('login') || currentUrl.toLowerCase().includes('account')) {
     return { error: 'UTN_EXPIRED: ' + currentUrl };
   }
 
-  // 2s para que los scripts Nubox se inicialicen
-  await new Promise(r => setTimeout(r, 2000));
-
-  // Cambiar a "Ano actual"
-  await page.evaluate(
-    'var h=document.getElementById("hdnMesesMostrar");' +
-    'if(h)h.value="1";' +
-    'var s=document.getElementById("s-option");' +
-    'if(s&&typeof s.onclick==="function")s.onclick.call(s);'
-  );
-
-  // Disparar postback
-  await page.evaluate(
-    'if(typeof __doPostBack==="function")' +
-    '__doPostBack("ReportViewer1$ctl09$ReportControl$ctl00","");'
-  );
-
-  // Polling: 23x2s = 46s. try/catch maneja pagina aun navegando.
-  let ssrsReady = false;
-  let lastDiag = null;
-  for (let i = 0; i < 23; i++) {
-    try {
-      const diagStr = await page.evaluate(
-        '(function(){' +
-        '  var hdn=document.getElementById("hdnMesesMostrar");' +
-        '  var tds=document.querySelectorAll("td");' +
-        '  var loading=Array.from(tds).some(function(td){return td.innerText.trim()==="Loading...";});' +
-        '  var hdnVal=hdn?hdn.value:"MISSING";' +
-        '  var ok=hdn&&hdn.value==="1"&&tds.length>=60&&!loading;' +
-        '  return JSON.stringify({ok:ok,hdn:hdnVal,tds:tds.length,loading:loading,url:location.href.slice(-60)});' +
-        '})()'
-      );
-      lastDiag = JSON.parse(diagStr);
-      if (lastDiag.ok) { ssrsReady = true; break; }
-    } catch(e) { lastDiag = {navErr: e.message.slice(0,60), iter: i}; }
-    await new Promise(r => setTimeout(r, 2000));
-  }
-
-  if (!ssrsReady) return { error: 'SSRS_TIMEOUT', diag: lastDiag };
-
-  // Extraer datos
+  // Extraer datos directamente del DOM ya renderizado
   const jsonStr = await page.evaluate(
     '(function(){' +
     '  var allTds=Array.from(document.querySelectorAll("td"));' +
+    '  if(allTds.length<20)return JSON.stringify({error:"SSRS_NO_DATA",tds:allTds.length});' +
     '  var headerCell=null;' +
     '  for(var i=0;i<allTds.length;i++){' +
     '    if(/[A-Z][a-z]{2}-\\d{2}/.test(allTds[i].innerText||"")){' +
     '      headerCell=allTds[i];break;' +
     '    }' +
     '  }' +
-    '  if(!headerCell)return JSON.stringify({error:"Sin header de meses",tdCount:allTds.length});' +
+    '  if(!headerCell){' +
+    '    var sample=allTds.slice(0,8).map(function(t){return t.innerText.trim().slice(0,30);});' +
+    '    return JSON.stringify({error:"Sin header de meses",tdCount:allTds.length,sample:sample});' +
+    '  }' +
     '  var MESES=[];' +
     '  var mm=headerCell.innerText.matchAll(/([A-Z][a-z]{2}-\\d{2})/g);' +
     '  var match=mm.next();while(!match.done){MESES.push(match.value[1]);match=mm.next();}' +
@@ -87,6 +53,6 @@ export default async function({ page }) {
   );
 
   const data = JSON.parse(jsonStr);
-  if (data.error) return { error: 'EXTRACT_FAIL: ' + data.error };
+  if (data.error) return { error: 'EXTRACT_FAIL: ' + data.error, details: data };
   return data;
 }
