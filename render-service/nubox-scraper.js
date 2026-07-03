@@ -1,9 +1,10 @@
 /**
  * render-service/nubox-scraper.js
  *
- * DIAGNOSTIC MODE: retorna outerHTML del elemento "Año actual",
- * todos los onclick handlers y el parentHTML — para identificar
- * cómo disparar el postback de ASP.NET.
+ * Fix v5: clic directo en <input type="radio" id="s-option"> para seleccionar
+ * "Año actual". El <li> no tiene onclick — el radio button es el control real.
+ * Después del clic se disparan eventos change/input y si no carga en 10s se
+ * hace __doPostBack('ReportViewer1$ctl03','') para forzar el refresh del SSRS.
  *
  * Vars requeridas:
  *   BROWSERLESS_TOKEN  — token de Browserless.io
@@ -22,91 +23,146 @@ const BROWSERLESS_HOSTS = [
 function buildBrowserCode(targetUrl) {
   return `
 export default async function({ page }) {
-  // 1. Navegar
+  // 1. Navegar con UTN
   await page.goto(${JSON.stringify(targetUrl)}, { waitUntil: 'domcontentloaded', timeout: 15000 });
 
-  // 2. Verificar login
+  // 2. Verificar que no redirigió a login
   const currentUrl = page.url();
   if (currentUrl.toLowerCase().includes('login') || currentUrl.toLowerCase().includes('account')) {
     return { error: 'UTN_EXPIRED: ' + currentUrl };
   }
 
-  // 3. Esperar 6s para que el JS de la página se ejecute completamente
-  await new Promise(r => setTimeout(r, 6000));
+  // 3. Esperar 4s para que el JS de la página inicialice
+  await new Promise(r => setTimeout(r, 4000));
 
-  // 4. Diagnóstico DOM completo — retornar INMEDIATAMENTE sin esperar datos
-  const diag = await page.evaluate(() => {
-    // Encontrar el elemento con texto "Año actual"
-    const all = Array.from(document.querySelectorAll('*'));
-    const anioEl = all.find(e => {
-      const t = (e.innerText || e.textContent || '').trim();
-      return t === 'Año actual';
-    });
-
-    // Todos los <li> con sus datos
-    const liItems = Array.from(document.querySelectorAll('li'))
-      .map(li => ({
-        text: (li.innerText || '').trim().slice(0, 60),
-        outerHTML: li.outerHTML.slice(0, 600),
-        onclick: li.getAttribute('onclick') || null
-      }))
-      .filter(li => li.text)
-      .slice(0, 15);
-
-    // Todos los elementos con onclick
-    const onclicks = Array.from(document.querySelectorAll('[onclick]'))
-      .map(e => ({
-        tag: e.tagName, id: e.id,
-        text: (e.innerText || '').trim().slice(0, 40),
-        onclick: e.getAttribute('onclick').slice(0, 250)
-      }))
-      .slice(0, 20);
-
-    // ¿Existe __doPostBack?
-    let hasDoPostBack = false;
-    try { hasDoPostBack = typeof __doPostBack !== 'undefined'; } catch(e) {}
-
-    // Fragmentos de scripts que mencionan doPostBack
-    const scriptSnips = Array.from(document.querySelectorAll('script'))
-      .map(s => s.textContent || '')
-      .filter(t => t.includes('doPostBack'))
-      .map(t => {
-        const idx = t.indexOf('doPostBack');
-        return t.slice(Math.max(0, idx - 40), idx + 120);
-      })
-      .slice(0, 5);
-
-    // Todos los <a> (debería mostrar 0 si el frame principal no tiene)
-    const links = Array.from(document.querySelectorAll('a'))
-      .map(a => ({
-        text: (a.innerText || '').trim().slice(0, 40),
-        href: (a.getAttribute('href') || '').slice(0, 150),
-        onclick: (a.getAttribute('onclick') || '').slice(0, 150)
-      }))
-      .filter(l => l.text || l.href)
-      .slice(0, 30);
-
-    return {
-      anioEl: anioEl ? {
-        tag: anioEl.tagName,
-        id: anioEl.id || null,
-        onclick: anioEl.getAttribute('onclick') || null,
-        outerHTML: anioEl.outerHTML.slice(0, 600),
-        parentTag: anioEl.parentElement ? anioEl.parentElement.tagName : null,
-        parentOuterHTML: anioEl.parentElement ? anioEl.parentElement.outerHTML.slice(0, 800) : null
-      } : null,
-      liItems,
-      onclicks,
-      hasDoPostBack,
-      scriptSnips,
-      links,
-      tdCount: document.querySelectorAll('td').length,
-      url: location.href
-    };
+  // 4. Seleccionar "Año actual": click en el radio button id="s-option"
+  const clickResult = await page.evaluate(() => {
+    const radio = document.getElementById('s-option');
+    if (!radio) {
+      // Fallback: buscar input[type=radio] con value="1" o name="selector"
+      const r2 = document.querySelector('input[type="radio"][value="1"], input[type="radio"][name="selector"][id*="s-"]');
+      if (r2) {
+        r2.click();
+        r2.dispatchEvent(new Event('change', { bubbles: true }));
+        r2.dispatchEvent(new Event('input', { bubbles: true }));
+        return { ok: true, method: 'fallback', id: r2.id, value: r2.value };
+      }
+      return { ok: false, reason: 's-option not found' };
+    }
+    // Click el radio y disparar eventos para que el JS del sitio reaccione
+    radio.click();
+    radio.dispatchEvent(new Event('change', { bubbles: true }));
+    radio.dispatchEvent(new Event('input', { bubbles: true }));
+    return { ok: true, method: 'radio_click', id: radio.id, checked: radio.checked, value: radio.value };
   });
 
-  // Retornar diagnóstico directamente (sin esperar tabla)
-  return { _diagnostic: true, diag };
+  // 5. Esperar 8s para que el AJAX del ReportViewer inicie
+  await new Promise(r => setTimeout(r, 8000));
+
+  // 6. Si la tabla no cambió, forzar __doPostBack del ReportViewer SSRS
+  const tdCount1 = await page.evaluate(() => document.querySelectorAll('td').length);
+  let forcedPostback = false;
+  if (tdCount1 <= 50) {
+    forcedPostback = true;
+    await page.evaluate(() => {
+      try {
+        // Postback del ReportViewer para refrescar con nuevo parámetro
+        if (typeof __doPostBack === 'function') {
+          __doPostBack('ReportViewer1$ctl03', '');
+        }
+      } catch(e) {}
+    });
+  }
+
+  // 7. Esperar que aparezcan datos: RUT pattern / columnas de meses / tdCount aumenta
+  let timedOut = false;
+  try {
+    await page.waitForFunction(
+      (ic) => {
+        const tds = Array.from(document.querySelectorAll('td'));
+        // Opción A: celdas RUT
+        if (tds.some(td => /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/.test((td.innerText || '').trim()))) return true;
+        // Opción B: columnas de meses en el body
+        if (/Ene-\\d{2}|Feb-\\d{2}|Mar-\\d{2}/.test(document.body.innerText)) return true;
+        // Opción C: tdCount creció significativamente
+        if (tds.length > ic + 20) return true;
+        return false;
+      },
+      { timeout: 35000 },
+      tdCount1
+    );
+  } catch(e) {
+    timedOut = true;
+  }
+
+  if (timedOut) {
+    const postDiag = await page.evaluate(() => ({
+      tdCount:        document.querySelectorAll('td').length,
+      bodySnip:       document.body.innerText.slice(0, 600),
+      url:            location.href,
+    }));
+    return { error: 'TIMEOUT_35s', clickResult, forcedPostback, tdCount1, postDiag };
+  }
+
+  // 8. Extraer datos del DOM
+  const resultado = await page.evaluate(() => {
+    const allTds = Array.from(document.querySelectorAll('td'));
+
+    // Buscar celda de encabezado con columnas de meses
+    const headerCell = allTds.find(td => {
+      const text = td.innerText || '';
+      return text.includes('Cliente') && text.includes('Total') &&
+             /[A-Z][a-z]{2}-\\d{2}/.test(text);
+    });
+
+    if (!headerCell) {
+      const rutPattern = /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/;
+      const rutCount = allTds.filter(td => rutPattern.test((td.innerText || '').trim())).length;
+      return {
+        error: 'Encabezado sin columnas de meses',
+        clientes: [], MESES: [],
+        rutCount,
+        bodySnip: document.body.innerText.slice(0, 400)
+      };
+    }
+
+    const MESES = [...headerCell.innerText.matchAll(/([A-Z][a-z]{2}-\\d{2})/g)].map(m => m[1]);
+    if (!MESES.length) return { error: 'Sin columnas mes en encabezado', clientes: [], MESES: [] };
+
+    const rutPattern = /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/;
+    const rutCells   = allTds.filter(td => rutPattern.test((td.innerText || '').trim()));
+
+    const results = [];
+    const seen    = new Set();
+
+    rutCells.forEach(rutCell => {
+      const rut = (rutCell.innerText || '').trim();
+      if (seen.has(rut)) return;
+      seen.add(rut);
+      const row = rutCell.closest('tr');
+      if (!row) return;
+      const cells = Array.from(row.querySelectorAll('td')).map(c => (c.innerText || '').trim());
+      const rutIdx = cells.indexOf(rut);
+      if (rutIdx < 0) return;
+      const nombre     = cells[rutIdx + 2] || cells[rutIdx + 1] || '';
+      const monthStart = rutIdx + 4;
+      const meses = {};
+      for (let i = 0; i < MESES.length; i++) {
+        const val = (cells[monthStart + i] || '').trim();
+        if (val) {
+          const num = parseInt(val.replace(/\\./g, ''), 10);
+          if (!isNaN(num) && num > 0) meses[MESES[i]] = num * 1000;
+        }
+      }
+      const totalStr = (cells[cells.length - 1] || '').trim();
+      const total    = totalStr ? parseInt(totalStr.replace(/\\./g, ''), 10) * 1000 : 0;
+      results.push({ rut, nombre, meses, total });
+    });
+
+    return { clientes: results, MESES };
+  });
+
+  return resultado;
 }
 `;
 }
@@ -130,7 +186,7 @@ async function scrapeNuboxResumen() {
         method:  'POST',
         headers: { 'Content-Type': 'application/javascript' },
         body:    browserCode,
-        timeout: 45000,
+        timeout: 90000,
       });
 
       if (!resp.ok) {
@@ -142,13 +198,9 @@ async function scrapeNuboxResumen() {
       const result = (raw && raw.data !== undefined) ? raw.data : raw;
 
       if (result.error) {
+        if (result.clickResult) console.warn('[scraper] CLICK:', JSON.stringify(result.clickResult));
+        if (result.postDiag)   console.warn('[scraper] POST-DIAG:', JSON.stringify(result.postDiag));
         throw new Error('Browser error: ' + result.error);
-      }
-
-      if (result._diagnostic) {
-        // Modo diagnóstico: loguear todo y retornar error descriptivo
-        console.warn('[scraper] DIAGNOSTIC:', JSON.stringify(result.diag));
-        throw new Error('DIAGNOSTIC_MODE — ver logs para DOM info');
       }
 
       if (!Array.isArray(result.clientes)) {
