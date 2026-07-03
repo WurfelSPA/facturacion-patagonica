@@ -4,7 +4,7 @@ export default async function({ page }) {
     await page.setCookie(cookies[i]);
   }
 
-  await page.goto(__TARGET_URL__, { waitUntil: 'networkidle2', timeout: 30000 });
+  await page.goto(__TARGET_URL__, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
   var currentUrl = page.url();
   if (/login|account/i.test(currentUrl)) {
@@ -24,7 +24,7 @@ export default async function({ page }) {
 
   if (!headerFound) {
     var dStr = await page.evaluate(
-      '(function(){var tds=Array.from(document.querySelectorAll("td"));return JSON.stringify({tdCount:tds.length,sample:tds.slice(0,8).map(function(t){return t.innerText.trim().slice(0,40);});});  })()'
+      '(function(){var tds=Array.from(document.querySelectorAll("td"));return JSON.stringify({tdCount:tds.length,sample:tds.slice(0,8).map(function(t){return t.innerText.trim().slice(0,40)})});  })()'
     );
     var d = JSON.parse(dStr);
     return { error: 'REPORT_NOT_CACHED', tdCount: d.tdCount, sample: d.sample };
@@ -37,9 +37,11 @@ export default async function({ page }) {
     '  for(var i=0;i<allTds.length;i++){' +
     '    if(/[A-Z][a-z]{2}-\\d{2}/.test(allTds[i].innerText||"")){headerCell=allTds[i];break;}' +
     '  }' +
+    '  if(!headerCell)return JSON.stringify({error:"no header cell"});' +
     '  var MESES=[];' +
-    '  var mm=headerCell.innerText.matchAll(/([A-Z][a-z]{2}-\\d{2})/g);' +
-    '  var match=mm.next();while(!match.done){MESES.push(match.value[1]);match=mm.next();}' +
+    '  var txt=headerCell.innerText||"";' +
+    '  var re=/([A-Z][a-z]{2}-\\d{2})/g;var mm;' +
+    '  while((mm=re.exec(txt))!==null){MESES.push(mm[1]);}' +
     '  var rutPattern=/^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/;' +
     '  var results=[];var seen={};' +
     '  allTds.forEach(function(rutCell){' +
@@ -64,6 +66,6 @@ export default async function({ page }) {
   );
 
   var data = JSON.parse(jsonStr);
-  if (data.error) return { error: 'EXTRACT_FAIL: ' + data.error, details: data };
+  if (data.error) return { error: 'EXTRACT_FAIL: ' + data.error };
   return data;
 }
