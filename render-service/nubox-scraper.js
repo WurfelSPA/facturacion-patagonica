@@ -1,136 +1,123 @@
 /**
  * render-service/nubox-scraper.js
  *
- * Usa puppeteer-core conectado a Browserless.io para navegar al Dashboard
- * de Nubox y extraer los datos del "Resumen de Ventas" desde el DOM.
+ * Llama a la API REST de Browserless.io para ejecutar código de browser
+ * en la nube y extraer el Resumen de Ventas de Nubox.
  *
- * Browserless.io corre Chrome en la nube — no se necesita Chrome local.
- * La conexión se hace vía WebSocket usando BROWSERLESS_TOKEN.
+ * No usa puppeteer — solo node-fetch para llamar al endpoint /function.
+ * El código del browser viaja como string en el body del POST.
  *
- * Flujo:
- *   1. Conectar a Browserless.io
- *   2. Navegar a Dashboard.aspx?action=Ventas&utn=TOKEN
- *   3. Esperar a que el ReportViewer cargue (aparecen celdas con RUT)
- *   4. Extraer meses dinámicamente del encabezado + valores por cliente
- *   5. Retornar { clientes, meses }
+ * Vars requeridas:
+ *   BROWSERLESS_TOKEN  — token de Browserless.io
+ *   NUBOX_UTN          — token UTN de sesión Nubox
  */
 
-const puppeteer = require('puppeteer-core');
+const fetch = require('node-fetch');
 
 const DASHBOARD = 'https://app.nubox.com/ServiFactura/paginas/Dashboard.aspx?action=Ventas';
 
-// Endpoints de Browserless.io (probar SFO primero, LON como fallback)
-const BROWSERLESS_ENDPOINTS = [
-  'wss://production-sfo.browserless.io',
-  'wss://production-lon.browserless.io',
+const BROWSERLESS_HOSTS = [
+  'https://production-sfo.browserless.io',
+  'https://production-lon.browserless.io',
 ];
+
+/**
+ * Construye el código JavaScript que se ejecutará en el browser de Browserless.
+ * El código es un ES module con export default function.
+ * Los regex usan \\ porque el string vive dentro de un template literal JS.
+ */
+function buildBrowserCode(targetUrl) {
+  return `
+export default async function({ page }) {
+  // 1. Navegar al Dashboard con UTN
+  await page.goto(${JSON.stringify(targetUrl)}, { waitUntil: 'networkidle2', timeout: 60000 });
+
+  // 2. Verificar que no redirigió a login
+  const currentUrl = page.url();
+  if (currentUrl.toLowerCase().includes('login') || currentUrl.toLowerCase().includes('account')) {
+    return { data: { error: 'UTN_EXPIRED: ' + currentUrl }, type: 'application/json' };
+  }
+
+  // 3. Esperar hasta que el ReportViewer cargue (aparecen celdas con patrón RUT)
+  try {
+    await page.waitForFunction(
+      () => {
+        const tds = document.querySelectorAll('td');
+        return Array.from(tds).some(td =>
+          /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/.test(td.innerText.trim())
+        );
+      },
+      { timeout: 30000 }
+    );
+  } catch(e) {
+    return { data: { error: 'TIMEOUT: tabla Nubox no cargó en 30s' }, type: 'application/json' };
+  }
+
+  // 4. Extraer datos del DOM
+  const resultado = await page.evaluate(() => {
+    const allTds = document.querySelectorAll('td');
+
+    // Detectar columnas de meses desde el encabezado (ej: "Ene-26", "Feb-26", ...)
+    const headerCell = Array.from(allTds).find(td => {
+      const text = td.innerText;
+      return text.includes('Cliente') && text.includes('Total') &&
+             /[A-Z][a-z]{2}-\\d{2}/.test(text);
+    });
+
+    if (!headerCell) return { error: 'Encabezado no encontrado', clientes: [], MESES: [] };
+
+    const MESES = [...headerCell.innerText.matchAll(/([A-Z][a-z]{2}-\\d{2})/g)].map(m => m[1]);
+    if (!MESES.length) return { error: 'Sin columnas de meses', clientes: [], MESES: [] };
+
+    // Extraer filas de clientes (identificadas por celda con patrón RUT)
+    const rutPattern = /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/;
+    const rutCells   = Array.from(allTds).filter(td => rutPattern.test(td.innerText.trim()));
+
+    const results = [];
+    const seen    = new Set();
+
+    rutCells.forEach(rutCell => {
+      const rut = rutCell.innerText.trim();
+      if (seen.has(rut)) return;
+      seen.add(rut);
+
+      const row = rutCell.closest('tr');
+      if (!row) return;
+
+      // Estructura de fila: [vacío, RUT, RUT, Nombre, Nombre, mes1..mes12, Total]
+      const cells     = Array.from(row.querySelectorAll('td')).map(c => c.innerText.trim());
+      const rutIdx    = cells.indexOf(rut);
+      if (rutIdx < 0) return;
+
+      const nombre     = cells[rutIdx + 2] || cells[rutIdx + 1] || '';
+      const monthStart = rutIdx + 4;
+
+      const meses = {};
+      for (let i = 0; i < MESES.length; i++) {
+        const val = (cells[monthStart + i] || '').trim();
+        if (val) {
+          const num = parseInt(val.replace(/\\./g, ''), 10);
+          if (!isNaN(num) && num > 0) meses[MESES[i]] = num * 1000; // miles de pesos → pesos
+        }
+      }
+
+      const totalStr = (cells[cells.length - 1] || '').trim();
+      const total    = totalStr ? parseInt(totalStr.replace(/\\./g, ''), 10) * 1000 : 0;
+
+      results.push({ rut, nombre, meses, total });
+    });
+
+    return { clientes: results, MESES };
+  });
+
+  return { data: resultado, type: 'application/json' };
+}
+`;
+}
 
 async function scrapeNuboxResumen() {
   const utn   = process.env.NUBOX_UTN;
   const token = process.env.BROWSERLESS_TOKEN;
 
   if (!utn)   throw new Error('Falta NUBOX_UTN en env vars');
-  if (!token) throw new Error('Falta BROWSERLESS_TOKEN en env vars');
-
-  const url = `${DASHBOARD}&utn=${encodeURIComponent(utn)}`;
-
-  // Intentar cada endpoint de Browserless hasta que funcione
-  let browser = null;
-  let lastErr  = null;
-
-  for (const endpoint of BROWSERLESS_ENDPOINTS) {
-    try {
-      const wsEndpoint = `${endpoint}?token=${token}`;
-      console.log(`[scraper] Conectando a Browserless: ${endpoint}...`);
-      browser = await puppeteer.connect({
-        browserWSEndpoint: wsEndpoint,
-      });
-      console.log('[scraper] Conectado a Browserless OK');
-      break;
-    } catch (err) {
-      console.warn(`[scraper] ${endpoint} falló: ${err.message}`);
-      lastErr = err;
-      browser = null;
-    }
-  }
-
-  if (!browser) {
-    throw new Error('No se pudo conectar a Browserless.io: ' + (lastErr?.message || 'desconocido'));
-  }
-
-  try {
-    const page = await browser.newPage();
-    await page.setViewport({ width: 1280, height: 800 });
-
-    console.log('[scraper] Navegando a Dashboard.aspx...');
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
-
-    // Verificar que no redirigió a login
-    const currentUrl = page.url();
-    if (
-      currentUrl.toLowerCase().includes('login') ||
-      currentUrl.toLowerCase().includes('account')
-    ) {
-      throw new Error('UTN_EXPIRED: redirigido a ' + currentUrl);
-    }
-
-    console.log('[scraper] Página cargada, esperando tabla de reporte...');
-
-    // Esperar hasta que aparezcan celdas con patrón RUT (XX.XXX.XXX-X)
-    await page.waitForFunction(
-      () => {
-        const tds = document.querySelectorAll('td');
-        return Array.from(tds).some(td =>
-          /^\d{1,2}\.\d{3}\.\d{3}-[\dkK]$/.test(td.innerText.trim())
-        );
-      },
-      { timeout: 30000 }
-    );
-
-    console.log('[scraper] Tabla cargada, extrayendo datos...');
-
-    const resultado = await page.evaluate(() => {
-      const allTds = document.querySelectorAll('td');
-
-      // 1. Detectar columnas de meses dinámicamente desde el encabezado
-      const headerCell = Array.from(allTds).find(td => {
-        const text = td.innerText;
-        return (
-          text.includes('Cliente') &&
-          text.includes('Total') &&
-          /[A-Z][a-z]{2}-\d{2}/.test(text)
-        );
-      });
-
-      let MESES = [];
-      if (headerCell) {
-        const mesPattern = /([A-Z][a-z]{2}-\d{2})/g;
-        MESES = [...headerCell.innerText.matchAll(mesPattern)].map(m => m[1]);
-      }
-
-      if (MESES.length === 0) {
-        return {
-          error: 'No se encontraron columnas de meses en el encabezado del reporte',
-          MESES: [],
-          clientes: [],
-        };
-      }
-
-      // 2. Extraer filas de clientes
-      const rutPattern = /^\d{1,2}\.\d{3}\.\d{3}-[\dkK]$/;
-      const rutCells   = Array.from(allTds).filter(td =>
-        rutPattern.test(td.innerText.trim())
-      );
-
-      const results = [];
-      const seen    = new Set();
-
-      rutCells.forEach(rutCell => {
-        const rut = rutCell.innerText.trim();
-        if (seen.has(rut)) return; // RUT duplicado por rendering del ReportViewer
-        seen.add(rut);
-
-        const row = rutCell.closest('tr');
-        if (!row) return;
-
-        // Estructura
+  if (!token) throw new Error('Falta BROWSERLESS_TOKEN en 
