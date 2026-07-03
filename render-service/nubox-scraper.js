@@ -1,15 +1,14 @@
 /**
  * render-service/nubox-scraper.js
  *
- * Fix v6: usa page.click() NATIVO de Puppeteer (no page.evaluate(() => el.click()))
- * para disparar la secuencia real de eventos del mouse (mousemove → mousedown → mouseup
- * → click → change) que activa los listeners jQuery/addEventListener de Nubox.
+ * Fix v7: diagnóstico quirúrgico para encontrar el mecanismo real que cambia
+ * la vista de "Últimos 12 meses" a "Año actual" en el Nubox SSRS.
  *
- * También monitorea XHR requests para descubrir qué llamada de red dispara el radio.
- *
- * Vars requeridas:
- *   BROWSERLESS_TOKEN  — token de Browserless.io
- *   NUBOX_UTN          — token UTN de sesión Nubox
+ * Captura:
+ *   1. TODOS los textos de los 46 <td> (para ver qué contiene la tabla actual)
+ *   2. Scripts inline filtrados por "selector", "ulRB", "s-option", "periodo"
+ *   3. Handlers jQuery si están disponibles
+ *   4. Intenta también URL con &selector=1 para ver si es un parámetro URL
  */
 
 const fetch = require('node-fetch');
@@ -22,125 +21,86 @@ const BROWSERLESS_HOSTS = [
 ];
 
 function buildBrowserCode(targetUrl) {
+  // También construimos la URL con selector=1
+  const urlWithSelector = targetUrl + '&selector=1';
+
   return `
 export default async function({ page }) {
-  // 1. Monitorear requests XHR/fetch ANTES de cualquier acción
-  const xhrLog = [];
-  page.on('request', req => {
-    const t = req.resourceType();
-    if (t === 'xhr' || t === 'fetch' || req.url().includes('Dashboard.aspx') || req.url().includes('ReportViewer')) {
-      xhrLog.push({
-        url: req.url().replace(/utn=[^&]+/, 'utn=***').slice(0, 300),
-        method: req.method(),
-        type: t,
-        post: (req.postData() || '').slice(0, 150),
-      });
-    }
-  });
+  // ── FASE 1: cargar página por defecto ─────────────────────────────────────
+  await page.goto(${JSON.stringify(targetUrl)}, { waitUntil: 'domcontentloaded', timeout: 20000 });
 
-  // 2. Navegar con UTN — networkidle2 para que JS esté completamente listo
-  await page.goto(${JSON.stringify(targetUrl)}, { waitUntil: 'networkidle2', timeout: 30000 });
-
-  // 3. Verificar que no redirigió a login
   const currentUrl = page.url();
   if (currentUrl.toLowerCase().includes('login') || currentUrl.toLowerCase().includes('account')) {
     return { error: 'UTN_EXPIRED: ' + currentUrl };
   }
 
-  // 4. Esperar 3s extra para inicialización de JS
-  await new Promise(r => setTimeout(r, 3000));
+  await new Promise(r => setTimeout(r, 6000));
 
-  const tdBefore = await page.evaluate(() => document.querySelectorAll('td').length);
-  const bodyBefore = await page.evaluate(() => document.body.innerText.slice(0, 400));
+  // ── FASE 2: capturar todos los tds y scripts relevantes ───────────────────
+  const diag = await page.evaluate(() => {
+    // A. Todos los textos de tds (tabla actual)
+    const tdTexts = Array.from(document.querySelectorAll('td'))
+      .map(td => td.innerText.trim())
+      .filter(t => t.length > 0);
 
-  // 5. Limpiar el log de XHR que acumuló durante la carga inicial
-  xhrLog.length = 0;
+    // B. Scripts inline filtrados por palabras clave relevantes
+    const keywords = ['selector', 'ulRB', 's-option', 'f-option', 'periodo', 'Period', 'rbSelector', 'anio', 'Anio', 'verReporte', 'cargarReporte', 'loadReport'];
+    const filteredScripts = Array.from(document.querySelectorAll('script:not([src])'))
+      .map(s => {
+        const t = s.textContent || '';
+        const matched = keywords.some(k => t.includes(k));
+        return matched ? t : null;
+      })
+      .filter(Boolean)
+      .join('\\n\\n========\\n\\n')
+      .slice(0, 6000);
 
-  // 6. CLICK NATIVO de Puppeteer en el radio button #s-option
-  //    page.click() genera: mousemove + mousedown + mouseup + click + change
-  //    Esto activa todos los listeners incluyendo jQuery .on('change', ...)
-  let clickErr = null;
-  try {
-    await page.click('#s-option');
-  } catch(e) {
-    clickErr = e.message;
-    // Fallback: click en el label (que redirige al radio)
-    try { await page.click('label[for="s-option"]'); } catch(e2) { clickErr += ' | label: ' + e2.message; }
-  }
-
-  // 7. Esperar 20s para que SSRS re-renderice con el nuevo parámetro
-  await new Promise(r => setTimeout(r, 20000));
-
-  const tdAfter  = await page.evaluate(() => document.querySelectorAll('td').length);
-  const bodyAfter = await page.evaluate(() => document.body.innerText.slice(0, 1500));
-  const radioState = await page.evaluate(() => ({
-    checked: document.getElementById('s-option')?.checked,
-    value:   document.getElementById('s-option')?.value,
-  }));
-
-  // 8. Intentar extraer datos si el table cambió
-  if (tdAfter > tdBefore + 10) {
-    const resultado = await page.evaluate(() => {
-      const allTds = Array.from(document.querySelectorAll('td'));
-
-      const headerCell = allTds.find(td => {
-        const text = td.innerText || '';
-        return /[A-Z][a-z]{2}-\\d{2}/.test(text);
-      });
-
-      if (!headerCell) {
-        return {
-          ok: false,
-          reason: 'No header con meses',
-          rutCount: allTds.filter(td => /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/.test((td.innerText||'').trim())).length,
-          first200: allTds.slice(0, 20).map(td => td.innerText.trim()).filter(t => t),
-        };
-      }
-
-      const MESES = [...headerCell.innerText.matchAll(/([A-Z][a-z]{2}-\\d{2})/g)].map(m => m[1]);
-      const rutPattern = /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/;
-      const rutCells = allTds.filter(td => rutPattern.test((td.innerText || '').trim()));
-
-      const results = [];
-      const seen = new Set();
-      rutCells.forEach(rutCell => {
-        const rut = rutCell.innerText.trim();
-        if (seen.has(rut)) return;
-        seen.add(rut);
-        const row = rutCell.closest('tr');
-        if (!row) return;
-        const cells = Array.from(row.querySelectorAll('td')).map(c => c.innerText.trim());
-        const rutIdx = cells.indexOf(rut);
-        if (rutIdx < 0) return;
-        const nombre = cells[rutIdx + 2] || cells[rutIdx + 1] || '';
-        const monthStart = rutIdx + 4;
-        const meses = {};
-        for (let i = 0; i < MESES.length; i++) {
-          const val = (cells[monthStart + i] || '').trim();
-          if (val) { const n = parseInt(val.replace(/\\./g,''),10); if(!isNaN(n)&&n>0) meses[MESES[i]]=n*1000; }
-        }
-        const total = parseInt((cells[cells.length-1]||'').replace(/\\./g,''),10)*1000||0;
-        results.push({ rut, nombre, meses, total });
-      });
-      return { ok: true, clientes: results, MESES };
-    });
-
-    if (resultado.ok && resultado.clientes.length > 0) {
-      return resultado; // SUCCESS
+    // C. Detectar jQuery y sus event handlers en el radio
+    let jqEvents = null;
+    if (typeof $ !== 'undefined' && $._data) {
+      try {
+        const el = document.getElementById('s-option');
+        jqEvents = JSON.stringify($._data(el, 'events') || {});
+      } catch(e) { jqEvents = 'error: ' + e.message; }
     }
-  }
 
-  // 9. Si no cambió, retornar diagnóstico completo
-  return {
-    error: 'DIAG_v6',
-    clickErr,
-    radioState,
-    tdBefore,
-    tdAfter,
-    bodyBefore,
-    bodyAfter,
-    xhrLog: xhrLog.slice(0, 20),
-  };
+    // D. Todos los elementos con event listeners inline + visible radio state
+    const radioEl = document.getElementById('s-option');
+    const radioInfo = radioEl ? {
+      checked: radioEl.checked,
+      value: radioEl.value,
+      name: radioEl.name,
+      outerHTML: radioEl.outerHTML,
+    } : null;
+
+    // E. Buscar cualquier función que contenga "selector" en nombre/cuerpo  
+    const windowFns = Object.keys(window)
+      .filter(k => typeof window[k] === 'function' && k.toLowerCase().includes('selector'))
+      .join(', ');
+
+    // F. Capturar src de todos los scripts externos
+    const externalScripts = Array.from(document.querySelectorAll('script[src]'))
+      .map(s => s.src)
+      .filter(u => !u.includes('Microsoft') && !u.includes('WebResource'))
+      .slice(0, 10);
+
+    return { tdTexts, filteredScripts, jqEvents, radioInfo, windowFns, externalScripts };
+  });
+
+  // ── FASE 3: intentar cargar URL con &selector=1 ───────────────────────────
+  await page.goto(${JSON.stringify(urlWithSelector)}, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await new Promise(r => setTimeout(r, 6000));
+
+  const diagSelector1 = await page.evaluate(() => {
+    const tdTexts = Array.from(document.querySelectorAll('td'))
+      .map(td => td.innerText.trim())
+      .filter(t => t.length > 0);
+    const bodySnip = document.body.innerText.slice(0, 800);
+    const radioChecked = document.getElementById('s-option')?.checked;
+    return { tdCount: document.querySelectorAll('td').length, tdTexts, bodySnip, radioChecked };
+  });
+
+  return { error: 'DIAG_v7', diag, diagSelector1 };
 }
 `;
 }
@@ -175,15 +135,21 @@ async function scrapeNuboxResumen() {
       const raw    = await resp.json();
       const result = (raw && raw.data !== undefined) ? raw.data : raw;
 
-      if (result.error) {
-        // Log diagnóstico completo
-        if (result.xhrLog)    console.warn('[scraper] XHR-LOG:', JSON.stringify(result.xhrLog));
-        if (result.bodyAfter) console.warn('[scraper] BODY-AFTER:', result.bodyAfter.slice(0, 400));
-        if (result.clickErr)  console.warn('[scraper] CLICK-ERR:', result.clickErr);
-        console.warn('[scraper] tdBefore:', result.tdBefore, '→ tdAfter:', result.tdAfter);
-        throw new Error('Browser error: ' + result.error);
+      if (result.error === 'DIAG_v7') {
+        const d = result.diag;
+        console.warn('[v7] TDs actuales:', JSON.stringify(d.tdTexts));
+        console.warn('[v7] Scripts filtrados:\n', d.filteredScripts || '(ninguno)');
+        console.warn('[v7] jQuery events:', d.jqEvents || 'jQuery no detectado');
+        console.warn('[v7] Window fns con "selector":', d.windowFns || 'ninguna');
+        console.warn('[v7] External scripts:', JSON.stringify(d.externalScripts));
+        console.warn('[v7] URL con &selector=1 — tdCount:', result.diagSelector1.tdCount);
+        console.warn('[v7] URL con &selector=1 — tds:', JSON.stringify(result.diagSelector1.tdTexts));
+        console.warn('[v7] URL con &selector=1 — radioChecked:', result.diagSelector1.radioChecked);
+        console.warn('[v7] URL con &selector=1 — bodySnip:', result.diagSelector1.bodySnip);
+        throw new Error('DIAG_v7 — ver logs');
       }
 
+      if (result.error) throw new Error('Browser error: ' + result.error);
       if (!Array.isArray(result.clientes)) {
         throw new Error('Respuesta inesperada: ' + JSON.stringify(result).slice(0, 200));
       }
@@ -192,7 +158,7 @@ async function scrapeNuboxResumen() {
       return { clientes: result.clientes, meses: result.MESES || [] };
 
     } catch (err) {
-      console.warn(`[scraper] ${host} falló: ${err.message}`);
+      console.warn(`[scraper] ${host} falló: ${err.message.slice(0, 100)}`);
       lastErr = err;
     }
   }
