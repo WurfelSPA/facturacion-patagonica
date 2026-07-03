@@ -1,8 +1,8 @@
 /**
- * render-service/nubox-scraper.js v28
- * Fase 1: Browserless captura ControlID + cookies (~12s)
- * Fase 2: Node.js espera 50s
- * Fase 3: Browserless restaura sesion + extrae DOM (reporte deberia estar cacheado)
+ * render-service/nubox-scraper.js v29
+ * Single-phase: una sola llamada Browserless que espera hasta 90s para que
+ * SSRS renderice el reporte en el DOM, luego extrae los datos.
+ * (La sesion de Browserless Standard permite sesiones largas)
  */
 
 const fetch = require('node-fetch');
@@ -14,16 +14,9 @@ const BROWSERLESS_HOSTS = [
   'https://production-lon.browserless.io',
 ];
 
-function buildBrowserCodeP1(targetUrl) {
+function buildBrowserCode(targetUrl) {
   const template = fs.readFileSync(path.join(__dirname, 'browser-code.js'), 'utf8');
   return template.replace("'__NUBOX_URL__'", JSON.stringify(targetUrl));
-}
-
-function buildBrowserCodeP2(targetUrl, cookies) {
-  const template = fs.readFileSync(path.join(__dirname, 'browser-code-p2.js'), 'utf8');
-  return template
-    .replace('__COOKIES_JSON__', JSON.stringify(cookies))
-    .replace('__TARGET_URL__', JSON.stringify(targetUrl));
 }
 
 async function callBrowserless(browserCode, timeoutMs) {
@@ -37,22 +30,22 @@ async function callBrowserless(browserCode, timeoutMs) {
         method:  'POST',
         headers: { 'Content-Type': 'application/javascript' },
         body:    browserCode,
-        timeout: timeoutMs || 30000,
+        timeout: timeoutMs || 150000,
       });
       if (!resp.ok) {
         const t = await resp.text();
-        throw new Error('HTTP ' + resp.status + ': ' + t.slice(0, 200));
+        throw new Error('HTTP ' + resp.status + ': ' + t.slice(0, 300));
       }
       const raw    = await resp.json();
       const result = (raw && raw.data !== undefined) ? raw.data : raw;
-      if (result.error) throw new Error('Browser error: ' + result.error);
+      if (result && result.error) throw new Error('Browser error: ' + result.error);
       return result;
     } catch(err) {
       console.warn('[scraper] ' + host + ' fallo: ' + err.message.slice(0, 200));
       lastErr = err;
     }
   }
-  throw new Error('Todos los endpoints Browserless fallaron: ' + lastErr.message);
+  throw new Error('Todos los endpoints fallaron. Ultimo: ' + lastErr.message);
 }
 
 async function scrapeNuboxResumen() {
@@ -61,25 +54,11 @@ async function scrapeNuboxResumen() {
 
   const targetUrl = 'https://app.nubox.com/ServiFactura/paginas/Dashboard.aspx?action=Ventas&utn=' + encodeURIComponent(utn);
 
-  // FASE 1: Capturar cookies y ControlID via Browserless (~12s)
-  console.log('[scraper] Fase 1: capturando sesion...');
-  const phase1 = await callBrowserless(buildBrowserCodeP1(targetUrl), 25000);
-  if (!phase1.phase1 || !phase1.controlId) {
-    throw new Error('Fase1 sin ControlID: ' + JSON.stringify(phase1).slice(0, 200));
-  }
-  const { controlId, cookies } = phase1;
-  console.log('[scraper] Fase 1 OK — ControlID=' + controlId + ', cookies=' + cookies.length);
-
-  // FASE 2: Esperar 50s para que el servidor SSRS renderice el reporte
-  console.log('[scraper] Fase 2: esperando 50s para que SSRS procese...');
-  await new Promise(function(resolve) { setTimeout(resolve, 50000); });
-
-  // FASE 3: Restaurar sesion + extraer DOM via Browserless (~20-60s)
-  console.log('[scraper] Fase 3: extrayendo datos del DOM con sesion restaurada...');
-  const result = await callBrowserless(buildBrowserCodeP2(targetUrl, cookies), 90000);
+  console.log('[scraper] Iniciando — esperando hasta 90s para que SSRS renderice...');
+  const result = await callBrowserless(buildBrowserCode(targetUrl), 150000);
 
   if (!Array.isArray(result.clientes)) {
-    throw new Error('Fase3 respuesta inesperada: ' + JSON.stringify(result).slice(0, 300));
+    throw new Error('Respuesta inesperada: ' + JSON.stringify(result).slice(0, 300));
   }
 
   console.log('[scraper] OK — ' + result.clientes.length + ' clientes, meses: ' + (result.MESES || []).join(', '));
