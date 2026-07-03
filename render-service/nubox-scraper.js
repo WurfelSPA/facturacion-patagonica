@@ -25,67 +25,110 @@ const BROWSERLESS_HOSTS = [
  * Construye el código JavaScript que se ejecutará en el browser de Browserless.
  * El código es un ES module con export default function.
  * Los regex usan \\ porque el string vive dentro de un template literal JS.
+ *
+ * FIXES vs versión anterior:
+ *  - waitForFunction busca en iframes también (Nubox ReportViewer vive en iframe)
+ *  - timeout aumentado a 60s (Nubox es lento)
+ *  - retorna data directamente sin wrapper {data, type} para evitar parsing issues
+ *  - goto usa domcontentloaded para no esperar XHR continuos
  */
 function buildBrowserCode(targetUrl) {
   return `
 export default async function({ page }) {
   // 1. Navegar al Dashboard con UTN
-  await page.goto(${JSON.stringify(targetUrl)}, { waitUntil: 'networkidle2', timeout: 60000 });
+  //    domcontentloaded es suficiente; waitForFunction espera la tabla
+  await page.goto(${JSON.stringify(targetUrl)}, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
   // 2. Verificar que no redirigió a login
   const currentUrl = page.url();
   if (currentUrl.toLowerCase().includes('login') || currentUrl.toLowerCase().includes('account')) {
-    return { data: { error: 'UTN_EXPIRED: ' + currentUrl }, type: 'application/json' };
+    return { error: 'UTN_EXPIRED: ' + currentUrl };
   }
 
-  // 3. Esperar hasta que el ReportViewer cargue (aparecen celdas con patrón RUT)
+  // 3. Esperar hasta que el ReportViewer cargue.
+  //    El ReportViewer de Nubox vive dentro de un iframe (mismo dominio),
+  //    por eso buscamos celdas con patrón RUT en iframes también.
+  let debugInfo = '';
   try {
     await page.waitForFunction(
       () => {
-        const tds = document.querySelectorAll('td');
-        return Array.from(tds).some(td =>
-          /^\\\\d{1,2}\\\\.\\\\d{3}\\\\.\\\\d{3}-[\\\\dkK]$/.test(td.innerText.trim())
+        // Helper inline (waitForFunction no cierra sobre variables externas)
+        function getAllTds() {
+          const tds = Array.from(document.querySelectorAll('td'));
+          const iframes = Array.from(document.querySelectorAll('iframe'));
+          for (const iframe of iframes) {
+            try {
+              const iDoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+              if (iDoc) tds.push(...Array.from(iDoc.querySelectorAll('td')));
+            } catch(e) { /* cross-origin, ignorar */ }
+          }
+          return tds;
+        }
+        return getAllTds().some(td =>
+          /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/.test((td.innerText || '').trim())
         );
       },
-      { timeout: 30000 }
+      { timeout: 60000 }
     );
   } catch(e) {
-    return { data: { error: 'TIMEOUT: tabla Nubox no cargo en 30s' }, type: 'application/json' };
+    // Capturar info de diagnóstico antes de fallar
+    debugInfo = await page.evaluate(() => {
+      const iframes = Array.from(document.querySelectorAll('iframe'));
+      return JSON.stringify({
+        title:        document.title,
+        url:          location.href,
+        tdCount:      document.querySelectorAll('td').length,
+        iframeCount:  iframes.length,
+        iframeSrcs:   iframes.map(f => f.src || f.name || '(vacío)').slice(0, 5),
+      });
+    });
+    return { error: 'TIMEOUT_60s — diagnostico: ' + debugInfo };
   }
 
-  // 4. Extraer datos del DOM
+  // 4. Extraer datos del DOM (main frame + iframes)
   const resultado = await page.evaluate(() => {
-    const allTds = document.querySelectorAll('td');
+    function getAllTds() {
+      const tds = Array.from(document.querySelectorAll('td'));
+      const iframes = Array.from(document.querySelectorAll('iframe'));
+      for (const iframe of iframes) {
+        try {
+          const iDoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+          if (iDoc) tds.push(...Array.from(iDoc.querySelectorAll('td')));
+        } catch(e) {}
+      }
+      return tds;
+    }
+    const allTds = getAllTds();
 
     // Detectar columnas de meses desde el encabezado (ej: "Ene-26", "Feb-26", ...)
-    const headerCell = Array.from(allTds).find(td => {
-      const text = td.innerText;
+    const headerCell = allTds.find(td => {
+      const text = td.innerText || '';
       return text.includes('Cliente') && text.includes('Total') &&
-             /[A-Z][a-z]{2}-\\\\d{2}/.test(text);
+             /[A-Z][a-z]{2}-\\d{2}/.test(text);
     });
 
     if (!headerCell) return { error: 'Encabezado no encontrado', clientes: [], MESES: [] };
 
-    const MESES = [...headerCell.innerText.matchAll(/([A-Z][a-z]{2}-\\\\d{2})/g)].map(m => m[1]);
+    const MESES = [...headerCell.innerText.matchAll(/([A-Z][a-z]{2}-\\d{2})/g)].map(m => m[1]);
     if (!MESES.length) return { error: 'Sin columnas de meses', clientes: [], MESES: [] };
 
-    // Extraer filas de clientes (identificadas por celda con patron RUT)
-    const rutPattern = /^\\\\d{1,2}\\\\.\\\\d{3}\\\\.\\\\d{3}-[\\\\dkK]$/;
-    const rutCells   = Array.from(allTds).filter(td => rutPattern.test(td.innerText.trim()));
+    // Extraer filas de clientes (identificadas por celda con patrón RUT)
+    const rutPattern = /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/;
+    const rutCells   = allTds.filter(td => rutPattern.test((td.innerText || '').trim()));
 
     const results = [];
     const seen    = new Set();
 
     rutCells.forEach(rutCell => {
-      const rut = rutCell.innerText.trim();
+      const rut = (rutCell.innerText || '').trim();
       if (seen.has(rut)) return;
       seen.add(rut);
 
       const row = rutCell.closest('tr');
       if (!row) return;
 
-      // Estructura de fila: [vacio, RUT, RUT, Nombre, Nombre, mes1..mes12, Total]
-      const cells     = Array.from(row.querySelectorAll('td')).map(c => c.innerText.trim());
+      // Estructura de fila: [vacío, RUT, RUT, Nombre, Nombre, mes1..mes12, Total]
+      const cells     = Array.from(row.querySelectorAll('td')).map(c => (c.innerText || '').trim());
       const rutIdx    = cells.indexOf(rut);
       if (rutIdx < 0) return;
 
@@ -96,13 +139,13 @@ export default async function({ page }) {
       for (let i = 0; i < MESES.length; i++) {
         const val = (cells[monthStart + i] || '').trim();
         if (val) {
-          const num = parseInt(val.replace(/\\\\./g, ''), 10);
-          if (!isNaN(num) && num > 0) meses[MESES[i]] = num * 1000; // miles de pesos a pesos
+          const num = parseInt(val.replace(/\\./g, ''), 10);
+          if (!isNaN(num) && num > 0) meses[MESES[i]] = num * 1000; // miles → pesos
         }
       }
 
       const totalStr = (cells[cells.length - 1] || '').trim();
-      const total    = totalStr ? parseInt(totalStr.replace(/\\\\./g, ''), 10) * 1000 : 0;
+      const total    = totalStr ? parseInt(totalStr.replace(/\\./g, ''), 10) * 1000 : 0;
 
       results.push({ rut, nombre, meses, total });
     });
@@ -110,7 +153,8 @@ export default async function({ page }) {
     return { clientes: results, MESES };
   });
 
-  return { data: resultado, type: 'application/json' };
+  // Retorna resultado directamente (sin wrapper {data,type})
+  return resultado;
 }
 `;
 }
@@ -134,7 +178,7 @@ async function scrapeNuboxResumen() {
         method:  'POST',
         headers: { 'Content-Type': 'application/javascript' },
         body:    browserCode,
-        timeout: 90000,
+        timeout: 120000, // 2 min para dar tiempo a Browserless
       });
 
       if (!resp.ok) {
@@ -142,23 +186,27 @@ async function scrapeNuboxResumen() {
         throw new Error(`Browserless HTTP ${resp.status}: ${txt.slice(0, 300)}`);
       }
 
-      const result = await resp.json();
+      const raw = await resp.json();
+
+      // Browserless puede entregar {data, type} o el objeto directo.
+      // Normalizamos accediendo a .data si existe, sino usamos raw directamente.
+      const result = (raw && raw.data !== undefined) ? raw.data : raw;
 
       if (result.error) throw new Error('Browser error: ' + result.error);
       if (!Array.isArray(result.clientes)) {
-        throw new Error('Respuesta inesperada: ' + JSON.stringify(result).slice(0, 200));
+        throw new Error('Respuesta inesperada: ' + JSON.stringify(raw).slice(0, 300));
       }
 
-      console.log(`[scraper] OK — ${result.clientes.length} clientes, meses: ${result.MESES ? result.MESES.join(', ') : 'N/A'}`);
+      console.log(`[scraper] OK — ${result.clientes.length} clientes, meses: ${result.MESES?.join(', ')}`);
       return { clientes: result.clientes, meses: result.MESES || [] };
 
     } catch (err) {
-      console.warn(`[scraper] ${host} fallo: ${err.message}`);
+      console.warn(`[scraper] ${host} falló: ${err.message}`);
       lastErr = err;
     }
   }
 
-  throw new Error('Todos los endpoints de Browserless fallaron. Ultimo error: ' + (lastErr ? lastErr.message : 'desconocido'));
+  throw new Error('Todos los endpoints de Browserless fallaron. Último error: ' + lastErr?.message);
 }
 
 module.exports = { scrapeNuboxResumen };
