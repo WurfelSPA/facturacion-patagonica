@@ -1,146 +1,84 @@
 /**
- * render-service/index.js
- *
- * Servidor Express en Render.com — sincronización mensual Nubox → Drive.
- *
- * Variables de entorno requeridas:
- *   PORT                 — asignado automáticamente por Render
- *   SYNC_SECRET          — token compartido con n8n y con Vercel
- *   NUBOX_UTN            — token UTN de sesión Nubox
- *   VERCEL_HISTORIAL_URL — URL del endpoint /api/historial en Vercel
- *
- * Endpoints:
- *   GET  /                       — health check
- *   GET  /sync-nubox/status      — estado de env vars
- *   POST /sync-nubox             — sincronización completa (requiere secret)
+ * index.js v30 - Express con chunked streaming y heartbeats para evitar
+ * el idle timeout de 100s de Render mientras Chromium trabaja.
  */
-
 const express = require('express');
 const fetch   = require('node-fetch');
-const { scrapeNuboxResumen }  = require('./nubox-scraper');
+const { scrapeNuboxResumen }    = require('./nubox-scraper');
 const { formatearResumenNubox } = require('./excel-parser');
 
 const app    = express();
-const PORT   = process.env.PORT || 3000;
+const PORT   = process.env.PORT || 10000;
 const SECRET = process.env.SYNC_SECRET || '';
 
 app.use(express.json());
 
-// ── Health check ──────────────────────────────────────────────────────────────
-app.get('/', (_req, res) => {
-  res.json({ status: 'ok', service: 'nubox-sync-v2', ts: new Date().toISOString() });
-});
+app.get('/', (_req, res) => res.json({ status: 'ok', service: 'nubox-sync-v3', ts: new Date().toISOString() }));
 
-// ── Status ────────────────────────────────────────────────────────────────────
-app.get('/sync-nubox/status', (_req, res) => {
-  res.json({
-    ok: true,
-    env: {
-      NUBOX_UTN:            process.env.NUBOX_UTN            ? '✓ set' : '✗ missing',
-      SYNC_SECRET:          process.env.SYNC_SECRET          ? '✓ set' : '✗ missing',
-      VERCEL_HISTORIAL_URL: process.env.VERCEL_HISTORIAL_URL ? '✓ set' : '✗ missing',
-    },
-  });
-});
+app.get('/sync-nubox/status', (_req, res) => res.json({ ok: true, env: {
+  NUBOX_UTN:            process.env.NUBOX_UTN            ? 'set' : 'MISSING',
+  SYNC_SECRET:          process.env.SYNC_SECRET          ? 'set' : 'MISSING',
+  VERCEL_HISTORIAL_URL: process.env.VERCEL_HISTORIAL_URL ? 'set' : 'MISSING',
+}}));
 
-// ── POST /sync-nubox ──────────────────────────────────────────────────────────
+function checkAuth(req) {
+  const hdr = (req.headers['authorization'] || '').replace(/^Bearer\s+/i, '');
+  const provided = hdr || (req.body || {}).secret || '';
+  return SECRET && provided === SECRET;
+}
+
 app.post('/sync-nubox', async (req, res) => {
   const start = Date.now();
-  console.log('[sync] Iniciando sincronización Nubox —', new Date().toISOString());
+  console.log('[sync] POST /sync-nubox', new Date().toISOString());
 
-  // 1. Autenticación
-  const { secret } = req.body || {};
-  if (!SECRET || secret !== SECRET) {
-    console.warn('[sync] Acceso no autorizado');
-    return res.status(401).json({ ok: false, error: 'No autorizado' });
-  }
+  if (!checkAuth(req)) return res.status(401).json({ ok: false, error: 'No autorizado' });
+  if (!process.env.NUBOX_UTN) return res.status(500).json({ ok: false, error: 'Falta NUBOX_UTN' });
+  if (!process.env.VERCEL_HISTORIAL_URL) return res.status(500).json({ ok: false, error: 'Falta VERCEL_HISTORIAL_URL' });
 
-  // 2. Verificar env vars
-  if (!process.env.NUBOX_UTN) {
-    return res.status(500).json({ ok: false, error: 'Falta NUBOX_UTN' });
-  }
-  if (!process.env.VERCEL_HISTORIAL_URL) {
-    return res.status(500).json({ ok: false, error: 'Falta VERCEL_HISTORIAL_URL' });
-  }
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Transfer-Encoding', 'chunked');
+  const beat = setInterval(() => res.write('\n'), 30000);
+  const done = p => { clearInterval(beat); res.end(JSON.stringify(p)); };
 
   try {
-    // 3. Scraping Nubox con Puppeteer
-    console.log('[sync] Paso 1: scraping Nubox (Puppeteer)...');
+    console.log('[sync] Paso 1: scraping...');
     const scraped = await scrapeNuboxResumen();
-    console.log(`[sync] Paso 1 OK — ${scraped.clientes.length} clientes, meses: ${scraped.meses.join(', ')}`);
+    console.log('[sync] Paso 1 OK -', scraped.clientes.length, 'clientes');
 
-    if (scraped.clientes.length === 0) {
-      return res.status(200).json({
-        ok: false,
-        warning: 'No se encontraron clientes en el Resumen de Ventas',
-        elapsed: Date.now() - start,
-      });
-    }
+    if (!scraped.clientes.length)
+      return done({ ok: false, warning: 'Sin clientes', elapsed: Date.now() - start });
 
-    // 4. Formatear datos
-    console.log('[sync] Paso 2: formateando datos...');
+    console.log('[sync] Paso 2: formateando...');
     const resumen = formatearResumenNubox(scraped);
-    console.log(
-      `[sync] Paso 2 OK — ${resumen.stats.totalClientes} clientes, ` +
-      `total: $${resumen.stats.totalGeneral.toLocaleString('es-CL')}`
-    );
 
-    // 5. Guardar en Drive vía endpoint Vercel
     console.log('[sync] Paso 3: guardando en Drive...');
-    const saveUrl = process.env.VERCEL_HISTORIAL_URL + '?syncResumen=1';
-    const saveResp = await fetch(saveUrl, {
-      method:  'POST',
-      headers: {
-        'Content-Type':   'application/json',
-        'x-sync-secret':  SECRET,
-      },
+    const sr = await fetch(process.env.VERCEL_HISTORIAL_URL + '?syncResumen=1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-sync-secret': SECRET },
       body: JSON.stringify({ resumen }),
       timeout: 30000,
     });
+    if (!sr.ok) throw new Error('VERCEL_ERROR: ' + sr.status + ' ' + (await sr.text()).slice(0, 200));
+    const srj = await sr.json();
+    console.log('[sync] Paso 3 OK:', JSON.stringify(srj));
 
-    if (!saveResp.ok) {
-      const errText = await saveResp.text();
-      throw new Error(`VERCEL_ERROR: ${saveResp.status} — ${errText.slice(0, 200)}`);
-    }
-
-    const saveResult = await saveResp.json();
-    console.log('[sync] Paso 3 OK:', JSON.stringify(saveResult));
-
-    return res.json({
-      ok: true,
-      clientes:     resumen.stats.totalClientes,
-      totalGeneral: resumen.stats.totalGeneral,
-      columnas:     resumen._columnas,
-      generado:     resumen._generado,
-      elapsed:      Date.now() - start,
-    });
-
+    done({ ok: true, clientes: resumen.stats.totalClientes, totalGeneral: resumen.stats.totalGeneral,
+           columnas: resumen._columnas, generado: resumen._generado, elapsed: Date.now() - start });
   } catch (err) {
     console.error('[sync] ERROR:', err.message);
-    return res.status(500).json({
-      ok:      false,
-      error:   err.message,
-      elapsed: Date.now() - start,
-    });
+    done({ ok: false, error: err.message, elapsed: Date.now() - start });
   }
 });
 
-// ── GET /diag — diagnóstico temporal sin auth (solo lectura) ──────────────
 app.get('/diag', async (_req, res) => {
   const start = Date.now();
-  if (!process.env.NUBOX_UTN || !process.env.BROWSERLESS_TOKEN) {
-    return res.status(500).json({ ok: false, error: 'Faltan env vars NUBOX_UTN / BROWSERLESS_TOKEN' });
-  }
+  if (!process.env.NUBOX_UTN) return res.status(500).json({ ok: false, error: 'Falta NUBOX_UTN' });
   try {
-    const result = await scrapeNuboxResumen();
-    console.log('[diag] resultado:', JSON.stringify(result).slice(0, 3000));
-    return res.json({ ok: true, result, elapsed: Date.now() - start });
+    const r = await scrapeNuboxResumen();
+    res.json({ ok: true, result: r, elapsed: Date.now() - start });
   } catch (err) {
-    console.error('[diag] error:', err.message);
-    return res.status(500).json({ ok: false, error: err.message, elapsed: Date.now() - start });
+    res.status(500).json({ ok: false, error: err.message, elapsed: Date.now() - start });
   }
 });
 
-app.listen(PORT, () =>
-  console.log(`[sync] Servidor nubox-sync-v2 en puerto ${PORT}`)
-);
+app.listen(PORT, () => console.log('[sync] nubox-sync-v3 en puerto', PORT));
