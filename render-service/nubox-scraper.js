@@ -1,7 +1,9 @@
 /**
  * render-service/nubox-scraper.js
  *
- * Fix v4: diagnóstico completo pre/post clic + eval() para __doPostBack ASP.NET
+ * DIAGNOSTIC MODE: retorna outerHTML del elemento "Año actual",
+ * todos los onclick handlers y el parentHTML — para identificar
+ * cómo disparar el postback de ASP.NET.
  *
  * Vars requeridas:
  *   BROWSERLESS_TOKEN  — token de Browserless.io
@@ -20,153 +22,91 @@ const BROWSERLESS_HOSTS = [
 function buildBrowserCode(targetUrl) {
   return `
 export default async function({ page }) {
-  // 1. Navegar al Dashboard con UTN
+  // 1. Navegar
   await page.goto(${JSON.stringify(targetUrl)}, { waitUntil: 'domcontentloaded', timeout: 15000 });
 
-  // 2. Verificar que no redirigió a login
+  // 2. Verificar login
   const currentUrl = page.url();
   if (currentUrl.toLowerCase().includes('login') || currentUrl.toLowerCase().includes('account')) {
     return { error: 'UTN_EXPIRED: ' + currentUrl };
   }
 
-  // 3. Esperar 4s para que la página cargue controles
-  await new Promise(r => setTimeout(r, 4000));
+  // 3. Esperar 6s para que el JS de la página se ejecute completamente
+  await new Promise(r => setTimeout(r, 6000));
 
-  // 4. Pre-click: capturar estado DOM y link "Año actual"
-  const preDiag = await page.evaluate(() => {
-    const links = Array.from(document.querySelectorAll('a'));
-    const anioLink = links.find(a => (a.innerText || a.textContent || '').trim() === 'Año actual');
+  // 4. Diagnóstico DOM completo — retornar INMEDIATAMENTE sin esperar datos
+  const diag = await page.evaluate(() => {
+    // Encontrar el elemento con texto "Año actual"
+    const all = Array.from(document.querySelectorAll('*'));
+    const anioEl = all.find(e => {
+      const t = (e.innerText || e.textContent || '').trim();
+      return t === 'Año actual';
+    });
+
+    // Todos los <li> con sus datos
+    const liItems = Array.from(document.querySelectorAll('li'))
+      .map(li => ({
+        text: (li.innerText || '').trim().slice(0, 60),
+        outerHTML: li.outerHTML.slice(0, 600),
+        onclick: li.getAttribute('onclick') || null
+      }))
+      .filter(li => li.text)
+      .slice(0, 15);
+
+    // Todos los elementos con onclick
+    const onclicks = Array.from(document.querySelectorAll('[onclick]'))
+      .map(e => ({
+        tag: e.tagName, id: e.id,
+        text: (e.innerText || '').trim().slice(0, 40),
+        onclick: e.getAttribute('onclick').slice(0, 250)
+      }))
+      .slice(0, 20);
+
+    // ¿Existe __doPostBack?
+    let hasDoPostBack = false;
+    try { hasDoPostBack = typeof __doPostBack !== 'undefined'; } catch(e) {}
+
+    // Fragmentos de scripts que mencionan doPostBack
+    const scriptSnips = Array.from(document.querySelectorAll('script'))
+      .map(s => s.textContent || '')
+      .filter(t => t.includes('doPostBack'))
+      .map(t => {
+        const idx = t.indexOf('doPostBack');
+        return t.slice(Math.max(0, idx - 40), idx + 120);
+      })
+      .slice(0, 5);
+
+    // Todos los <a> (debería mostrar 0 si el frame principal no tiene)
+    const links = Array.from(document.querySelectorAll('a'))
+      .map(a => ({
+        text: (a.innerText || '').trim().slice(0, 40),
+        href: (a.getAttribute('href') || '').slice(0, 150),
+        onclick: (a.getAttribute('onclick') || '').slice(0, 150)
+      }))
+      .filter(l => l.text || l.href)
+      .slice(0, 30);
+
     return {
+      anioEl: anioEl ? {
+        tag: anioEl.tagName,
+        id: anioEl.id || null,
+        onclick: anioEl.getAttribute('onclick') || null,
+        outerHTML: anioEl.outerHTML.slice(0, 600),
+        parentTag: anioEl.parentElement ? anioEl.parentElement.tagName : null,
+        parentOuterHTML: anioEl.parentElement ? anioEl.parentElement.outerHTML.slice(0, 800) : null
+      } : null,
+      liItems,
+      onclicks,
+      hasDoPostBack,
+      scriptSnips,
+      links,
       tdCount: document.querySelectorAll('td').length,
-      anioFound: !!anioLink,
-      anioHref: anioLink ? (anioLink.getAttribute('href') || '').slice(0, 200) : null,
-      anioId:   anioLink ? anioLink.id : null,
-      allLinks: links.map(a => ({
-        t: (a.innerText || '').trim().slice(0, 40),
-        h: (a.getAttribute('href') || '').slice(0, 120)
-      })).filter(l => l.t).slice(0, 35)
+      url: location.href
     };
   });
 
-  // 5. Hacer clic en "Año actual" — usar eval() si href es javascript:
-  const clickResult = await page.evaluate(() => {
-    // Primero buscar entre <a> tags
-    const links = Array.from(document.querySelectorAll('a'));
-    const link = links.find(a => (a.innerText || a.textContent || '').trim() === 'Año actual');
-    if (link) {
-      const href = link.getAttribute('href') || '';
-      if (href.toLowerCase().startsWith('javascript:')) {
-        try {
-          eval(href.slice('javascript:'.length));
-          return { ok: true, method: 'eval', href: href.slice(0, 150) };
-        } catch(e) {
-          link.click();
-          return { ok: true, method: 'click_fallback', err: e.message, href: href.slice(0, 80) };
-        }
-      }
-      link.click();
-      return { ok: true, method: 'click', href: href.slice(0, 80) };
-    }
-    // Fallback: cualquier elemento con ese texto
-    const all = Array.from(document.querySelectorAll('a, button, span, input, li'));
-    const el = all.find(e => (e.innerText || e.textContent || e.value || '').trim() === 'Año actual');
-    if (el) {
-      el.click();
-      return { ok: true, method: 'generic', tag: el.tagName };
-    }
-    return { ok: false };
-  });
-
-  // 6. Esperar que la tabla cargue mensualmente (35s máx para quedar en ≤55s total)
-  let timedOut = false;
-  const initCount = preDiag.tdCount || 46;
-  try {
-    await page.waitForFunction(
-      (ic) => {
-        // Opción A: celdas con patrón RUT
-        const tds = Array.from(document.querySelectorAll('td'));
-        if (tds.some(td => /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/.test((td.innerText || '').trim()))) return true;
-        // Opción B: columnas de meses en texto
-        if (/Ene-\\d{2}|Feb-\\d{2}|Mar-\\d{2}/.test(document.body.innerText)) return true;
-        // Opción C: tdCount aumentó mucho (se cargaron filas)
-        if (document.querySelectorAll('td').length > ic + 15) return true;
-        return false;
-      },
-      { timeout: 35000 },
-      initCount
-    );
-  } catch(e) {
-    timedOut = true;
-  }
-
-  if (timedOut) {
-    const postDiag = await page.evaluate(() => ({
-      tdCount:  document.querySelectorAll('td').length,
-      bodySnip: document.body.innerText.slice(0, 800),
-      url:      location.href,
-    }));
-    return { error: 'TIMEOUT_35s', preDiag, clickResult, postDiag };
-  }
-
-  // 7. Extraer datos del DOM
-  const resultado = await page.evaluate(() => {
-    const allTds = Array.from(document.querySelectorAll('td'));
-
-    // Buscar encabezado con columnas de meses
-    const headerCell = allTds.find(td => {
-      const text = td.innerText || '';
-      return text.includes('Cliente') && text.includes('Total') &&
-             /[A-Z][a-z]{2}-\\d{2}/.test(text);
-    });
-
-    if (!headerCell) {
-      const rutPattern = /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/;
-      const rutCount = allTds.filter(td => rutPattern.test((td.innerText || '').trim())).length;
-      return {
-        error: 'Encabezado sin columnas de meses',
-        clientes: [], MESES: [],
-        rutCount,
-        bodySnip: document.body.innerText.slice(0, 400)
-      };
-    }
-
-    const MESES = [...headerCell.innerText.matchAll(/([A-Z][a-z]{2}-\\d{2})/g)].map(m => m[1]);
-    if (!MESES.length) return { error: 'Sin columnas mes en encabezado', clientes: [], MESES: [] };
-
-    const rutPattern = /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/;
-    const rutCells   = allTds.filter(td => rutPattern.test((td.innerText || '').trim()));
-
-    const results = [];
-    const seen    = new Set();
-
-    rutCells.forEach(rutCell => {
-      const rut = (rutCell.innerText || '').trim();
-      if (seen.has(rut)) return;
-      seen.add(rut);
-      const row = rutCell.closest('tr');
-      if (!row) return;
-      const cells = Array.from(row.querySelectorAll('td')).map(c => (c.innerText || '').trim());
-      const rutIdx = cells.indexOf(rut);
-      if (rutIdx < 0) return;
-      const nombre     = cells[rutIdx + 2] || cells[rutIdx + 1] || '';
-      const monthStart = rutIdx + 4;
-      const meses = {};
-      for (let i = 0; i < MESES.length; i++) {
-        const val = (cells[monthStart + i] || '').trim();
-        if (val) {
-          const num = parseInt(val.replace(/\\./g, ''), 10);
-          if (!isNaN(num) && num > 0) meses[MESES[i]] = num * 1000;
-        }
-      }
-      const totalStr = (cells[cells.length - 1] || '').trim();
-      const total    = totalStr ? parseInt(totalStr.replace(/\\./g, ''), 10) * 1000 : 0;
-      results.push({ rut, nombre, meses, total });
-    });
-
-    return { clientes: results, MESES };
-  });
-
-  return resultado;
+  // Retornar diagnóstico directamente (sin esperar tabla)
+  return { _diagnostic: true, diag };
 }
 `;
 }
@@ -190,7 +130,7 @@ async function scrapeNuboxResumen() {
         method:  'POST',
         headers: { 'Content-Type': 'application/javascript' },
         body:    browserCode,
-        timeout: 90000,
+        timeout: 45000,
       });
 
       if (!resp.ok) {
@@ -202,11 +142,13 @@ async function scrapeNuboxResumen() {
       const result = (raw && raw.data !== undefined) ? raw.data : raw;
 
       if (result.error) {
-        // Loguear diagnóstico detallado
-        if (result.preDiag)    console.warn('[scraper] PRE-DIAG:',   JSON.stringify(result.preDiag));
-        if (result.clickResult) console.warn('[scraper] CLICK:',     JSON.stringify(result.clickResult));
-        if (result.postDiag)   console.warn('[scraper] POST-DIAG:',  JSON.stringify(result.postDiag));
         throw new Error('Browser error: ' + result.error);
+      }
+
+      if (result._diagnostic) {
+        // Modo diagnóstico: loguear todo y retornar error descriptivo
+        console.warn('[scraper] DIAGNOSTIC:', JSON.stringify(result.diag));
+        throw new Error('DIAGNOSTIC_MODE — ver logs para DOM info');
       }
 
       if (!Array.isArray(result.clientes)) {
