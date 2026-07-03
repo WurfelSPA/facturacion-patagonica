@@ -9,7 +9,7 @@ export default async function({ page }) {
   // 2s para que los scripts Nubox se inicialicen
   await new Promise(r => setTimeout(r, 2000));
 
-  // Cambiar a "Ano actual" — strings (no arrow fn: strict mode ES module)
+  // Cambiar a "Ano actual"
   await page.evaluate(
     'var h=document.getElementById("hdnMesesMostrar");' +
     'if(h)h.value="1";' +
@@ -17,37 +17,36 @@ export default async function({ page }) {
     'if(s&&typeof s.onclick==="function")s.onclick.call(s);'
   );
 
-  // Disparar postback — causa recarga completa de pagina
+  // Disparar postback
   await page.evaluate(
     'if(typeof __doPostBack==="function")' +
     '__doPostBack("ReportViewer1$ctl09$ReportControl$ctl00","");'
   );
 
-  // 3s para que arranque la navegacion (el try/catch del poll maneja el resto)
-  await new Promise(r => setTimeout(r, 3000));
-
-  // Polling: 22x2s = 44s maximos. Los primeros ciclos pueden fallar
-  // mientras la pagina recarga (execution context destroyed) — el catch lo maneja.
-  // SSRS tarda ~25-35s en renderizar desde el postback.
+  // Polling: 23x2s = 46s. try/catch maneja pagina aun navegando.
   let ssrsReady = false;
-  for (let i = 0; i < 22; i++) {
+  let lastDiag = null;
+  for (let i = 0; i < 23; i++) {
     try {
-      const ok = await page.evaluate(
-        'document.getElementById("hdnMesesMostrar") &&' +
-        'document.getElementById("hdnMesesMostrar").value === "1" &&' +
-        'document.querySelectorAll("td").length >= 60 &&' +
-        '!Array.from(document.querySelectorAll("td")).some(function(td) {' +
-        '  return td.innerText.trim() === "Loading...";' +
-        '})'
+      const diagStr = await page.evaluate(
+        '(function(){' +
+        '  var hdn=document.getElementById("hdnMesesMostrar");' +
+        '  var tds=document.querySelectorAll("td");' +
+        '  var loading=Array.from(tds).some(function(td){return td.innerText.trim()==="Loading...";});' +
+        '  var hdnVal=hdn?hdn.value:"MISSING";' +
+        '  var ok=hdn&&hdn.value==="1"&&tds.length>=60&&!loading;' +
+        '  return JSON.stringify({ok:ok,hdn:hdnVal,tds:tds.length,loading:loading,url:location.href.slice(-60)});' +
+        '})()'
       );
-      if (ok) { ssrsReady = true; break; }
-    } catch(e) { /* pagina aun navegando, ignorar */ }
+      lastDiag = JSON.parse(diagStr);
+      if (lastDiag.ok) { ssrsReady = true; break; }
+    } catch(e) { lastDiag = {navErr: e.message.slice(0,60), iter: i}; }
     await new Promise(r => setTimeout(r, 2000));
   }
 
-  if (!ssrsReady) return { error: 'SSRS_TIMEOUT: no cargo en 47s' };
+  if (!ssrsReady) return { error: 'SSRS_TIMEOUT', diag: lastDiag };
 
-  // Extraer datos (IIFE en string — sin funciones flecha)
+  // Extraer datos
   const jsonStr = await page.evaluate(
     '(function(){' +
     '  var allTds=Array.from(document.querySelectorAll("td"));' +
