@@ -1,8 +1,11 @@
 /**
  * render-service/nubox-scraper.js
  *
- * Browserless free tier: hard timeout = 60s per /function call.
- * waitForFunction must use ≤45s so the error return completes before kill.
+ * Fix: el Resumen de Ventas por default muestra vista resumen (Cliente, Total).
+ * Hay que hacer clic en "Año actual" para cargar la vista mensual (Ene-26 … Jul-26).
+ * El clic dispara AJAX de ASP.NET UpdatePanel → la tabla se recarga con columnas de meses.
+ *
+ * Browserless free tier: hard timeout 60s → waitForFunction máx 40s.
  *
  * Vars requeridas:
  *   BROWSERLESS_TOKEN  — token de Browserless.io
@@ -21,7 +24,7 @@ const BROWSERLESS_HOSTS = [
 function buildBrowserCode(targetUrl) {
   return `
 export default async function({ page }) {
-  // 1. Navegar con domcontentloaded (más rápido; waitForFunction espera la tabla)
+  // 1. Navegar al Dashboard con UTN
   await page.goto(${JSON.stringify(targetUrl)}, { waitUntil: 'domcontentloaded', timeout: 15000 });
 
   // 2. Verificar que no redirigió a login
@@ -30,87 +33,94 @@ export default async function({ page }) {
     return { error: 'UTN_EXPIRED: ' + currentUrl };
   }
 
-  // Helper: buscar TDs en main frame + iframes (Nubox ReportViewer vive en iframe)
-  // NOTA: debe definirse inline porque waitForFunction no cierra sobre variables externas.
-  const ALL_TDS_FN = () => {
-    function getAllTds() {
-      const tds = Array.from(document.querySelectorAll('td'));
-      const iframes = Array.from(document.querySelectorAll('iframe'));
-      for (const iframe of iframes) {
-        try {
-          const iDoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
-          if (iDoc) tds.push(...Array.from(iDoc.querySelectorAll('td')));
-        } catch(e) {}
-      }
-      return tds;
-    }
-    return getAllTds().some(td =>
-      /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/.test((td.innerText || '').trim())
-    );
-  };
+  // 3. Esperar 3s para que el página inicial cargue controles
+  await new Promise(r => setTimeout(r, 3000));
 
-  // 3. Esperar tabla. MÁXIMO 45s para retornar ANTES del kill de Browserless (60s).
+  // 4. Hacer clic en "Año actual" para cargar vista mensual (Ene-26 … mes-actual)
+  //    El clic dispara el UpdatePanel de ASP.NET que recarga la tabla con columnas de meses.
+  const clickResult = await page.evaluate(() => {
+    const all = Array.from(document.querySelectorAll('a, button, span, input, label, li, td'));
+    const el = all.find(e => {
+      const text = (e.innerText || e.textContent || e.value || '').trim();
+      return text === 'Año actual';
+    });
+    if (el) {
+      el.click();
+      return { clicked: true, tag: el.tagName, text: el.innerText };
+    }
+    // Fallback: buscar por href o data-*
+    const link = document.querySelector('a[href*="actual"], [data-value="actual"]');
+    if (link) {
+      link.click();
+      return { clicked: true, tag: link.tagName, via: 'href/data' };
+    }
+    // Retornar todos los textos de links para debug
+    const linkTexts = Array.from(document.querySelectorAll('a')).map(a => a.innerText.trim()).filter(Boolean).slice(0, 20);
+    return { clicked: false, linkTexts };
+  });
+  console.log('[browser] clickResult:', JSON.stringify(clickResult));
+
+  // 5. Esperar a que la tabla se recargue con columnas de meses (patrón RUT en celdas)
+  //    Máximo 40s (Browserless free tier mata la conexión a los 60s)
   let timedOut = false;
   try {
-    await page.waitForFunction(ALL_TDS_FN, { timeout: 45000 });
+    await page.waitForFunction(
+      () => {
+        const tds = Array.from(document.querySelectorAll('td'));
+        return tds.some(td => /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/.test((td.innerText || '').trim()));
+      },
+      { timeout: 40000 }
+    );
   } catch(e) {
     timedOut = true;
   }
 
   if (timedOut) {
-    // Capturar diagnóstico para saber qué hay en la página
+    // Diagnóstico: capturar estado actual
     const diag = await page.evaluate(() => {
-      function getAllTds() {
-        const tds = Array.from(document.querySelectorAll('td'));
-        const iframes = Array.from(document.querySelectorAll('iframe'));
-        for (const iframe of iframes) {
-          try {
-            const iDoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
-            if (iDoc) tds.push(...Array.from(iDoc.querySelectorAll('td')));
-          } catch(e) {}
-        }
-        return tds;
-      }
-      const iframes = Array.from(document.querySelectorAll('iframe'));
+      const tds = Array.from(document.querySelectorAll('td'));
+      const headerCell = tds.find(td => {
+        const text = td.innerText || '';
+        return text.includes('Cliente') && text.includes('Total');
+      });
       return {
-        title:       document.title,
-        url:         location.href,
-        mainTds:     document.querySelectorAll('td').length,
-        allTds:      getAllTds().length,
-        iframes:     iframes.length,
-        iframeSrcs:  iframes.map(f => (f.src || f.name || '').slice(0, 80)).slice(0, 5),
-        bodySnip:    (document.body ? document.body.innerText : '').slice(0, 300),
+        tdCount:    tds.length,
+        headerText: headerCell ? (headerCell.innerText || '').slice(0, 200) : null,
+        bodySnip:   (document.body ? document.body.innerText : '').slice(0, 500),
+        url:        location.href,
       };
     });
-    return { error: 'TIMEOUT_45s', diag };
+    return { error: 'TIMEOUT_40s_post_click', diag };
   }
 
-  // 4. Extraer datos del DOM (main frame + iframes)
+  // 6. Extraer datos
   const resultado = await page.evaluate(() => {
-    function getAllTds() {
-      const tds = Array.from(document.querySelectorAll('td'));
-      const iframes = Array.from(document.querySelectorAll('iframe'));
-      for (const iframe of iframes) {
-        try {
-          const iDoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
-          if (iDoc) tds.push(...Array.from(iDoc.querySelectorAll('td')));
-        } catch(e) {}
-      }
-      return tds;
-    }
-    const allTds = getAllTds();
+    const allTds = Array.from(document.querySelectorAll('td'));
 
-    // Detectar encabezado de meses (ej: "Ene-26", "Feb-26", ...)
+    // Encabezado con columnas de meses
     const headerCell = allTds.find(td => {
       const text = td.innerText || '';
       return text.includes('Cliente') && text.includes('Total') &&
              /[A-Z][a-z]{2}-\\d{2}/.test(text);
     });
 
-    if (!headerCell) return { error: 'Encabezado no encontrado', clientes: [], MESES: [] };
+    if (!headerCell) {
+      // Intentar encabezado distribuido (th elements)
+      const ths = Array.from(document.querySelectorAll('th'));
+      const mesRE = /^[A-Z][a-z]{2}-\\d{2}$/;
+      const mesHeaders = ths.filter(th => mesRE.test((th.innerText || '').trim())).map(th => (th.innerText || '').trim());
+      if (mesHeaders.length === 0) {
+        return { error: 'Encabezado de meses no encontrado', tdCount: allTds.length, clientes: [], MESES: [] };
+      }
+      // Usar th-based approach
+      const MESES = mesHeaders;
+      const rutPattern = /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/;
+      const rutCells   = allTds.filter(td => rutPattern.test((td.innerText || '').trim()));
+      // ... (continuación abajo)
+    }
 
     const MESES = [...headerCell.innerText.matchAll(/([A-Z][a-z]{2}-\\d{2})/g)].map(m => m[1]);
-    if (!MESES.length) return { error: 'Sin columnas de meses', clientes: [], MESES: [] };
+    if (!MESES.length) return { error: 'Sin columnas de meses en encabezado', clientes: [], MESES: [] };
 
     const rutPattern = /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/;
     const rutCells   = allTds.filter(td => rutPattern.test((td.innerText || '').trim()));
@@ -184,15 +194,10 @@ async function scrapeNuboxResumen() {
       }
 
       const raw = await resp.json();
-
-      // Browserless puede entregar {data,type} o el objeto directo; normalizamos.
       const result = (raw && raw.data !== undefined) ? raw.data : raw;
 
       if (result.error) {
-        // Loguear diagnóstico si viene (TIMEOUT_45s)
-        if (result.diag) {
-          console.warn('[scraper] DIAG:', JSON.stringify(result.diag));
-        }
+        if (result.diag) console.warn('[scraper] DIAG:', JSON.stringify(result.diag));
         throw new Error('Browser error: ' + result.error);
       }
       if (!Array.isArray(result.clientes)) {
