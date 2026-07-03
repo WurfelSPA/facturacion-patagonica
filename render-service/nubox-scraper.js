@@ -44,13 +44,13 @@ export default async function({ page }) {
       () => {
         const tds = document.querySelectorAll('td');
         return Array.from(tds).some(td =>
-          /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/.test(td.innerText.trim())
+          /^\\\\d{1,2}\\\\.\\\\d{3}\\\\.\\\\d{3}-[\\\\dkK]$/.test(td.innerText.trim())
         );
       },
       { timeout: 30000 }
     );
   } catch(e) {
-    return { data: { error: 'TIMEOUT: tabla Nubox no cargó en 30s' }, type: 'application/json' };
+    return { data: { error: 'TIMEOUT: tabla Nubox no cargo en 30s' }, type: 'application/json' };
   }
 
   // 4. Extraer datos del DOM
@@ -61,16 +61,16 @@ export default async function({ page }) {
     const headerCell = Array.from(allTds).find(td => {
       const text = td.innerText;
       return text.includes('Cliente') && text.includes('Total') &&
-             /[A-Z][a-z]{2}-\\d{2}/.test(text);
+             /[A-Z][a-z]{2}-\\\\d{2}/.test(text);
     });
 
     if (!headerCell) return { error: 'Encabezado no encontrado', clientes: [], MESES: [] };
 
-    const MESES = [...headerCell.innerText.matchAll(/([A-Z][a-z]{2}-\\d{2})/g)].map(m => m[1]);
+    const MESES = [...headerCell.innerText.matchAll(/([A-Z][a-z]{2}-\\\\d{2})/g)].map(m => m[1]);
     if (!MESES.length) return { error: 'Sin columnas de meses', clientes: [], MESES: [] };
 
-    // Extraer filas de clientes (identificadas por celda con patrón RUT)
-    const rutPattern = /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/;
+    // Extraer filas de clientes (identificadas por celda con patron RUT)
+    const rutPattern = /^\\\\d{1,2}\\\\.\\\\d{3}\\\\.\\\\d{3}-[\\\\dkK]$/;
     const rutCells   = Array.from(allTds).filter(td => rutPattern.test(td.innerText.trim()));
 
     const results = [];
@@ -84,7 +84,7 @@ export default async function({ page }) {
       const row = rutCell.closest('tr');
       if (!row) return;
 
-      // Estructura de fila: [vacío, RUT, RUT, Nombre, Nombre, mes1..mes12, Total]
+      // Estructura de fila: [vacio, RUT, RUT, Nombre, Nombre, mes1..mes12, Total]
       const cells     = Array.from(row.querySelectorAll('td')).map(c => c.innerText.trim());
       const rutIdx    = cells.indexOf(rut);
       if (rutIdx < 0) return;
@@ -96,13 +96,13 @@ export default async function({ page }) {
       for (let i = 0; i < MESES.length; i++) {
         const val = (cells[monthStart + i] || '').trim();
         if (val) {
-          const num = parseInt(val.replace(/\\./g, ''), 10);
-          if (!isNaN(num) && num > 0) meses[MESES[i]] = num * 1000; // miles de pesos → pesos
+          const num = parseInt(val.replace(/\\\\./g, ''), 10);
+          if (!isNaN(num) && num > 0) meses[MESES[i]] = num * 1000; // miles de pesos a pesos
         }
       }
 
       const totalStr = (cells[cells.length - 1] || '').trim();
-      const total    = totalStr ? parseInt(totalStr.replace(/\\./g, ''), 10) * 1000 : 0;
+      const total    = totalStr ? parseInt(totalStr.replace(/\\\\./g, ''), 10) * 1000 : 0;
 
       results.push({ rut, nombre, meses, total });
     });
@@ -120,4 +120,45 @@ async function scrapeNuboxResumen() {
   const token = process.env.BROWSERLESS_TOKEN;
 
   if (!utn)   throw new Error('Falta NUBOX_UTN en env vars');
-  if (!token) throw new Error('Falta BROWSERLESS_TOKEN en 
+  if (!token) throw new Error('Falta BROWSERLESS_TOKEN en env vars');
+
+  const targetUrl   = `${DASHBOARD}&utn=${encodeURIComponent(utn)}`;
+  const browserCode = buildBrowserCode(targetUrl);
+
+  let lastErr = null;
+
+  for (const host of BROWSERLESS_HOSTS) {
+    try {
+      console.log(`[scraper] POST ${host}/function ...`);
+      const resp = await fetch(`${host}/function?token=${token}`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/javascript' },
+        body:    browserCode,
+        timeout: 90000,
+      });
+
+      if (!resp.ok) {
+        const txt = await resp.text();
+        throw new Error(`Browserless HTTP ${resp.status}: ${txt.slice(0, 300)}`);
+      }
+
+      const result = await resp.json();
+
+      if (result.error) throw new Error('Browser error: ' + result.error);
+      if (!Array.isArray(result.clientes)) {
+        throw new Error('Respuesta inesperada: ' + JSON.stringify(result).slice(0, 200));
+      }
+
+      console.log(`[scraper] OK — ${result.clientes.length} clientes, meses: ${result.MESES ? result.MESES.join(', ') : 'N/A'}`);
+      return { clientes: result.clientes, meses: result.MESES || [] };
+
+    } catch (err) {
+      console.warn(`[scraper] ${host} fallo: ${err.message}`);
+      lastErr = err;
+    }
+  }
+
+  throw new Error('Todos los endpoints de Browserless fallaron. Ultimo error: ' + (lastErr ? lastErr.message : 'desconocido'));
+}
+
+module.exports = { scrapeNuboxResumen };
