@@ -51,7 +51,7 @@ async function exportSSRSCsv(controlId, cookies) {
   const exportUrl =
     'https://app.nubox.com/ServiFactura/Reserved.ReportViewerWebControl.axd' +
     '?OpType=Export&ControlID=' + controlId +
-    '&Format=CSV&ContentDisposition=AlwaysInline';
+    '&ReportStack=1&Format=CSV&ContentDisposition=AlwaysInline';
 
   const cookieStr = cookies.map(function(c) { return c.name + '=' + c.value; }).join('; ');
 
