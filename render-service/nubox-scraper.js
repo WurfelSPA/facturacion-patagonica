@@ -1,11 +1,8 @@
 /**
  * render-service/nubox-scraper.js
  *
- * Llama a la API REST de Browserless.io para ejecutar código de browser
- * en la nube y extraer el Resumen de Ventas de Nubox.
- *
- * No usa puppeteer — solo node-fetch para llamar al endpoint /function.
- * El código del browser viaja como string en el body del POST.
+ * Browserless free tier: hard timeout = 60s per /function call.
+ * waitForFunction must use ≤45s so the error return completes before kill.
  *
  * Vars requeridas:
  *   BROWSERLESS_TOKEN  — token de Browserless.io
@@ -21,23 +18,11 @@ const BROWSERLESS_HOSTS = [
   'https://production-lon.browserless.io',
 ];
 
-/**
- * Construye el código JavaScript que se ejecutará en el browser de Browserless.
- * El código es un ES module con export default function.
- * Los regex usan \\ porque el string vive dentro de un template literal JS.
- *
- * FIXES vs versión anterior:
- *  - waitForFunction busca en iframes también (Nubox ReportViewer vive en iframe)
- *  - timeout aumentado a 60s (Nubox es lento)
- *  - retorna data directamente sin wrapper {data, type} para evitar parsing issues
- *  - goto usa domcontentloaded para no esperar XHR continuos
- */
 function buildBrowserCode(targetUrl) {
   return `
 export default async function({ page }) {
-  // 1. Navegar al Dashboard con UTN
-  //    domcontentloaded es suficiente; waitForFunction espera la tabla
-  await page.goto(${JSON.stringify(targetUrl)}, { waitUntil: 'domcontentloaded', timeout: 90000 });
+  // 1. Navegar con domcontentloaded (más rápido; waitForFunction espera la tabla)
+  await page.goto(${JSON.stringify(targetUrl)}, { waitUntil: 'domcontentloaded', timeout: 15000 });
 
   // 2. Verificar que no redirigió a login
   const currentUrl = page.url();
@@ -45,44 +30,59 @@ export default async function({ page }) {
     return { error: 'UTN_EXPIRED: ' + currentUrl };
   }
 
-  // 3. Esperar hasta que el ReportViewer cargue.
-  //    El ReportViewer de Nubox vive dentro de un iframe (mismo dominio),
-  //    por eso buscamos celdas con patrón RUT en iframes también.
-  let debugInfo = '';
-  try {
-    await page.waitForFunction(
-      () => {
-        // Helper inline (waitForFunction no cierra sobre variables externas)
-        function getAllTds() {
-          const tds = Array.from(document.querySelectorAll('td'));
-          const iframes = Array.from(document.querySelectorAll('iframe'));
-          for (const iframe of iframes) {
-            try {
-              const iDoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
-              if (iDoc) tds.push(...Array.from(iDoc.querySelectorAll('td')));
-            } catch(e) { /* cross-origin, ignorar */ }
-          }
-          return tds;
-        }
-        return getAllTds().some(td =>
-          /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/.test((td.innerText || '').trim())
-        );
-      },
-      { timeout: 60000 }
-    );
-  } catch(e) {
-    // Capturar info de diagnóstico antes de fallar
-    debugInfo = await page.evaluate(() => {
+  // Helper: buscar TDs en main frame + iframes (Nubox ReportViewer vive en iframe)
+  // NOTA: debe definirse inline porque waitForFunction no cierra sobre variables externas.
+  const ALL_TDS_FN = () => {
+    function getAllTds() {
+      const tds = Array.from(document.querySelectorAll('td'));
       const iframes = Array.from(document.querySelectorAll('iframe'));
-      return JSON.stringify({
-        title:        document.title,
-        url:          location.href,
-        tdCount:      document.querySelectorAll('td').length,
-        iframeCount:  iframes.length,
-        iframeSrcs:   iframes.map(f => f.src || f.name || '(vacío)').slice(0, 5),
-      });
+      for (const iframe of iframes) {
+        try {
+          const iDoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+          if (iDoc) tds.push(...Array.from(iDoc.querySelectorAll('td')));
+        } catch(e) {}
+      }
+      return tds;
+    }
+    return getAllTds().some(td =>
+      /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/.test((td.innerText || '').trim())
+    );
+  };
+
+  // 3. Esperar tabla. MÁXIMO 45s para retornar ANTES del kill de Browserless (60s).
+  let timedOut = false;
+  try {
+    await page.waitForFunction(ALL_TDS_FN, { timeout: 45000 });
+  } catch(e) {
+    timedOut = true;
+  }
+
+  if (timedOut) {
+    // Capturar diagnóstico para saber qué hay en la página
+    const diag = await page.evaluate(() => {
+      function getAllTds() {
+        const tds = Array.from(document.querySelectorAll('td'));
+        const iframes = Array.from(document.querySelectorAll('iframe'));
+        for (const iframe of iframes) {
+          try {
+            const iDoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+            if (iDoc) tds.push(...Array.from(iDoc.querySelectorAll('td')));
+          } catch(e) {}
+        }
+        return tds;
+      }
+      const iframes = Array.from(document.querySelectorAll('iframe'));
+      return {
+        title:       document.title,
+        url:         location.href,
+        mainTds:     document.querySelectorAll('td').length,
+        allTds:      getAllTds().length,
+        iframes:     iframes.length,
+        iframeSrcs:  iframes.map(f => (f.src || f.name || '').slice(0, 80)).slice(0, 5),
+        bodySnip:    (document.body ? document.body.innerText : '').slice(0, 300),
+      };
     });
-    return { error: 'TIMEOUT_60s — diagnostico: ' + debugInfo };
+    return { error: 'TIMEOUT_45s', diag };
   }
 
   // 4. Extraer datos del DOM (main frame + iframes)
@@ -100,7 +100,7 @@ export default async function({ page }) {
     }
     const allTds = getAllTds();
 
-    // Detectar columnas de meses desde el encabezado (ej: "Ene-26", "Feb-26", ...)
+    // Detectar encabezado de meses (ej: "Ene-26", "Feb-26", ...)
     const headerCell = allTds.find(td => {
       const text = td.innerText || '';
       return text.includes('Cliente') && text.includes('Total') &&
@@ -112,7 +112,6 @@ export default async function({ page }) {
     const MESES = [...headerCell.innerText.matchAll(/([A-Z][a-z]{2}-\\d{2})/g)].map(m => m[1]);
     if (!MESES.length) return { error: 'Sin columnas de meses', clientes: [], MESES: [] };
 
-    // Extraer filas de clientes (identificadas por celda con patrón RUT)
     const rutPattern = /^\\d{1,2}\\.\\d{3}\\.\\d{3}-[\\dkK]$/;
     const rutCells   = allTds.filter(td => rutPattern.test((td.innerText || '').trim()));
 
@@ -127,7 +126,6 @@ export default async function({ page }) {
       const row = rutCell.closest('tr');
       if (!row) return;
 
-      // Estructura de fila: [vacío, RUT, RUT, Nombre, Nombre, mes1..mes12, Total]
       const cells     = Array.from(row.querySelectorAll('td')).map(c => (c.innerText || '').trim());
       const rutIdx    = cells.indexOf(rut);
       if (rutIdx < 0) return;
@@ -140,7 +138,7 @@ export default async function({ page }) {
         const val = (cells[monthStart + i] || '').trim();
         if (val) {
           const num = parseInt(val.replace(/\\./g, ''), 10);
-          if (!isNaN(num) && num > 0) meses[MESES[i]] = num * 1000; // miles → pesos
+          if (!isNaN(num) && num > 0) meses[MESES[i]] = num * 1000;
         }
       }
 
@@ -153,7 +151,6 @@ export default async function({ page }) {
     return { clientes: results, MESES };
   });
 
-  // Retorna resultado directamente (sin wrapper {data,type})
   return resultado;
 }
 `;
@@ -178,7 +175,7 @@ async function scrapeNuboxResumen() {
         method:  'POST',
         headers: { 'Content-Type': 'application/javascript' },
         body:    browserCode,
-        timeout: 120000, // 2 min para dar tiempo a Browserless
+        timeout: 90000,
       });
 
       if (!resp.ok) {
@@ -188,11 +185,16 @@ async function scrapeNuboxResumen() {
 
       const raw = await resp.json();
 
-      // Browserless puede entregar {data, type} o el objeto directo.
-      // Normalizamos accediendo a .data si existe, sino usamos raw directamente.
+      // Browserless puede entregar {data,type} o el objeto directo; normalizamos.
       const result = (raw && raw.data !== undefined) ? raw.data : raw;
 
-      if (result.error) throw new Error('Browser error: ' + result.error);
+      if (result.error) {
+        // Loguear diagnóstico si viene (TIMEOUT_45s)
+        if (result.diag) {
+          console.warn('[scraper] DIAG:', JSON.stringify(result.diag));
+        }
+        throw new Error('Browser error: ' + result.error);
+      }
       if (!Array.isArray(result.clientes)) {
         throw new Error('Respuesta inesperada: ' + JSON.stringify(raw).slice(0, 300));
       }
