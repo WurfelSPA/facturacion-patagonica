@@ -20,137 +20,152 @@ export default async function({ page }) {
     ssrsLoaded = true;
   } catch(e) { ssrsLoaded = false; }
 
-  // Capturar info de la pagina
-  const pageInfo = await page.evaluate(() => {
-    const scripts = Array.from(document.querySelectorAll('script:not([src])'))
-      .map(s => s.textContent || '').join(' ');
-
-    // cargaCustomRadioButtons completa (2000 chars)
-    const fnIdx = scripts.indexOf('cargaCustomRadioButtons');
-    const fnCtx = fnIdx >= 0 ? scripts.slice(Math.max(0, fnIdx - 50), fnIdx + 2000) : 'NOT FOUND';
-
-    // Todos los __doPostBack targets
-    const pbMatches = [];
-    const re = /__doPostBack\s*\(\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]*)['"]\s*\)/g;
-    let m;
-    while ((m = re.exec(scripts)) !== null) {
-      pbMatches.push({ target: m[1], arg: m[2] });
-    }
-
-    // hdnMesesMostrar
-    const hdnEl = document.getElementById('hdnMesesMostrar');
-
-    // Elementos con onclick
-    const clickables = Array.from(document.querySelectorAll('[onclick]'))
-      .map(el => ({
-        tag: el.tagName, id: el.id || '',
-        onclick: (el.getAttribute('onclick') || '').slice(0, 120),
-      })).slice(0, 20);
-
-    // Formularios
-    const forms = Array.from(document.querySelectorAll('form')).map(f => ({
-      id: f.id, action: (f.action || '').slice(0, 80),
-    }));
-
-    // ASP.NET hiddens
-    const evtTarget = document.getElementById('__EVENTTARGET');
-    const evtArg    = document.getElementById('__EVENTARGUMENT');
-
-    return {
-      fnCtx: fnCtx,
-      pbTargets: pbMatches.slice(0, 30),
-      hdnMesesMostrar: hdnEl ? { value: hdnEl.value, type: hdnEl.type } : null,
-      clickables: clickables,
-      forms: forms,
-      aspNet: {
-        eventTarget: evtTarget ? evtTarget.value : 'NOT FOUND',
-        eventArg: evtArg ? evtArg.value : 'NOT FOUND',
-      },
-    };
-  });
-
-  // Monitor de requests
+  // Monitor de requests desde el inicio
   const reqLog = [];
   page.on('request', req => {
     const rt = req.resourceType();
     if (rt !== 'image' && rt !== 'stylesheet' && rt !== 'font' && rt !== 'other') {
       reqLog.push({
         method: req.method(), type: rt,
-        url: req.url().replace(/utn=[^&]+/, 'utn=***').slice(0, 180),
-        body: (req.postData() || '').slice(0, 200),
+        url: req.url().replace(/utn=[^&]+/, 'utn=***').slice(0, 120),
+        bodySnip: (req.postData() || '').slice(0, 300),
       });
     }
   });
 
-  // Llamar onclick de s-option directamente
-  const onclickResult = await page.evaluate(() => {
-    const el = document.getElementById('s-option');
-    if (!el) return { err: 'no s-option' };
-    const hadOnclick = typeof el.onclick === 'function';
-    if (hadOnclick) el.onclick.call(el);
+  const tdsBefore = (await page.evaluate(() => document.querySelectorAll('td').length));
+
+  // Paso 1: set hdnMesesMostrar = "1" y llamar onclick
+  const step1 = await page.evaluate(() => {
     const hdnEl = document.getElementById('hdnMesesMostrar');
+    if (hdnEl) hdnEl.value = '1';
+    const sOpt = document.getElementById('s-option');
+    const hadOnclick = sOpt && typeof sOpt.onclick === 'function';
+    if (hadOnclick) sOpt.onclick.call(sOpt);
+
+    // Intentar trigger jQuery change si jQuery existe
+    let jqTriggered = false;
+    try {
+      if (typeof jQuery !== 'undefined') {
+        jQuery('#s-option').trigger('change');
+        jqTriggered = true;
+      }
+    } catch(e) {}
+
     return {
+      hdnAfter: hdnEl ? hdnEl.value : 'NOT FOUND',
       hadOnclick: hadOnclick,
-      hdnMesesMostrar: hdnEl ? hdnEl.value : 'NOT FOUND',
+      jqTriggered: jqTriggered,
     };
   });
 
-  await new Promise(r => setTimeout(r, 1000));
+  await new Promise(r => setTimeout(r, 500));
 
-  // Intentar cada __doPostBack target encontrado
-  const triedTargets = [];
-  for (const pb of pageInfo.pbTargets.slice(0, 10)) {
-    const before = reqLog.length;
+  const results = [];
+
+  // Paso 2: intentar cada target en orden; parar si hdnMesesMostrar se mantiene en "1"
+  const targets = [
+    'ReportViewer1$ctl09$ReportControl$ctl00',
+    'ReportViewer1$ctl09$ReportControl',
+    'ReportViewer1$ctl03',
+  ];
+
+  let successTarget = null;
+
+  for (const target of targets) {
+    const reqsBefore = reqLog.length;
+
+    // Asegurar hdnMesesMostrar = "1" antes de cada postback
+    await page.evaluate(() => {
+      const hdnEl = document.getElementById('hdnMesesMostrar');
+      if (hdnEl) hdnEl.value = '1';
+    });
+
     try {
-      await page.evaluate(function(t, a) {
-        if (typeof __doPostBack === 'function') __doPostBack(t, a);
-      }, pb.target, pb.arg);
-      await new Promise(r => setTimeout(r, 1500));
+      await page.evaluate(function(t) {
+        if (typeof __doPostBack === 'function') __doPostBack(t, '');
+      }, target);
     } catch(e) {}
-    triedTargets.push({ target: pb.target, arg: pb.arg, newReqs: reqLog.length - before });
-    if (reqLog.length - before > 0) break;
-  }
 
-  // Si ninguno funcionó, probar targets SSRS estandar
-  if (reqLog.length === 0) {
-    const ssrsTargets = ['ReportViewer1$ctl09$ctl00', 'ReportViewer1$ctl06', 'ReportViewer1$ctl05$ctl00'];
-    for (const t of ssrsTargets) {
-      const before = reqLog.length;
-      try {
-        await page.evaluate(function(tgt) {
-          if (typeof __doPostBack === 'function') __doPostBack(tgt, '');
-        }, t);
-        await new Promise(r => setTimeout(r, 1500));
-      } catch(e) {}
-      triedTargets.push({ target: t, arg: '', newReqs: reqLog.length - before });
-      if (reqLog.length - before > 0) break;
+    // Esperar más que antes: 20 segundos para que SSRS cargue
+    await new Promise(r => setTimeout(r, 20000));
+
+    const stateAfter = await page.evaluate(() => {
+      const tds = document.querySelectorAll('td');
+      const hdnEl = document.getElementById('hdnMesesMostrar');
+      return {
+        tdCount: tds.length,
+        hdnMesesMostrar: hdnEl ? hdnEl.value : 'NOT FOUND',
+        fChecked: document.getElementById('f-option') ? document.getElementById('f-option').checked : null,
+        sChecked: document.getElementById('s-option') ? document.getElementById('s-option').checked : null,
+        first5Tds: Array.from(tds).slice(0, 5).map(td => td.innerText.trim().slice(0, 40)),
+        bodySnip: document.body.innerText.replace(/\s+/g, ' ').slice(0, 500),
+        newReqs: 0,
+      };
+    });
+    stateAfter.newReqs = reqLog.length - reqsBefore;
+
+    results.push({ target: target, state: stateAfter });
+
+    // Si hdnMesesMostrar se mantiene en "1" Y tdCount aumentó → probable éxito
+    if (stateAfter.hdnMesesMostrar === '1' && stateAfter.tdCount > tdsBefore + 20) {
+      successTarget = target;
+      break;
+    }
+
+    // Si tdCount cambió mucho aunque hdnMesesMostrar volvió a "0", seguir buscando
+    if (stateAfter.hdnMesesMostrar === '1') {
+      successTarget = target;
+      break;
     }
   }
 
-  await new Promise(r => setTimeout(r, 8000));
-
-  const state2 = await page.evaluate(() => {
-    const tds = document.querySelectorAll('td');
-    const hdnEl = document.getElementById('hdnMesesMostrar');
-    const fEl   = document.getElementById('f-option');
-    const sEl   = document.getElementById('s-option');
-    return {
-      tdCount: tds.length,
-      hdnMesesMostrar: hdnEl ? hdnEl.value : 'NOT FOUND',
-      fChecked: fEl ? fEl.checked : null,
-      sChecked: sEl ? sEl.checked : null,
-      first5Tds: Array.from(tds).slice(0, 5).map(td => td.innerText.trim().slice(0, 40)),
-      bodySnip: document.body.innerText.replace(/\s+/g, ' ').slice(0, 700),
-    };
-  });
+  // Si encontramos un target exitoso, intentar extraer datos
+  if (successTarget) {
+    const resultado = await page.evaluate(() => {
+      const allTds = Array.from(document.querySelectorAll('td'));
+      const headerCell = allTds.find(td => /[A-Z][a-z]{2}-\d{2}/.test(td.innerText || ''));
+      if (!headerCell) return { ok: false, reason: 'Sin header de meses' };
+      const MESES = [...headerCell.innerText.matchAll(/([A-Z][a-z]{2}-\d{2})/g)].map(m => m[1]);
+      const rutPattern = /^\d{1,2}\.\d{3}\.\d{3}-[\dkK]$/;
+      const rutCells = allTds.filter(td => rutPattern.test((td.innerText || '').trim()));
+      const results = [];
+      const seen = new Set();
+      rutCells.forEach(rutCell => {
+        const rut = rutCell.innerText.trim();
+        if (seen.has(rut)) return;
+        seen.add(rut);
+        const row = rutCell.closest('tr');
+        if (!row) return;
+        const cells = Array.from(row.querySelectorAll('td')).map(c => c.innerText.trim());
+        const rutIdx = cells.indexOf(rut);
+        if (rutIdx < 0) return;
+        const nombre = cells[rutIdx + 2] || cells[rutIdx + 1] || '';
+        const monthStart = rutIdx + 4;
+        const meses = {};
+        for (let i = 0; i < MESES.length; i++) {
+          const val = (cells[monthStart + i] || '').trim();
+          if (val) {
+            const n = parseInt(val.replace(/\./g, ''), 10);
+            if (!isNaN(n) && n > 0) meses[MESES[i]] = n * 1000;
+          }
+        }
+        const total = parseInt((cells[cells.length - 1] || '').replace(/\./g, ''), 10) * 1000 || 0;
+        results.push({ rut, nombre, meses, total });
+      });
+      return { ok: true, clientes: results, MESES };
+    });
+    if (resultado.ok && resultado.clientes.length > 0) {
+      return resultado;
+    }
+  }
 
   return {
-    error: 'DIAG_v10',
+    error: 'DIAG_v11',
     ssrsLoaded: ssrsLoaded,
-    pageInfo: pageInfo,
-    onclickResult: onclickResult,
-    triedTargets: triedTargets,
-    state2: state2,
+    tdsBefore: tdsBefore,
+    step1: step1,
+    results: results,
     reqLog: reqLog.slice(0, 20),
   };
 }
