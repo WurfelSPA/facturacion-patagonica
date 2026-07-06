@@ -530,74 +530,12 @@ export default async function handler(req, res) {
         uploadJson = await createRes.json();
       }
 
-      // 6. Subir PDFs individuales a Drive (acceso rápido sin descargar ZIP)
-      let indivUploaded = 0;
-      const indivErrors = [];
-      const filesToUpload = [];
-      // Reconstruir lista de archivos con nro válido
-      for (let i = 0; i < pageBufs.length; i++) {
-        const text = extractPageText(srcDoc, i, globalCMap);
-        const nro = detectNro(text);
-        if (!nro) continue; // sin nro → no podemos buscarlo por folio, skip
-        const cod = detectCod(text);
-        if (!cod) continue;
-        const cliente = detectCliente(text);
-        const fname = cliente ? `F-${nro} ${cliente}.pdf` : `F-${nro}.pdf`;
-        filesToUpload.push({ fname, buf: pageBufs[i] });
-      }
-      // Subir en lotes de 5 — para cada archivo, PATCH si existe, POST si es nuevo
-      // Esto evita acumular duplicados en Drive que confunden la búsqueda
-      const BATCH = 5;
-      for (let b = 0; b < filesToUpload.length; b += BATCH) {
-        const batch = filesToUpload.slice(b, b + BATCH);
-        await Promise.all(batch.map(async ({ fname, buf }) => {
-          try {
-            // Buscar si ya existe un archivo con ese nombre en la carpeta
-            const qExist = encodeURIComponent(`'${destFolderId}' in parents and name='${fname}' and trashed=false`);
-            const existRes = await fetch(
-              `https://www.googleapis.com/drive/v3/files?q=${qExist}&fields=files(id)&pageSize=5`,
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
-            const existData = existRes.ok ? await existRes.json() : { files: [] };
-            const existingIds = (existData.files || []).map(f => f.id);
-
-            let uploadOk = false;
-            if (existingIds.length > 0) {
-              // Actualizar el primero (PATCH con solo el contenido), borrar duplicados
-              const keepId = existingIds[0];
-              const patchRes = await fetch(
-                `https://www.googleapis.com/upload/drive/v3/files/${keepId}?uploadType=media`,
-                { method: "PATCH", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/pdf" }, body: buf }
-              );
-              uploadOk = patchRes.ok;
-              // Borrar duplicados silenciosamente
-              for (const dupeId of existingIds.slice(1)) {
-                fetch(`https://www.googleapis.com/drive/v3/files/${dupeId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
-              }
-            } else {
-              // Crear nuevo
-              const bnd = "ind_pdf_boundary";
-              const meta = JSON.stringify({ name: fname, mimeType: "application/pdf", parents: [destFolderId] });
-              const metaPart = Buffer.from(`--${bnd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${bnd}\r\nContent-Type: application/pdf\r\n\r\n`);
-              const endPart = Buffer.from(`\r\n--${bnd}--`);
-              const body = Buffer.concat([metaPart, buf, endPart]);
-              const postRes = await fetch(
-                "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
-                { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/related; boundary=${bnd}` }, body }
-              );
-              uploadOk = postRes.ok;
-            }
-            if (uploadOk) indivUploaded++;
-            else indivErrors.push(fname);
-          } catch { indivErrors.push(fname); }
-        }));
-      }
-      console.log(`PDFs individuales subidos: ${indivUploaded}/${filesToUpload.length}`);
-
+      // Paso 6 eliminado: subir PDFs individuales causaba timeout (400+ llamadas Drive API).
+      // El ZIP completo ya está en Drive — es suficiente para el flujo de envío de correos.
       return res.status(200).json({
         ok: true, zipName, zipFileId: uploadJson.id, totalFacturas, sinCod,
         breakdown: Object.entries(breakdown).sort(([a],[b])=>a.localeCompare(b)),
-        indivUploaded, indivErrors: indivErrors.slice(0, 10),
+        indivUploaded: 0, indivErrors: [],
       });
     }
 
@@ -612,3 +550,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: e.message, stack: e.stack?.slice(0,300) });
   }
 }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
