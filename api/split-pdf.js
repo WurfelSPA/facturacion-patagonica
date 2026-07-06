@@ -407,15 +407,7 @@ export default async function handler(req, res) {
     const pdfBuf = await driveDownload(token, pdfFileId);
     console.log(`PDF: ${pdfBuf.length} bytes`);
 
-    // 2. Texto del PDF COMPLETO — fuente confiable (CMap y streams completos)
-    const globalCMap = buildCMap(pdfBuf);
-    console.log(`CMap: ${Object.keys(globalCMap).length} entradas`);
-    const fullText = getDecodedStreams(pdfBuf).map(d => applyTextOps(d, globalCMap)).join(" ");
-    console.log(`Texto completo: ${fullText.length} chars`);
-    const pageTexts = splitByPages(fullText);
-    console.log(`Secciones por factura: ${pageTexts.length}`);
-
-    // 3. Separar páginas con pdf-lib (confiable — siempre produce el conteo correcto)
+    // 2. Separar páginas con pdf-lib — incluye fuentes+CMap por página (confiable)
     const srcDoc = await PDFDocument.load(pdfBuf, { ignoreEncryption: true });
     const totalPages = srcDoc.getPageCount();
     console.log(`Páginas pdf-lib: ${totalPages}`);
@@ -426,17 +418,17 @@ export default async function handler(req, res) {
       sd.addPage(cp);
       pageBufs.push(Buffer.from(await sd.save()));
     }
-    console.log(`PDFs individuales generados: ${pageBufs.length}`);
+    console.log(`PDFs individuales: ${pageBufs.length}`);
 
+    // 3. Extraer texto POR PÁGINA desde el buffer copiado por pdf-lib
+    //    pdf-lib.copyPages copia fuentes+CMap → extractText() funciona correctamente
+    //    Garantiza alineación: pageBufs[i] y su texto son siempre la misma página
     const zip = new JSZip();
     const sinCod = [];
     const breakdown = {};
 
     for (let i = 0; i < pageBufs.length; i++) {
-      // Texto: sección correspondiente del texto completo (mejor que extraer del buffer mínimo)
-      const text = i < pageTexts.length
-        ? pageTexts[i]
-        : getDecodedStreams(pageBufs[i]).map(d => applyTextOps(d, globalCMap)).join("").replace(/\s+/g, " ").trim();
+      const text = extractText(pageBufs[i]);
       const cod = detectCod(text);
       const nro = detectNro(text);
 
