@@ -5001,6 +5001,55 @@ function App(){
           onClick:()=>buscarZip(periodo),
           style:{fontSize:11,padding:"4px 12px",borderRadius:7,border:"1px solid var(--rdim)",background:"transparent",color:"var(--red)",cursor:"pointer"}
         },"\u21ba Reintentar"),
+        /* ── Subir ZIP de facturas directamente (bypass split-pdf) ── */
+        (zipStatus==="missing"||zipStatus==="error")&&!splitLoading&&
+        h("label",{
+          style:{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,padding:"6px 16px",borderRadius:8,
+            border:"1px solid #3b82f6",background:"#eff6ff",color:"#1d4ed8",cursor:"pointer",fontWeight:600}
+        },
+          h("input",{type:"file",accept:".zip,application/zip",style:{display:"none"},
+            onChange:async ev=>{
+              const file=ev.target.files[0]; if(!file)return;
+              setZipStatus("splitting");
+              try{
+                const MN={"Enero":"01","Febrero":"02","Marzo":"03","Abril":"04","Mayo":"05","Junio":"06","Julio":"07","Agosto":"08","Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12"};
+                const [mesNombre,anio]=periodo.split(" ");
+                const mesNum=MN[mesNombre]||"01";
+                const zipName=`${anio}-${mesNum}.zip`;
+                notify("Subiendo ZIP de facturas a Drive...","info");
+                const gToken=await getToken();
+                const buf=await file.arrayBuffer();
+                const boundary="zip_direct_boundary";
+                const meta=JSON.stringify({name:zipName,mimeType:"application/zip",parents:[DRIVE_FACTURACION_FOLDER_ID]});
+                const metaBytes=new TextEncoder().encode(`--${boundary}
+Content-Type: application/json; charset=UTF-8
+
+${meta}
+--${boundary}
+Content-Type: application/zip
+
+`);
+                const endBytes=new TextEncoder().encode(`
+--${boundary}--`);
+                const bodyBytes=new Uint8Array(metaBytes.length+buf.byteLength+endBytes.length);
+                bodyBytes.set(metaBytes,0);bodyBytes.set(new Uint8Array(buf),metaBytes.length);bodyBytes.set(endBytes,metaBytes.length+buf.byteLength);
+                const uploadResp=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{
+                  method:"POST",
+                  headers:{Authorization:`Bearer ${gToken}`,"Content-Type":`multipart/related; boundary=${boundary}`},
+                  body:bodyBytes
+                });
+                if(!uploadResp.ok){const t=await uploadResp.text();throw new Error("Drive ZIP upload "+uploadResp.status+": "+t.slice(0,100));}
+                const uploadJson=await uploadResp.json();
+                if(!uploadJson.id)throw new Error("Drive no devolvió fileId para ZIP");
+                notify("✓ ZIP subido a Drive — cargando...","ok");
+                periodoActivado.current=true;autoProcesado.current=false;
+                buscarZip(periodo);
+              }catch(e){setZipStatus("error");setZipError(e.message);notify("Error: "+e.message,"err");}
+              ev.target.value="";
+            }
+          }),
+          "📦 Subir ZIP directo"
+        ),
         zipStatus==="missing"&&!canGenerate&&!splitLoading&&
         h("label",{
           style:{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,padding:"6px 16px",borderRadius:8,
