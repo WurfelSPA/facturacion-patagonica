@@ -80,6 +80,43 @@ async function handleGet(req, res) {
     }
   }
 
+  // Buscar / descargar ZIP de XMLs del período
+  if (req.query.xmlPeriodo) {
+    const xParts = (req.query.xmlPeriodo||"").split(" ");
+    const xMes = xParts[0], xAnio = xParts[1];
+    const xMesNum = MES_NUM[xMes];
+    if (!xMesNum || !xAnio) return res.status(400).json({ error: "Periodo XML invalido" });
+    const saJson2 = process.env.GOOGLE_SERVICE_ACCOUNT;
+    if (!saJson2) return res.status(500).json({ error: "SA no configurada" });
+    try {
+      const tok2 = await getSAToken("https://www.googleapis.com/auth/drive.readonly");
+      const allFiles2 = await driveList(tok2, FACTURACION_FOLDER_ID);
+      const xNorm = s => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+      const xmlZip = allFiles2.find(f => {
+        const n = xNorm(f.name);
+        return n.endsWith(".zip") && n.includes("xml") && (
+          n.includes(`${xAnio}-${xMesNum}`) ||
+          n.includes(xNorm(xMes))
+        );
+      });
+      if (!xmlZip) return res.status(404).json({ error: "xml_not_found" });
+      const rawSz = xmlZip.size ? parseInt(xmlZip.size) : null;
+      const szMB = rawSz !== null ? Math.round(rawSz/1024/1024) : 999;
+      if (szMB > 30) return res.status(404).json({ error: "xml_too_large", fileId: xmlZip.id });
+      const dr2 = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${xmlZip.id}?alt=media`,
+        { headers: { Authorization: `Bearer ${tok2}` } }
+      );
+      if (!dr2.ok) throw new Error("Drive " + dr2.status);
+      const buf2 = await dr2.arrayBuffer();
+      res.setHeader("Content-Type","application/zip");
+      res.setHeader("Content-Disposition",`attachment; filename="${xmlZip.name}"`);
+      res.setHeader("Cache-Control","no-store");
+      res.setHeader("Content-Length", buf2.byteLength);
+      return res.status(200).send(Buffer.from(buf2));
+    } catch(e2) { return res.status(500).json({ error: e2.message }); }
+  }
+
   // Descarga ZIP del período
   const periodo = req.query.periodo;
   if (!periodo) return res.status(400).json({ error: "Falta parametro periodo" });
