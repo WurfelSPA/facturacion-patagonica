@@ -794,6 +794,9 @@ async function procesarPDFs(zipFile,addLog){
       const tipo=textoJ.includes("Serv. Adm.")||textoJ.includes("Serv.Adm.")?"serv_adm":textoJ.includes("Habilitaci")?"habilitacion":textoJ.includes("Arriendo")?"arriendo":nroFact.startsWith("FEE-")?"serv_adm":"arriendo";
 
     /* Extraer UF del texto del PDF — 3 patrones + fallback flat */
+    /* RUT destinatario — identificador inequívoco para matching */
+    let rutPdf=null;
+    try{const rm=textoJ.match(/Se[nñ]or\(es\).*?RUT\s*([\d]{1,2}\.?[\d]{3}\.?[\d]{3}-[\dkK])/i);if(rm)rutPdf=rm[1].replace(/\./g,"").toLowerCase();}catch(e){}
     let ufPdf=null;
     try{
       if(texto.length>10){
@@ -844,7 +847,7 @@ async function procesarPDFs(zipFile,addLog){
       }
     }catch(e){console.warn("[monto] error:",e.message);}
 
-    pdfs.push({sitio,nroFact,tipo,ufPdf,montoTotal,ivaAmount,nombreEnArchivo,zipPath:path,pdfNombre:nombre});
+    pdfs.push({sitio,nroFact,tipo,ufPdf,montoTotal,ivaAmount,nombreEnArchivo,zipPath:path,pdfNombre:nombre,rutPdf});
   }
 
   const conUF=pdfs.filter(p=>p.ufPdf!==null).length;
@@ -3726,11 +3729,14 @@ function App(){
           if(p.nombreEnArchivo&&ncli){
             const na=p.nombreEnArchivo;
             const matches=ncli===na||ncli.includes(na)||(na.length>=4&&ncli.includes(na))||(ncli.length>=4&&na.includes(ncli));
-            const fwN=na.split(" ").find(w=>w.length>=4)||"";
-            const fwC=ncli.split(" ").find(w=>w.length>=4)||"";
+            /* palabras genéricas que NO distinguen empresas */
+            const SW=new Set(["comercial","sociedad","industrial","limitada","limitado","ltda","chile","servicios","servicio","distribuidora","inversiones","empresa","empresas","corp","corporacion","de","del","la","el","los","las","spa","sa"]);
+            const sigW=ws=>ws.split(" ").find(w=>w.length>=5&&!SW.has(w))||"";
+            const fwN=sigW(na),fwC=sigW(ncli);
             if(matches||(fwN&&fwC&&fwN===fwC))score+=300;
           }
-          if(rutNorm&&p.rutPdf&&p.rutPdf===rutNorm)score+=200;
+          /* RUT: identificador inequívoco — peso 1000 */
+          {const rn=(rutNorm||"").replace(/\./g,"").toLowerCase();if(rn&&p.rutPdf&&p.rutPdf===rn)score+=1000;}
           if(p.ufPdf!==null&&c.uf!=null){
             const diff=Math.abs(p.ufPdf-c.uf);
             if(diff<0.01)score+=50;
