@@ -407,47 +407,33 @@ export default async function handler(req, res) {
     const pdfBuf = await driveDownload(token, pdfFileId);
     console.log(`PDF: ${pdfBuf.length} bytes`);
 
-    // 2. Extraer texto del PDF COMPLETO (confiable — CMap + todos los streams en orden)
+    // 2. Texto del PDF COMPLETO — fuente confiable (CMap y streams completos)
     const globalCMap = buildCMap(pdfBuf);
-    console.log(`CMap global: ${Object.keys(globalCMap).length} entradas`);
-    const fullStreams = getDecodedStreams(pdfBuf);
-    const fullText = fullStreams.map(d => applyTextOps(d, globalCMap)).join(" ");
+    console.log(`CMap: ${Object.keys(globalCMap).length} entradas`);
+    const fullText = getDecodedStreams(pdfBuf).map(d => applyTextOps(d, globalCMap)).join(" ");
     console.log(`Texto completo: ${fullText.length} chars`);
-
-    // Dividir texto en secciones por factura (fuente de verdad del total de páginas)
     const pageTexts = splitByPages(fullText);
-    const expectedPages = pageTexts.length;
-    console.log(`Secciones de factura detectadas: ${expectedPages}`);
+    console.log(`Secciones por factura: ${pageTexts.length}`);
 
-    // 3. Separar páginas PDF — usar parser mínimo; si el conteo no cuadra, fallback pdf-lib
-    let pageBufs = splitPDFPages(pdfBuf);
-    const customCount = pageBufs ? pageBufs.length : 0;
-    if (!pageBufs || customCount < expectedPages * 0.9) {
-      console.log(`splitPDFPages devolvió ${customCount} (esperado ${expectedPages}), fallback a pdf-lib`);
-      try {
-        const srcDocFb = await PDFDocument.load(pdfBuf, { ignoreEncryption: true });
-        const totalPagesFb = srcDocFb.getPageCount();
-        pageBufs = [];
-        for (let i = 0; i < totalPagesFb; i++) {
-          const singleDoc = await PDFDocument.create();
-          const [copiedPage] = await singleDoc.copyPages(srcDocFb, [i]);
-          singleDoc.addPage(copiedPage);
-          pageBufs.push(Buffer.from(await singleDoc.save()));
-        }
-        console.log(`pdf-lib: ${pageBufs.length} páginas separadas`);
-      } catch (fbErr) {
-        throw new Error(`splitPDFPages fallback pdf-lib: ${fbErr.message}`);
-      }
+    // 3. Separar páginas con pdf-lib (confiable — siempre produce el conteo correcto)
+    const srcDoc = await PDFDocument.load(pdfBuf, { ignoreEncryption: true });
+    const totalPages = srcDoc.getPageCount();
+    console.log(`Páginas pdf-lib: ${totalPages}`);
+    const pageBufs = [];
+    for (let i = 0; i < totalPages; i++) {
+      const sd = await PDFDocument.create();
+      const [cp] = await sd.copyPages(srcDoc, [i]);
+      sd.addPage(cp);
+      pageBufs.push(Buffer.from(await sd.save()));
     }
-    if (pageBufs.length === 0) throw new Error("No se pudieron separar las páginas del PDF");
-    console.log(`Páginas PDF separadas: ${pageBufs.length}`);
+    console.log(`PDFs individuales generados: ${pageBufs.length}`);
 
     const zip = new JSZip();
     const sinCod = [];
     const breakdown = {};
 
     for (let i = 0; i < pageBufs.length; i++) {
-      // Texto: usar sección del texto completo (más confiable que extraer del buffer mínimo)
+      // Texto: sección correspondiente del texto completo (mejor que extraer del buffer mínimo)
       const text = i < pageTexts.length
         ? pageTexts[i]
         : getDecodedStreams(pageBufs[i]).map(d => applyTextOps(d, globalCMap)).join("").replace(/\s+/g, " ").trim();
