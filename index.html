@@ -3552,7 +3552,9 @@ function App(){
   const xmlZipInputRef=React.useRef(null);
   const onXmlZipFile=React.useCallback((f)=>{
     if(!f)return;
-    setXmlZipFile(f);xmlZipFileRef.current=f;setXmlZipStatus("ready");
+    setXmlZipFile(f);xmlZipFileRef.current=f;
+    autoProcesado.current=false; /* permitir auto-proceso tras upload manual */
+    setXmlZipStatus("ready");
   },[]);
 
 
@@ -4934,8 +4936,7 @@ function App(){
                 if(!splitRes.ok)throw new Error(splitData.error||"Error al separar PDF");
                 notify("✓ "+splitData.totalFacturas+" facturas de "+periodo+" listas en Drive — procesando...","ok");
                 periodoActivado.current=true;autoProcesado.current=false;
-                buscarZip(periodo);
-                buscarXmlZip(periodo);
+                buscarZip(periodo); /* buscarZip llama buscarXmlZip internamente */
               }catch(e){setZipStatus("error");setZipError(e.message);notify("Error: "+e.message,"err");}
               ev.target.value="";
             }
@@ -5018,8 +5019,7 @@ function App(){
           onClick:()=>{
             periodoActivado.current=true;autoProcesado.current=false;autoNuboxRef.current=false;
             setZipStatus("idle");setData([]);
-            buscarZip(periodo);
-            buscarXmlZip(periodo);
+            buscarZip(periodo); /* buscarZip llama buscarXmlZip internamente */
           }
         },
           zipStatus==="loading"||zipStatus==="splitting"||splitLoading
