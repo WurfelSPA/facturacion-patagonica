@@ -3844,9 +3844,13 @@ function App(){
       setTimeout(()=>{setShowProc(false);setView("table");},1800);
       setData(filas);
       const prevSent=new Set();
-      filas.forEach((f,i)=>{const key=`${periodo}|${f.cliente}|${f.concepto}`;if(sentKeys.has(key))prevSent.add(i);});
+      filas.forEach((f,i)=>{
+        const key=`${periodo}|${f.cliente}|${f.concepto}`;
+        /* yaEnviado viene de la planilla (columna "Correo Enviado") */
+        if(sentKeys.has(key)||f.yaEnviado)prevSent.add(i);
+      });
       setSentSet(prevSent);
-      if(prevSent.size>0)addLog(`✓ ${prevSent.size} correos ya enviados en sesiones anteriores`,"ok");
+      if(prevSent.size>0)addLog(`✓ ${prevSent.size} correos ya marcados como enviados (planilla + sesiones anteriores)`,"ok");
       /* ── Email de notificación con stats reales ── */
       try{
         const eTotal=filas.length;
