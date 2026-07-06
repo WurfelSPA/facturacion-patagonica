@@ -5066,7 +5066,7 @@ function App(){
           style:{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,padding:"6px 16px",borderRadius:8,
             border:"1px solid var(--adim)",background:"var(--abg)",color:"var(--amber)",cursor:"pointer",fontWeight:600,marginTop:4}
         },
-          h("input",{type:"file",accept:".zip,application/zip",style:{display:"none"},
+          h("input",{type:"file",accept:".zip,.ZIP,application/zip,application/x-zip-compressed,application/octet-stream",style:{display:"none"},
             onChange:async ev=>{
               const file=ev.target.files[0]; if(!file)return;
               setXmlZipStatus("loading");
