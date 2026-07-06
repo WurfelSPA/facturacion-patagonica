@@ -654,8 +654,32 @@ async function procesarPlanillaFacturacion(file,periodo){
 
   /* Fechas en fila 3 (índice 2) */
   const fila3=dataRaw[2]||[];
+  /* Buscar "Correo Enviado" en fila3 y las 3 filas de cabecera adyacentes (estructura de planilla puede variar) */
+  function buscarColEnviado(dataRaw,desde,hasta){
+    const hdrs=[dataRaw[0]||[],dataRaw[1]||[],dataRaw[2]||[],dataRaw[3]||[]];
+    for(let j=desde;j<=hasta;j++){
+      const txt=hdrs.map(r=>String(r[j]||"")).join(" ").toLowerCase();
+      if(txt.includes("enviado"))return j;
+    }
+    return -1;
+  }
+  function buscarColPagado(dataRaw,desde,hasta){
+    const hdrs=[dataRaw[0]||[],dataRaw[1]||[],dataRaw[2]||[],dataRaw[3]||[]];
+    for(let j=desde;j<=hasta;j++){
+      const txt=hdrs.map(r=>String(r[j]||"")).join(" ").toLowerCase();
+      if(txt.includes("pagado"))return j;
+    }
+    return -1;
+  }
   for(let i=64;i<fila3.length;i++){
-    if(esTargetMes(fila3[i])){colGS=i;colGT=i+1;colEnviado=i+3;colPagado=i+4;break;}
+    if(esTargetMes(fila3[i])){
+      colGS=i;colGT=i+1;
+      colEnviado=buscarColEnviado(dataRaw,i+2,i+10);
+      if(colEnviado===-1)colEnviado=i+3; /* fallback */
+      colPagado=buscarColPagado(dataRaw,colEnviado+1,colEnviado+5);
+      if(colPagado===-1)colPagado=colEnviado+1; /* fallback */
+      break;
+    }
   }
   if(colGS===-1)throw new Error(`No se encontró columna para ${periodo}. Verifica que la planilla tenga ese mes.`);
 
@@ -708,7 +732,16 @@ async function leerHistorialAnio(xlsxFile, anio){
     const mesNum=mesIdx+1;
     if(mesesMap[mesNombre])continue; /* solo primer hit por mes */
     const hasEnviado=(anio>2026)||(anio===2026&&mesNum>=6);
-    mesesMap[mesNombre]={colGS:i,colGT:i+1,colEnviado:hasEnviado?i+3:-1,mesNum};
+    let colEnvH=-1;
+    if(hasEnviado){
+      const hdrsH=[dataRaw[0]||[],dataRaw[1]||[],dataRaw[2]||[],dataRaw[3]||[]];
+      for(let j=i+2;j<=i+10;j++){
+        const txt=hdrsH.map(r=>String(r[j]||"")).join(" ").toLowerCase();
+        if(txt.includes("enviado")){colEnvH=j;break;}
+      }
+      if(colEnvH===-1)colEnvH=i+3; /* fallback */
+    }
+    mesesMap[mesNombre]={colGS:i,colGT:i+1,colEnviado:colEnvH,mesNum};
   }
 
   const excl=["","VACANTE","Nombre Cliente","Areas Comunes Edificio","Areas comunes Edificio (Subterraneos)","Area Comun"];
@@ -3791,9 +3824,9 @@ function App(){
       setTimeout(()=>{setShowProc(false);setView("table");},1800);
       setData(filas);
       const prevSent=new Set();
-      filas.forEach((f,i)=>{const key=`${periodo}|${f.cliente}|${f.concepto}`;if(sentKeys.has(key)||f.yaEnviado)prevSent.add(i);});
+      filas.forEach((f,i)=>{const key=`${periodo}|${f.cliente}|${f.concepto}`;if(sentKeys.has(key))prevSent.add(i);});
       setSentSet(prevSent);
-      if(prevSent.size>0)addLog(`✓ ${prevSent.size} correos ya marcados como enviados (planilla + sesiones anteriores)`,"ok");
+      if(prevSent.size>0)addLog(`✓ ${prevSent.size} correos ya enviados en sesiones anteriores`,"ok");
       /* ── Email de notificación con stats reales ── */
       try{
         const eTotal=filas.length;
