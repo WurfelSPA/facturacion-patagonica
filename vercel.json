@@ -2,11 +2,11 @@
   "functions": {
     "api/split-pdf.js": {
       "maxDuration": 300,
-      "memory": 3009
+      "memory": 3008
     },
     "api/drive-pdf.js": {
       "maxDuration": 300,
-      "memory": 3009
+      "memory": 3008
     },
     "api/historial-batch.js": {
       "maxDuration": 300

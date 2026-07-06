@@ -3543,7 +3543,7 @@ function App(){
         method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({pdfFileId:pdfMaestroId,periodo:periodoCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID,userToken:uTok}),
       });
-      let data;try{data=await res.json();}catch(_je){throw new Error("split-pdf: error del servidor — intente de nuevo");}
+      let data;try{data=await res.json();}catch(_je){throw new Error(`split-pdf: error del servidor (HTTP ${res.status}) — intente de nuevo`);}
       if(!res.ok)throw new Error(data.error||"Error desconocido");
       notify("✓ "+data.totalFacturas+" facturas generadas y subidas a Drive","ok");
       /* 2. Recargar ZIP desde Drive */
@@ -3928,7 +3928,7 @@ function App(){
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({pdfFileId,periodo:periodoCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID,userToken:await getToken().catch(()=>null)}),
       });
-      let data;try{data=await res.json();}catch(_je){throw new Error("split-pdf: error del servidor — intente de nuevo");}
+      let data;try{data=await res.json();}catch(_je){throw new Error(`split-pdf: error del servidor (HTTP ${res.status}) — intente de nuevo`);}
       if(!res.ok)throw new Error(data.error||"Error desconocido");
       setSplitResult(data);
       if(data.zipBase64){
@@ -5040,7 +5040,7 @@ function App(){
                   let splitRes;
                   try{splitRes=await fetch("/api/split-pdf",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pdfFileId:fileId,periodo:mesCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID,userToken:gToken}),signal:splitCtrl.signal});}
                   finally{clearTimeout(splitTimeout);}
-                  let splitData;try{splitData=await splitRes.json();}catch(_je){throw new Error("split-pdf: error del servidor — intente de nuevo");}
+                  let splitData;try{splitData=await splitRes.json();}catch(_je){throw new Error(`split-pdf: error del servidor (HTTP ${splitRes.status}) — intente de nuevo`);}
                   if(!splitRes.ok)throw new Error(splitData.error||"Error al separar PDF");
                   notify("✓ "+splitData.totalFacturas+" facturas de "+periodo+" listas en Drive — procesando...","ok");
                   /* ── Notificación Telegram al subir ── */
