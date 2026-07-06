@@ -3391,6 +3391,7 @@ function App(){
   const [histAnio,setHistAnio]=useState(2026);
   const [unlocked,setUnlocked]=useState(false);
   const [showPwdModal,setShowPwdModal]=useState(false);
+  const [showUploadModal,setShowUploadModal]=useState(false);
   const [currentUser,setCurrentUser]=React.useState(null);
   const [showChangePwd,setShowChangePwd]=React.useState(false);
   const [userMenuOpen,setUserMenuOpen]=React.useState(false);
@@ -3564,6 +3565,7 @@ function App(){
     autoProcesado.current=false;
     autoNuboxRef.current=false;
     setXmlZipStatus("idle");setXmlZipFileId(null);
+    setShowUploadModal(false);
     /* No reseteamos periodoActivado aquí — se resetea solo al cambiar período desde el selector */
   },[periodo]);
   /* Resetear periodoActivado al salir de facturación para evitar auto-ejecución al volver */
@@ -3944,6 +3946,7 @@ function App(){
     }catch(e){
       setSplitResult({error:e.message});
       notify("Error: "+e.message,"err");
+      setShowUploadModal(true);
     }finally{setSplitLoading(false);}
   };
   const handleLogin=()=>{
@@ -4828,6 +4831,76 @@ function App(){
       )
     ),
     showChangePwd&&h(ChangePwdModal,null),
+    showUploadModal&&h("div",{
+      style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.58)",backdropFilter:"blur(5px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1200},
+      onClick:e=>{if(e.target===e.currentTarget)setShowUploadModal(false);}
+    },
+      h("div",{style:{background:"var(--surf)",borderRadius:16,padding:"32px 36px",maxWidth:460,width:"90%",boxShadow:"0 24px 64px rgba(0,0,0,0.38)",border:"1px solid var(--bdr)"}},
+        h("div",{style:{fontSize:36,textAlign:"center",marginBottom:12}},"📄"),
+        h("div",{style:{fontSize:17,fontWeight:700,color:"var(--tx)",textAlign:"center",marginBottom:6}},
+          "Subir PDF de facturas"
+        ),
+        h("div",{style:{fontSize:13,color:"var(--txd)",textAlign:"center",marginBottom:8}},
+          "Nubox no disponible — sube el PDF manualmente desde tu carpeta de Descargas."
+        ),
+        h("code",{style:{display:"block",fontSize:12,color:"var(--acc)",background:"var(--surf2)",padding:"7px 14px",borderRadius:8,margin:"0 0 20px",textAlign:"center",wordBreak:"break-all"}},
+          `Facturas_PISA_${periodo.split(" ")[1]}-${({"Enero":"01","Febrero":"02","Marzo":"03","Abril":"04","Mayo":"05","Junio":"06","Julio":"07","Agosto":"08","Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12"})[periodo.split(" ")[0]]||"01"}.pdf`
+        ),
+        h("label",{
+          style:{display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontSize:14,fontWeight:700,padding:"14px 24px",borderRadius:10,background:"var(--acc)",color:"#fff",cursor:"pointer",width:"100%",boxSizing:"border-box",marginBottom:10}
+        },
+          h("input",{type:"file",accept:"application/pdf,.pdf",style:{display:"none"},
+            onChange:async ev=>{
+              const file=ev.target.files[0]; if(!file)return;
+              setZipStatus("splitting");
+              try{
+                const MN={"Enero":"01","Febrero":"02","Marzo":"03","Abril":"04","Mayo":"05","Junio":"06","Julio":"07","Agosto":"08","Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12"};
+                const mesCode=`${periodo.split(" ")[1]}-${MN[periodo.split(" ")[0]]||"01"}`;
+                const fileName=`Facturas_PISA_${mesCode}.pdf`;
+                notify("Subiendo PDF a Drive...","info");
+                const gToken=await getToken();
+                const buf=await file.arrayBuffer();
+                const meta=JSON.stringify({name:fileName,mimeType:"application/pdf",parents:[DRIVE_FACTURACION_FOLDER_ID]});
+                const boundary="pdf_modal_upload_boundary";
+                const metaBytes=new TextEncoder().encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`);
+                const endBytes=new TextEncoder().encode(`\r\n--${boundary}--`);
+                const bodyBytes=new Uint8Array(metaBytes.length+buf.byteLength+endBytes.length);
+                bodyBytes.set(metaBytes,0);bodyBytes.set(new Uint8Array(buf),metaBytes.length);bodyBytes.set(endBytes,metaBytes.length+buf.byteLength);
+                const uploadResp=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{
+                  method:"POST",
+                  headers:{Authorization:`Bearer ${gToken}`,"Content-Type":`multipart/related; boundary=${boundary}`},
+                  body:bodyBytes
+                });
+                if(!uploadResp.ok){const t=await uploadResp.text();throw new Error("Drive upload error "+uploadResp.status+": "+t.slice(0,100));}
+                const uploadJson=await uploadResp.json();
+                const fileId=uploadJson.id;
+                if(!fileId)throw new Error("Drive no devolvió fileId");
+                notify("✓ PDF subido — separando facturas...","ok");
+                setZipStatus("splitting");
+                setShowUploadModal(false);
+                const splitCtrl=new AbortController();
+                const splitTimeout=setTimeout(()=>splitCtrl.abort(),280000);
+                let splitRes;
+                try{splitRes=await fetch("/api/split-pdf",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pdfFileId:fileId,periodo:mesCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID,userToken:gToken}),signal:splitCtrl.signal});}
+                finally{clearTimeout(splitTimeout);}
+                let splitData;try{splitData=await splitRes.json();}catch(_je){throw new Error(`split-pdf: error del servidor (HTTP ${splitRes.status}) — intente de nuevo`);}
+                if(!splitRes.ok)throw new Error(splitData.error||"Error al separar PDF");
+                notify("✓ "+splitData.totalFacturas+" facturas de "+periodo+" listas en Drive — procesando...","ok");
+                periodoActivado.current=true;autoProcesado.current=false;
+                buscarZip(periodo);
+                buscarXmlZip(periodo);
+              }catch(e){setZipStatus("error");setZipError(e.message);notify("Error: "+e.message,"err");}
+              ev.target.value="";
+            }
+          }),
+          "📁 Seleccionar PDF desde mi equipo"
+        ),
+        h("button",{
+          onClick:()=>setShowUploadModal(false),
+          style:{display:"block",width:"100%",padding:"10px",background:"transparent",border:"1px solid var(--bdr)",borderRadius:10,color:"var(--txd)",fontSize:13,cursor:"pointer"}
+        },"Cancelar")
+      )
+    ),
     userMenuOpen&&h('div',{onClick:function(){setUserMenuOpen(false);},style:{position:'fixed',inset:0,zIndex:99}}),
     showPwdModal&&h("div",{className:"pwd-modal-overlay",onClick:e=>{if(e.target===e.currentTarget){setShowPwdModal(false);setPwdInput("");setPwdError(false);}}},
       h("div",{className:"pwd-modal"},
