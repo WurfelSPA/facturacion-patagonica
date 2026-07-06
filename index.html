@@ -679,8 +679,8 @@ async function procesarPlanillaFacturacion(file,periodo){
     const sentColLetter=colIndexToLetter(colEnviado); /* columna dinámica: HC para Junio, HG para Julio, etc. */
     const pagadoColLetter=colPagado>0?colIndexToLetter(colPagado):"";
     const m2Billing=row[42]!=null&&row[42]!==""?Number(row[42]):null; /* Col AQ: m² */
-    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado,sheetRow,sentColLetter,pagadoColLetter,m2:m2Billing});
-    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado,sheetRow,sentColLetter,pagadoColLetter,m2:m2Billing});
+    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado,sheetRow,sentColLetter,pagadoColLetter,m2:m2Billing,arrendadora:String(row[5]||"").trim()});
+    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado,sheetRow,sentColLetter,pagadoColLetter,m2:m2Billing,arrendadora:String(row[5]||"").trim()});
   }
   return clientes;
 }
@@ -1421,6 +1421,7 @@ function formatRUT(rut){
   return result+dv;
 }
 function getEstado(r){
+  if(!r.factura&&r.arrendadora)return"tercero";
   if(!r.factura)return"missing";
   // Facturas grandes (>500 UF): solo verificar que tengan PDF asignado
   if(r.ufPlan>5000)return r.factura?"ok":"missing";
@@ -1443,6 +1444,7 @@ function Badge({e,row}){
     ok:{l:"Coincide",bg:"var(--gbg)",col:"var(--green)",bdr:"var(--gdim)",ic:"✓"},
     diff:{l:row&&row.matchScore===1?"Revisar":"Difiere",bg:"var(--abg)",col:"var(--amber)",bdr:"var(--adim)",ic:"△"},
     missing:{l:"Sin PDF",bg:"var(--rbg)",col:"var(--red)",bdr:"var(--rdim)",ic:"○"},
+    tercero:{l:row?.arrendadora||"3°",bg:"var(--surf2)",col:"var(--txm)",bdr:"var(--bdr)",ic:"⬦"},
     sent_sheet:{l:"Enviado",bg:"var(--gbg)",col:"var(--green)",bdr:"var(--gdim)",ic:"✓"}
   };
   const c=cfg[e]||cfg.missing;
@@ -3774,7 +3776,7 @@ function App(){
             }
           }
         }
-        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,montoTotal,ivaAmount,enviado:false,yaEnviado:c.yaEnviado||false,yaPagado:c.yaPagado||false,sheetRow:c.sheetRow||null,sentColLetter:c.sentColLetter||"HC",pagadoColLetter:c.pagadoColLetter||""});
+        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,montoTotal,ivaAmount,enviado:false,yaEnviado:c.yaEnviado||false,yaPagado:c.yaPagado||false,sheetRow:c.sheetRow||null,sentColLetter:c.sentColLetter||"HC",pagadoColLetter:c.pagadoColLetter||"",arrendadora:c.arrendadora||""});
       }
 
       /* ── Si no hay datos de planilla, mostrar igual los PDFs detectados ── */
@@ -4023,9 +4025,9 @@ function App(){
   /* Sin SetupPanel — siempre va al dashboard */
 
   const enriched=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
-  const stats={total:enriched.length,ok:enriched.filter(r=>r.estado==="ok").length,diff:enriched.filter(r=>r.estado!=="ok").length,sent:sentSet.size,conPdf:enriched.filter(r=>r.factura&&r.ufPdf!==null).length,sinPdf:enriched.filter(r=>!r.factura||r.ufPdf===null).length};
+  const stats={total:enriched.length,ok:enriched.filter(r=>r.estado==="ok").length,diff:enriched.filter(r=>r.estado!=="ok").length,sent:sentSet.size,conPdf:enriched.filter(r=>r.factura&&r.ufPdf!==null).length,sinPdf:enriched.filter(r=>(!r.factura||r.ufPdf===null)&&r.estado!=="tercero").length};
   const filtered=enriched.filter(r=>{
-    const mf=filter==="all"||(filter==="ok"&&r.estado==="ok"&&!sentSet.has(r.i))||(filter==="diff"&&r.estado!=="ok")||(filter==="sent"&&sentSet.has(r.i))||(filter==="difiere"&&r.estado==="diff"&&r.matchScore!==1)||(filter==="sinpdf"&&!r.factura);
+    const mf=filter==="all"||(filter==="ok"&&r.estado==="ok"&&!sentSet.has(r.i))||(filter==="diff"&&r.estado!=="ok")||(filter==="sent"&&sentSet.has(r.i))||(filter==="difiere"&&r.estado==="diff"&&r.matchScore!==1)||(filter==="sinpdf"&&!r.factura&&r.estado!=="tercero");
     const mc=concFilter==="all"||(concFilter==="arr"&&r.concepto==="Arriendo")||(concFilter==="srv"&&r.concepto==="Serv. Adm.")||(concFilter==="hab"&&r.concepto==="Habilitación")||(concFilter==="ppr"&&!r.yaPagado);
     const normQ=s=>(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," ").trim();
     const q=normQ(search);

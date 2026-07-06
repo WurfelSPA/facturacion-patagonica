@@ -429,6 +429,7 @@ export default async function handler(req, res) {
     //    Garantiza alineación: pageBufs[i] y su texto son siempre la misma página
     const zip = new JSZip();
     const sinCod = [];
+    const manifest = [];
     const breakdown = {};
 
     for (let i = 0; i < pageBufs.length; i++) {
@@ -452,6 +453,7 @@ export default async function handler(req, res) {
       else                fname = `F-p${i+1}.pdf`;
       zip.file(`${cod}/${fname}`, pageBufs[i]);
       breakdown[cod] = (breakdown[cod] || 0) + 1;
+      manifest.push({p:i+1, cod, nro: nro||null, cliente: cliente||null, archivo:`${cod}/${fname}`});
       console.log(`Pág ${i+1}: ${cod} → ${fname}`);
     }
 
@@ -459,6 +461,7 @@ export default async function handler(req, res) {
       const scLines = sinCod.map(s=>`Pág ${s.p}: ${s.txt}`).join("\n");
       zip.file(`sin_cod.txt`, `Páginas sin COD (${sinCod.length}):\n${scLines}\n`);
     }
+    zip.file(`manifest.json`, JSON.stringify(manifest, null, 2));
 
     /* Resumen legible para verificación */
     const resumenLines = [`Período: ${periodo}`, `Total facturas: ${Object.values(breakdown).reduce((a,b)=>a+b,0)}`, ``];
