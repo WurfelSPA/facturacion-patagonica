@@ -363,12 +363,13 @@ function detectCod(text) {
   return COD_MAP[m[1].trim().replace(/-$/,"").toUpperCase()] || null;
 }
 function detectNro(text) {
-  /* Tolerante con variantes del carácter º (º, °, o, ø) y con o sin espacio.
-     Prioridades:
-     1. "N° 14548" / "Nº14548" (patrón clásico Nubox)
-     2. "F-14548" / "FEE-14548" en el texto del PDF (referencia del documento)
-     3. Fallback genérico: N + hasta 4 no-alfanuméricos + 4-6 dígitos */
-  const m = text.match(/N[\xBA\xB0o\u00BA\u00B0]?[\s°º]*\s*(\d{4,6})/i)
+  /* Busca el número de la factura en orden de confiabilidad:
+     1. Header exacto "FACTURA [EXENTA] ELECTRONICA Nº XXXXX" (evita folios de referencia)
+     2. "N° XXXXX" / "Nº XXXXX" genérico (patrón clásico Nubox)
+     3. "F-XXXXX" / "FEE-XXXXX" en el texto
+     4. Fallback genérico: N + hasta 4 no-alfanuméricos + 4-6 dígitos */
+  const m = text.match(/FACTURA(?:\s+EXENTA)?\s+ELECTR[O\u00D3]NICA\s*N[\xBA\xB0o\u00BA\u00B0°º]?\s*(\d{4,6})/i)
+    || text.match(/N[\xBA\xB0o\u00BA\u00B0]?[\s°º]*\s*(\d{4,6})/i)
     || text.match(/F(?:EE)?-\s*(\d{4,6})/i)
     || text.match(/N[^a-zA-Z\d]{0,4}(\d{4,6})/);
   return m ? m[1] : null;
