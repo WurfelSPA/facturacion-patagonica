@@ -96,6 +96,7 @@ async function handleGet(req, res) {
         const n = xNorm(f.name);
         return n.endsWith(".zip") && n.includes("xml") && (
           n.includes(`${xAnio}-${xMesNum}`) ||
+          n.includes(`${xAnio}_${xMesNum}`) || /* Facturas XML_PISA_2026_07.zip */
           n.includes(xNorm(xMes))
         );
       });
