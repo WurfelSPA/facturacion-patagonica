@@ -385,7 +385,7 @@ function detectCliente(text) {
   return m[1].trim()
     .replace(/[/\\:*?"<>|]/g, "")
     .replace(/\s+/g, " ")
-    .slice(0, 30)
+    .slice(0, 50)
     .trim();
 }
 

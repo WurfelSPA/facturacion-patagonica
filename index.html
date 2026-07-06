@@ -3705,75 +3705,69 @@ function App(){
       const MANUAL={"A-2|Banco Estado Express|202.6|arriendo":"FEE-39","A-2|Banco del Estado de Chile|256.7|arriendo":"FEE-39","4-A|Sociedad de Alimentos Leefood SpA|7.48|serv_adm":"F-14756"};
       const filas=[];
 
-      /* CRUCE: scoring RUT + UF
-       * Scoring:
-       *   RUT exacto                         → +200 pts  (identificador inequívoco)
-       *   UF exacta   (diff < 0.01)          → +50  pts
-       *   UF próxima  (diff < 0.5)           → +20  pts
-       *   UF muy próxima (diff < 2, sin RUT) → +5   pts  (tiebreak leve)
-       *
-       * Reglas:
-       *   - Candidatos válidos: mismo sitio + mismo tipo, no usados aún
-       *   - Solo se asigna si score >= 200 (RUT match) O score >= 50 (UF exacta sin RUT)
-       *   - Fallback sin score mínimo: solo si hay exactamente 1 candidato disponible
-       *     para ese sitio+tipo (evita asignación ciega cuando hay ambigüedad)
-       *   - Facturas CLP fijo (ufPdf===null): se cruzan solo por RUT exacto
+      /* CRUCE: greedy pre-ordenado por score (evita que orden de planilla robe PDFs)
+       * Scoring: nombre +300, RUT +200, UF exacta +50, UF próx +20, UF muy próx +5
+       * Paso 1: calcular todos los pares (ci, pi, score) con score > 0
+       * Paso 2: ordenar desc y asignar greedy (mejor par global primero)
+       * Paso 3: fallback solo para PDFs no reclamados (score=0 para todos)
        */
-      for(const c of clientes){
+      const normNombreFn=s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9 ]/g,"").trim();
+      const pairScores=[];
+      for(let ci=0;ci<clientes.length;ci++){
+        const c=clientes[ci];
+        const mk=`${c.sitio}|${c.cliente}|${c.uf}|${c.tipo}`;
+        if(MANUAL[mk])continue;
+        const ncli=normNombreFn(c.cliente);
+        const rutNorm=c.rut||"";
+        for(let pi=0;pi<pdfs.length;pi++){
+          const p=pdfs[pi];
+          if(p.sitio!==c.sitio||p.tipo!==c.tipo)continue;
+          let score=0;
+          if(p.nombreEnArchivo&&ncli){
+            const na=p.nombreEnArchivo;
+            const matches=ncli===na||ncli.includes(na)||(na.length>=4&&ncli.includes(na))||(ncli.length>=4&&na.includes(ncli));
+            const fwN=na.split(" ").find(w=>w.length>=4)||"";
+            const fwC=ncli.split(" ").find(w=>w.length>=4)||"";
+            if(matches||(fwN&&fwC&&fwN===fwC))score+=300;
+          }
+          if(rutNorm&&p.rutPdf&&p.rutPdf===rutNorm)score+=200;
+          if(p.ufPdf!==null&&c.uf!=null){
+            const diff=Math.abs(p.ufPdf-c.uf);
+            if(diff<0.01)score+=50;
+            else if(diff<0.5)score+=20;
+            else if(diff<2.0)score+=5;
+          }
+          if(score>0)pairScores.push({ci,pi,score});
+        }
+      }
+      pairScores.sort((a,b)=>b.score-a.score);
+      const clienteAsignado=new Set();
+      const greedy={};
+      for(const {ci,pi,score} of pairScores){
+        if(!clienteAsignado.has(ci)&&!pdfUsado.has(pi)){
+          greedy[ci]={pi,score};
+          clienteAsignado.add(ci);
+          pdfUsado.add(pi);
+        }
+      }
+
+      for(let ci=0;ci<clientes.length;ci++){
+        const c=clientes[ci];
         const correo=c.email||"";
         const concepto=c.tipo==="arriendo"?"Arriendo":c.tipo==="habilitacion"?"Habilitación":"Serv. Adm.";
         const colRef=c.tipo==="arriendo"?"GS":"GT";
         const mk=`${c.sitio}|${c.cliente}|${c.uf}|${c.tipo}`;
         let factura="",ufPdf=null,montoTotal=null,ivaAmount=null,matchScore=0;
         if(MANUAL[mk]){factura=MANUAL[mk];ufPdf=c.uf;matchScore=999;}
-        else{
-          let bestIdx=-1,bestScore=0;
-          const rutNorm=c.rut||"";
-
-          /* Normaliza nombre para matching: minúsculas, sin tildes, solo alfanumérico */
-          const normNombre=s=>(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9 ]/g,"").trim();
-          const ncli=normNombre(c.cliente);
-
-          for(let idx=0;idx<pdfs.length;idx++){
-            if(pdfUsado.has(idx))continue;
-            const p=pdfs[idx];
-            if(p.sitio!==c.sitio||p.tipo!==c.tipo)continue;
-            let score=0;
-            /* Nombre en archivo — identificador más directo (el archivo ya lleva el nombre del cliente) */
-            if(p.nombreEnArchivo&&ncli){
-              const na=p.nombreEnArchivo; /* ya está en lowercase desde procesarPDFs */
-              const matches=ncli===na||ncli.includes(na)||(na.length>=4&&ncli.includes(na))||(ncli.length>=4&&na.includes(ncli));
-              const fwN=na.split(" ").find(w=>w.length>=4)||"";
-              const fwC=ncli.split(" ").find(w=>w.length>=4)||"";
-              if(matches||(fwN&&fwC&&fwN===fwC)) score+=300;
-            }
-            /* RUT exacto — identificador inequívoco */
-            if(rutNorm&&p.rutPdf&&p.rutPdf===rutNorm) score+=200;
-            /* UF */
-            if(p.ufPdf!==null&&c.uf!=null){
-              const diff=Math.abs(p.ufPdf-c.uf);
-              if(diff<0.01)       score+=50;
-              else if(diff<0.5)   score+=20;
-              else if(diff<2.0)   score+=5;
-            }
-            if(score>bestScore){bestScore=score;bestIdx=idx;}
-          }
-
-          const UMBRAL_NOMBRE=300;
-          const UMBRAL_RUT=200;
-          const UMBRAL_UF=50;
-
-          if(bestScore>=UMBRAL_NOMBRE||bestScore>=UMBRAL_RUT||bestScore>=UMBRAL_UF){
-            pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;montoTotal=pdfs[bestIdx].montoTotal||null;ivaAmount=pdfs[bestIdx].ivaAmount||null;matchScore=bestScore;
-          } else {
-            const candidatos=pdfs.reduce((acc,p,idx)=>{
-              if(!pdfUsado.has(idx)&&p.sitio===c.sitio&&p.tipo===c.tipo)acc.push(idx);
-              return acc;
-            },[]);
-            if(candidatos.length===1){
-              bestIdx=candidatos[0];
-              pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;montoTotal=pdfs[bestIdx].montoTotal||null;ivaAmount=pdfs[bestIdx].ivaAmount||null;matchScore=1;
-            }
+        else if(greedy[ci]){
+          const a=greedy[ci];const p=pdfs[a.pi];
+          factura=p.nroFact;ufPdf=p.ufPdf;montoTotal=p.montoTotal||null;ivaAmount=p.ivaAmount||null;matchScore=a.score;
+        } else {
+          /* Fallback: solo PDFs no reclamados (score=0 para todos) — evita asignaciones cruzadas */
+          const candidatos=pdfs.reduce((acc,p,idx)=>{if(!pdfUsado.has(idx)&&p.sitio===c.sitio&&p.tipo===c.tipo)acc.push(idx);return acc;},[]);
+          if(candidatos.length===1){
+            const idx=candidatos[0];
+            pdfUsado.add(idx);factura=pdfs[idx].nroFact;ufPdf=pdfs[idx].ufPdf;montoTotal=pdfs[idx].montoTotal||null;ivaAmount=pdfs[idx].ivaAmount||null;matchScore=1;
           }
         }
         filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,montoTotal,ivaAmount,enviado:false,yaEnviado:c.yaEnviado||false,yaPagado:c.yaPagado||false,sheetRow:c.sheetRow||null,sentColLetter:c.sentColLetter||"HC",pagadoColLetter:c.pagadoColLetter||"",arrendadora:c.arrendadora||""});
@@ -4025,9 +4019,9 @@ function App(){
   /* Sin SetupPanel — siempre va al dashboard */
 
   const enriched=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
-  const stats={total:enriched.length,ok:enriched.filter(r=>r.estado==="ok").length,diff:enriched.filter(r=>r.estado!=="ok").length,sent:sentSet.size,conPdf:enriched.filter(r=>r.factura&&r.ufPdf!==null).length,sinPdf:enriched.filter(r=>(!r.factura||r.ufPdf===null)&&r.estado!=="tercero").length};
+  const stats={total:enriched.length,ok:enriched.filter(r=>r.estado==="ok").length,diff:enriched.filter(r=>r.estado!=="ok"&&r.estado!=="tercero").length,sent:sentSet.size,conPdf:enriched.filter(r=>r.factura&&r.ufPdf!==null).length,sinPdf:enriched.filter(r=>(!r.factura||r.ufPdf===null)&&r.estado!=="tercero").length};
   const filtered=enriched.filter(r=>{
-    const mf=filter==="all"||(filter==="ok"&&r.estado==="ok"&&!sentSet.has(r.i))||(filter==="diff"&&r.estado!=="ok")||(filter==="sent"&&sentSet.has(r.i))||(filter==="difiere"&&r.estado==="diff"&&r.matchScore!==1)||(filter==="sinpdf"&&!r.factura&&r.estado!=="tercero");
+    const mf=filter==="all"||(filter==="ok"&&r.estado==="ok"&&!sentSet.has(r.i))||(filter==="diff"&&r.estado!=="ok"&&r.estado!=="tercero")||(filter==="sent"&&sentSet.has(r.i))||(filter==="difiere"&&r.estado==="diff"&&r.matchScore!==1)||(filter==="sinpdf"&&!r.factura&&r.estado!=="tercero");
     const mc=concFilter==="all"||(concFilter==="arr"&&r.concepto==="Arriendo")||(concFilter==="srv"&&r.concepto==="Serv. Adm.")||(concFilter==="hab"&&r.concepto==="Habilitación")||(concFilter==="ppr"&&!r.yaPagado);
     const normQ=s=>(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," ").trim();
     const q=normQ(search);
@@ -5097,7 +5091,7 @@ function App(){
         ))
       ),
       h("div",{style:{background:"#ddeaf8",borderBottom:"1px solid #b8d0ee",padding:"8px 18px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
-        [{k:"all",l:`Todos (${stats.total})`},{k:"ok",l:`Coinciden (${stats.ok})`},{k:"diff",l:`Revisar (${stats.total-stats.ok})`},{k:"sent",l:`Enviados (${stats.sent})`},
+        [{k:"all",l:`Todos (${stats.total})`},{k:"ok",l:`Coinciden (${stats.ok})`},{k:"diff",l:`Revisar (${stats.diff})`},{k:"sent",l:`Enviados (${stats.sent})`},
          {k:"difiere",l:`Difiere (${enriched.filter(r=>r.estado==="diff"&&r.matchScore!==1).length})`},
          {k:"sinpdf",l:`Sin PDF (${stats.sinPdf})`}]
         .map(f=>h("button",{key:f.k,className:`pill${filter===f.k?" active":""}`,onClick:()=>setFilter(f.k)},f.l)),
