@@ -358,9 +358,12 @@ const COD_MAP = {"5-A":"5A","5A":"5A","4-A":"4A","4A":"4A","A-1":"A1","A1":"A1",
   "A-2":"A2","A2":"A2","B":"B","D-2":"D2","D2":"D2","D-3":"D3","D3":"D3"};
 
 function detectCod(text) {
-  const m = text.match(/COD:\s*([A-D0-9][-A-D0-9]*)/);
+  // Case-insensitive, A-Z (no solo A-D) y máx 5 chars para evitar match de descripciones largas
+  const m = text.match(/COD:\s*([A-Z0-9][-A-Z0-9]{0,4})/i);
   if (!m) return null;
-  return COD_MAP[m[1].trim().replace(/-$/,"").toUpperCase()] || null;
+  const raw = m[1].trim().replace(/-$/,"").toUpperCase();
+  // Usar COD_MAP si hay mapeo; si no, usar el valor normalizado directamente
+  return COD_MAP[raw] !== undefined ? COD_MAP[raw] : raw;
 }
 function detectNro(text) {
   /* Busca el número de la factura en orden de confiabilidad:
@@ -434,7 +437,7 @@ export default async function handler(req, res) {
       const nro = detectNro(text);
 
       if (!cod) {
-        sinCod.push(i + 1);
+        sinCod.push({p:i+1, txt:text.slice(0,250).replace(/\s+/g," ").trim()});
         console.log(`Pág ${i+1}: sin COD — texto: "${text.slice(0,80)}"`);
         continue;
       }
@@ -453,7 +456,8 @@ export default async function handler(req, res) {
     }
 
     if (sinCod.length > 0) {
-      zip.file(`sin_cod.txt`, `Páginas sin COD: ${sinCod.join(", ")}\n`);
+      const scLines = sinCod.map(s=>`Pág ${s.p}: ${s.txt}`).join("\n");
+      zip.file(`sin_cod.txt`, `Páginas sin COD (${sinCod.length}):\n${scLines}\n`);
     }
 
     /* Resumen legible para verificación */
