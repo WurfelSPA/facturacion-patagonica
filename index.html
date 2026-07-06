@@ -3468,6 +3468,11 @@ function App(){
   const [canGenerate,setCanGenerate]=useState(false);  /* si se puede generar el ZIP */
   const zipPeriodoRef=React.useRef(""); /* período del ZIP actualmente cargado */
 
+  /* Estado ZIP de XMLs */
+  const [xmlZipStatus,setXmlZipStatus]=useState("idle"); /* idle/loading/ready/missing */
+  const [xmlZipFileId,setXmlZipFileId]=useState(null);
+  const xmlZipPeriodoRef=React.useRef("");
+
   /* Buscar ZIP cuando se selecciona un período */
   const buscarZip=React.useCallback((p)=>{
     if(!p)return;
@@ -3503,6 +3508,27 @@ function App(){
 
   const cargarZipDrive=React.useCallback(()=>buscarZip(periodo),[periodo,buscarZip]);
 
+  /* Buscar ZIP de XMLs cuando se selecciona un período */
+  const buscarXmlZip=React.useCallback((p)=>{
+    if(!p)return;
+    xmlZipPeriodoRef.current=p;
+    setXmlZipStatus("loading");
+    const [mesNombre,anio]=p.split(" ");
+    const mesNum={"Enero":"01","Febrero":"02","Marzo":"03","Abril":"04","Mayo":"05","Junio":"06","Julio":"07","Agosto":"08","Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12"}[mesNombre]||"01";
+    const xmlZipName=`Facturas XML_PISA_${anio}-${mesNum}.zip`;
+    fetch(`/api/storage?buscarPdf=${encodeURIComponent(xmlZipName)}&folderId=${DRIVE_FACTURACION_FOLDER_ID}`)
+      .then(r=>r.json())
+      .then(d=>{
+        if(xmlZipPeriodoRef.current!==p)return;
+        if(d.pdfFileId){setXmlZipFileId(d.pdfFileId);setXmlZipStatus("ready");}
+        else{setXmlZipFileId(null);setXmlZipStatus("missing");}
+      })
+      .catch(()=>{
+        if(xmlZipPeriodoRef.current!==p)return;
+        setXmlZipStatus("missing");setXmlZipFileId(null);
+      });
+  },[]);
+
   /* Generar ZIP desde PDF maestro del mes */
   const generarZip=React.useCallback(async()=>{
     if(!periodo||!pdfMaestroId)return;
@@ -3517,7 +3543,7 @@ function App(){
         method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({pdfFileId:pdfMaestroId,periodo:periodoCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID,userToken:uTok}),
       });
-      let data;try{data=await res.json();}catch(je){throw new Error(`split-pdf timeout o error del servidor (HTTP ${res.status}) — intente de nuevo`);}
+      const data=await res.json();
       if(!res.ok)throw new Error(data.error||"Error desconocido");
       notify("✓ "+data.totalFacturas+" facturas generadas y subidas a Drive","ok");
       /* 2. Recargar ZIP desde Drive */
@@ -3537,6 +3563,7 @@ function App(){
   useEffect(()=>{
     autoProcesado.current=false;
     autoNuboxRef.current=false;
+    setXmlZipStatus("idle");setXmlZipFileId(null);
     /* No reseteamos periodoActivado aquí — se resetea solo al cambiar período desde el selector */
   },[periodo]);
   /* Resetear periodoActivado al salir de facturación para evitar auto-ejecución al volver */
@@ -3901,7 +3928,7 @@ function App(){
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({pdfFileId,periodo:periodoCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID,userToken:await getToken().catch(()=>null)}),
       });
-      let data;try{data=await res.json();}catch(je){throw new Error(`split-pdf timeout o error del servidor (HTTP ${res.status}) — intente de nuevo`);}
+      const data=await res.json();
       if(!res.ok)throw new Error(data.error||"Error desconocido");
       setSplitResult(data);
       if(data.zipBase64){
@@ -4872,6 +4899,7 @@ function App(){
             periodoActivado.current=true;autoProcesado.current=false;autoNuboxRef.current=false;
             setZipStatus("idle");setData([]);
             buscarZip(periodo);
+            buscarXmlZip(periodo);
           }
         },
           zipStatus==="loading"||zipStatus==="splitting"||splitLoading
@@ -5008,11 +5036,11 @@ function App(){
                   notify("✓ PDF subido — separando facturas...","ok");
                   setZipStatus("splitting");
                   const splitCtrl=new AbortController();
-                  const splitTimeout=setTimeout(()=>splitCtrl.abort(),280000);
+                  const splitTimeout=setTimeout(()=>splitCtrl.abort(),90000);
                   let splitRes;
                   try{splitRes=await fetch("/api/split-pdf",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pdfFileId:fileId,periodo:mesCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID,userToken:gToken}),signal:splitCtrl.signal});}
                   finally{clearTimeout(splitTimeout);}
-                  let splitData;try{splitData=await splitRes.json();}catch(je){throw new Error(`split-pdf timeout o error del servidor (HTTP ${splitRes.status}) — intente de nuevo`);}
+                  const splitData=await splitRes.json();
                   if(!splitRes.ok)throw new Error(splitData.error||"Error al separar PDF");
                   notify("✓ "+splitData.totalFacturas+" facturas de "+periodo+" listas en Drive — procesando...","ok");
                   /* ── Notificación Telegram al subir ── */
@@ -5024,11 +5052,61 @@ function App(){
                   /* ── Continuar automáticamente al reporte ── */
                   periodoActivado.current=true;autoProcesado.current=false;
                   buscarZip(periodo);
+                  buscarXmlZip(periodo);
                 }catch(e){setZipStatus("error");setZipError(e.message);notify("Error: "+e.message,"err");}
                 ev.target.value="";
               }
             }),
           "📄 Subir PDF manualmente"
+        ),
+        /* ── ZIP de XMLs ── */
+        xmlZipStatus==="loading"&&h("span",{style:{fontSize:12,color:"var(--txd)",marginLeft:2,display:"flex",alignItems:"center",gap:4}},h("span",{className:"spin"},"⟳")," Buscando XMLs..."),
+        xmlZipStatus==="ready"&&h("span",{style:{fontSize:12,color:"var(--green)",marginLeft:2,display:"flex",alignItems:"center",gap:4}},"✓ ZIP de XMLs listo"),
+        xmlZipStatus==="missing"&&h("label",{
+          style:{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,padding:"6px 16px",borderRadius:8,
+            border:"1px solid var(--adim)",background:"var(--abg)",color:"var(--amber)",cursor:"pointer",fontWeight:600,marginTop:4}
+        },
+          h("input",{type:"file",accept:".zip,application/zip",style:{display:"none"},
+            onChange:async ev=>{
+              const file=ev.target.files[0]; if(!file)return;
+              setXmlZipStatus("loading");
+              try{
+                const [mesNombre,anio]=periodo.split(" ");
+                const mesNum={"Enero":"01","Febrero":"02","Marzo":"03","Abril":"04","Mayo":"05","Junio":"06","Julio":"07","Agosto":"08","Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12"}[mesNombre]||"01";
+                const fileName=`Facturas XML_PISA_${anio}-${mesNum}.zip`;
+                notify("Subiendo ZIP de XMLs a Drive...","info");
+                const gToken=await getToken();
+                const buf=await file.arrayBuffer();
+                const boundary="xml_zip_boundary";
+                const meta=JSON.stringify({name:fileName,mimeType:"application/zip",parents:[DRIVE_FACTURACION_FOLDER_ID]});
+                const metaBytes=new TextEncoder().encode(`--${boundary}
+Content-Type: application/json; charset=UTF-8
+
+${meta}
+--${boundary}
+Content-Type: application/zip
+
+`);
+                const endBytes=new TextEncoder().encode(`
+--${boundary}--`);
+                const bodyBytes=new Uint8Array(metaBytes.length+buf.byteLength+endBytes.length);
+                bodyBytes.set(metaBytes,0);bodyBytes.set(new Uint8Array(buf),metaBytes.length);bodyBytes.set(endBytes,metaBytes.length+buf.byteLength);
+                const uploadResp=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{
+                  method:"POST",
+                  headers:{Authorization:`Bearer ${gToken}`,"Content-Type":`multipart/related; boundary=${boundary}`},
+                  body:bodyBytes
+                });
+                if(!uploadResp.ok){const t=await uploadResp.text();throw new Error("Drive upload "+uploadResp.status+": "+t.slice(0,100));}
+                const uploadJson=await uploadResp.json();
+                if(!uploadJson.id)throw new Error("Drive no devolvió fileId para XML ZIP");
+                setXmlZipFileId(uploadJson.id);
+                setXmlZipStatus("ready");
+                notify("✓ ZIP de XMLs subido a Drive","ok");
+              }catch(e){setXmlZipStatus("missing");notify("Error XML ZIP: "+e.message,"err");}
+              ev.target.value="";
+            }
+          }),
+          "📦 Subir ZIP de XMLs"
         )
       ),
       files.planilla
