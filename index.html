@@ -5165,6 +5165,16 @@ function App(){
               fontFamily:"'DM Sans',sans-serif"}
           },"⬇ Reporte")
         ),
+        xmlZipStatus==="missing"&&h("span",{style:{fontSize:11,color:"var(--amber)",display:"flex",alignItems:"center",gap:5,background:"var(--abg)",border:"1px solid var(--adim)",borderRadius:7,padding:"4px 10px"}},
+          "⚠ Falta ZIP de XMLs",
+          h("label",{style:{cursor:"pointer",fontWeight:700,textDecoration:"underline",marginLeft:2}},
+            "⬆ Subir",
+            h("input",{type:"file",accept:".zip",style:{display:"none"},onChange:e=>{if(e.target.files[0])onXmlZipFile(e.target.files[0]);}})
+          )
+        ),
+        xmlZipStatus==="ready"&&h("span",{style:{fontSize:11,color:"var(--green)",display:"flex",alignItems:"center",gap:4,background:"var(--gbg)",border:"1px solid var(--gdim)",borderRadius:7,padding:"4px 10px"}},
+          "✓ XMLs listos"
+        ),
         h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:190,fontFamily:"'DM Sans',sans-serif"}}),
         h("input",{value:searchFactura,onChange:e=>setSearchFactura(e.target.value),placeholder:"N° Factura...",style:{width:130,fontFamily:"'DM Mono',monospace"}})
       ),
