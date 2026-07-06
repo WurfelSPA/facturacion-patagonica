@@ -429,13 +429,22 @@ export default async function handler(req, res) {
     if (pageBufs.length === 0) throw new Error("No se pudieron separar las páginas del PDF");
     console.log(`Páginas separadas: ${pageBufs.length}`);
 
-    // 3. Extraer texto con zlib puro por página (sin pdf-lib)
+    // 3. Extraer texto — CMap del PDF completo (tiene todas las fuentes/encoding),
+    //    streams de texto de cada página individual
+    const globalCMap = buildCMap(pdfBuf);
+    console.log(`CMap global: ${Object.keys(globalCMap).length} entradas`);
     const zip = new JSZip();
     const sinCod = [];
     const breakdown = {};
 
     for (let i = 0; i < pageBufs.length; i++) {
-      const text = extractText(pageBufs[i]);
+      // Usar globalCMap del PDF completo; si la página tiene su propio CMap, fusionarlo
+      const pageCMap = buildCMap(pageBufs[i]);
+      const mapping = Object.keys(globalCMap).length > 0
+        ? Object.assign({}, globalCMap, pageCMap)
+        : pageCMap;
+      const pageStreams = getDecodedStreams(pageBufs[i]);
+      const text = pageStreams.map(d => applyTextOps(d, mapping)).join("").replace(/\s+/g, " ").trim();
       const cod = detectCod(text);
       const nro = detectNro(text);
 
