@@ -1421,7 +1421,7 @@ function formatRUT(rut){
   return result+dv;
 }
 function getEstado(r){
-  if(!r.factura&&r.arrendadora)return"tercero";
+  if(!r.factura&&r.arrendadora&&!/PISA/i.test(r.arrendadora))return"tercero";
   if(!r.factura)return"missing";
   // Facturas grandes (>500 UF): solo verificar que tengan PDF asignado
   if(r.ufPlan>5000)return r.factura?"ok":"missing";
