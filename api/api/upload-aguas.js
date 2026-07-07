@@ -1,28 +1,23 @@
 /**
  * api/upload-aguas.js
  *
- * Endpoint Vercel — dos modos:
- *
- * Modo A (render-service): recibe pdfBase64 directamente
- *   Body: { boletas: [{ nroFactura, mes, pdfBase64 }] }
- *
- * Modo B (browser-directo): recibe URL de Sovos, Vercel baja el PDF
- *   Body: { boletas: [{ nroFactura, mes, sovosUrl }] }
+ * Endpoint Vercel — recibe PDFs de boletas Aguas Andinas desde render-service
+ * y los sube a Google Drive usando GOOGLE_SERVICE_ACCOUNT ya configurada.
  *
  * POST /api/upload-aguas
  * Headers: x-sync-secret: <SYNC_SECRET>
+ * Body: { boletas: [{ nroFactura, mes, pdfBase64, monto?, estado? }] }
+ *
+ * Env vars requeridas (ya en Vercel):
+ *   GOOGLE_SERVICE_ACCOUNT          — JSON de cuenta de servicio
+ *   SYNC_SECRET                     — token de autenticación
+ * Env vars nuevas a agregar en Vercel:
+ *   AGUAS_ANDINAS_DRIVE_FOLDER_ID   — ID carpeta "agua" en Drive
  */
 
 export const config = { api: { bodyParser: { sizeLimit: '10mb' } } };
 
-// ── CORS ──────────────────────────────────────────────────────────────────────
-function setCors(res) {
-  res.setHeader('Access-Control-Allow-Origin',  '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-sync-secret');
-}
-
-// ── JWT + Auth ─────────────────────────────────────────────────────────────────
+// ── JWT + Auth (mismo patrón que planilla.js) ─────────────────────────────────
 async function signJWT(payload, privateKey) {
   const header = { alg: 'RS256', typ: 'JWT' };
   const encode = obj =>
@@ -122,6 +117,7 @@ async function driveUploadPDF(token, filename, pdfBase64, folderId) {
   const metadata  = JSON.stringify({ name: filename, parents: [folderId] });
   const pdfBytes  = Buffer.from(pdfBase64, 'base64');
 
+  // Build multipart body
   const enc  = new TextEncoder();
   const part1 = enc.encode(
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`
@@ -147,33 +143,20 @@ async function driveUploadPDF(token, filename, pdfBase64, folderId) {
   return await r.json();
 }
 
-// ── Sovos PDF fetcher (server-to-server, sin restricciones CORS) ──────────────
-async function fetchSovosPdf(sovosUrl) {
-  const r = await fetch(sovosUrl, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36',
-      'Accept': 'application/pdf,*/*',
-    },
-  });
-  if (!r.ok) throw new Error(`Sovos HTTP ${r.status}`);
-  const ct = r.headers.get('content-type') || '';
-  const buf = await r.arrayBuffer();
-  if (buf.byteLength < 1000) throw new Error(`Sovos respuesta muy pequeña: ${buf.byteLength}b — ` + ct);
-  return Buffer.from(buf).toString('base64');
-}
-
 // ── Main handler ──────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
-  setCors(res);
+  res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST')    return res.status(405).json({ error: 'Method not allowed' });
 
+  // Auth
   const secret = req.headers['x-sync-secret'] || req.body?.secret;
   const SYNC_SECRET = process.env.SYNC_SECRET || '';
   if (!SYNC_SECRET || secret !== SYNC_SECRET) {
     return res.status(401).json({ error: 'No autorizado' });
   }
 
+  // Env vars
   const saJson       = process.env.GOOGLE_SERVICE_ACCOUNT;
   const parentFolder = process.env.AGUAS_ANDINAS_DRIVE_FOLDER_ID;
   if (!saJson)       return res.status(500).json({ error: 'Falta GOOGLE_SERVICE_ACCOUNT' });
@@ -188,6 +171,8 @@ export default async function handler(req, res) {
   const token   = await getAccessToken(sa);
   const uploaded = [];
   const errors   = [];
+
+  // Cache month folder IDs to avoid repeated Drive API calls
   const folderCache = {};
 
   for (const b of boletas) {
@@ -196,40 +181,31 @@ export default async function handler(req, res) {
       errors.push({ nroFactura: b.nroFactura, error: 'No se pudo parsear mes: ' + b.mes });
       continue;
     }
-
-    // Obtener PDF en base64: desde pdfBase64 directo o descargando de Sovos
-    let pdfBase64 = b.pdfBase64 || null;
-    if (!pdfBase64 && b.sovosUrl) {
-      try {
-        pdfBase64 = await fetchSovosPdf(b.sovosUrl);
-        console.log('[upload-aguas] PDF descargado de Sovos para', b.nroFactura, '— tamaño:', Math.round(pdfBase64.length * 0.75 / 1024), 'KB');
-      } catch (err) {
-        errors.push({ nroFactura: b.nroFactura, error: 'Sovos fetch: ' + err.message });
-        continue;
-      }
-    }
-
-    if (!pdfBase64) {
-      errors.push({ nroFactura: b.nroFactura, error: 'falta pdfBase64 o sovosUrl' });
+    if (!b.pdfBase64) {
+      errors.push({ nroFactura: b.nroFactura, error: 'pdfBase64 vacío' });
       continue;
     }
 
     const cacheKey = `${parsed.month}-${parsed.year}`;
 
     try {
+      // Find or create month subfolder (cached)
       if (!folderCache[cacheKey]) {
         const folders = await driveList(token,
           `'${parentFolder}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
         );
         const match = folders.find(f => folderMatchesMes(f.name, parsed));
-        folderCache[cacheKey] = match
-          ? match.id
-          : await driveCreateFolder(token, `${parsed.year}-${parsed.num}`, parentFolder);
+        if (match) {
+          folderCache[cacheKey] = match.id;
+        } else {
+          folderCache[cacheKey] = await driveCreateFolder(token, cacheKey, parentFolder);
+        }
       }
 
       const folderId = folderCache[cacheKey];
       const filename = `aguasandinas_${parsed.year}${parsed.num}_factura_${b.nroFactura}.pdf`;
 
+      // Skip if already exists
       const existing = await driveList(token,
         `'${folderId}' in parents and name='${filename}' and trashed=false`
       );
@@ -238,7 +214,8 @@ export default async function handler(req, res) {
         continue;
       }
 
-      const file = await driveUploadPDF(token, filename, pdfBase64, folderId);
+      // Upload
+      const file = await driveUploadPDF(token, filename, b.pdfBase64, folderId);
       uploaded.push({ filename, id: file.id, size: file.size, folder: cacheKey });
       console.log('[upload-aguas] Subido:', filename);
 
@@ -249,7 +226,7 @@ export default async function handler(req, res) {
   }
 
   return res.status(200).json({
-    ok: true,
+    ok:       true,
     uploaded: uploaded.length,
     errors:   errors.length,
     uploadedFiles: uploaded,
