@@ -631,6 +631,15 @@ async function parsePlanillaParaDashboard(file){
 /* ═══════════════════════════════════
    PROCESAMIENTO DE BILLING
 ═══════════════════════════════════ */
+/* Busca columna cuyo header (filas 0-3) satisface test(array_de_valores, col_idx) */
+function buscarCol(dataRaw,desde,hasta,test){
+  const hdrs=[dataRaw[0]||[],dataRaw[1]||[],dataRaw[2]||[],dataRaw[3]||[]];
+  for(let j=desde;j<=hasta;j++){
+    const vs=hdrs.map(r=>String(r[j]||"").trim().toLowerCase());
+    if(test(vs))return j;
+  }
+  return -1;
+}
 async function procesarPlanillaFacturacion(file,periodo){
   const buf=await readFileAsBuffer(file);
   const wb=XLSX.read(buf,{type:"array"});
@@ -652,10 +661,20 @@ async function procesarPlanillaFacturacion(file,periodo){
     return false;
   }
 
-  /* Fechas en fila 3 (índice 2) */
+  /* Fechas en fila 3 (índice 2) — estructura nueva (may-26+): 6 cols/período */
   const fila3=dataRaw[2]||[];
   for(let i=64;i<fila3.length;i++){
-    if(esTargetMes(fila3[i])){colGS=i;colGT=i+1;colEnviado=i+3;colPagado=i+4;break;}
+    if(!esTargetMes(fila3[i]))continue;
+    colGS=i;
+    /* GC: "GC" exacto en header — i+1 (estructura ≤abr-26) o i+2 (may-26+) */
+    const gcCol=buscarCol(dataRaw,i+1,i+3,vs=>vs.some(v=>v==="gc"));
+    colGT=gcCol!==-1?gcCol:i+1;
+    /* Correo Enviado: buscar header "enviado" en rango i+2..i+10 */
+    colEnviado=buscarCol(dataRaw,i+2,i+10,vs=>vs.some(v=>v.includes("enviado")));
+    /* Pagado: buscar header "pagado" después de Correo Enviado */
+    const envBase=colEnviado>0?colEnviado:i+4;
+    colPagado=buscarCol(dataRaw,envBase+1,envBase+5,vs=>vs.some(v=>v.includes("pagado")));
+    break;
   }
   if(colGS===-1)throw new Error(`No se encontró columna para ${periodo}. Verifica que la planilla tenga ese mes.`);
 
@@ -707,8 +726,10 @@ async function leerHistorialAnio(xlsxFile, anio){
     const mesNombre=MESES_N[mesIdx];
     const mesNum=mesIdx+1;
     if(mesesMap[mesNombre])continue; /* solo primer hit por mes */
-    const hasEnviado=(anio>2026)||(anio===2026&&mesNum>=6);
-    mesesMap[mesNombre]={colGS:i,colGT:i+1,colEnviado:hasEnviado?i+3:-1,mesNum};
+    /* Detectar GC y Correo Enviado dinámicamente (estructura cambia desde may-26) */
+    const gcColH=buscarCol(dataRaw,i+1,i+3,vs=>vs.some(v=>v==="gc"));
+    const envColH=buscarCol(dataRaw,i+2,i+10,vs=>vs.some(v=>v.includes("enviado")));
+    mesesMap[mesNombre]={colGS:i,colGT:gcColH!==-1?gcColH:i+1,colEnviado:envColH!==-1?envColH:-1,mesNum};
   }
 
   const excl=["","VACANTE","Nombre Cliente","Areas Comunes Edificio","Areas comunes Edificio (Subterraneos)","Area Comun"];
