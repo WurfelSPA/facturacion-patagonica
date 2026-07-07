@@ -3,12 +3,26 @@ export default async function({ page }) {
   const CLAVE = __CLAVE__;
   const BASE  = 'https://www.aguasandinas.cl';
 
+  // ── Anti-detección ────────────────────────────────────────────────────────
+  await page.setUserAgent(
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+  );
+  await page.setExtraHTTPHeaders({
+    'Accept-Language': 'es-CL,es;q=0.9',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+  });
+  await page.evaluateOnNewDocument(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    Object.defineProperty(navigator, 'languages', { get: () => ['es-CL', 'es'] });
+    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
+  });
+
   // Helper: probar múltiples selectores hasta encontrar uno
-  async function waitForAny(selectors, timeout = 15000) {
+  async function waitForAny(selectors, timeout = 20000) {
     const start = Date.now();
     while (Date.now() - start < timeout) {
       for (const sel of selectors) {
-        if (await page.$(sel)) return sel;
+        try { if (await page.$(sel)) return sel; } catch(e) {}
       }
       await new Promise(r => setTimeout(r, 500));
     }
@@ -18,55 +32,59 @@ export default async function({ page }) {
   try {
     // ── 1. LOGIN ──────────────────────────────────────────────────────────────
     await page.goto(BASE + '/web/aguasandinas/login', { waitUntil: 'networkidle2', timeout: 45000 });
-    await new Promise(r => setTimeout(r, 2000));
+    // Esperar más para páginas JS-heavy
+    await new Promise(r => setTimeout(r, 5000));
 
     const afterLoginUrl   = page.url();
     const afterLoginTitle = await page.title();
 
-    // Si ya redirigió a página autenticada, está logueado
     if (!afterLoginUrl.includes('/login')) {
-      // Posiblemente ya hay sesión activa — ir directo a mis-cuentas
       console.log('[aguas] Ya autenticado, URL:', afterLoginUrl);
     } else {
-      // Buscar el campo RUT con selectores alternativos
+      // Diagnóstico: capturar HTML del body para ver qué cargó
+      const bodyHtml = await page.evaluate(() => document.body?.innerHTML?.slice(0, 1000) || 'EMPTY');
+      console.log('[aguas] Body HTML (1000 chars):', bodyHtml.replace(/\s+/g, ' '));
+
       const rutSel = await waitForAny([
         '#rut2',
         'input[placeholder*="RUT" i]',
         'input[placeholder*="Rut" i]',
         'input[name*="rut" i]',
         'input[id*="rut" i]',
-        'form input[type="text"]:first-of-type',
+        'form input[type="text"]',
         'input[type="text"]',
-      ], 15000);
+      ], 20000);
 
       if (!rutSel) {
-        // Devolver diagnóstico
-        const bodyText = await page.evaluate(() => document.body?.innerText?.slice(0, 500));
-        return { error: `LOGIN_FORM_NOT_FOUND. URL: ${afterLoginUrl}. Title: ${afterLoginTitle}. Body: ${bodyText}` };
+        const bodyText = await page.evaluate(() => document.body?.innerText?.slice(0, 800) || 'EMPTY');
+        const allInputs = await page.evaluate(() =>
+          Array.from(document.querySelectorAll('input')).map(i => `${i.tagName}[id=${i.id}][name=${i.name}][type=${i.type}]`).join(', ')
+        );
+        return {
+          error: `LOGIN_FORM_NOT_FOUND`,
+          url: afterLoginUrl,
+          title: afterLoginTitle,
+          bodyText,
+          allInputs,
+        };
       }
 
-      console.log('[aguas] Selector RUT encontrado:', rutSel);
+      console.log('[aguas] Selector RUT:', rutSel);
 
-      // Campo contraseña
       const claveSel = await waitForAny([
         '#clave',
         'input[type="password"]',
-        'input[placeholder*="contraseña" i]',
-        'input[placeholder*="clave" i]',
       ], 5000) || 'input[type="password"]';
 
-      // Submit
       const submitSel = await waitForAny([
         '#btn-submit-login',
         'button[type="submit"]',
         'input[type="submit"]',
-        'button:contains("INGRESAR")',
       ], 5000) || 'button[type="submit"]';
 
       await page.click(rutSel);
       await page.type(rutSel, RUT, { delay: 70 });
       await new Promise(r => setTimeout(r, 400));
-
       await page.click(claveSel);
       await page.type(claveSel, CLAVE, { delay: 70 });
       await new Promise(r => setTimeout(r, 600));
@@ -78,18 +96,17 @@ export default async function({ page }) {
 
       if (page.url().includes('/login')) {
         const bodyText = await page.evaluate(() => document.body?.innerText?.slice(0, 300));
-        return { error: 'LOGIN_FAILED. URL: ' + page.url() + '. Body: ' + bodyText };
+        return { error: 'LOGIN_FAILED', url: page.url(), bodyText };
       }
     }
 
     // ── 2. MIS CUENTAS ────────────────────────────────────────────────────────
     await page.goto(BASE + '/web/aguasandinas/mis-cuentas', { waitUntil: 'networkidle2', timeout: 45000 });
-    await new Promise(r => setTimeout(r, 4000));
+    await new Promise(r => setTimeout(r, 5000));
 
     const results  = [];
     const failures = [];
 
-    // ── 3. ITERATE 3 PAGES ────────────────────────────────────────────────────
     for (let pgNum = 1; pgNum <= 3; pgNum++) {
       if (pgNum > 1) {
         const clicked = await page.evaluate((pn) => {
@@ -99,15 +116,10 @@ export default async function({ page }) {
           link.click();
           return true;
         }, pgNum);
-
-        if (!clicked) {
-          failures.push({ page: pgNum, error: 'Pagination link not found' });
-          break;
-        }
+        if (!clicked) { failures.push({ page: pgNum, error: 'Pagination link not found' }); break; }
         await new Promise(r => setTimeout(r, 4000));
       }
 
-      // Read boleta metadata from DOM
       const boletas = await page.evaluate(() => {
         const rows = Array.from(document.querySelectorAll('table tr')).slice(1);
         return rows.map((row, i) => {
@@ -123,47 +135,28 @@ export default async function({ page }) {
         }).filter(b => b.nroFactura && /\d{6,}/.test(b.nroFactura));
       });
 
-      if (boletas.length === 0) {
-        failures.push({ page: pgNum, error: 'No boletas found in table' });
-        continue;
-      }
+      if (boletas.length === 0) { failures.push({ page: pgNum, error: 'No boletas found' }); continue; }
 
-      // Download each boleta
       for (const boleta of boletas) {
         try {
-          let pdfBase64 = null;
-
           const waiter = page.waitForResponse(
             r => r.url().includes('/descarga/documento') && r.request().method() === 'POST',
             { timeout: 25000 }
           );
-
           await page.evaluate((idx) => {
-            if (typeof validaciones === 'function') {
-              validaciones(idx, false, 'descargaDocumento');
-            }
+            if (typeof validaciones === 'function') validaciones(idx, false, 'descargaDocumento');
           }, boleta.idx);
-
           const pdfResp = await waiter;
           const buffer  = await pdfResp.buffer();
-          pdfBase64     = buffer.toString('base64');
-
-          results.push({ ...boleta, pdfBase64, pdfSize: buffer.length });
+          results.push({ ...boleta, pdfBase64: buffer.toString('base64'), pdfSize: buffer.length });
           await new Promise(r => setTimeout(r, 800));
-
         } catch (err) {
           failures.push({ ...boleta, error: err.message.slice(0, 200) });
         }
       }
     }
 
-    return {
-      ok:          true,
-      total:       results.length,
-      failures:    failures.length,
-      results,
-      failureList: failures,
-    };
+    return { ok: true, total: results.length, failures: failures.length, results, failureList: failures };
 
   } catch (err) {
     return { error: err.message.slice(0, 500) };
