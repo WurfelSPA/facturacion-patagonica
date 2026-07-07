@@ -12,6 +12,7 @@ export default async function({ page }) {
       return { error: 'LOGIN_PAGE_NOT_FOUND: ' + page.url() };
     }
 
+    await page.waitForSelector('#rut2', { timeout: 15000 });
     await page.type('#rut2', RUT, { delay: 70 });
     await new Promise(r => setTimeout(r, 400));
     await page.type('#clave', CLAVE, { delay: 70 });
