@@ -3624,7 +3624,7 @@ function App(){
 
   /* Auto-procesar cuando planilla OK + AMBOS ZIPs listos — solo si el usuario activó el período */
   useEffect(()=>{
-    if(periodoActivado.current&&planillaStatus==="ok"&&zipStatus==="ready"&&xmlZipStatus==="ready"&&!autoProcesado.current&&data.length===0){
+    if(periodoActivado.current&&planillaStatus==="ok"&&zipStatus==="ready"&&(xmlZipStatus==="ready"||xmlZipStatus==="missing")&&!autoProcesado.current&&data.length===0){
       autoProcesado.current=true;
       procesar();
     }
@@ -5037,7 +5037,7 @@ function App(){
           onClick:()=>{
             periodoActivado.current=true;autoProcesado.current=false;autoNuboxRef.current=false;
             setZipStatus("idle");setData([]);
-            buscarZip(periodo); /* buscarZip llama buscarXmlZip internamente */
+            splitPDF(); /* re-split automático: usa split-pdf.js actualizado, luego buscarZip() */
           }
         },
           zipStatus==="loading"||zipStatus==="splitting"||splitLoading
@@ -5130,12 +5130,6 @@ function App(){
             }catch(e){notify("Error: "+e.message,"err");}
           }
         },"\u2709\ufe0f Enviar Planilla "+periodo+" a Contabilidad"),
-        /* Re-generar ZIP (re-split con código actualizado) */
-        zipStatus==="ready"&&!splitLoading&&h("button",{
-          onClick:splitPDF,
-          title:"Re-separar el PDF de Nubox y subir ZIP a Drive (actualiza Serv. Adm. y otros cambios de split)",
-          style:{fontSize:11,padding:"3px 11px",borderRadius:7,border:"1px solid var(--bdr)",background:"transparent",color:"var(--txm)",cursor:"pointer",marginLeft:4}
-        },"\ud83d\udd04 Re-generar ZIP"),
         (zipStatus==="loading"||zipStatus==="splitting"||splitLoading)&&
         h("span",{style:{fontSize:12,color:"var(--txd)",fontStyle:"italic",marginLeft:4}},
           zipStatus==="splitting"?"Separando facturas...":splitLoading?"Descargando desde Nubox...":"Buscando PDFs en Drive..."
