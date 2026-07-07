@@ -1497,7 +1497,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── POST ── guarda/fusiona período ─────────────────────────────
+    // ── POST ── guarda/fusiona período ─────────────────────────────────────
     if (req.method === "POST") {
       const { anio, periodo, data: periodoData } = req.body || {};
       if (!anio || !periodo || !periodoData)

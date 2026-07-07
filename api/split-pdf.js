@@ -358,21 +358,17 @@ const COD_MAP = {"5-A":"5A","5A":"5A","4-A":"4A","4A":"4A","A-1":"A1","A1":"A1",
   "A-2":"A2","A2":"A2","B":"B","D-2":"D2","D2":"D2","D-3":"D3","D3":"D3"};
 
 function detectCod(text) {
-  // Case-insensitive, A-Z (no solo A-D) y máx 5 chars para evitar match de descripciones largas
-  const m = text.match(/COD:\s*([A-Z0-9][-A-Z0-9]{0,4})/i);
+  const m = text.match(/COD:\s*([A-D0-9][-A-D0-9]*)/);
   if (!m) return null;
-  const raw = m[1].trim().replace(/-$/,"").toUpperCase();
-  // Usar COD_MAP si hay mapeo; si no, usar el valor normalizado directamente
-  return COD_MAP[raw] !== undefined ? COD_MAP[raw] : raw;
+  return COD_MAP[m[1].trim().replace(/-$/,"").toUpperCase()] || null;
 }
 function detectNro(text) {
-  /* Busca el número de la factura en orden de confiabilidad:
-     1. Header exacto "FACTURA [EXENTA] ELECTRONICA Nº XXXXX" (evita folios de referencia)
-     2. "N° XXXXX" / "Nº XXXXX" genérico (patrón clásico Nubox)
-     3. "F-XXXXX" / "FEE-XXXXX" en el texto
-     4. Fallback genérico: N + hasta 4 no-alfanuméricos + 4-6 dígitos */
-  const m = text.match(/FACTURA(?:\s+EXENTA)?\s+ELECTR[O\u00D3]NICA\s*N[\xBA\xB0o\u00BA\u00B0°º]?\s*(\d{4,6})/i)
-    || text.match(/N[\xBA\xB0o\u00BA\u00B0]?[\s°º]*\s*(\d{4,6})/i)
+  /* Tolerante con variantes del carácter º (º, °, o, ø) y con o sin espacio.
+     Prioridades:
+     1. "N° 14548" / "Nº14548" (patrón clásico Nubox)
+     2. "F-14548" / "FEE-14548" en el texto del PDF (referencia del documento)
+     3. Fallback genérico: N + hasta 4 no-alfanuméricos + 4-6 dígitos */
+  const m = text.match(/N[\xBA\xB0o\u00BA\u00B0]?[\s°º]*\s*(\d{4,6})/i)
     || text.match(/F(?:EE)?-\s*(\d{4,6})/i)
     || text.match(/N[^a-zA-Z\d]{0,4}(\d{4,6})/);
   return m ? m[1] : null;
@@ -385,7 +381,7 @@ function detectCliente(text) {
   return m[1].trim()
     .replace(/[/\\:*?"<>|]/g, "")
     .replace(/\s+/g, " ")
-    .slice(0, 50)
+    .slice(0, 30)
     .trim();
 }
 
@@ -411,34 +407,46 @@ export default async function handler(req, res) {
     const pdfBuf = await driveDownload(token, pdfFileId);
     console.log(`PDF: ${pdfBuf.length} bytes`);
 
-    // 2. Separar páginas con pdf-lib — incluye fuentes+CMap por página (confiable)
+    // 2. Separar páginas — splitPDFPages crea PDFs mínimos (~50-100 KB c/u)
+    //    pdf-lib se carga SOLO para extracción de texto (CMap/streams)
+    //    Usar pdf-lib copyPages generaría PDFs de 5-10 MB cada uno (hereda
+    //    todos los recursos del doc completo) → ZIPs de 500+ MB → timeout.
     const srcDoc = await PDFDocument.load(pdfBuf, { ignoreEncryption: true });
     const totalPages = srcDoc.getPageCount();
-    console.log(`Páginas pdf-lib: ${totalPages}`);
-    const pageBufs = [];
-    for (let i = 0; i < totalPages; i++) {
-      const sd = await PDFDocument.create();
-      const [cp] = await sd.copyPages(srcDoc, [i]);
-      sd.addPage(cp);
-      pageBufs.push(Buffer.from(await sd.save()));
+    console.log(`Páginas a separar: ${totalPages}`);
+    let usedCustomSplit = true;
+    let pageBufs = splitPDFPages(pdfBuf);
+    if (!pageBufs || pageBufs.length === 0) {
+      // Fallback a pdf-lib si el parser mínimo falla (PDF no estándar)
+      console.log("splitPDFPages sin resultado, fallback a pdf-lib");
+      usedCustomSplit = false;
+      pageBufs = [];
+      for (let i = 0; i < totalPages; i++) {
+        const singleDoc = await PDFDocument.create();
+        const [copiedPage] = await singleDoc.copyPages(srcDoc, [i]);
+        singleDoc.addPage(copiedPage);
+        pageBufs.push(Buffer.from(await singleDoc.save()));
+      }
     }
-    console.log(`PDFs individuales: ${pageBufs.length}`);
+    if (pageBufs.length === 0) throw new Error("No se pudieron separar las páginas del PDF");
+    console.log(`Páginas separadas: ${pageBufs.length} (método: ${usedCustomSplit ? "custom-minimal" : "pdf-lib-fallback"})`);
 
-    // 3. Extraer texto POR PÁGINA desde el buffer copiado por pdf-lib
-    //    pdf-lib.copyPages copia fuentes+CMap → extractText() funciona correctamente
-    //    Garantiza alineación: pageBufs[i] y su texto son siempre la misma página
+    // 3. CMap desde el PDF ya parseado (sin regex sobre bytes crudos — rápido)
+    const globalCMap = buildCMapFromDoc(srcDoc);
+    console.log(`CMap global: ${Object.keys(globalCMap).length} entradas`);
+
+    // Extraer texto vía content streams del srcDoc (O(streams/página), garantiza alineación)
     const zip = new JSZip();
     const sinCod = [];
-    const manifest = [];
     const breakdown = {};
 
     for (let i = 0; i < pageBufs.length; i++) {
-      const text = extractText(pageBufs[i]);
+      const text = extractPageText(srcDoc, i, globalCMap);
       const cod = detectCod(text);
       const nro = detectNro(text);
 
       if (!cod) {
-        sinCod.push({p:i+1, txt:text.slice(0,250).replace(/\s+/g," ").trim()});
+        sinCod.push(i + 1);
         console.log(`Pág ${i+1}: sin COD — texto: "${text.slice(0,80)}"`);
         continue;
       }
@@ -453,15 +461,12 @@ export default async function handler(req, res) {
       else                fname = `F-p${i+1}.pdf`;
       zip.file(`${cod}/${fname}`, pageBufs[i]);
       breakdown[cod] = (breakdown[cod] || 0) + 1;
-      manifest.push({p:i+1, cod, nro: nro||null, cliente: cliente||null, archivo:`${cod}/${fname}`});
       console.log(`Pág ${i+1}: ${cod} → ${fname}`);
     }
 
     if (sinCod.length > 0) {
-      const scLines = sinCod.map(s=>`Pág ${s.p}: ${s.txt}`).join("\n");
-      zip.file(`sin_cod.txt`, `Páginas sin COD (${sinCod.length}):\n${scLines}\n`);
+      zip.file(`sin_cod.txt`, `Páginas sin COD: ${sinCod.join(", ")}\n`);
     }
-    zip.file(`manifest.json`, JSON.stringify(manifest, null, 2));
 
     /* Resumen legible para verificación */
     const resumenLines = [`Período: ${periodo}`, `Total facturas: ${Object.values(breakdown).reduce((a,b)=>a+b,0)}`, ``];
@@ -545,3 +550,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: e.message, stack: e.stack?.slice(0,300) });
   }
 }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
