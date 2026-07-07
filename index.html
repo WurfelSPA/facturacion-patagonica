@@ -3791,9 +3791,9 @@ function App(){
       setTimeout(()=>{setShowProc(false);setView("table");},1800);
       setData(filas);
       const prevSent=new Set();
-      filas.forEach((f,i)=>{const key=`${periodo}|${f.cliente}|${f.concepto}`;if(sentKeys.has(key)||f.yaEnviado)prevSent.add(i);});
+      filas.forEach((f,i)=>{const key=`${periodo}|${f.cliente}|${f.concepto}`;if(sentKeys.has(key))prevSent.add(i);});
       setSentSet(prevSent);
-      if(prevSent.size>0)addLog(`✓ ${prevSent.size} correos ya marcados como enviados (planilla + sesiones anteriores)`,"ok");
+      if(prevSent.size>0)addLog(`✓ ${prevSent.size} correos ya enviados en sesiones anteriores`,"ok");
       /* ── Email de notificación con stats reales ── */
       try{
         const eTotal=filas.length;
@@ -5139,12 +5139,19 @@ function App(){
                   row.estado==="missing"?h(Badge,{e:"missing",row}):
                   sent?h(Badge,{e:"sent_sheet",row}):
                   sending?h("span",{style:{color:"var(--blue)",fontSize:11,display:"inline-flex",alignItems:"center",gap:4}},h("span",{className:"spin"},"⟳")," Enviando..."):
-                  row.estado==="ok"&&!noEmail?h("button",{
-                    className:"btn-send",
-                    onClick:unlocked?()=>setPreview({row,idx:i}):()=>setShowPwdModal(true),
-                    title:unlocked?"Enviar correo":"Clave requerida para enviar",
-                    style:{opacity:unlocked?1:0.55,cursor:unlocked?"pointer":"pointer"}
-                  },"✉ "+(unlocked?"Enviar":"🔒")):
+                  row.estado==="ok"&&!noEmail?h("div",{style:{display:"flex",alignItems:"center",gap:4}},
+                    h("button",{
+                      className:"btn-send",
+                      onClick:unlocked?()=>setPreview({row,idx:i}):()=>setShowPwdModal(true),
+                      title:unlocked?"Enviar correo":"Clave requerida para enviar",
+                      style:{opacity:unlocked?1:0.55,cursor:"pointer"}
+                    },"✉ "+(unlocked?"Enviar":"🔒")),
+                    unlocked&&h("button",{
+                      title:"Marcar como enviado (sin reenviar correo)",
+                      style:{background:"var(--gbg)",border:"1px solid var(--gdim)",color:"var(--green)",borderRadius:6,padding:"3px 8px",fontSize:11,cursor:"pointer",fontWeight:700,lineHeight:1},
+                      onClick:()=>{const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(i,key);if(row.sheetRow&&!MODO_PRUEBA){marcarEnviadoSheet(row.sheetRow,row.sentColLetter).catch(e=>console.warn("mark-sent:",e.message));}}
+                    },"✓")
+                  ):
                   h(Badge,{e:row.estado,row})
                 ),
                 h("td",{style:{padding:"8px 11px",background:bg,textAlign:"center"}},
