@@ -146,9 +146,6 @@ const TEST_DEST="";
 const MODO_PRUEBA=TEST_DEST!=="";
 const VER="v4.10.1";
 const SEND_PWD="patagonica2026";
-/* Clientes que reciben XML en vez de PDF */
-const XML_CLIENTES_FRAG=["banco de credito e inversiones","libertadores"];
-const isXmlCliente=n=>{const s=(n||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");return XML_CLIENTES_FRAG.some(x=>s.includes(x));};
 const DRIVE_PLANILLA_ID="1yIKK0ZgU5C1ARsD6NIryRlHnom2Qilml";
 const DRIVE_FACTURACION_FOLDER_ID="1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u"; /* Carpeta Facturacion Mensual */
 const DRIVE_PDF_FACTURAS_ID="1Pl7s4FNyjVQOMcEBtgCcvCGD4FlzRg2W"; /* PDF Facturas del mes — actualizar cada mes */
@@ -634,15 +631,6 @@ async function parsePlanillaParaDashboard(file){
 /* ═══════════════════════════════════
    PROCESAMIENTO DE BILLING
 ═══════════════════════════════════ */
-function buscarCol(dataRaw,desde,hasta,test){
-  /* Revisar filas 0-5 para detectar headers dinámicamente */
-  const hdrs=[dataRaw[0]||[],dataRaw[1]||[],dataRaw[2]||[],dataRaw[3]||[],dataRaw[4]||[],dataRaw[5]||[]];
-  for(let j=desde;j<=hasta;j++){
-    const vs=hdrs.map(r=>String(r[j]||"").trim().toLowerCase());
-    if(test(vs))return j;
-  }
-  return -1;
-}
 async function procesarPlanillaFacturacion(file,periodo){
   const buf=await readFileAsBuffer(file);
   const wb=XLSX.read(buf,{type:"array"});
@@ -667,14 +655,7 @@ async function procesarPlanillaFacturacion(file,periodo){
   /* Fechas en fila 3 (índice 2) */
   const fila3=dataRaw[2]||[];
   for(let i=64;i<fila3.length;i++){
-    if(!esTargetMes(fila3[i]))continue;
-    colGS=i;
-    const gcCol=buscarCol(dataRaw,i+1,i+3,vs=>vs.some(v=>v==="gc"));
-    colGT=gcCol!==-1?gcCol:i+1;
-    colEnviado=buscarCol(dataRaw,i+2,i+12,vs=>vs.some(v=>v.includes("enviado")));
-    const envBase=colEnviado>0?colEnviado:i+4;
-    colPagado=buscarCol(dataRaw,envBase+1,envBase+5,vs=>vs.some(v=>v.includes("pagado")));
-    break;
+    if(esTargetMes(fila3[i])){colGS=i;colGT=i+1;colEnviado=i+3;colPagado=i+4;break;}
   }
   if(colGS===-1)throw new Error(`No se encontró columna para ${periodo}. Verifica que la planilla tenga ese mes.`);
 
@@ -698,8 +679,8 @@ async function procesarPlanillaFacturacion(file,periodo){
     const sentColLetter=colIndexToLetter(colEnviado); /* columna dinámica: HC para Junio, HG para Julio, etc. */
     const pagadoColLetter=colPagado>0?colIndexToLetter(colPagado):"";
     const m2Billing=row[42]!=null&&row[42]!==""?Number(row[42]):null; /* Col AQ: m² */
-    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado,sheetRow,sentColLetter,pagadoColLetter,m2:m2Billing,arrendadora:String(row[5]||"").trim()});
-    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado,sheetRow,sentColLetter,pagadoColLetter,m2:m2Billing,arrendadora:String(row[5]||"").trim()});
+    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado,sheetRow,sentColLetter,pagadoColLetter,m2:m2Billing});
+    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado,sheetRow,sentColLetter,pagadoColLetter,m2:m2Billing});
   }
   return clientes;
 }
@@ -726,9 +707,8 @@ async function leerHistorialAnio(xlsxFile, anio){
     const mesNombre=MESES_N[mesIdx];
     const mesNum=mesIdx+1;
     if(mesesMap[mesNombre])continue; /* solo primer hit por mes */
-    const gcColH=buscarCol(dataRaw,i+1,i+3,vs=>vs.some(v=>v==="gc"));
-    const envColH=buscarCol(dataRaw,i+2,i+12,vs=>vs.some(v=>v.includes("enviado")));
-    mesesMap[mesNombre]={colGS:i,colGT:gcColH!==-1?gcColH:i+1,colEnviado:envColH!==-1?envColH:-1,mesNum};
+    const hasEnviado=(anio>2026)||(anio===2026&&mesNum>=6);
+    mesesMap[mesNombre]={colGS:i,colGT:i+1,colEnviado:hasEnviado?i+3:-1,mesNum};
   }
 
   const excl=["","VACANTE","Nombre Cliente","Areas Comunes Edificio","Areas comunes Edificio (Subterraneos)","Area Comun"];
@@ -814,9 +794,6 @@ async function procesarPDFs(zipFile,addLog){
       const tipo=textoJ.includes("Serv. Adm.")||textoJ.includes("Serv.Adm.")?"serv_adm":textoJ.includes("Habilitaci")?"habilitacion":textoJ.includes("Arriendo")?"arriendo":nroFact.startsWith("FEE-")?"serv_adm":"arriendo";
 
     /* Extraer UF del texto del PDF — 3 patrones + fallback flat */
-    /* RUT destinatario — identificador inequívoco para matching */
-    let rutPdf=null;
-    try{const rm=textoJ.match(/Se[nñ]or\(es\).*?RUT\s*([\d]{1,2}\.?[\d]{3}\.?[\d]{3}-[\dkK])/i);if(rm)rutPdf=rm[1].replace(/\./g,"").toLowerCase();}catch(e){}
     let ufPdf=null;
     try{
       if(texto.length>10){
@@ -867,7 +844,7 @@ async function procesarPDFs(zipFile,addLog){
       }
     }catch(e){console.warn("[monto] error:",e.message);}
 
-    pdfs.push({sitio,nroFact,tipo,ufPdf,montoTotal,ivaAmount,nombreEnArchivo,zipPath:path,pdfNombre:nombre,rutPdf});
+    pdfs.push({sitio,nroFact,tipo,ufPdf,montoTotal,ivaAmount,nombreEnArchivo,zipPath:path,pdfNombre:nombre});
   }
 
   const conUF=pdfs.filter(p=>p.ufPdf!==null).length;
@@ -875,19 +852,6 @@ async function procesarPDFs(zipFile,addLog){
   addLog(`  Sitios: ${[...new Set(pdfs.map(p=>p.sitio))].join(", ")}`,"info");
   pdfs.slice(0,2).forEach(p=>addLog(`  ${p.nroFact} ${p.sitio} ${p.tipo} UF=${p.ufPdf} "${p.nombreEnArchivo}"`,"info"));
   return pdfs;
-}
-async function extractXmlFromZip(xmlZipFile,nroFact){
-  if(!xmlZipFile||!nroFact)return null;
-  const buf=await xmlZipFile.arrayBuffer();
-  const zip=await window.JSZip.loadAsync(buf);
-  const nro=String(nroFact).replace(/^0+/,"");
-  const cands=Object.keys(zip.files).filter(n=>{
-    const low=n.toLowerCase();
-    return low.endsWith(".xml")&&(low.includes(nro)||!!low.match(new RegExp("f[-_]?0*"+nro+"(\\.|$)","i")));
-  });
-  if(!cands.length)return null;
-  const content=await zip.files[cands[0]].async("uint8array");
-  return{name:cands[0].split("/").pop(),content};
 }
 async function getPdfBase64FromZip(zipFile,zipPath){
   const buf=await readFileAsBuffer(zipFile);
@@ -1457,7 +1421,6 @@ function formatRUT(rut){
   return result+dv;
 }
 function getEstado(r){
-  if(!r.factura&&r.arrendadora&&!/PISA/i.test(r.arrendadora))return"tercero";
   if(!r.factura)return"missing";
   // Facturas grandes (>500 UF): solo verificar que tengan PDF asignado
   if(r.ufPlan>5000)return r.factura?"ok":"missing";
@@ -1480,7 +1443,6 @@ function Badge({e,row}){
     ok:{l:"Coincide",bg:"var(--gbg)",col:"var(--green)",bdr:"var(--gdim)",ic:"✓"},
     diff:{l:row&&row.matchScore===1?"Revisar":"Difiere",bg:"var(--abg)",col:"var(--amber)",bdr:"var(--adim)",ic:"△"},
     missing:{l:"Sin PDF",bg:"var(--rbg)",col:"var(--red)",bdr:"var(--rdim)",ic:"○"},
-    tercero:{l:row?.arrendadora||"3°",bg:"var(--surf2)",col:"var(--txm)",bdr:"var(--bdr)",ic:"⬦"},
     sent_sheet:{l:"Enviado",bg:"var(--gbg)",col:"var(--green)",bdr:"var(--gdim)",ic:"✓"}
   };
   const c=cfg[e]||cfg.missing;
@@ -1539,7 +1501,7 @@ function EmailModal({row,periodo,onClose,onConfirm,sending}){
       ),
       h("div",{style:{display:"flex",gap:10,marginTop:16,justifyContent:"flex-end"}},
         !sending&&h("button",{onClick:onClose,style:{padding:"7px 16px",borderRadius:8,border:"1px solid var(--bdr)",background:"transparent",color:"var(--txm)",fontSize:12}},"Cancelar"),
-        h("button",{onClick:sending?null:onConfirm,disabled:sending,style:{padding:"8px 20px",borderRadius:8,border:"none",background:sending?"var(--surf3)":MODO_PRUEBA?"#a05c00":"var(--green)",color:sending?"var(--txm)":"#fff",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:6}},sending?h("span",null,h("span",{className:"spin"},"⟳")," Enviando..."):("✉ "+(isXmlCliente(row?.cliente)?"Enviar XML":"Confirmar envío")))
+        h("button",{onClick:sending?null:onConfirm,disabled:sending,style:{padding:"8px 20px",borderRadius:8,border:"none",background:sending?"var(--surf3)":MODO_PRUEBA?"#a05c00":"var(--green)",color:sending?"var(--txm)":"#fff",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:6}},sending?h("span",null,h("span",{className:"spin"},"⟳")," Enviando..."):"✉ Confirmar envío")
       )
     )
   );
@@ -3429,7 +3391,6 @@ function App(){
   const [histAnio,setHistAnio]=useState(2026);
   const [unlocked,setUnlocked]=useState(false);
   const [showPwdModal,setShowPwdModal]=useState(false);
-  const [showUploadModal,setShowUploadModal]=useState(false);
   const [currentUser,setCurrentUser]=React.useState(null);
   const [showChangePwd,setShowChangePwd]=React.useState(false);
   const [userMenuOpen,setUserMenuOpen]=React.useState(false);
@@ -3507,27 +3468,6 @@ function App(){
   const [canGenerate,setCanGenerate]=useState(false);  /* si se puede generar el ZIP */
   const zipPeriodoRef=React.useRef(""); /* período del ZIP actualmente cargado */
 
-  /* Estado ZIP de XMLs (BCI y SLEP Los Libertadores) */
-  const [xmlZipStatus,setXmlZipStatus]=useState("idle"); /* idle|loading|ready|missing */
-  const [xmlZipFile,setXmlZipFile]=useState(null);
-  const xmlZipFileRef=React.useRef(null);
-  const xmlZipPeriodoRef=React.useRef("");
-
-  /* Buscar ZIP de XMLs para clientes especiales */
-  const buscarXmlZip=React.useCallback((p)=>{
-    if(!p)return;
-    setXmlZipStatus("loading");setXmlZipFile(null);xmlZipFileRef.current=null;
-    fetch("/api/storage?xmlPeriodo="+encodeURIComponent(p))
-      .then(async r=>{
-        if(r.status===404){setXmlZipStatus("missing");return;}
-        if(!r.ok)throw new Error("HTTP "+r.status);
-        const blob=await r.blob();
-        const f=new File([blob],"xml-"+p.replace(" ","-")+".zip",{type:"application/zip"});
-        setXmlZipFile(f);xmlZipFileRef.current=f;setXmlZipStatus("ready");
-      })
-      .catch(e=>{setXmlZipStatus("error");console.warn("XML ZIP:",e.message);setXmlZipStatus("missing");});
-  },[]);
-
   /* Buscar ZIP cuando se selecciona un período */
   const buscarZip=React.useCallback((p)=>{
     if(!p)return;
@@ -3559,22 +3499,9 @@ function App(){
         if(zipPeriodoRef.current!==p)return;
         setZipStatus("error");setZipError(e.message);
       });
-    /* también buscar ZIP de XMLs */
-    buscarXmlZip(p);
-  },[buscarXmlZip]);
-
-  const cargarZipDrive=React.useCallback(()=>buscarZip(periodo),[periodo,buscarZip]);
-
-  /* Subir XML ZIP manualmente */
-  const xmlZipInputRef=React.useRef(null);
-  const onXmlZipFile=React.useCallback((f)=>{
-    if(!f)return;
-    setXmlZipFile(f);xmlZipFileRef.current=f;
-    autoProcesado.current=false; /* permitir auto-proceso tras upload manual */
-    setXmlZipStatus("ready");
   },[]);
 
-
+  const cargarZipDrive=React.useCallback(()=>buscarZip(periodo),[periodo,buscarZip]);
 
   /* Generar ZIP desde PDF maestro del mes */
   const generarZip=React.useCallback(async()=>{
@@ -3590,7 +3517,7 @@ function App(){
         method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({pdfFileId:pdfMaestroId,periodo:periodoCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID,userToken:uTok}),
       });
-      let data;try{data=await res.json();}catch(_je){throw new Error(`split-pdf: error del servidor (HTTP ${res.status}) — intente de nuevo`);}
+      const data=await res.json();
       if(!res.ok)throw new Error(data.error||"Error desconocido");
       notify("✓ "+data.totalFacturas+" facturas generadas y subidas a Drive","ok");
       /* 2. Recargar ZIP desde Drive */
@@ -3610,7 +3537,6 @@ function App(){
   useEffect(()=>{
     autoProcesado.current=false;
     autoNuboxRef.current=false;
-    setShowUploadModal(false);
     /* No reseteamos periodoActivado aquí — se resetea solo al cambiar período desde el selector */
   },[periodo]);
   /* Resetear periodoActivado al salir de facturación para evitar auto-ejecución al volver */
@@ -3622,13 +3548,13 @@ function App(){
     }
   },[view]);
 
-  /* Auto-procesar cuando planilla OK + AMBOS ZIPs listos — solo si el usuario activó el período */
+  /* Auto-procesar cuando planilla OK + ZIP listo — solo si el usuario activó el período */
   useEffect(()=>{
-    if(periodoActivado.current&&planillaStatus==="ok"&&zipStatus==="ready"&&(xmlZipStatus==="ready"||xmlZipStatus==="missing")&&!autoProcesado.current&&data.length===0){
+    if(periodoActivado.current&&planillaStatus==="ok"&&zipStatus==="ready"&&!autoProcesado.current&&data.length===0){
       autoProcesado.current=true;
       procesar();
     }
-  },[planillaStatus,zipStatus,xmlZipStatus]);
+  },[planillaStatus,zipStatus]);
 
   /* Auto-descargar desde Nubox cuando no hay PDF — solo si el usuario activó el período */
   useEffect(()=>{
@@ -3684,12 +3610,11 @@ function App(){
   },[files.planilla]);
 
   const getToken=useCallback(async(forceConsent)=>{if(!forceConsent&&gmailToken)return gmailToken;const token=await getGoogleToken(clientId,forceConsent);setGmailToken(token);return token;},[gmailToken,clientId,setGmailToken]);
-  const todosSubidos=files.zip&&zipStatus==="ready"&&xmlZipStatus==="ready"; /* ambos ZIPs obligatorios */
+  const todosSubidos=files.zip&&zipStatus==="ready"; /* planilla es opcional */
 
   /* ── PROCESAR ── */
   const procesar=useCallback(async()=>{
     if(!files.zip)return;
-    /* XML ZIP es opcional — se valida al momento de enviar si el cliente lo requiere */
     setShowProc(true);setProcDone(false);setProcLogs([]);setProcProgress(5);
     try{
       /* ── PASO 1: PLANILLA (opcional — puede no tener datos del mes) ── */
@@ -3749,76 +3674,79 @@ function App(){
       const MANUAL={"A-2|Banco Estado Express|202.6|arriendo":"FEE-39","A-2|Banco del Estado de Chile|256.7|arriendo":"FEE-39","4-A|Sociedad de Alimentos Leefood SpA|7.48|serv_adm":"F-14756"};
       const filas=[];
 
-      /* CRUCE: greedy pre-ordenado por score (evita que orden de planilla robe PDFs)
-       * Scoring: nombre +300, RUT +200, UF exacta +50, UF próx +20, UF muy próx +5
-       * Paso 1: calcular todos los pares (ci, pi, score) con score > 0
-       * Paso 2: ordenar desc y asignar greedy (mejor par global primero)
-       * Paso 3: fallback solo para PDFs no reclamados (score=0 para todos)
+      /* CRUCE: scoring RUT + UF
+       * Scoring:
+       *   RUT exacto                         → +200 pts  (identificador inequívoco)
+       *   UF exacta   (diff < 0.01)          → +50  pts
+       *   UF próxima  (diff < 0.5)           → +20  pts
+       *   UF muy próxima (diff < 2, sin RUT) → +5   pts  (tiebreak leve)
+       *
+       * Reglas:
+       *   - Candidatos válidos: mismo sitio + mismo tipo, no usados aún
+       *   - Solo se asigna si score >= 200 (RUT match) O score >= 50 (UF exacta sin RUT)
+       *   - Fallback sin score mínimo: solo si hay exactamente 1 candidato disponible
+       *     para ese sitio+tipo (evita asignación ciega cuando hay ambigüedad)
+       *   - Facturas CLP fijo (ufPdf===null): se cruzan solo por RUT exacto
        */
-      const normNombreFn=s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9 ]/g,"").trim();
-      const pairScores=[];
-      for(let ci=0;ci<clientes.length;ci++){
-        const c=clientes[ci];
-        const mk=`${c.sitio}|${c.cliente}|${c.uf}|${c.tipo}`;
-        if(MANUAL[mk])continue;
-        const ncli=normNombreFn(c.cliente);
-        const rutNorm=c.rut||"";
-        for(let pi=0;pi<pdfs.length;pi++){
-          const p=pdfs[pi];
-          if(p.tipo!==c.tipo)continue;
-          if(p.sitio!=="default"&&p.sitio!==c.sitio)continue;
-          let score=0;
-          if(p.nombreEnArchivo&&ncli){
-            const na=p.nombreEnArchivo;
-            const matches=ncli===na||ncli.includes(na)||(na.length>=4&&ncli.includes(na))||(ncli.length>=4&&na.includes(ncli));
-            /* palabras genéricas que NO distinguen empresas */
-            const SW=new Set(["comercial","sociedad","industrial","limitada","limitado","ltda","chile","servicios","servicio","distribuidora","inversiones","empresa","empresas","corp","corporacion","de","del","la","el","los","las","spa","sa"]);
-            const sigW=ws=>ws.split(" ").find(w=>w.length>=5&&!SW.has(w))||"";
-            const fwN=sigW(na),fwC=sigW(ncli);
-            if(matches||(fwN&&fwC&&fwN===fwC))score+=300;
-          }
-          /* RUT: identificador inequívoco — peso 1000 */
-          {const rn=(rutNorm||"").replace(/\./g,"").toLowerCase();if(rn&&p.rutPdf&&p.rutPdf===rn)score+=1000;}
-          if(p.ufPdf!==null&&c.uf!=null){
-            const diff=Math.abs(p.ufPdf-c.uf);
-            if(diff<0.01)score+=50;
-            else if(diff<0.5)score+=20;
-            else if(diff<2.0)score+=5;
-          }
-          if(score>0)pairScores.push({ci,pi,score});
-        }
-      }
-      pairScores.sort((a,b)=>b.score-a.score);
-      const clienteAsignado=new Set();
-      const greedy={};
-      for(const {ci,pi,score} of pairScores){
-        if(!clienteAsignado.has(ci)&&!pdfUsado.has(pi)){
-          greedy[ci]={pi,score};
-          clienteAsignado.add(ci);
-          pdfUsado.add(pi);
-        }
-      }
-
-      for(let ci=0;ci<clientes.length;ci++){
-        const c=clientes[ci];
+      for(const c of clientes){
         const correo=c.email||"";
         const concepto=c.tipo==="arriendo"?"Arriendo":c.tipo==="habilitacion"?"Habilitación":"Serv. Adm.";
         const colRef=c.tipo==="arriendo"?"GS":"GT";
         const mk=`${c.sitio}|${c.cliente}|${c.uf}|${c.tipo}`;
         let factura="",ufPdf=null,montoTotal=null,ivaAmount=null,matchScore=0;
         if(MANUAL[mk]){factura=MANUAL[mk];ufPdf=c.uf;matchScore=999;}
-        else if(greedy[ci]){
-          const a=greedy[ci];const p=pdfs[a.pi];
-          factura=p.nroFact;ufPdf=p.ufPdf;montoTotal=p.montoTotal||null;ivaAmount=p.ivaAmount||null;matchScore=a.score;
-        } else {
-          /* Fallback: solo PDFs no reclamados (score=0 para todos) — evita asignaciones cruzadas */
-          const candidatos=pdfs.reduce((acc,p,idx)=>{if(!pdfUsado.has(idx)&&p.tipo===c.tipo&&(p.sitio===c.sitio||p.sitio==="default"))acc.push(idx);return acc;},[]);
-          if(candidatos.length===1){
-            const idx=candidatos[0];
-            pdfUsado.add(idx);factura=pdfs[idx].nroFact;ufPdf=pdfs[idx].ufPdf;montoTotal=pdfs[idx].montoTotal||null;ivaAmount=pdfs[idx].ivaAmount||null;matchScore=1;
+        else{
+          let bestIdx=-1,bestScore=0;
+          const rutNorm=c.rut||"";
+
+          /* Normaliza nombre para matching: minúsculas, sin tildes, solo alfanumérico */
+          const normNombre=s=>(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9 ]/g,"").trim();
+          const ncli=normNombre(c.cliente);
+
+          for(let idx=0;idx<pdfs.length;idx++){
+            if(pdfUsado.has(idx))continue;
+            const p=pdfs[idx];
+            if(p.tipo!==c.tipo)continue;
+            if(p.sitio!=="default"&&p.sitio!==c.sitio)continue;
+            let score=0;
+            /* Nombre en archivo — identificador más directo (el archivo ya lleva el nombre del cliente) */
+            if(p.nombreEnArchivo&&ncli){
+              const na=p.nombreEnArchivo; /* ya está en lowercase desde procesarPDFs */
+              const matches=ncli===na||ncli.includes(na)||(na.length>=4&&ncli.includes(na))||(ncli.length>=4&&na.includes(ncli));
+              const fwN=na.split(" ").find(w=>w.length>=4)||"";
+              const fwC=ncli.split(" ").find(w=>w.length>=4)||"";
+              if(matches||(fwN&&fwC&&fwN===fwC)) score+=300;
+            }
+            /* RUT exacto — identificador inequívoco */
+            if(rutNorm&&p.rutPdf&&p.rutPdf===rutNorm) score+=200;
+            /* UF */
+            if(p.ufPdf!==null&&c.uf!=null){
+              const diff=Math.abs(p.ufPdf-c.uf);
+              if(diff<0.01)       score+=50;
+              else if(diff<0.5)   score+=20;
+              else if(diff<2.0)   score+=5;
+            }
+            if(score>bestScore){bestScore=score;bestIdx=idx;}
+          }
+
+          const UMBRAL_NOMBRE=300;
+          const UMBRAL_RUT=200;
+          const UMBRAL_UF=50;
+
+          if(bestScore>=UMBRAL_NOMBRE||bestScore>=UMBRAL_RUT||bestScore>=UMBRAL_UF){
+            pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;montoTotal=pdfs[bestIdx].montoTotal||null;ivaAmount=pdfs[bestIdx].ivaAmount||null;matchScore=bestScore;
+          } else {
+            const candidatos=pdfs.reduce((acc,p,idx)=>{
+              if(!pdfUsado.has(idx)&&p.tipo===c.tipo&&(p.sitio===c.sitio||p.sitio==="default"))acc.push(idx);
+              return acc;
+            },[]);
+            if(candidatos.length===1){
+              bestIdx=candidatos[0];
+              pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;montoTotal=pdfs[bestIdx].montoTotal||null;ivaAmount=pdfs[bestIdx].ivaAmount||null;matchScore=1;
+            }
           }
         }
-        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,montoTotal,ivaAmount,enviado:false,yaEnviado:c.yaEnviado||false,yaPagado:c.yaPagado||false,sheetRow:c.sheetRow||null,sentColLetter:c.sentColLetter||"HC",pagadoColLetter:c.pagadoColLetter||"",arrendadora:c.arrendadora||""});
+        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,montoTotal,ivaAmount,enviado:false,yaEnviado:c.yaEnviado||false,yaPagado:c.yaPagado||false,sheetRow:c.sheetRow||null,sentColLetter:c.sentColLetter||"HC",pagadoColLetter:c.pagadoColLetter||""});
       }
 
       /* ── Si no hay datos de planilla, mostrar igual los PDFs detectados ── */
@@ -3864,13 +3792,9 @@ function App(){
       setTimeout(()=>{setShowProc(false);setView("table");},1800);
       setData(filas);
       const prevSent=new Set();
-      filas.forEach((f,i)=>{
-        const key=`${periodo}|${f.cliente}|${f.concepto}`;
-        /* yaEnviado viene de la planilla (columna "Correo Enviado") */
-        if(sentKeys.has(key)||f.yaEnviado)prevSent.add(i);
-      });
+      filas.forEach((f,i)=>{const key=`${periodo}|${f.cliente}|${f.concepto}`;if(sentKeys.has(key))prevSent.add(i);});
       setSentSet(prevSent);
-      if(prevSent.size>0)addLog(`✓ ${prevSent.size} correos ya marcados como enviados (planilla + sesiones anteriores)`,"ok");
+      if(prevSent.size>0)addLog(`✓ ${prevSent.size} correos ya enviados en sesiones anteriores`,"ok");
       /* ── Email de notificación con stats reales ── */
       try{
         const eTotal=filas.length;
@@ -3930,27 +3854,15 @@ function App(){
       const token=await getToken();
       const subject=row.cliente+" "+row.factura+" — "+row.concepto+" "+periodo+" — Patagónica Inmobiliaria SpA";
       const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura,ufSII);
-      let attB64=null,attNombre=null;
-      if(isXmlCliente(row.cliente)){
-        /* Cliente XML: adjuntar XML sin comprimir */
-        const xf=xmlZipFileRef.current||xmlZipFile;
-        if(xf&&row.factura){
-          try{const x=await extractXmlFromZip(xf,row.factura);if(x){attB64=btoa(String.fromCharCode(...x.content));attNombre=x.name;}}
-          catch(e){console.warn("XML extract:",e.message);}
-        }
-        if(!attB64)notify("⚠ XML no encontrado para "+row.factura+" — enviando sin adjunto","warn");
-      }else{
-        /* Cliente normal: adjuntar PDF */
-        const pdf=pdfMap[row.factura];
-        if(pdf?.zipPath&&files.zip){try{attB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);attNombre=pdf?.nombre;}catch(e){}}
-        else if(pdf?.driveFileId){try{attB64=await getPdfBase64FromDrive(pdf.driveFileId);attNombre=pdf?.nombre;}catch(e){console.warn("Drive PDF:",e.message);}}
-      }
-      await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,attB64,attNombre);
+      const pdf=pdfMap[row.factura];let pdfB64=null;
+      if(pdf?.zipPath&&files.zip){try{pdfB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}}
+      else if(pdf?.driveFileId){try{pdfB64=await getPdfBase64FromDrive(pdf.driveFileId);}catch(e){console.warn("Drive PDF:",e.message);}}
+      await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);
       const key=`${periodo}|${row.cliente}|${row.concepto}`;
       marcarEnviado(idx,key);
+      /* Marcar en planilla Google Sheets — llamada directa desde frontend */
       if(row.sheetRow&&!MODO_PRUEBA){marcarEnviadoSheet(row.sheetRow,row.sentColLetter).catch(e=>console.warn("mark-sent:",e.message));}
-      const tipo=isXmlCliente(row.cliente)?"XML":"PDF";
-      notify("✓ Correo enviado"+(MODO_PRUEBA?" (PRUEBA)":"")+" → "+dest+(attB64?` · con ${tipo}`:""));
+      notify("✓ Correo enviado"+(MODO_PRUEBA?" (PRUEBA)":"")+" → "+dest+(pdfB64?" · con PDF":""));
     }catch(e){if(e.message.includes("invalid_grant")||e.message.includes("Token"))setGmailToken(null);notify("Error: "+e.message,"err");}
     setSendingIdx(null);
   };
@@ -3990,7 +3902,7 @@ function App(){
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({pdfFileId,periodo:periodoCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID,userToken:await getToken().catch(()=>null)}),
       });
-      let data;try{data=await res.json();}catch(_je){throw new Error(`split-pdf: error del servidor (HTTP ${res.status}) — intente de nuevo`);}
+      const data=await res.json();
       if(!res.ok)throw new Error(data.error||"Error desconocido");
       setSplitResult(data);
       if(data.zipBase64){
@@ -4006,7 +3918,6 @@ function App(){
     }catch(e){
       setSplitResult({error:e.message});
       notify("Error: "+e.message,"err");
-      setShowUploadModal(true);
     }finally{setSplitLoading(false);}
   };
   const handleLogin=()=>{
@@ -4024,16 +3935,10 @@ function App(){
         const dest=MODO_PRUEBA?TEST_DEST:row.correo;
         const subject=row.cliente+" "+row.factura+" — "+row.concepto+" "+periodo+" — Patagónica Inmobiliaria SpA";
         const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura,ufSII);
-        let pdfB64=null,pdfNom=null;
-        if(isXmlCliente(row.cliente)){
-          const xf2=xmlZipFileRef.current||xmlZipFile;
-          if(xf2&&row.factura){try{const x2=await extractXmlFromZip(xf2,row.factura);if(x2){pdfB64=btoa(String.fromCharCode(...x2.content));pdfNom=x2.name;}}catch(e){}}
-        }else{
-          const pdf=pdfMap[row.factura];
-          if(pdf?.zipPath&&files.zip){try{pdfB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);pdfNom=pdf?.nombre;}catch(e){}}
-          else if(pdf?.driveFileId){try{pdfB64=await getPdfBase64FromDrive(pdf.driveFileId);pdfNom=pdf?.nombre;}catch(e){console.warn("Drive PDF:",e.message);}}
-        }
-        try{await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdfNom);const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(row.i,key);if(row.sheetRow&&!MODO_PRUEBA){marcarEnviadoSheet(row.sheetRow,row.sentColLetter).catch(e=>console.warn("mark-sent:",e.message));}enviados++;await new Promise(r=>setTimeout(r,400));}
+        const pdf=pdfMap[row.factura];let pdfB64=null;
+        if(pdf?.zipPath&&files.zip){try{pdfB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}}
+      else if(pdf?.driveFileId){try{pdfB64=await getPdfBase64FromDrive(pdf.driveFileId);}catch(e){console.warn("Drive PDF:",e.message);}}
+        try{await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(row.i,key);if(row.sheetRow&&!MODO_PRUEBA){marcarEnviadoSheet(row.sheetRow,row.sentColLetter).catch(e=>console.warn("mark-sent:",e.message));}enviados++;await new Promise(r=>setTimeout(r,400));}
         catch(e){notify("Error en "+row.cliente+": "+e.message,"err");}
       }
       if(enviados>0){try{const resumenRows=pend.slice(0,enviados);const resumenHtml=buildResumenHtml(resumenRows,periodo);const resSubject="Resumen Facturación "+periodo+" — "+enviados+" correos enviados";await sendGmail(token,"amelendez@patagonica.cl","","amelendez@patagonica.cl",resSubject,resumenHtml,null,null);}catch(e){console.warn("Error enviando resumen:",e.message);}}
@@ -4089,9 +3994,9 @@ function App(){
   /* Sin SetupPanel — siempre va al dashboard */
 
   const enriched=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
-  const stats={total:enriched.length,ok:enriched.filter(r=>r.estado==="ok").length,diff:enriched.filter(r=>r.estado!=="ok"&&r.estado!=="tercero").length,sent:sentSet.size,conPdf:enriched.filter(r=>r.factura&&r.ufPdf!==null).length,sinPdf:enriched.filter(r=>(!r.factura||r.ufPdf===null)&&r.estado!=="tercero").length};
+  const stats={total:enriched.length,ok:enriched.filter(r=>r.estado==="ok").length,diff:enriched.filter(r=>r.estado!=="ok").length,sent:sentSet.size,conPdf:enriched.filter(r=>r.factura&&r.ufPdf!==null).length,sinPdf:enriched.filter(r=>!r.factura||r.ufPdf===null).length};
   const filtered=enriched.filter(r=>{
-    const mf=filter==="all"||(filter==="ok"&&r.estado==="ok"&&!sentSet.has(r.i))||(filter==="diff"&&r.estado!=="ok"&&r.estado!=="tercero")||(filter==="sent"&&sentSet.has(r.i))||(filter==="difiere"&&r.estado==="diff"&&r.matchScore!==1)||(filter==="sinpdf"&&!r.factura&&r.estado!=="tercero");
+    const mf=filter==="all"||(filter==="ok"&&r.estado==="ok"&&!sentSet.has(r.i))||(filter==="diff"&&r.estado!=="ok")||(filter==="sent"&&sentSet.has(r.i))||(filter==="difiere"&&r.estado==="diff"&&r.matchScore!==1)||(filter==="sinpdf"&&!r.factura);
     const mc=concFilter==="all"||(concFilter==="arr"&&r.concepto==="Arriendo")||(concFilter==="srv"&&r.concepto==="Serv. Adm.")||(concFilter==="hab"&&r.concepto==="Habilitación")||(concFilter==="ppr"&&!r.yaPagado);
     const normQ=s=>(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," ").trim();
     const q=normQ(search);
@@ -4897,76 +4802,6 @@ function App(){
       )
     ),
     showChangePwd&&h(ChangePwdModal,null),
-    showUploadModal&&h("div",{
-      style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.58)",backdropFilter:"blur(5px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1200},
-      onClick:e=>{if(e.target===e.currentTarget)setShowUploadModal(false);}
-    },
-      h("div",{style:{background:"var(--surf)",borderRadius:16,padding:"32px 36px",maxWidth:460,width:"90%",boxShadow:"0 24px 64px rgba(0,0,0,0.38)",border:"1px solid var(--bdr)"}},
-        h("div",{style:{fontSize:36,textAlign:"center",marginBottom:12}},"📄"),
-        h("div",{style:{fontSize:17,fontWeight:700,color:"var(--tx)",textAlign:"center",marginBottom:6}},
-          "Subir PDF de facturas"
-        ),
-        h("div",{style:{fontSize:13,color:"var(--txd)",textAlign:"center",marginBottom:8}},
-          "Nubox no disponible — sube el PDF manualmente desde tu carpeta de Descargas."
-        ),
-        h("code",{style:{display:"block",fontSize:12,color:"var(--acc)",background:"var(--surf2)",padding:"7px 14px",borderRadius:8,margin:"0 0 20px",textAlign:"center",wordBreak:"break-all"}},
-          `Facturas_PISA_${periodo.split(" ")[1]}-${({"Enero":"01","Febrero":"02","Marzo":"03","Abril":"04","Mayo":"05","Junio":"06","Julio":"07","Agosto":"08","Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12"})[periodo.split(" ")[0]]||"01"}.pdf`
-        ),
-        h("label",{
-          style:{display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontSize:14,fontWeight:700,padding:"14px 24px",borderRadius:10,background:"var(--acc)",color:"#fff",cursor:"pointer",width:"100%",boxSizing:"border-box",marginBottom:10}
-        },
-          h("input",{type:"file",accept:"application/pdf,.pdf",style:{display:"none"},
-            onChange:async ev=>{
-              const file=ev.target.files[0]; if(!file)return;
-              // Cerrar modal inmediatamente al seleccionar — el botón Procesar muestra el progreso
-              setShowUploadModal(false);
-              setZipStatus("splitting");
-              try{
-                const MN={"Enero":"01","Febrero":"02","Marzo":"03","Abril":"04","Mayo":"05","Junio":"06","Julio":"07","Agosto":"08","Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12"};
-                const mesCode=`${periodo.split(" ")[1]}-${MN[periodo.split(" ")[0]]||"01"}`;
-                const fileName=`Facturas_PISA_${mesCode}.pdf`;
-                notify("Subiendo PDF a Drive...","info");
-                const gToken=await getToken();
-                const buf=await file.arrayBuffer();
-                const meta=JSON.stringify({name:fileName,mimeType:"application/pdf",parents:[DRIVE_FACTURACION_FOLDER_ID]});
-                const boundary="pdf_modal_upload_boundary";
-                const metaBytes=new TextEncoder().encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`);
-                const endBytes=new TextEncoder().encode(`\r\n--${boundary}--`);
-                const bodyBytes=new Uint8Array(metaBytes.length+buf.byteLength+endBytes.length);
-                bodyBytes.set(metaBytes,0);bodyBytes.set(new Uint8Array(buf),metaBytes.length);bodyBytes.set(endBytes,metaBytes.length+buf.byteLength);
-                const uploadResp=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{
-                  method:"POST",
-                  headers:{Authorization:`Bearer ${gToken}`,"Content-Type":`multipart/related; boundary=${boundary}`},
-                  body:bodyBytes
-                });
-                if(!uploadResp.ok){const t=await uploadResp.text();throw new Error("Drive upload error "+uploadResp.status+": "+t.slice(0,100));}
-                const uploadJson=await uploadResp.json();
-                const fileId=uploadJson.id;
-                if(!fileId)throw new Error("Drive no devolvió fileId");
-                notify("✓ PDF subido — separando facturas...","ok");
-                setZipStatus("splitting");
-                const splitCtrl=new AbortController();
-                const splitTimeout=setTimeout(()=>splitCtrl.abort(),280000);
-                let splitRes;
-                try{splitRes=await fetch("/api/split-pdf",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pdfFileId:fileId,periodo:mesCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID,userToken:gToken}),signal:splitCtrl.signal});}
-                finally{clearTimeout(splitTimeout);}
-                let splitData;try{splitData=await splitRes.json();}catch(_je){throw new Error(`split-pdf: error del servidor (HTTP ${splitRes.status}) — intente de nuevo`);}
-                if(!splitRes.ok)throw new Error(splitData.error||"Error al separar PDF");
-                notify("✓ "+splitData.totalFacturas+" facturas de "+periodo+" listas en Drive — procesando...","ok");
-                periodoActivado.current=true;autoProcesado.current=false;
-                buscarZip(periodo); /* buscarZip llama buscarXmlZip internamente */
-              }catch(e){setZipStatus("error");setZipError(e.message);notify("Error: "+e.message,"err");}
-              ev.target.value="";
-            }
-          }),
-          "📁 Seleccionar PDF desde mi equipo"
-        ),
-        h("button",{
-          onClick:()=>setShowUploadModal(false),
-          style:{display:"block",width:"100%",padding:"10px",background:"transparent",border:"1px solid var(--bdr)",borderRadius:10,color:"var(--txd)",fontSize:13,cursor:"pointer"}
-        },"Cancelar")
-      )
-    ),
     userMenuOpen&&h('div',{onClick:function(){setUserMenuOpen(false);},style:{position:'fixed',inset:0,zIndex:99}}),
     showPwdModal&&h("div",{className:"pwd-modal-overlay",onClick:e=>{if(e.target===e.currentTarget){setShowPwdModal(false);setPwdInput("");setPwdError(false);}}},
       h("div",{className:"pwd-modal"},
@@ -5032,12 +4867,13 @@ function App(){
         ),
         h("button",{
           className:"btn-primary",
-          style:{fontSize:14,minWidth:190,opacity:(zipStatus==="loading"||zipStatus==="splitting"||splitLoading||xmlZipStatus==="missing"||xmlZipStatus==="loading")?0.6:1},
-          disabled:zipStatus==="loading"||zipStatus==="splitting"||splitLoading||xmlZipStatus==="missing"||xmlZipStatus==="loading",
+          style:{fontSize:14,minWidth:190,opacity:(zipStatus==="loading"||zipStatus==="splitting"||splitLoading)?0.6:1},
+          disabled:zipStatus==="loading"||zipStatus==="splitting"||splitLoading,
           onClick:()=>{
             periodoActivado.current=true;autoProcesado.current=false;autoNuboxRef.current=false;
-            setZipStatus("idle");setData([]);
-            buscarZip(periodo);
+            setData([]);
+            /* Re-generar ZIP siempre: vaciar y dejar que auto-split useEffect llame splitPDF() */
+            setZipStatus("missing");
           }
         },
           zipStatus==="loading"||zipStatus==="splitting"||splitLoading
@@ -5139,16 +4975,63 @@ function App(){
           onClick:()=>buscarZip(periodo),
           style:{fontSize:11,padding:"4px 12px",borderRadius:7,border:"1px solid var(--rdim)",background:"transparent",color:"var(--red)",cursor:"pointer"}
         },"\u21ba Reintentar"),
-        /* ── ZIP de XMLs ── */
-        xmlZipStatus==="loading"&&h("span",{style:{fontSize:12,color:"var(--txd)",marginLeft:2,display:"flex",alignItems:"center",gap:4}},h("span",{className:"spin"},"⟳")," Buscando XMLs..."),
-        xmlZipStatus==="ready"&&h("span",{style:{fontSize:12,color:"var(--green)",marginLeft:2,display:"flex",alignItems:"center",gap:4}},"✓ ZIP de XMLs listo"),
-        xmlZipStatus==="missing"&&h("div",{style:{display:"flex",alignItems:"center",gap:8,marginLeft:2,padding:"6px 14px",borderRadius:8,background:"var(--abg)",border:"1px solid var(--adim)"}},
-          h("span",{style:{fontSize:12,fontWeight:700,color:"var(--amber)"}},"⚠ Falta ZIP de XMLs — requerido para BCI y SLEP"),
-          h("label",{style:{cursor:"pointer",padding:"4px 12px",borderRadius:6,border:"1px solid var(--adim)",background:"#fff",color:"var(--amber)",fontSize:11,fontWeight:700,whiteSpace:"nowrap"}},
-            "⬆ Subir ZIP de XMLs",
-            h("input",{type:"file",accept:".zip",style:{display:"none"},onChange:e=>{if(e.target.files[0])onXmlZipFile(e.target.files[0]);}})
-          )
-        ),
+        zipStatus==="missing"&&!canGenerate&&!splitLoading&&
+        h("label",{
+          style:{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,padding:"6px 16px",borderRadius:8,
+            border:"1px solid var(--adim)",background:"var(--abg)",color:"var(--amber)",cursor:"pointer",fontWeight:600}
+        },
+          h("input",{type:"file",accept:"application/pdf",style:{display:"none"},
+              onChange:async ev=>{
+                const file=ev.target.files[0]; if(!file)return;
+                setZipStatus("splitting");
+                try{
+                  const MN={"Enero":"01","Febrero":"02","Marzo":"03","Abril":"04","Mayo":"05","Junio":"06","Julio":"07","Agosto":"08","Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12"};
+                  const mesCode=`${periodo.split(" ")[1]}-${MN[periodo.split(" ")[0]]||"01"}`;
+                  const fileName=`Facturas_PISA_${mesCode}.pdf`;
+                  notify("Subiendo PDF a Drive...","info");
+                  // Subir PDF directo a Drive con OAuth del usuario (drive.file scope)
+                  const gToken=await getToken();
+                  const buf=await file.arrayBuffer();
+                  const meta=JSON.stringify({name:fileName,mimeType:"application/pdf",parents:[DRIVE_FACTURACION_FOLDER_ID]});
+                  const boundary="pdf_upload_boundary";
+                  const metaBytes=new TextEncoder().encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`);
+                  const endBytes=new TextEncoder().encode(`\r\n--${boundary}--`);
+                  const bodyBytes=new Uint8Array(metaBytes.length+buf.byteLength+endBytes.length);
+                  bodyBytes.set(metaBytes,0);bodyBytes.set(new Uint8Array(buf),metaBytes.length);bodyBytes.set(endBytes,metaBytes.length+buf.byteLength);
+                  const uploadResp=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{
+                    method:"POST",
+                    headers:{Authorization:`Bearer ${gToken}`,"Content-Type":`multipart/related; boundary=${boundary}`},
+                    body:bodyBytes
+                  });
+                  if(!uploadResp.ok){const t=await uploadResp.text();throw new Error("Drive upload error "+uploadResp.status+": "+t.slice(0,100));}
+                  const uploadJson=await uploadResp.json();
+                  const fileId=uploadJson.id;
+                  if(!fileId)throw new Error("Drive no devolvió fileId");
+                  notify("✓ PDF subido — separando facturas...","ok");
+                  setZipStatus("splitting");
+                  const splitCtrl=new AbortController();
+                  const splitTimeout=setTimeout(()=>splitCtrl.abort(),90000);
+                  let splitRes;
+                  try{splitRes=await fetch("/api/split-pdf",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pdfFileId:fileId,periodo:mesCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID,userToken:gToken}),signal:splitCtrl.signal});}
+                  finally{clearTimeout(splitTimeout);}
+                  const splitData=await splitRes.json();
+                  if(!splitRes.ok)throw new Error(splitData.error||"Error al separar PDF");
+                  notify("✓ "+splitData.totalFacturas+" facturas de "+periodo+" listas en Drive — procesando...","ok");
+                  /* ── Notificación Telegram al subir ── */
+                  try{
+                    const tgBot=window.__TG_BOT__;
+                    const tgChat=window.__TG_CHAT__;
+                    if(tgBot&&tgChat) await sendTelegram(tgBot,tgChat,`✅ Facturas PISA ${periodo} listas\n${splitData.totalFacturas} PDFs subidos a Drive.`);
+                  }catch(e){console.warn("Telegram notif error:",e.message);}
+                  /* ── Continuar automáticamente al reporte ── */
+                  periodoActivado.current=true;autoProcesado.current=false;
+                  buscarZip(periodo);
+                }catch(e){setZipStatus("error");setZipError(e.message);notify("Error: "+e.message,"err");}
+                ev.target.value="";
+              }
+            }),
+          "📄 Subir PDF manualmente"
+        )
       ),
       files.planilla
         ?h(LlenarPlanillaView,{periodo,planillaFile:files.planilla,embedded:true})
@@ -5166,7 +5049,7 @@ function App(){
         ))
       ),
       h("div",{style:{background:"#ddeaf8",borderBottom:"1px solid #b8d0ee",padding:"8px 18px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
-        [{k:"all",l:`Todos (${stats.total})`},{k:"ok",l:`Coinciden (${stats.ok})`},{k:"diff",l:`Revisar (${stats.diff})`},{k:"sent",l:`Enviados (${stats.sent})`},
+        [{k:"all",l:`Todos (${stats.total})`},{k:"ok",l:`Coinciden (${stats.ok})`},{k:"diff",l:`Revisar (${stats.total-stats.ok})`},{k:"sent",l:`Enviados (${stats.sent})`},
          {k:"difiere",l:`Difiere (${enriched.filter(r=>r.estado==="diff"&&r.matchScore!==1).length})`},
          {k:"sinpdf",l:`Sin PDF (${stats.sinPdf})`}]
         .map(f=>h("button",{key:f.k,className:`pill${filter===f.k?" active":""}`,onClick:()=>setFilter(f.k)},f.l)),
@@ -5188,25 +5071,15 @@ function App(){
               fontFamily:"'DM Sans',sans-serif"}
           },"⬇ Reporte")
         ),
-        xmlZipStatus==="missing"&&h("span",{style:{fontSize:11,color:"var(--amber)",display:"flex",alignItems:"center",gap:5,background:"var(--abg)",border:"1px solid var(--adim)",borderRadius:7,padding:"4px 10px"}},
-          "⚠ Falta ZIP de XMLs",
-          h("label",{style:{cursor:"pointer",fontWeight:700,textDecoration:"underline",marginLeft:2}},
-            "⬆ Subir",
-            h("input",{type:"file",accept:".zip",style:{display:"none"},onChange:e=>{if(e.target.files[0])onXmlZipFile(e.target.files[0]);}})
-          )
-        ),
-        xmlZipStatus==="ready"&&h("span",{style:{fontSize:11,color:"var(--green)",display:"flex",alignItems:"center",gap:4,background:"var(--gbg)",border:"1px solid var(--gdim)",borderRadius:7,padding:"4px 10px"}},
-          "✓ XMLs listos"
-        ),
         h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:190,fontFamily:"'DM Sans',sans-serif"}}),
         h("input",{value:searchFactura,onChange:e=>setSearchFactura(e.target.value),placeholder:"N° Factura...",style:{width:130,fontFamily:"'DM Mono',monospace"}})
       ),
-      h("div",{style:{flex:1,overflowX:"auto",overflowY:"auto",minHeight:0}},
+      h("div",{style:{flex:1,overflowX:"auto"}},
         h("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:940}},
           h("colgroup",null,h("col",{style:{width:58}}),h("col",{style:{width:"15%"}}),h("col",{style:{width:"17%"}}),h("col",{style:{width:88}}),h("col",{style:{width:88}}),h("col",{style:{width:72}}),h("col",{style:{width:72}}),h("col",{style:{width:96}}),h("col",{style:{width:110}}),h("col",{style:{width:60}})),
           h("thead",null,h("tr",{style:{background:"#ddeaf8"}},
             ["Sitio","Cliente","Correo","Concepto","Factura","UF planilla","UF PDF","Monto+IVA","Estado/Acción","Pagado"].map((hd,hi)=>
-              h("th",{key:hd,style:{padding:"8px 11px",textAlign:hi===9?"center":"left",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:"0.07em",borderBottom:"1px solid var(--bdr)",position:"sticky",top:0,zIndex:2,background:"#ddeaf8",boxShadow:"0 1px 0 var(--bdr)"}},hd.toUpperCase())
+              h("th",{key:hd,style:{padding:"8px 11px",textAlign:hi===9?"center":"left",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:"0.07em",borderBottom:"1px solid var(--bdr)"}},hd.toUpperCase())
             )
           )),
           h("tbody",null,filtered.length===0?
@@ -5273,7 +5146,7 @@ function App(){
                     onClick:unlocked?()=>setPreview({row,idx:i}):()=>setShowPwdModal(true),
                     title:unlocked?"Enviar correo":"Clave requerida para enviar",
                     style:{opacity:unlocked?1:0.55,cursor:unlocked?"pointer":"pointer"}
-                  },isXmlCliente(row.cliente)?"✉ "+(unlocked?"Enviar XML":"🔒"):"✉ "+(unlocked?"Enviar":"🔒")):
+                  },"✉ "+(unlocked?"Enviar":"🔒")):
                   h(Badge,{e:row.estado,row})
                 ),
                 h("td",{style:{padding:"8px 11px",background:bg,textAlign:"center"}},
@@ -5317,4 +5190,4 @@ function App(){
 ReactDOM.createRoot(document.getElementById("root")).render(h(App));
 </script>
 <script>/* resumen-static: datos embebidos para fallback offline/CDN */
-window._RESUMEN_STATIC={"clientes":[{"nombre":"OLYMPUS CORPORATION CHILE SPA","meses":{"Enero 2026":15047740,"Febrero 2026":21534206,"Marzo 2026":117430080,"Abril 2026":20580013,"Mayo 2026":144775209,"Junio 2026":162000010},"total":481367258},{"nombre":"SANCHEZ HERMANOS SPA","meses":{"Enero 2026":77117322,"Febrero 2026":75614544,"Marzo 2026":90560256,"Abril 2026":75907446,"Mayo 2026":76523202,"Junio 2026":78023952},"total":473746722},{"nombre":"INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA","meses":{"Enero 2026":51127028,"Febrero 2026":49660373,"Marzo 2026":49822139,"Abril 2026":49851352,"Mayo 2026":50223222,"Junio 2026":50877425},"total":301561539},{"nombre":"SONEPAR CHILE SA","meses":{"Enero 2026":47632567,"Febrero 2026":46387694,"Marzo 2026":46538404,"Abril 2026":46565619,"Mayo 2026":46979148,"Junio 2026":47588636},"total":281692068},{"nombre":"SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE LOS LIBERTADORES","meses":{"Enero 2026":32298080,"Febrero 2026":32950083,"Marzo 2026":32429034,"Abril 2026":32447710,"Mayo 2026":32723430,"Junio 2026":33141601},"total":195989938},{"nombre":"DRAGER CHILE LIMITADA","meses":{"Enero 2026":24372758,"Febrero 2026":23713994,"Marzo 2026":23791109,"Abril 2026":23805034,"Mayo 2026":24016630,"Junio 2026":24328494},"total":144028019},{"nombre":"TRANE DE CHILE S A","meses":{"Enero 2026":19129179,"Febrero 2026":18629983,"Marzo 2026":18690507,"Abril 2026":18701437,"Mayo 2026":18867509,"Junio 2026":19112280},"total":113130895},{"nombre":"BANCO DEL ESTADO DE CHILE","meses":{"Enero 2026":18255866,"Febrero 2026":18231109,"Marzo 2026":18288871,"Abril 2026":18299302,"Mayo 2026":18457793,"Junio 2026":18691388},"total":110224329},{"nombre":"COMERCIAL SNA-E (CHILE) LIMITADA","meses":{"Enero 2026":19291278,"Febrero 2026":17109542,"Marzo 2026":17164686,"Abril 2026":17174645,"Mayo 2026":17325954,"Junio 2026":17548967},"total":105615072},{"nombre":"COMERCIALIZADORA INDUSTRIAL W & L LIMITADA","meses":{"Enero 2026":17090114,"Febrero 2026":16609352,"Marzo 2026":16663426,"Abril 2026":16673190,"Mayo 2026":16821561,"Junio 2026":17040240},"total":100897883},{"nombre":"COMERCIAL INGERSOLL RAND (CHILE) LIMITADA","meses":{"Enero 2026":31260454,"Febrero 2026":17917872,"Marzo 2026":10163768,"Abril 2026":10174360,"Mayo 2026":10335326,"Junio 2026":18385334},"total":98237114},{"nombre":"BANCO DE CREDITO E INVERSIONES","meses":{"Enero 2026":32195192,"Marzo 2026":16126699,"Abril 2026":16135897,"Mayo 2026":16275650,"Junio 2026":16481629},"total":97215067},{"nombre":"SOCIEDAD DE ALIMENTOS LEEFOOD SPA.","meses":{"Enero 2026":13960805,"Febrero 2026":13660249,"Marzo 2026":13704422,"Abril 2026":13712397,"Mayo 2026":13833600,"Junio 2026":14012237},"total":82883710},{"nombre":"MEGAMIN S.A.","meses":{"Enero 2026":11069411,"Febrero 2026":10831006,"Marzo 2026":10866030,"Abril 2026":10872355,"Mayo 2026":10968454,"Junio 2026":11110095},"total":65717351},{"nombre":"JOHN CRANE CHILE S A","meses":{"Enero 2026":10266744,"Febrero 2026":10030064,"Marzo 2026":10062548,"Abril 2026":10068414,"Mayo 2026":10157546,"Junio 2026":10288915},"total":60874231},{"nombre":"VOITH TURBO S A","meses":{"Enero 2026":9829227,"Febrero 2026":9617914,"Marzo 2026":9649014,"Abril 2026":9654631,"Mayo 2026":9739964,"Junio 2026":9865736},"total":58356486},{"nombre":"CONGO FILMS S.A.S. AGENCIA EN CHILE","meses":{"Enero 2026":9187851,"Febrero 2026":9013194,"Marzo 2026":9042264,"Abril 2026":9047515,"Mayo 2026":9127280,"Junio 2026":9244844},"total":54662948},{"nombre":"FESTO S A","meses":{"Enero 2026":8395592,"Febrero 2026":8299084,"Marzo 2026":8325648,"Abril 2026":8330444,"Mayo 2026":8403332,"Junio 2026":8510759},"total":50264859},{"nombre":"CAJA DE COMPENSACION DE ASIGNACION FAMILIAR DE LOS ANDES","meses":{"Enero 2026":11606565,"Febrero 2026":11590826,"Marzo 2026":11627549,"Abril 2026":11634181},"total":46459121},{"nombre":"IN WASSER SPA.","meses":{"Enero 2026":7358235,"Febrero 2026":7384468,"Marzo 2026":7408363,"Abril 2026":7412678,"Mayo 2026":7438859,"Junio 2026":7535494},"total":44538097},{"nombre":"CASINO IMPERIO LIMITADA","meses":{"Enero 2026":6877961,"Febrero 2026":6890049,"Marzo 2026":6912173,"Abril 2026":6916170,"Mayo 2026":6953585,"Junio 2026":7043061},"total":41592999},{"nombre":"MEDILAND SPA","meses":{"Enero 2026":6897156,"Febrero 2026":6763719,"Marzo 2026":6785541,"Abril 2026":6789483,"Mayo 2026":6849360,"Junio 2026":6937614},"total":41022873},{"nombre":"SEGAFREDO ZANETTI CHILE S.A.","meses":{"Enero 2026":6570792,"Febrero 2026":6454102,"Marzo 2026":6474892,"Abril 2026":6478647,"Mayo 2026":6508747,"Junio 2026":6592824},"total":39080004},{"nombre":"A3D CHILE S A","meses":{"Enero 2026":7320011,"Febrero 2026":7058740,"Marzo 2026":7081900,"Abril 2026":7086083,"Mayo 2026":5034931,"Junio 2026":5101831},"total":38683496},{"nombre":"INDUSTRIA YKK CHILE LTDA","meses":{"Enero 2026":6292674,"Febrero 2026":6176149,"Marzo 2026":6196059,"Abril 2026":6199654,"Mayo 2026":6254286,"Junio 2026":6334803},"total":37453625},{"nombre":"PULLMAN CARGO S A","meses":{"Enero 2026":8560193,"Febrero 2026":4454729,"Marzo 2026":4469038,"Abril 2026":4471621,"Mayo 2026":4510881,"Junio 2026":9369463},"total":35835925},{"nombre":"DISTRIBUIDORA SANCHEZ 4G SPA","meses":{"Enero 2026":5201977,"Febrero 2026":5189100,"Marzo 2026":8287908,"Abril 2026":5209231,"Mayo 2026":5217910,"Junio 2026":5286873},"total":34392999},{"nombre":"GALLYAS TELECOM S.A.","meses":{"Enero 2026":5649406,"Febrero 2026":5537777,"Marzo 2026":5555651,"Abril 2026":5558879,"Mayo 2026":5607925,"Junio 2026":5680212},"total":33589850},{"nombre":"SOC COMERCIAL JOSE MARIN ANTONIN Y COMPANIA LIMITADA","meses":{"Enero 2026":5563321,"Febrero 2026":5414965,"Marzo 2026":5432567,"Abril 2026":5435746,"Mayo 2026":5484044,"Junio 2026":5555231},"total":32885874},{"nombre":"NCH CHILE S A","meses":{"Enero 2026":5463453,"Febrero 2026":5404094,"Marzo 2026":5421469,"Abril 2026":5424607,"Mayo 2026":5466602,"Junio 2026":5536870},"total":32717095},{"nombre":"PERFOMEX CHILE SPA","meses":{"Enero 2026":5330610,"Febrero 2026":5236352,"Marzo 2026":5253218,"Abril 2026":5256265,"Mayo 2026":5302543,"Junio 2026":5370751},"total":31749739},{"nombre":"SOCIEDAD COMERCIAL E INDUSTRIAL HYDROTORC LIMITADA","meses":{"Enero 2026":4985694,"Febrero 2026":4998110,"Marzo 2026":5014209,"Abril 2026":5017116,"Mayo 2026":5040435,"Junio 2026":5105545},"total":30161109},{"nombre":"PARKER HANNIFIN CORPORATION CHILE LIMITADA","meses":{"Enero 2026":5008975,"Febrero 2026":4915155,"Marzo 2026":4931003,"Abril 2026":4933865,"Mayo 2026":4977351,"Junio 2026":5041445},"total":29807794},{"nombre":"CAJA DE COMPENSACION ASIGNACION FAMILIAR 18 DE SEPTIEMBRE","meses":{"Enero 2026":4769420,"Febrero 2026":4762952,"Marzo 2026":4778043,"Abril 2026":4780768,"Mayo 2026":4822174,"Junio 2026":4883202},"total":28796559},{"nombre":"FEDEX EXPRESS CHILE SPA","meses":{"Enero 2026":4825928,"Febrero 2026":4741037,"Marzo 2026":4756307,"Abril 2026":4759064,"Mayo 2026":4800962,"Junio 2026":4862711},"total":28746009},{"nombre":"SOCIEDAD FABRICA Y DISTRIBUIDORA DE ALIMENTOS JP LIMITADA","meses":{"Enero 2026":4548325,"Febrero 2026":4582848,"Marzo 2026":4597927,"Abril 2026":4600652,"Mayo 2026":4597774,"Junio 2026":4658763},"total":27586289},{"nombre":"TEZMAN CHILE SPA","meses":{"Enero 2026":4534566,"Febrero 2026":4461081,"Marzo 2026":4475428,"Abril 2026":4478018,"Mayo 2026":4517385,"Junio 2026":4575410},"total":27041888},{"nombre":"COMERCIALIZADORA JUANA CATALDO E HIJO SPA","meses":{"Enero 2026":4469766,"Febrero 2026":4392557,"Marzo 2026":4406699,"Abril 2026":4409254,"Mayo 2026":4448059,"Junio 2026":4505251},"total":26631586},{"nombre":"CORSUD SPA","meses":{"Enero 2026":4327868,"Febrero 2026":4250852,"Marzo 2026":4264545,"Abril 2026":4267018,"Mayo 2026":4304591,"Junio 2026":4359969},"total":25774843},{"nombre":"ALIMENTOS NEVA SPA","meses":{"Enero 2026":4259757,"Febrero 2026":4193845,"Marzo 2026":4207323,"Abril 2026":4209758,"Mayo 2026":4246740,"Junio 2026":4301245},"total":25418668},{"nombre":"CAMPO MAR SPA","meses":{"Marzo 2026":23468765},"total":23468765},{"nombre":"COMERCIAL GRANJA MARINA LIMITADA","meses":{"Enero 2026":3902272,"Febrero 2026":3840941,"Marzo 2026":3850643,"Abril 2026":3852396,"Mayo 2026":3879017,"Junio 2026":3918253},"total":23243522},{"nombre":"COMERCIAL KPC CHILE LIMITADA","meses":{"Enero 2026":3754130,"Febrero 2026":3702243,"Marzo 2026":3714121,"Abril 2026":3716266,"Mayo 2026":3737160,"Junio 2026":3785195},"total":22409115},{"nombre":"BANCO BICE","meses":{"Abril 2026":5208508,"Mayo 2026":5253619,"Junio 2026":10702886},"total":21165013},{"nombre":"LABORATORIO DENTAL Y SERVICIOS ODONTOLOGICOS ILAB LIMITADA","meses":{"Enero 2026":3497295,"Febrero 2026":3464814,"Marzo 2026":3475881,"Abril 2026":3477878,"Mayo 2026":3501305,"Junio 2026":3546055},"total":20963228},{"nombre":"LA ARAUCANA C C A F","meses":{"Enero 2026":3458002,"Febrero 2026":3453313,"Marzo 2026":3464254,"Abril 2026":3466230,"Mayo 2026":3496251,"Junio 2026":3540498},"total":20878548},{"nombre":"GRUPO DROP SPA","meses":{"Enero 2026":3426348,"Febrero 2026":3362412,"Marzo 2026":3373254,"Abril 2026":3375210,"Mayo 2026":3404956,"Junio 2026":3448798},"total":20390978},{"nombre"
+window._RESUMEN_STATIC={"clientes":[{"nombre":"OLYMPUS CORPORATION CHILE SPA","meses":{"Enero 2026":15047740,"Febrero 2026":21534206,"Marzo 2026":117430080,"Abril 2026":20580013,"Mayo 2026":144775209,"Junio 2026":162000010},"total":481367258},{"nombre":"SANCHEZ HERMANOS SPA","meses":{"Enero 2026":77117322,"Febrero 2026":75614544,"Marzo 2026":90560256,"Abril 2026":75907446,"Mayo 2026":76523202,"Junio 2026":78023952},"total":473746722},{"nombre":"INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA","meses":{"Enero 2026":51127028,"Febrero 2026":49660373,"Marzo 2026":49822139,"Abril 2026":49851352,"Mayo 2026":50223222,"Junio 2026":50877425},"total":301561539},{"nombre":"SONEPAR CHILE SA","meses":{"Enero 2026":47632567,"Febrero 2026":46387694,"Marzo 2026":46538404,"Abril 2026":46565619,"Mayo 2026":46979148,"Junio 2026":47588636},"total":281692068},{"nombre":"SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE LOS LIBERTADORES","meses":{"Enero 2026":32298080,"Febrero 2026":32950083,"Marzo 2026":32429034,"Abril 2026":32447710,"Mayo 2026":32723430,"Junio 2026":33141601},"total":195989938},{"nombre":"DRAGER CHILE LIMITADA","meses":{"Enero 2026":24372758,"Febrero 2026":23713994,"Marzo 2026":23791109,"Abril 2026":23805034,"Mayo 2026":24016630,"Junio 2026":24328494},"total":144028019},{"nombre":"TRANE DE CHILE S A","meses":{"Enero 2026":19129179,"Febrero 2026":18629983,"Marzo 2026":18690507,"Abril 2026":18701437,"Mayo 2026":18867509,"Junio 2026":19112280},"total":113130895},{"nombre":"BANCO DEL ESTADO DE CHILE","meses":{"Enero 2026":18255866,"Febrero 2026":18231109,"Marzo 2026":18288871,"Abril 2026":18299302,"Mayo 2026":18457793,"Junio 2026":18691388},"total":110224329},{"nombre":"COMERCIAL SNA-E (CHILE) LIMITADA","meses":{"Enero 2026":19291278,"Febrero 2026":17109542,"Marzo 2026":17164686,"Abril 2026":17174645,"Mayo 2026":17325954,"Junio 2026":17548967},"total":105615072},{"nombre":"COMERCIALIZADORA INDUSTRIAL W & L LIMITADA","meses":{"Enero 2026":17090114,"Febrero 2026":16609352,"Marzo 2026":16663426,"Abril 2026":16673190,"Mayo 2026":16821561,"Junio 2026":17040240},"total":100897883},{"nombre":"COMERCIAL INGERSOLL RAND (CHILE) LIMITADA","meses":{"Enero 2026":31260454,"Febrero 2026":17917872,"Marzo 2026":10163768,"Abril 2026":10174360,"Mayo 2026":10335326,"Junio 2026":18385334},"total":98237114},{"nombre":"BANCO DE CREDITO E INVERSIONES","meses":{"Enero 2026":32195192,"Marzo 2026":16126699,"Abril 2026":16135897,"Mayo 2026":16275650,"Junio 2026":16481629},"total":97215067},{"nombre":"SOCIEDAD DE ALIMENTOS LEEFOOD SPA.","meses":{"Enero 2026":13960805,"Febrero 2026":13660249,"Marzo 2026":13704422,"Abril 2026":13712397,"Mayo 2026":13833600,"Junio 2026":14012237},"total":82883710},{"nombre":"MEGAMIN S.A.","meses":{"Enero 2026":11069411,"Febrero 2026":10831006,"Marzo 2026":10866030,"Abril 2026":10872355,"Mayo 2026":10968454,"Junio 2026":11110095},"total":65717351},{"nombre":"JOHN CRANE CHILE S A","meses":{"Enero 2026":10266744,"Febrero 2026":10030064,"Marzo 2026":10062548,"Abril 2026":10068414,"Mayo 2026":10157546,"Junio 2026":10288915},"total":60874231},{"nombre":"VOITH TURBO S A","meses":{"Enero 2026":9829227,"Febrero 2026":9617914,"Marzo 2026":9649014,"Abril 2026":9654631,"Mayo 2026":9739964,"Junio 2026":9865736},"total":58356486},{"nombre":"CONGO FILMS S.A.S. AGENCIA EN CHILE","meses":{"Enero 2026":9187851,"Febrero 2026":9013194,"Marzo 2026":9042264,"Abril 2026":9047515,"Mayo 2026":9127280,"Junio 2026":9244844},"total":54662948},{"nombre":"FESTO S A","meses":{"Enero 2026":8395592,"Febrero 2026":8299084,"Marzo 2026":8325648,"Abril 2026":8330444,"Mayo 2026":8403332,"Junio 2026":8510759},"total":50264859},{"nombre":"CAJA DE COMPENSACION DE ASIGNACION FAMILIAR DE LOS ANDES","meses":{"Enero 2026":11606565,"Febrero 2026":11590826,"Marzo 2026":11627549,"Abril 2026":11634181},"total":46459121},{"nombre":"IN WASSER SPA.","meses":{"Enero 2026":7358235,"Febrero 2026":7384468,"Marzo 2026":7408363,"Abril 2026":7412678,"Mayo 2026":7438859,"Junio 2026":7535494},"total":44538097},{"nombre":"CASINO IMPERIO LIMITADA","meses":{"Enero 2026":6877961,"Febrero 2026":6890049,"Marzo 2026":6912173,"Abril 2026":6916170,"Mayo 2026":6953585,"Junio 2026":7043061},"total":41592999},{"nombre":"MEDILAND SPA","meses":{"Enero 2026":6897156,"Febrero 2026":6763719,"Marzo 2026":6785541,"Abril 2026":6789483,"Mayo 2026":6849360,"Junio 2026":6937614},"total":41022873},{"nombre":"SEGAFREDO ZANETTI CHILE S.A.","meses":{"Enero 2026":6570792,"Febrero 2026":6454102,"Marzo 2026":6474892,"Abril 2026":6478647,"Mayo 2026":6508747,"Junio 2026":6592824},"total":39080004},{"nombre":"A3D CHILE S A","meses":{"Enero 2026":7320011,"Febrero 2026":7058740,"Marzo 2026":7081900,"Abril 2026":7086083,"Mayo 2026":5034931,"Junio 2026":5101831},"total":38683496},{"nombre":"INDUSTRIA YKK CHILE LTDA","meses":{"Enero 2026":6292674,"Febrero 2026":6176149,"Marzo 2026":6196059,"Abril 2026":6199654,"Mayo 2026":6254286,"Junio 2026":6334803},"total":37453625},{"nombre":"PULLMAN CARGO S A","meses":{"Enero 2026":8560193,"Febrero 2026":4454729,"Marzo 2026":4469038,"Abril 2026":4471621,"Mayo 2026":4510881,"Junio 2026":9369463},"total":35835925},{"nombre":"DISTRIBUIDORA SANCHEZ 4G SPA","meses":{"Enero 2026":5201977,"Febrero 2026":5189100,"Marzo 2026":8287908,"Abril 2026":5209231,"Mayo 2026":5217910,"Junio 2026":5286873},"total":34392999},{"nombre":"GALLYAS TELECOM S.A.","meses":{"Enero 2026":5649406,"Febrero 2026":5537777,"Marzo 2026":5555651,"Abril 2026":5558879,"Mayo 2026":5607925,"Junio 2026":5680212},"total":33589850},{"nombre":"SOC COMERCIAL JOSE MARIN ANTONIN Y COMPANIA LIMITADA","meses":{"Enero 2026":5563321,"Febrero 2026":5414965,"Marzo 2026":5432567,"Abril 2026":5435746,"Mayo 2026":5484044,"Junio 2026":5555231},"total":32885874},{"nombre":"NCH CHILE S A","meses":{"Enero 2026":5463453,"Febrero 2026":5404094,"Marzo 2026":5421469,"Abril 2026":5424607,"Mayo 2026":5466602,"Junio 2026":5536870},"total":32717095},{"nombre":"PERFOMEX CHILE SPA","meses":{"Enero 2026":5330610,"Febrero 2026":5236352,"Marzo 2026":5253218,"Abril 2026":5256265,"Mayo 2026":5302543,"Junio 2026":5370751},"total":31749739},{"nombre":"SOCIEDAD COMERCIAL E INDUSTRIAL HYDROTORC LIMITADA","meses":{"Enero 2026":4985694,"Febrero 2026":4998110,"Marzo 2026":5014209,"Abril 2026":5017116,"Mayo 2026":5040435,"Junio 2026":5105545},"total":30161109},{"nombre":"PARKER HANNIFIN CORPORATION CHILE LIMITADA","meses":{"Enero 2026":5008975,"Febrero 2026":4915155,"Marzo 2026":4931003,"Abril 2026":4933865,"Mayo 2026":4977351,"Junio 2026":5041445},"total":29807794},{"nombre":"CAJA DE COMPENSACION ASIGNACION FAMILIAR 18 DE SEPTIEMBRE","meses":{"Enero 2026":4769420,"Febrero 2026":4762952,"Marzo 2026":4778043,"Abril 2026":4780768,"Mayo 2026":4822174,"Junio 2026":4883202},"total":28796559},{"nombre":"FEDEX EXPRESS CHILE SPA","meses":{"Enero 2026":4825928,"Febrero 2026":4741037,"Marzo 2026":4756307,"Abril 2026":4759064,"Mayo 2026":4800962,"Junio 2026":4862711},"total":28746009},{"nombre":"SOCIEDAD FABRICA Y DISTRIBUIDORA DE ALIMENTOS JP LIMITADA","meses":{"Enero 2026":4548325,"Febrero 2026":4582848,"Marzo 2026":4597927,"Abril 2026":4600652,"Mayo 2026":4597774,"Junio 2026":4658763},"total":27586289},{"nombre":"TEZMAN CHILE SPA","meses":{"Enero 2026":4534566,"Febrero 2026":4461081,"Marzo 2026":4475428,"Abril 2026":4478018,"Mayo 2026":4517385,"Junio 2026":4575410},"total":27041888},{"nombre":"COMERCIALIZADORA JUANA CATALDO E HIJO SPA","meses":{"Enero 2026":4469766,"Febrero 2026":4392557,"Marzo 2026":4406699,"Abril 2026":4409254,"Mayo 2026":4448059,"Junio 2026":4505251},"total":26631586},{"nombre":"CORSUD SPA","meses":{"Enero 2026":4327868,"Febrero 2026":4250852,"Marzo 2026":4264545,"Abril 2026":4267018,"Mayo 2026":4304591,"Junio 2026":4359969},"total":25774843},{"nombre":"ALIMENTOS NEVA SPA","meses":{"Enero 2026":4259757,"Febrero 2026":4193845,"Marzo 2026":4207323,"Abril 2026":4209758,"Mayo 2026":4246740,"Junio 2026":4301245},"total":25418668},{"nombre":"CAMPO MAR SPA","meses":{"Marzo 2026":23468765},"total":23468765},{"nombre":"COMERCIAL GRANJA MARINA LIMITADA","meses":{"Enero 2026":3902272,"Febrero 2026":3840941,"Marzo 2026":3850643,"Abril 2026":3852396,"Mayo 2026":3879017,"Junio 2026":3918253},"total":23243522},{"nombre":"COMERCIAL KPC CHILE LIMITADA","meses":{"Enero 2026":3754130,"Febrero 2026":3702243,"Marzo 2026":3714121,"Abril 2026":3716266,"Mayo 2026":3737160,"Junio 2026":3785195},"total":22409115},{"nombre":"BANCO BICE","meses":{"Abril 2026":5208508,"Mayo 2026":5253619,"Junio 2026":10702886},"total":21165013},{"nombre":"LABORATORIO DENTAL Y SERVICIOS ODONTOLOGICOS ILAB LIMITADA","meses":{"Enero 2026":3497295,"Febrero 2026":3464814,"Marzo 2026":3475881,"Abril 2026":3477878,"Mayo 2026":3501305,"Junio 2026":3546055},"total":20963228},{"nombre":"LA ARAUCANA C C A F","meses":{"Enero 2026":3458002,"Febrero 2026":3453313,"Marzo 2026":3464254,"Abril 2026":3466230,"Mayo 2026":3496251,"Junio 2026":3540498},"total":20878548},{"nombre":"GRUPO DROP SPA","meses":{"Enero 2026":3426348,"Febrero 2026":3362412,"Marzo 2026":3373254,"Abril 2026":3375210,"Mayo 2026":3404956,"Junio 2026":3448798},"total":20390978},{"nombre"                                                                                                                                
