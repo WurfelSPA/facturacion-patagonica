@@ -41,7 +41,7 @@ async function scrapeAguasAndinas() {
 
   for (const host of BROWSERLESS_HOSTS) {
     try {
-      const url = `${host}/function?token=${token}`;
+      const url = `${host}/function?token=${token}&stealth=true`;
       console.log('[aguas] POST', host + '/function ...');
 
       const resp = await fetch(url, {
