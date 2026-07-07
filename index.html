@@ -5037,7 +5037,7 @@ function App(){
           onClick:()=>{
             periodoActivado.current=true;autoProcesado.current=false;autoNuboxRef.current=false;
             setZipStatus("idle");setData([]);
-            buscarZip(periodo); /* buscarZip llama buscarXmlZip internamente */
+            splitPDF(); /* re-split automático → buscarZip() → auto-procesar */
           }
         },
           zipStatus==="loading"||zipStatus==="splitting"||splitLoading
