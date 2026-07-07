@@ -1,182 +1,64 @@
 /**
  * render-service/drive-uploader.js
  *
- * Sube los PDFs scrapeados de Aguas Andinas a Google Drive.
- * Estructura esperada en Drive:
- *   [AGUAS_ANDINAS_DRIVE_FOLDER_ID]/
- *     jun-2026/   (o cualquier nombre que contenga "jun" + "2026")
- *     may-2026/
- *     ...
+ * Delega la subida de PDFs a Google Drive al endpoint Vercel /api/upload-aguas,
+ * que ya tiene las credenciales de la cuenta de servicio configuradas.
  *
  * Env vars requeridas:
- *   GOOGLE_SERVICE_ACCOUNT_JSON     — JSON completo de la cuenta de servicio
- *   AGUAS_ANDINAS_DRIVE_FOLDER_ID   — ID de la carpeta "agua" en Drive
+ *   VERCEL_UPLOAD_URL — URL completa del endpoint (ej: https://facturacion-patagonica.vercel.app/api/upload-aguas)
+ *   SYNC_SECRET       — token de autenticación compartido
  */
 
-const { google }   = require('googleapis');
-const { Readable } = require('stream');
+const fetch = require('node-fetch');
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
-function getAuthClient() {
-  const saJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  if (!saJson) throw new Error('Falta GOOGLE_SERVICE_ACCOUNT_JSON');
-  const creds = JSON.parse(saJson);
-  return new google.auth.JWT({
-    email:  creds.client_email,
-    key:    creds.private_key,
-    scopes: ['https://www.googleapis.com/auth/drive'],
-  });
-}
+const BATCH_SIZE = 5; // ~5 × 150KB × 1.33 base64 ≈ 1MB por batch, bien bajo el límite Vercel
 
-// ── Month helpers ─────────────────────────────────────────────────────────────
-const ES_MONTHS = {
-  ene: { en: 'jan', num: '01', es: 'enero'      },
-  feb: { en: 'feb', num: '02', es: 'febrero'    },
-  mar: { en: 'mar', num: '03', es: 'marzo'      },
-  abr: { en: 'apr', num: '04', es: 'abril'      },
-  may: { en: 'may', num: '05', es: 'mayo'       },
-  jun: { en: 'jun', num: '06', es: 'junio'      },
-  jul: { en: 'jul', num: '07', es: 'julio'      },
-  ago: { en: 'aug', num: '08', es: 'agosto'     },
-  sep: { en: 'sep', num: '09', es: 'septiembre' },
-  oct: { en: 'oct', num: '10', es: 'octubre'    },
-  nov: { en: 'nov', num: '11', es: 'noviembre'  },
-  dic: { en: 'dec', num: '12', es: 'diciembre'  },
-};
-
-// Parses "jun/2026" → { month: 'jun', year: '2026', num: '06', es: 'junio' }
-function parseMes(mes) {
-  if (!mes) return null;
-  const m = String(mes).match(/^(\w{3})\/(\d{4})$/);
-  if (!m) return null;
-  const key = m[1].toLowerCase();
-  const info = ES_MONTHS[key];
-  if (!info) return null;
-  return { month: key, year: m[2], ...info };
-}
-
-// Check if a Drive folder name matches a parsed month
-function folderMatchesMes(folderName, parsed) {
-  const name = folderName.toLowerCase();
-  const { month, year, num, es } = parsed;
-  // Accept: jun-2026, jun 2026, junio-2026, junio 2026, 2026-06, 06-2026, etc.
-  return (
-    (name.includes(month) && name.includes(year)) ||
-    (name.includes(es)    && name.includes(year)) ||
-    (name.includes(year + '-' + num)) ||
-    (name.includes(num + '-' + year))
-  );
-}
-
-// ── Drive helpers ─────────────────────────────────────────────────────────────
-async function listChildFolders(drive, parentId) {
-  const q = `'${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-  const res = await drive.files.list({
-    q,
-    fields: 'files(id, name)',
-    pageSize: 100,
-  });
-  return res.data.files || [];
-}
-
-async function findOrCreateMonthFolder(drive, parentId, parsed) {
-  const folders = await listChildFolders(drive, parentId);
-  const match   = folders.find(f => folderMatchesMes(f.name, parsed));
-  if (match) {
-    console.log(`[drive] Carpeta existente: "${match.name}" (${match.id})`);
-    return match.id;
-  }
-
-  // Create with standard name e.g. "jun-2026"
-  const newName = `${parsed.month}-${parsed.year}`;
-  console.log(`[drive] Creando carpeta: "${newName}" bajo ${parentId}`);
-  const created = await drive.files.create({
-    requestBody: {
-      name:     newName,
-      mimeType: 'application/vnd.google-apps.folder',
-      parents:  [parentId],
-    },
-    fields: 'id',
-  });
-  return created.data.id;
-}
-
-// ── Main export ───────────────────────────────────────────────────────────────
 async function uploadBoletas(boletas) {
-  const parentFolderId = process.env.AGUAS_ANDINAS_DRIVE_FOLDER_ID;
-  if (!parentFolderId) throw new Error('Falta AGUAS_ANDINAS_DRIVE_FOLDER_ID');
+  const uploadUrl = process.env.VERCEL_UPLOAD_URL;
+  const secret    = process.env.SYNC_SECRET || '';
 
-  const auth  = getAuthClient();
-  const drive = google.drive({ version: 'v3', auth });
+  if (!uploadUrl) throw new Error('Falta VERCEL_UPLOAD_URL');
+  if (!secret)    throw new Error('Falta SYNC_SECRET');
 
   const uploaded = [];
   const errors   = [];
 
-  // Group boletas by month to minimize folder listing calls
-  const byMonth = new Map();
-  for (const b of boletas) {
-    const parsed = parseMes(b.mes);
-    if (!parsed) {
-      errors.push({ boleta: b, error: 'No se pudo parsear mes: ' + b.mes });
-      continue;
-    }
-    const key = `${parsed.month}-${parsed.year}`;
-    if (!byMonth.has(key)) byMonth.set(key, { parsed, items: [] });
-    byMonth.get(key).items.push(b);
-  }
+  // Procesar en batches para respetar límite de 10MB en Vercel
+  for (let i = 0; i < boletas.length; i += BATCH_SIZE) {
+    const batch     = boletas.slice(i, i + BATCH_SIZE);
+    const batchNum  = Math.floor(i / BATCH_SIZE) + 1;
+    const totalBatches = Math.ceil(boletas.length / BATCH_SIZE);
 
-  for (const [key, { parsed, items }] of byMonth) {
-    let folderId;
+    console.log(`[drive] Batch ${batchNum}/${totalBatches} — ${batch.length} boletas`);
+
     try {
-      folderId = await findOrCreateMonthFolder(drive, parentFolderId, parsed);
-    } catch (err) {
-      const msg = `No se pudo obtener carpeta ${key}: ${err.message}`;
-      console.error('[drive]', msg);
-      items.forEach(b => errors.push({ boleta: b, error: msg }));
-      continue;
-    }
+      const resp = await fetch(uploadUrl, {
+        method:  'POST',
+        headers: {
+          'Content-Type':   'application/json',
+          'x-sync-secret':  secret,
+        },
+        body:    JSON.stringify({ boletas: batch }),
+        timeout: 120000, // 2 min por batch
+      });
 
-    for (const b of items) {
-      if (!b.pdfBase64) {
-        errors.push({ boleta: b, error: 'pdfBase64 vacío' });
+      if (!resp.ok) {
+        const txt = await resp.text();
+        const msg = `HTTP ${resp.status}: ${txt.slice(0, 200)}`;
+        console.error('[drive] Batch error:', msg);
+        batch.forEach(b => errors.push({ nroFactura: b.nroFactura, error: msg }));
         continue;
       }
 
-      // Filename: aguasandinas_202606_factura_9297652.pdf
-      const filename = `aguasandinas_${parsed.year}${parsed.num}_factura_${b.nroFactura}.pdf`;
+      const result = await resp.json();
+      console.log(`[drive] Batch ${batchNum} OK — subidos: ${result.uploaded}, errores: ${result.errors}`);
 
-      try {
-        // Skip if already uploaded
-        const q = `'${folderId}' in parents and name = '${filename}' and trashed = false`;
-        const existing = await drive.files.list({ q, fields: 'files(id, name)', pageSize: 1 });
-        if (existing.data.files && existing.data.files.length > 0) {
-          console.log('[drive] Ya existe, saltando:', filename);
-          uploaded.push({ filename, id: existing.data.files[0].id, skipped: true });
-          continue;
-        }
+      if (result.uploadedFiles) uploaded.push(...result.uploadedFiles);
+      if (result.errorList)     errors.push(...result.errorList);
 
-        const buffer = Buffer.from(b.pdfBase64, 'base64');
-        const stream = Readable.from(buffer);
-
-        const res = await drive.files.create({
-          requestBody: {
-            name:    filename,
-            parents: [folderId],
-          },
-          media: {
-            mimeType: 'application/pdf',
-            body:     stream,
-          },
-          fields: 'id, name, size',
-        });
-
-        console.log('[drive] Subido:', filename, '→', res.data.id, `(${res.data.size} bytes)`);
-        uploaded.push({ filename, id: res.data.id, size: res.data.size, folder: key });
-
-      } catch (err) {
-        console.error('[drive] Error subiendo', filename, ':', err.message);
-        errors.push({ boleta: b, error: err.message });
-      }
+    } catch (err) {
+      console.error('[drive] Batch', batchNum, 'excepción:', err.message);
+      batch.forEach(b => errors.push({ nroFactura: b.nroFactura, error: err.message }));
     }
   }
 
