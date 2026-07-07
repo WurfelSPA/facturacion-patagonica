@@ -3,33 +3,87 @@ export default async function({ page }) {
   const CLAVE = __CLAVE__;
   const BASE  = 'https://www.aguasandinas.cl';
 
+  // Helper: probar múltiples selectores hasta encontrar uno
+  async function waitForAny(selectors, timeout = 15000) {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+      for (const sel of selectors) {
+        if (await page.$(sel)) return sel;
+      }
+      await new Promise(r => setTimeout(r, 500));
+    }
+    return null;
+  }
+
   try {
     // ── 1. LOGIN ──────────────────────────────────────────────────────────────
-    await page.goto(BASE + '/web/aguasandinas/login', { waitUntil: 'networkidle2', timeout: 30000 });
-    await new Promise(r => setTimeout(r, 1200));
+    await page.goto(BASE + '/web/aguasandinas/login', { waitUntil: 'networkidle2', timeout: 45000 });
+    await new Promise(r => setTimeout(r, 2000));
 
-    if (!page.url().includes('/login')) {
-      return { error: 'LOGIN_PAGE_NOT_FOUND: ' + page.url() };
-    }
+    const afterLoginUrl   = page.url();
+    const afterLoginTitle = await page.title();
 
-    await page.waitForSelector('#rut2', { timeout: 15000 });
-    await page.type('#rut2', RUT, { delay: 70 });
-    await new Promise(r => setTimeout(r, 400));
-    await page.type('#clave', CLAVE, { delay: 70 });
-    await new Promise(r => setTimeout(r, 600));
+    // Si ya redirigió a página autenticada, está logueado
+    if (!afterLoginUrl.includes('/login')) {
+      // Posiblemente ya hay sesión activa — ir directo a mis-cuentas
+      console.log('[aguas] Ya autenticado, URL:', afterLoginUrl);
+    } else {
+      // Buscar el campo RUT con selectores alternativos
+      const rutSel = await waitForAny([
+        '#rut2',
+        'input[placeholder*="RUT" i]',
+        'input[placeholder*="Rut" i]',
+        'input[name*="rut" i]',
+        'input[id*="rut" i]',
+        'form input[type="text"]:first-of-type',
+        'input[type="text"]',
+      ], 15000);
 
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }),
-      page.click('#btn-submit-login'),
-    ]);
+      if (!rutSel) {
+        // Devolver diagnóstico
+        const bodyText = await page.evaluate(() => document.body?.innerText?.slice(0, 500));
+        return { error: `LOGIN_FORM_NOT_FOUND. URL: ${afterLoginUrl}. Title: ${afterLoginTitle}. Body: ${bodyText}` };
+      }
 
-    if (page.url().includes('/login')) {
-      return { error: 'LOGIN_FAILED', url: page.url() };
+      console.log('[aguas] Selector RUT encontrado:', rutSel);
+
+      // Campo contraseña
+      const claveSel = await waitForAny([
+        '#clave',
+        'input[type="password"]',
+        'input[placeholder*="contraseña" i]',
+        'input[placeholder*="clave" i]',
+      ], 5000) || 'input[type="password"]';
+
+      // Submit
+      const submitSel = await waitForAny([
+        '#btn-submit-login',
+        'button[type="submit"]',
+        'input[type="submit"]',
+        'button:contains("INGRESAR")',
+      ], 5000) || 'button[type="submit"]';
+
+      await page.click(rutSel);
+      await page.type(rutSel, RUT, { delay: 70 });
+      await new Promise(r => setTimeout(r, 400));
+
+      await page.click(claveSel);
+      await page.type(claveSel, CLAVE, { delay: 70 });
+      await new Promise(r => setTimeout(r, 600));
+
+      await Promise.all([
+        page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }),
+        page.click(submitSel),
+      ]);
+
+      if (page.url().includes('/login')) {
+        const bodyText = await page.evaluate(() => document.body?.innerText?.slice(0, 300));
+        return { error: 'LOGIN_FAILED. URL: ' + page.url() + '. Body: ' + bodyText };
+      }
     }
 
     // ── 2. MIS CUENTAS ────────────────────────────────────────────────────────
     await page.goto(BASE + '/web/aguasandinas/mis-cuentas', { waitUntil: 'networkidle2', timeout: 45000 });
-    // Extra wait for reCAPTCHA v3 + portlet initialization
     await new Promise(r => setTimeout(r, 4000));
 
     const results  = [];
@@ -50,13 +104,12 @@ export default async function({ page }) {
           failures.push({ page: pgNum, error: 'Pagination link not found' });
           break;
         }
-        // Wait for table refresh
         await new Promise(r => setTimeout(r, 4000));
       }
 
       // Read boleta metadata from DOM
       const boletas = await page.evaluate(() => {
-        const rows  = Array.from(document.querySelectorAll('table tr')).slice(1);
+        const rows = Array.from(document.querySelectorAll('table tr')).slice(1);
         return rows.map((row, i) => {
           const cells = Array.from(row.querySelectorAll('td'));
           return {
@@ -78,66 +131,41 @@ export default async function({ page }) {
       // Download each boleta
       for (const boleta of boletas) {
         try {
-          // Register response waiter BEFORE triggering the download
-          const descargaPromise = page.waitForResponse(
-            r => r.status() === 200 && (
-              r.url().includes('%2Fdescarga%2Fdocumento') ||
-              r.url().includes('/descarga/documento')
-            ),
+          let pdfBase64 = null;
+
+          const waiter = page.waitForResponse(
+            r => r.url().includes('/descarga/documento') && r.request().method() === 'POST',
             { timeout: 25000 }
           );
 
-          // Trigger download (calls validarCaptcha3 XHR, then /descarga/documento XHR)
           await page.evaluate((idx) => {
             if (typeof validaciones === 'function') {
               validaciones(idx, false, 'descargaDocumento');
-            } else {
-              throw new Error('validaciones() not defined on page');
             }
           }, boleta.idx);
 
-          const resp        = await descargaPromise;
-          const contentType = resp.headers()['content-type'] || '';
-          const buffer      = await resp.buffer();
+          const pdfResp = await waiter;
+          const buffer  = await pdfResp.buffer();
+          pdfBase64     = buffer.toString('base64');
 
-          if (buffer.length < 100) {
-            failures.push({ boleta, error: 'Empty PDF response (len=' + buffer.length + '), captcha may have failed' });
-          } else {
-            results.push({
-              nroFactura:  boleta.nroFactura,
-              mes:         boleta.mes,
-              vencimiento: boleta.vencimiento,
-              monto:       boleta.monto,
-              estado:      boleta.estado,
-              page:        pgNum,
-              contentType,
-              size:        buffer.length,
-              pdfBase64:   buffer.toString('base64'),
-            });
-          }
-
-          // Small pause between downloads (rate limiting + reCAPTCHA)
-          await new Promise(r => setTimeout(r, 2500));
+          results.push({ ...boleta, pdfBase64, pdfSize: buffer.length });
+          await new Promise(r => setTimeout(r, 800));
 
         } catch (err) {
-          failures.push({ boleta, error: err.message });
-          await new Promise(r => setTimeout(r, 1000));
+          failures.push({ ...boleta, error: err.message.slice(0, 200) });
         }
       }
     }
 
     return {
-      ok:       true,
-      total:    results.length,
-      failures: failures.length,
+      ok:          true,
+      total:       results.length,
+      failures:    failures.length,
       results,
       failureList: failures,
     };
 
-  } catch (topErr) {
-    return {
-      error: topErr.message,
-      stack: topErr.stack ? topErr.stack.substring(0, 600) : '',
-    };
+  } catch (err) {
+    return { error: err.message.slice(0, 500) };
   }
 }
