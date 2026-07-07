@@ -12,7 +12,7 @@
  *   AGUAS_ANDINAS_USER           — RUT de acceso al portal Aguas Andinas
  *   AGUAS_ANDINAS_PASS           — Contraseña del portal Aguas Andinas
  *   AGUAS_ANDINAS_DRIVE_FOLDER_ID — ID de la carpeta "agua" en Google Drive
- *   GOOGLE_SERVICE_ACCOUNT_JSON  — JSON completo de cuenta de servicio Google
+ *   VERCEL_UPLOAD_URL             — URL del endpoint upload-aguas en Vercel
  *
  * Endpoints:
  *   GET  /                         — health check
@@ -62,7 +62,7 @@ app.get('/sync-aguas-andinas/status', (_req, res) => {
       AGUAS_ANDINAS_USER:            process.env.AGUAS_ANDINAS_USER            ? '✓ set' : '✗ missing',
       AGUAS_ANDINAS_PASS:            process.env.AGUAS_ANDINAS_PASS            ? '✓ set' : '✗ missing',
       AGUAS_ANDINAS_DRIVE_FOLDER_ID: process.env.AGUAS_ANDINAS_DRIVE_FOLDER_ID ? '✓ set' : '✗ missing',
-      GOOGLE_SERVICE_ACCOUNT_JSON:   process.env.GOOGLE_SERVICE_ACCOUNT_JSON   ? '✓ set' : '✗ missing',
+      VERCEL_UPLOAD_URL:             process.env.VERCEL_UPLOAD_URL             ? '✓ set' : '✗ missing',
     },
   });
 });
@@ -150,7 +150,7 @@ app.post('/sync-aguas-andinas', async (req, res) => {
     'AGUAS_ANDINAS_USER',
     'AGUAS_ANDINAS_PASS',
     'AGUAS_ANDINAS_DRIVE_FOLDER_ID',
-    'GOOGLE_SERVICE_ACCOUNT_JSON',
+    'VERCEL_UPLOAD_URL',
   ].filter(k => !process.env[k]);
 
   if (missing.length > 0) {
