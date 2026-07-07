@@ -60,7 +60,7 @@ async function scrapeAguasAndinas() {
       const result = (raw && raw.data !== undefined) ? raw.data : raw;
 
       if (result.error) {
-        throw new Error('Browser error: ' + result.error);
+        throw new Error('Browser error: ' + JSON.stringify(result).slice(0, 800));
       }
       if (!Array.isArray(result.results)) {
         throw new Error('Respuesta inesperada: ' + JSON.stringify(result).slice(0, 200));
