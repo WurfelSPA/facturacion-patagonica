@@ -15,8 +15,8 @@ const fs    = require('fs');
 const path  = require('path');
 
 const BROWSERLESS_HOSTS = [
-  'https://production-sfo.browserless.io',
   'https://production-lon.browserless.io',
+  'https://production-sfo.browserless.io',
 ];
 
 // Node-fetch socket timeout: 2 min (Browserless usa el default del plan)

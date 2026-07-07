@@ -3,21 +3,16 @@ export default async function({ page }) {
   const CLAVE = __CLAVE__;
   const BASE  = 'https://www.aguasandinas.cl';
 
-  // ── Anti-detección ────────────────────────────────────────────────────────
   await page.setUserAgent(
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
   );
-  await page.setExtraHTTPHeaders({
-    'Accept-Language': 'es-CL,es;q=0.9',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-  });
+  await page.setExtraHTTPHeaders({ 'Accept-Language': 'es-CL,es;q=0.9' });
   await page.evaluateOnNewDocument(() => {
     Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
     Object.defineProperty(navigator, 'languages', { get: () => ['es-CL', 'es'] });
     Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
   });
 
-  // Helper: probar múltiples selectores hasta encontrar uno
   async function waitForAny(selectors, timeout = 20000) {
     const start = Date.now();
     while (Date.now() - start < timeout) {
@@ -30,21 +25,14 @@ export default async function({ page }) {
   }
 
   try {
-    // ── 1. LOGIN ──────────────────────────────────────────────────────────────
     await page.goto(BASE + '/web/aguasandinas/login', { waitUntil: 'networkidle2', timeout: 45000 });
-    // Esperar más para páginas JS-heavy
     await new Promise(r => setTimeout(r, 5000));
 
-    const afterLoginUrl   = page.url();
-    const afterLoginTitle = await page.title();
+    const afterLoginUrl = page.url();
 
     if (!afterLoginUrl.includes('/login')) {
-      console.log('[aguas] Ya autenticado, URL:', afterLoginUrl);
+      // Ya autenticado
     } else {
-      // Diagnóstico: capturar HTML del body para ver qué cargó
-      const bodyHtml = await page.evaluate(() => document.body?.innerHTML?.slice(0, 1000) || 'EMPTY');
-      console.log('[aguas] Body HTML (1000 chars):', bodyHtml.replace(/\s+/g, ' '));
-
       const rutSel = await waitForAny([
         '#rut2',
         'input[placeholder*="RUT" i]',
@@ -56,31 +44,15 @@ export default async function({ page }) {
       ], 20000);
 
       if (!rutSel) {
-        const bodyText = await page.evaluate(() => document.body?.innerText?.slice(0, 800) || 'EMPTY');
+        const bodyHtml = await page.evaluate(() => document.body?.innerHTML?.slice(0, 1500) || 'EMPTY');
         const allInputs = await page.evaluate(() =>
-          Array.from(document.querySelectorAll('input')).map(i => `${i.tagName}[id=${i.id}][name=${i.name}][type=${i.type}]`).join(', ')
+          Array.from(document.querySelectorAll('input')).map(i => `[id=${i.id}][name=${i.name}][type=${i.type}]`).join(', ')
         );
-        return {
-          error: `LOGIN_FORM_NOT_FOUND`,
-          url: afterLoginUrl,
-          title: afterLoginTitle,
-          bodyText,
-          allInputs,
-        };
+        return { error: 'LOGIN_FORM_NOT_FOUND', url: afterLoginUrl, bodyHtml, allInputs };
       }
 
-      console.log('[aguas] Selector RUT:', rutSel);
-
-      const claveSel = await waitForAny([
-        '#clave',
-        'input[type="password"]',
-      ], 5000) || 'input[type="password"]';
-
-      const submitSel = await waitForAny([
-        '#btn-submit-login',
-        'button[type="submit"]',
-        'input[type="submit"]',
-      ], 5000) || 'button[type="submit"]';
+      const claveSel = await waitForAny(['#clave', 'input[type="password"]'], 5000) || 'input[type="password"]';
+      const submitSel = await waitForAny(['#btn-submit-login', 'button[type="submit"]', 'input[type="submit"]'], 5000) || 'button[type="submit"]';
 
       await page.click(rutSel);
       await page.type(rutSel, RUT, { delay: 70 });
@@ -95,12 +67,15 @@ export default async function({ page }) {
       ]);
 
       if (page.url().includes('/login')) {
-        const bodyText = await page.evaluate(() => document.body?.innerText?.slice(0, 300));
-        return { error: 'LOGIN_FAILED', url: page.url(), bodyText };
+        // Capturar HTML para ver si hay CAPTCHA o error message
+        await new Promise(r => setTimeout(r, 2000));
+        const bodyHtml = await page.evaluate(() => document.body?.innerHTML?.slice(0, 2000) || 'EMPTY');
+        const bodyText = await page.evaluate(() => document.body?.innerText?.trim()?.slice(0, 500) || 'EMPTY');
+        return { error: 'LOGIN_FAILED', url: page.url(), bodyText, bodyHtml };
       }
     }
 
-    // ── 2. MIS CUENTAS ────────────────────────────────────────────────────────
+    // ── MIS CUENTAS ───────────────────────────────────────────────────────────
     await page.goto(BASE + '/web/aguasandinas/mis-cuentas', { waitUntil: 'networkidle2', timeout: 45000 });
     await new Promise(r => setTimeout(r, 5000));
 
@@ -110,8 +85,7 @@ export default async function({ page }) {
     for (let pgNum = 1; pgNum <= 3; pgNum++) {
       if (pgNum > 1) {
         const clicked = await page.evaluate((pn) => {
-          const links = Array.from(document.querySelectorAll('a.paginadoraa'));
-          const link  = links.find(l => l.textContent.trim() === String(pn));
+          const link = Array.from(document.querySelectorAll('a.paginadoraa')).find(l => l.textContent.trim() === String(pn));
           if (!link) return false;
           link.click();
           return true;
@@ -125,12 +99,12 @@ export default async function({ page }) {
         return rows.map((row, i) => {
           const cells = Array.from(row.querySelectorAll('td'));
           return {
-            idx:         i,
-            nroFactura:  cells[0]?.textContent?.trim() || '',
-            mes:         cells[1]?.textContent?.trim() || '',
+            idx: i,
+            nroFactura: cells[0]?.textContent?.trim() || '',
+            mes: cells[1]?.textContent?.trim() || '',
             vencimiento: cells[2]?.textContent?.trim() || '',
-            monto:       cells[3]?.textContent?.trim() || '',
-            estado:      cells[4]?.textContent?.trim() || '',
+            monto: cells[3]?.textContent?.trim() || '',
+            estado: cells[4]?.textContent?.trim() || '',
           };
         }).filter(b => b.nroFactura && /\d{6,}/.test(b.nroFactura));
       });
