@@ -19,8 +19,8 @@ const BROWSERLESS_HOSTS = [
   'https://production-lon.browserless.io',
 ];
 
-// Timeout generoso: login (~20s) + 36 boletas × ~5s + paginación = ~5 min
-const BROWSERLESS_TIMEOUT_MS = 300000;
+// Node-fetch socket timeout: 2 min (Browserless usa el default del plan)
+const NODE_FETCH_TIMEOUT_MS = 120000;
 
 function buildBrowserCode() {
   const tpl   = fs.readFileSync(path.join(__dirname, 'aguas-andinas-browser.js'), 'utf8');
@@ -41,14 +41,14 @@ async function scrapeAguasAndinas() {
 
   for (const host of BROWSERLESS_HOSTS) {
     try {
-      const url = `${host}/function?token=${token}&timeout=${BROWSERLESS_TIMEOUT_MS}`;
+      const url = `${host}/function?token=${token}`;
       console.log('[aguas] POST', host + '/function ...');
 
       const resp = await fetch(url, {
         method:  'POST',
         headers: { 'Content-Type': 'application/javascript' },
         body:    browserCode,
-        timeout: BROWSERLESS_TIMEOUT_MS + 30000, // Node-fetch socket timeout > Browserless timeout
+        timeout: NODE_FETCH_TIMEOUT_MS,
       });
 
       if (!resp.ok) {
