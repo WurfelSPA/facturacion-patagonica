@@ -3689,7 +3689,7 @@ function App(){
   /* ── PROCESAR ── */
   const procesar=useCallback(async()=>{
     if(!files.zip)return;
-    if(!xmlZipFileRef.current){notify("⚠ Primero sube el ZIP de XMLs (Facturas XML_PISA_AAAA-MM.zip)","warn");return;}
+    /* XML ZIP es opcional — se valida al momento de enviar si el cliente lo requiere */
     setShowProc(true);setProcDone(false);setProcLogs([]);setProcProgress(5);
     try{
       /* ── PASO 1: PLANILLA (opcional — puede no tener datos del mes) ── */
