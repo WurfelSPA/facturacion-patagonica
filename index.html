@@ -5139,18 +5139,10 @@ function App(){
                   row.estado==="missing"?h(Badge,{e:"missing",row}):
                   sent?h(Badge,{e:"sent_sheet",row}):
                   sending?h("span",{style:{color:"var(--blue)",fontSize:11,display:"inline-flex",alignItems:"center",gap:4}},h("span",{className:"spin"},"⟳")," Enviando..."):
-                  row.estado==="ok"&&!noEmail?h("div",{style:{display:"flex",alignItems:"center",gap:4}},
-                    h("button",{
-                      className:"btn-send",
-                      onClick:unlocked?()=>setPreview({row,idx:i}):()=>setShowPwdModal(true),
-                      title:unlocked?"Enviar correo":"Clave requerida para enviar",
-                      style:{opacity:unlocked?1:0.55,cursor:"pointer"}
-                    },"✉ "+(unlocked?"Enviar":"🔒")),
-                    h("button",{
-                      title:unlocked?"Marcar como enviado (sin reenviar correo)":"Desbloquear para marcar como enviado",
-                      style:{background:"var(--gbg)",border:"1px solid var(--gdim)",color:"var(--green)",borderRadius:6,padding:"3px 8px",fontSize:11,cursor:"pointer",fontWeight:700,lineHeight:1,opacity:unlocked?1:0.5},
-                      onClick:unlocked?(()=>{const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(i,key);if(row.sheetRow&&!MODO_PRUEBA){marcarEnviadoSheet(row.sheetRow,row.sentColLetter).catch(e=>console.warn("mark-sent:",e.message));}}):()=>setShowPwdModal(true)
-                    },"✓")
+                  row.estado==="ok"&&!noEmail?(
+                  unlocked
+                    ?h("button",{className:"btn-send",onClick:()=>setPreview({row,idx:i}),title:"Enviar correo"},"✉ Enviar")
+                    :h("span",{style:{fontSize:11,color:"var(--txd)",opacity:0.55,display:"inline-flex",alignItems:"center",gap:3,fontFamily:"'DM Sans',sans-serif"}},"✉ Sin enviar")
                   ):
                   h(Badge,{e:row.estado,row})
                 ),
