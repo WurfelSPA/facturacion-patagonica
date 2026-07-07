@@ -104,7 +104,10 @@ function splitPDFPages(buf) {
       if (bfsVisited.has(ref)) continue;
       bfsVisited.add(ref);
       const o = getObj(ref);
-      const subRefs = [...o.matchAll(/(\d+)\s+0\s+R/g)].map(r => parseInt(r[1]));
+      /* Solo escanear el diccionario, NO el stream binario (evita falsos matches en datos comprimidos que causan OOM) */
+      const streamStart = o.indexOf("stream");
+      const dictPart = streamStart > 0 ? o.slice(0, streamStart) : o;
+      const subRefs = [...dictPart.matchAll(/(\d+)\s+0\s+R/g)].map(r => parseInt(r[1]));
       for (const r2 of subRefs) {
         if (!needed.has(r2) && objOffsets[r2] != null) {
           needed.add(r2);
