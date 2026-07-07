@@ -1,10 +1,11 @@
 {
   "functions": {
-    "api/split-pdf.js": { "maxDuration": 300, "memory": 3008 },
-    "api/drive-pdf.js": { "maxDuration": 300, "memory": 3008 },
+    "api/split-pdf.js": { "maxDuration": 300 },
+    "api/drive-pdf.js": { "maxDuration": 300 },
     "api/historial-batch.js": { "maxDuration": 300 },
     "api/historial.js": { "includeFiles": "historial-excel-2026.json", "maxDuration": 120 },
-    "api/planilla.js": { "maxDuration": 60 }
+    "api/planilla.js": { "maxDuration": 60 },
+    "api/upload-aguas.js": { "maxDuration": 60 }
   },
   "crons": [
     { "path": "/api/planilla?addMonth=1", "schedule": "0 12 25 * *" }
