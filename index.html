@@ -5146,10 +5146,10 @@ function App(){
                       title:unlocked?"Enviar correo":"Clave requerida para enviar",
                       style:{opacity:unlocked?1:0.55,cursor:"pointer"}
                     },"✉ "+(unlocked?"Enviar":"🔒")),
-                    unlocked&&h("button",{
-                      title:"Marcar como enviado (sin reenviar correo)",
-                      style:{background:"var(--gbg)",border:"1px solid var(--gdim)",color:"var(--green)",borderRadius:6,padding:"3px 8px",fontSize:11,cursor:"pointer",fontWeight:700,lineHeight:1},
-                      onClick:()=>{const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(i,key);if(row.sheetRow&&!MODO_PRUEBA){marcarEnviadoSheet(row.sheetRow,row.sentColLetter).catch(e=>console.warn("mark-sent:",e.message));}}
+                    h("button",{
+                      title:unlocked?"Marcar como enviado (sin reenviar correo)":"Desbloquear para marcar como enviado",
+                      style:{background:"var(--gbg)",border:"1px solid var(--gdim)",color:"var(--green)",borderRadius:6,padding:"3px 8px",fontSize:11,cursor:"pointer",fontWeight:700,lineHeight:1,opacity:unlocked?1:0.5},
+                      onClick:unlocked?(()=>{const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(i,key);if(row.sheetRow&&!MODO_PRUEBA){marcarEnviadoSheet(row.sheetRow,row.sentColLetter).catch(e=>console.warn("mark-sent:",e.message));}}):()=>setShowPwdModal(true)
                     },"✓")
                   ):
                   h(Badge,{e:row.estado,row})
