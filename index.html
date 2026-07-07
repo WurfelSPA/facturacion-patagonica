@@ -635,7 +635,7 @@ async function parsePlanillaParaDashboard(file){
    PROCESAMIENTO DE BILLING
 ═══════════════════════════════════ */
 function buscarCol(dataRaw,desde,hasta,test){
-  /* Revisar filas 0-5: fila3 tiene fechas, fila4 puede tener sub-headers */
+  /* Revisar filas 0-5 para detectar headers dinámicamente */
   const hdrs=[dataRaw[0]||[],dataRaw[1]||[],dataRaw[2]||[],dataRaw[3]||[],dataRaw[4]||[],dataRaw[5]||[]];
   for(let j=desde;j<=hasta;j++){
     const vs=hdrs.map(r=>String(r[j]||"").trim().toLowerCase());
@@ -669,15 +669,11 @@ async function procesarPlanillaFacturacion(file,periodo){
   for(let i=64;i<fila3.length;i++){
     if(!esTargetMes(fila3[i]))continue;
     colGS=i;
-    /* GC: buscar header "gc" exacto — i+1 (≤abr-26) o i+2 (may-26+) */
     const gcCol=buscarCol(dataRaw,i+1,i+3,vs=>vs.some(v=>v==="gc"));
     colGT=gcCol!==-1?gcCol:i+1;
-    /* Correo Enviado: buscar header "enviado" */
     colEnviado=buscarCol(dataRaw,i+2,i+12,vs=>vs.some(v=>v.includes("enviado")));
-    /* Pagado: buscar header "pagado" */
     const envBase=colEnviado>0?colEnviado:i+4;
     colPagado=buscarCol(dataRaw,envBase+1,envBase+5,vs=>vs.some(v=>v.includes("pagado")));
-    console.log(\`[planilla] colGS=\${colGS}(\${colIndexToLetter(colGS)}) colGT=\${colGT}(\${colIndexToLetter(colGT)}) colEnviado=\${colEnviado}(\${colEnviado>0?colIndexToLetter(colEnviado):"—"}) colPagado=\${colPagado}(\${colPagado>0?colIndexToLetter(colPagado):"—"})\`);
     break;
   }
   if(colGS===-1)throw new Error(`No se encontró columna para ${periodo}. Verifica que la planilla tenga ese mes.`);
