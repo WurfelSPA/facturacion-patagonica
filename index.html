@@ -3415,6 +3415,8 @@ function App(){
   const [histClient,setHistClient]=useState(null);
   const [splitLoading,setSplitLoading]=useState(false);
   const [splitResult,setSplitResult]=useState(null);
+  const [pdfUploadNeeded,setPdfUploadNeeded]=useState(false);
+  const [pdfUploadLoading,setPdfUploadLoading]=useState(false);
   const [ufSII,setUfSII]=useState(null);
   const [histAnio,setHistAnio]=useState(2026);
   const [unlocked,setUnlocked]=useState(false);
@@ -3560,6 +3562,26 @@ function App(){
 
   /* Refs de control de flujo automático */
   const autoProcesado=React.useRef(false);
+  const handlePdfUpload=React.useCallback(async(e)=>{
+    const file=e.target.files[0];if(!file)return;
+    const [mesNombre,anio]=periodo.split(" ");
+    const mesNum=MES_STR[mesNombre];
+    const pdfNombre=`Facturas_PISA_${anio}-${mesNum}.pdf`;
+    setPdfUploadLoading(true);
+    try{
+      notify(`Subiendo ${pdfNombre} a Drive...`,"info");
+      const r1=await fetch("/api/storage",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({action:"upload-url",filename:pdfNombre,mimeType:"application/pdf",folderId:DRIVE_FACTURACION_FOLDER_ID})});
+      const d1=await r1.json();
+      if(!r1.ok)throw new Error(d1.error||"Error al iniciar subida");
+      const r2=await fetch(d1.uploadUrl,{method:"PUT",body:file,headers:{"Content-Type":"application/pdf"}});
+      if(!r2.ok)throw new Error("Error Drive "+r2.status);
+      notify("\u2713 PDF subido. Separando facturas...","ok");
+      setPdfUploadNeeded(false);setSplitResult(null);
+      splitPDF();
+    }catch(err){notify("Error al subir PDF: "+err.message,"err");}
+    finally{setPdfUploadLoading(false);}
+  },[periodo]);
   const autoNuboxRef=React.useRef(false);
   const periodoActivado=React.useRef(false);  /* true solo cuando el usuario elige período */
   useEffect(()=>{
@@ -3574,6 +3596,10 @@ function App(){
       autoProcesado.current=false;
       autoNuboxRef.current=false;
     }
+  },[view]);
+  /* Verificar Drive al entrar en vista facturación */
+  useEffect(()=>{
+    if(view==="upload"&&periodo&&zipStatus==="idle") buscarZip(periodo);
   },[view]);
 
   /* Auto-procesar cuando planilla OK + ZIP listo — solo si el usuario activó el período */
@@ -3946,6 +3972,7 @@ function App(){
       notify("✓ "+data.zipName+" descargado ("+data.totalFacturas+" facturas)","ok");
       buscarZip(periodo);
     }catch(e){
+      if(e.message.includes("Nubox:"))setPdfUploadNeeded(true);
       setSplitResult({error:e.message});
       notify("Error: "+e.message,"err");
     }finally{setSplitLoading(false);}
@@ -4901,7 +4928,7 @@ function App(){
           disabled:zipStatus==="loading"||zipStatus==="splitting"||splitLoading,
           onClick:()=>{
             periodoActivado.current=true;autoProcesado.current=false;autoNuboxRef.current=false;
-            setData([]);setCanGenerate(true);
+            setData([]);setCanGenerate(true);setPdfUploadNeeded(false);
             /* Llamar splitPDF() directamente para evitar el bug donde
                setZipStatus("missing") no dispara re-render si ya era "missing" */
             splitPDF();
@@ -5006,6 +5033,18 @@ function App(){
           onClick:()=>buscarZip(periodo),
           style:{fontSize:11,padding:"4px 12px",borderRadius:7,border:"1px solid var(--rdim)",background:"transparent",color:"var(--red)",cursor:"pointer"}
         },"\u21ba Reintentar"),
+        pdfUploadNeeded&&h("label",{
+          style:{display:"inline-flex",alignItems:"center",gap:8,
+            cursor:pdfUploadLoading?"not-allowed":"pointer",
+            background:"#fff8e1",border:"1px solid #f5c842",
+            borderRadius:8,padding:"5px 14px",fontSize:12,color:"#7c5c00",fontWeight:600,
+            opacity:pdfUploadLoading?0.6:1}
+        },
+          pdfUploadLoading?h("span",{className:"spin"},"⧗"):" 📄",
+          pdfUploadLoading?" Subiendo...":" Subir PDF de Nubox manualmente",
+          h("input",{type:"file",accept:".pdf",style:{display:"none"},
+            disabled:pdfUploadLoading,onChange:handlePdfUpload})
+        ),
         ),
       files.planilla
         ?h(LlenarPlanillaView,{periodo,planillaFile:files.planilla,embedded:true})
