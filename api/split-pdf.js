@@ -1,4 +1,5 @@
 export const config = { api: { bodyParser: true, responseLimit: '60mb' } };
+import { deflateRawSync, inflateSync } from 'node:zlib';
 
 // ── JWT / OAuth ──────────────────────────────────────────────────────────────
 async function signJWT(payload, privateKey) {
@@ -319,7 +320,7 @@ function getDecodedStreams(pdfBuf) {
   while ((m = re.exec(str)) !== null) streams.push(Buffer.from(m[1], "latin1"));
   const decoded = [];
   for (const s of streams) {
-    try { decoded.push(require("zlib").inflateSync(s).toString("latin1")); } catch {
+    try { decoded.push(inflateSync(s).toString("latin1")); } catch {
       const raw = s.toString("latin1");
       if (raw.includes("Tj") || raw.includes("TJ")) decoded.push(raw);
     }
@@ -419,7 +420,6 @@ export default async function handler(req, res) {
     const pdfBuf = await driveDownload(token, pdfFileId);
     console.log(`PDF: ${pdfBuf.length} bytes`);
 
-    const { deflateRawSync } = require("zlib"); // built-in: require() funciona en Vercel/esbuild
     // 2. Separar páginas y construir ZIP — una página a la vez (generator) para minimizar RAM.
     //    Cada pageBuf se comprime inmediatamente con zlib; sólo datos comprimidos se acumulan.
     const zipEntries = [];
