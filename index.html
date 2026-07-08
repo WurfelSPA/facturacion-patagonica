@@ -2425,7 +2425,17 @@ function CuentasServiciosView({dashData,driveLoading}){
       ),
       h("div",{style:{display:"flex",alignItems:"center",gap:8}},
         h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente, sitio, RUT...",style:{width:220}}),
-        h("button",{onClick:()=>window.print(),title:"Imprimir tabla",style:{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)",fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}},"🖨️ Imprimir")
+        h("button",{onClick:()=>window.print(),title:"Imprimir tabla",style:{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)",fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}},"🖨️ Imprimir"),
+        h("button",{onClick:()=>{
+          const HEADERS=["Sitio","Edificio","RUT","Cliente","Dirección","ID Aguas Andinas","Nº Medidor AA","ID Enel","Nº Medidor Enel"];
+          const rows=filtered.map(c=>[c.sitio||"",c.edificio||"",c.rut||"",c.isVacante?"VACANTE":(c.nombre||""),c.dir||"",c.idAgua||"",c.medAgua||"",c.idEnel||"",c.medEnel||""]);
+          const ws=XLSX.utils.aoa_to_sheet([HEADERS,...rows]);
+          /* Ancho de columnas automático según contenido */
+          ws["!cols"]=[{wch:8},{wch:24},{wch:14},{wch:32},{wch:36},{wch:18},{wch:16},{wch:14},{wch:16}];
+          const wb=XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb,"Cuentas Servicios",ws);
+          XLSX.writeFile(wb,"Cuentas_Servicios.xlsx");
+        },title:"Descargar Excel",style:{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,border:"1px solid #1d6f42",background:"#e8f5e9",color:"#1d6f42",fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}},"📥 Excel")
       )
     ),
     h("div",{style:{flex:1,overflowY:"auto",overflowX:"auto",minHeight:0}},
