@@ -60,17 +60,47 @@ function splitPDFPages(buf) {
     return end > off ? src.slice(off, end + 6) : src.slice(off, off + 4096);
   }
 
-  // 2. Encontrar el objeto Pages (catálogo)
+  // 2. Encontrar páginas — BFS desde /Catalog → /Pages (soporta árboles multi-nivel)
   function findPages() {
+    // Estrategia 1: desde /Catalog → raíz /Pages → BFS colectando sólo hojas /Page
     for (const num of Object.keys(objOffsets)) {
       const o = getObj(parseInt(num));
-      if (o.includes("/Type /Pages") || o.includes("/Type/Pages")) {
-        const kidsM = o.match(/\/Kids\s*\[([^\]]+)\]/);
-        if (kidsM) return kidsM[1].trim().split(/\s+R/).filter(s => s.trim())
-          .map(s => parseInt(s.trim().split(/\s+/)[0])).filter(n => !isNaN(n));
+      if (o.includes("/Type /Catalog") || o.includes("/Type/Catalog")) {
+        const m = o.match(/\/Pages\s+(\d+)\s+0\s+R/);
+        if (!m) continue;
+        const result = [];
+        const queue = [parseInt(m[1])];
+        const seen = new Set();
+        while (queue.length > 0) {
+          const ref = queue.shift();
+          if (seen.has(ref)) continue;
+          seen.add(ref);
+          const node = getObj(ref);
+          const isPages = node.includes("/Type /Pages") || node.includes("/Type/Pages");
+          // Nota: /Type/Pages contiene /Type/Page como subcadena → revisar isPages primero
+          const isPage = !isPages && (node.includes("/Type /Page") || node.includes("/Type/Page"));
+          if (isPage) { result.push(ref); continue; }
+          // Nodo intermedio Pages → expandir Kids
+          const kidsM = node.match(/\/Kids\s*\[([^\]]+)\]/);
+          if (kidsM) {
+            const kids = kidsM[1].trim().split(/\s+R/).filter(s => s.trim())
+              .map(s => parseInt(s.trim().split(/\s+/)[0])).filter(n => !isNaN(n));
+            queue.push(...kids);
+          }
+        }
+        if (result.length > 0) return result;
       }
     }
-    return [];
+    // Estrategia 2: escanear todos los objetos /Type/Page directamente (orden por posición)
+    const pages = [];
+    for (const num of Object.keys(objOffsets)) {
+      const n = parseInt(num);
+      const o = getObj(n);
+      const isPages = o.includes("/Type /Pages") || o.includes("/Type/Pages");
+      const isPage  = !isPages && (o.includes("/Type /Page") || o.includes("/Type/Page"));
+      if (isPage) pages.push(n);
+    }
+    return pages.sort((a, b) => objOffsets[a] - objOffsets[b]);
   }
 
   const pageNums = findPages();
