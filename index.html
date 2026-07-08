@@ -4874,8 +4874,9 @@ function App(){
           onClick:()=>{
             periodoActivado.current=true;autoProcesado.current=false;autoNuboxRef.current=false;
             setData([]);setCanGenerate(true);
-            /* Re-generar ZIP siempre: vaciar y dejar que auto-split useEffect llame splitPDF() */
-            setZipStatus("missing");
+            /* Llamar splitPDF() directamente para evitar el bug donde
+               setZipStatus("missing") no dispara re-render si ya era "missing" */
+            splitPDF();
           }
         },
           zipStatus==="loading"||zipStatus==="splitting"||splitLoading
