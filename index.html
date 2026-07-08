@@ -3902,7 +3902,9 @@ function App(){
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({pdfFileId,periodo:periodoCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID,userToken:await getToken().catch(()=>null)}),
       });
-      const data=await res.json();
+      const rawText=await res.text();
+      let data;
+      try{data=JSON.parse(rawText);}catch(_){throw new Error("split-pdf: error del servidor (HTTP "+res.status+") — intente de nuevo");}
       if(!res.ok)throw new Error(data.error||"Error desconocido");
       setSplitResult(data);
       if(data.zipBase64){
@@ -4871,7 +4873,7 @@ function App(){
           disabled:zipStatus==="loading"||zipStatus==="splitting"||splitLoading,
           onClick:()=>{
             periodoActivado.current=true;autoProcesado.current=false;autoNuboxRef.current=false;
-            setData([]);
+            setData([]);setCanGenerate(true);
             /* Re-generar ZIP siempre: vaciar y dejar que auto-split useEffect llame splitPDF() */
             setZipStatus("missing");
           }
@@ -4975,64 +4977,7 @@ function App(){
           onClick:()=>buscarZip(periodo),
           style:{fontSize:11,padding:"4px 12px",borderRadius:7,border:"1px solid var(--rdim)",background:"transparent",color:"var(--red)",cursor:"pointer"}
         },"\u21ba Reintentar"),
-        zipStatus==="missing"&&!canGenerate&&!splitLoading&&
-        h("label",{
-          style:{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,padding:"6px 16px",borderRadius:8,
-            border:"1px solid var(--adim)",background:"var(--abg)",color:"var(--amber)",cursor:"pointer",fontWeight:600}
-        },
-          h("input",{type:"file",accept:"application/pdf",style:{display:"none"},
-              onChange:async ev=>{
-                const file=ev.target.files[0]; if(!file)return;
-                setZipStatus("splitting");
-                try{
-                  const MN={"Enero":"01","Febrero":"02","Marzo":"03","Abril":"04","Mayo":"05","Junio":"06","Julio":"07","Agosto":"08","Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12"};
-                  const mesCode=`${periodo.split(" ")[1]}-${MN[periodo.split(" ")[0]]||"01"}`;
-                  const fileName=`Facturas_PISA_${mesCode}.pdf`;
-                  notify("Subiendo PDF a Drive...","info");
-                  // Subir PDF directo a Drive con OAuth del usuario (drive.file scope)
-                  const gToken=await getToken();
-                  const buf=await file.arrayBuffer();
-                  const meta=JSON.stringify({name:fileName,mimeType:"application/pdf",parents:[DRIVE_FACTURACION_FOLDER_ID]});
-                  const boundary="pdf_upload_boundary";
-                  const metaBytes=new TextEncoder().encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`);
-                  const endBytes=new TextEncoder().encode(`\r\n--${boundary}--`);
-                  const bodyBytes=new Uint8Array(metaBytes.length+buf.byteLength+endBytes.length);
-                  bodyBytes.set(metaBytes,0);bodyBytes.set(new Uint8Array(buf),metaBytes.length);bodyBytes.set(endBytes,metaBytes.length+buf.byteLength);
-                  const uploadResp=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{
-                    method:"POST",
-                    headers:{Authorization:`Bearer ${gToken}`,"Content-Type":`multipart/related; boundary=${boundary}`},
-                    body:bodyBytes
-                  });
-                  if(!uploadResp.ok){const t=await uploadResp.text();throw new Error("Drive upload error "+uploadResp.status+": "+t.slice(0,100));}
-                  const uploadJson=await uploadResp.json();
-                  const fileId=uploadJson.id;
-                  if(!fileId)throw new Error("Drive no devolvió fileId");
-                  notify("✓ PDF subido — separando facturas...","ok");
-                  setZipStatus("splitting");
-                  const splitCtrl=new AbortController();
-                  const splitTimeout=setTimeout(()=>splitCtrl.abort(),90000);
-                  let splitRes;
-                  try{splitRes=await fetch("/api/split-pdf",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pdfFileId:fileId,periodo:mesCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID,userToken:gToken}),signal:splitCtrl.signal});}
-                  finally{clearTimeout(splitTimeout);}
-                  const splitData=await splitRes.json();
-                  if(!splitRes.ok)throw new Error(splitData.error||"Error al separar PDF");
-                  notify("✓ "+splitData.totalFacturas+" facturas de "+periodo+" listas en Drive — procesando...","ok");
-                  /* ── Notificación Telegram al subir ── */
-                  try{
-                    const tgBot=window.__TG_BOT__;
-                    const tgChat=window.__TG_CHAT__;
-                    if(tgBot&&tgChat) await sendTelegram(tgBot,tgChat,`✅ Facturas PISA ${periodo} listas\n${splitData.totalFacturas} PDFs subidos a Drive.`);
-                  }catch(e){console.warn("Telegram notif error:",e.message);}
-                  /* ── Continuar automáticamente al reporte ── */
-                  periodoActivado.current=true;autoProcesado.current=false;
-                  buscarZip(periodo);
-                }catch(e){setZipStatus("error");setZipError(e.message);notify("Error: "+e.message,"err");}
-                ev.target.value="";
-              }
-            }),
-          "📄 Subir PDF manualmente"
-        )
-      ),
+        ),
       files.planilla
         ?h(LlenarPlanillaView,{periodo,planillaFile:files.planilla,embedded:true})
         :h("div",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--txd)",fontSize:13}},
