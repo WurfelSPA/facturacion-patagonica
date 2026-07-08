@@ -2433,7 +2433,7 @@ function CuentasServiciosView({dashData,driveLoading}){
           /* Ancho de columnas automático según contenido */
           ws["!cols"]=[{wch:8},{wch:24},{wch:14},{wch:32},{wch:36},{wch:18},{wch:16},{wch:14},{wch:16}];
           const wb=XLSX.utils.book_new();
-          XLSX.utils.book_append_sheet(wb,"Cuentas Servicios",ws);
+          XLSX.utils.book_append_sheet(wb,ws,"Cuentas Servicios");
           XLSX.writeFile(wb,"Cuentas_Servicios.xlsx");
         },title:"Descargar Excel",style:{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,border:"1px solid #1d6f42",background:"#e8f5e9",color:"#1d6f42",fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}},"📥 Excel")
       )

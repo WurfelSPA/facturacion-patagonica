@@ -446,20 +446,8 @@ export default async function handler(req, res) {
     let usedCustomSplit = true;
     let pageBufs = splitPDFPages(pdfBuf);
     if (!pageBufs || pageBufs.length === 0) {
-      // Fallback a pdf-lib solo si el parser mínimo falla (PDF no estándar)
-      console.log("splitPDFPages sin resultado, fallback a pdf-lib");
-      usedCustomSplit = false;
-      const srcDocFb = await PDFDocument.load(pdfBuf, { ignoreEncryption: true });
-      const totalPagesFb = srcDocFb.getPageCount();
-      pageBufs = [];
-      for (let i = 0; i < totalPagesFb; i++) {
-        const singleDoc = await PDFDocument.create();
-        const [copiedPage] = await singleDoc.copyPages(srcDocFb, [i]);
-        singleDoc.addPage(copiedPage);
-        pageBufs.push(Buffer.from(await singleDoc.save()));
-      }
+      throw new Error("splitPDFPages: no se encontraron páginas — el PDF puede estar corrupto o tener estructura no estándar");
     }
-    if (pageBufs.length === 0) throw new Error("No se pudieron separar las páginas del PDF");
     console.log(`Páginas separadas: ${pageBufs.length} (método: ${usedCustomSplit ? "custom-minimal" : "pdf-lib-fallback"})`);
 
     // 3. Extraer texto de cada página via regex sobre streams binarios
