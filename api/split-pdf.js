@@ -1,5 +1,3 @@
-import { deflateRawSync } from "zlib";
-
 export const config = { api: { bodyParser: true, responseLimit: '60mb' } };
 
 // ── JWT / OAuth ──────────────────────────────────────────────────────────────
@@ -421,6 +419,7 @@ export default async function handler(req, res) {
     const pdfBuf = await driveDownload(token, pdfFileId);
     console.log(`PDF: ${pdfBuf.length} bytes`);
 
+    const { deflateRawSync } = require("zlib"); // built-in: require() funciona en Vercel/esbuild
     // 2. Separar páginas y construir ZIP — una página a la vez (generator) para minimizar RAM.
     //    Cada pageBuf se comprime inmediatamente con zlib; sólo datos comprimidos se acumulan.
     const zipEntries = [];
