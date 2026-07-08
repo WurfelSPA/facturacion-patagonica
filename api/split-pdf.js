@@ -410,23 +410,21 @@ export default async function handler(req, res) {
     const pdfBuf = await driveDownload(token, pdfFileId);
     console.log(`PDF: ${pdfBuf.length} bytes`);
 
-    // 2. Separar páginas — splitPDFPages crea PDFs mínimos (~50-100 KB c/u)
-    //    pdf-lib se carga SOLO para extracción de texto (CMap/streams)
-    //    Usar pdf-lib copyPages generaría PDFs de 5-10 MB cada uno (hereda
-    //    todos los recursos del doc completo) → ZIPs de 500+ MB → timeout.
-    const srcDoc = await PDFDocument.load(pdfBuf, { ignoreEncryption: true });
-    const totalPages = srcDoc.getPageCount();
-    console.log(`Páginas a separar: ${totalPages}`);
+    // 2. Separar páginas — custom parser SIN pdf-lib en ruta principal.
+    //    pdf-lib solo se carga como fallback si el parser mínimo falla.
+    //    Cargar pdf-lib + splitPDFPages simultáneamente duplicaba RAM → OOM.
     let usedCustomSplit = true;
     let pageBufs = splitPDFPages(pdfBuf);
     if (!pageBufs || pageBufs.length === 0) {
-      // Fallback a pdf-lib si el parser mínimo falla (PDF no estándar)
+      // Fallback a pdf-lib solo si el parser mínimo falla (PDF no estándar)
       console.log("splitPDFPages sin resultado, fallback a pdf-lib");
       usedCustomSplit = false;
+      const srcDocFb = await PDFDocument.load(pdfBuf, { ignoreEncryption: true });
+      const totalPagesFb = srcDocFb.getPageCount();
       pageBufs = [];
-      for (let i = 0; i < totalPages; i++) {
+      for (let i = 0; i < totalPagesFb; i++) {
         const singleDoc = await PDFDocument.create();
-        const [copiedPage] = await singleDoc.copyPages(srcDoc, [i]);
+        const [copiedPage] = await singleDoc.copyPages(srcDocFb, [i]);
         singleDoc.addPage(copiedPage);
         pageBufs.push(Buffer.from(await singleDoc.save()));
       }
@@ -434,17 +432,14 @@ export default async function handler(req, res) {
     if (pageBufs.length === 0) throw new Error("No se pudieron separar las páginas del PDF");
     console.log(`Páginas separadas: ${pageBufs.length} (método: ${usedCustomSplit ? "custom-minimal" : "pdf-lib-fallback"})`);
 
-    // 3. CMap desde el PDF ya parseado (sin regex sobre bytes crudos — rápido)
-    const globalCMap = buildCMapFromDoc(srcDoc);
-    console.log(`CMap global: ${Object.keys(globalCMap).length} entradas`);
-
-    // Extraer texto vía content streams del srcDoc (O(streams/página), garantiza alineación)
+    // 3. Extraer texto de cada página via regex sobre streams binarios
+    //    (sin pdf-lib: ahorra 100-200 MB RAM; extractText() usa CMap embebido en cada pageBuf)
     const zip = new JSZip();
     const sinCod = [];
     const breakdown = {};
 
     for (let i = 0; i < pageBufs.length; i++) {
-      const text = extractPageText(srcDoc, i, globalCMap);
+      const text = extractText(pageBufs[i]);
       const cod = detectCod(text);
       const nro = detectNro(text);
 
