@@ -2,3 +2,12 @@
 .env*
 node_modules/
 render-service/node_modules/
+
+# Archivos temporales de Excel (lock files)
+.~lock.*#
+~$*.xlsx
+~$*.xls
+
+# Archivos de datos generados (no deben versionarse)
+historial-*.xlsx
+historial-*.json
