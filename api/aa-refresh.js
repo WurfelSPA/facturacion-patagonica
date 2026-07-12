@@ -68,26 +68,21 @@ function buildBrowserlessScript(rut, clave) {
 
       if (!accountLinks.length) throw new Error('No se encontraron cuentas');
 
-      // 5. Scrapear deuda de cada cuenta en lotes de 3
-      const BATCH = 3;
-      for (let i = 0; i < accountLinks.length; i += BATCH) {
-        const batch = accountLinks.slice(i, i + BATCH);
-        await Promise.all(batch.map(async (link) => {
-          try {
-            const r = await fetch(link.href, { credentials: 'include', redirect: 'follow' });
-            const html = await r.text();
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            const deuda = doc.querySelector('span.total_deuda')?.textContent?.trim() || '$0';
-            const divText = doc.querySelector('#divmonto')?.innerText || '';
-            const fecha = (divText.match(/\\d{2}\\/\\d{2}\\/\\d{4}/) || [])[0] || null;
-            results[link.id] = { deuda, vencimiento: fecha };
-          } catch (e) {
-            results[link.id] = { deuda: null, error: e.message };
-          }
-        }));
-        // Pausa entre lotes
-        await new Promise(r => setTimeout(r, 500));
+      // 5. Scrapear deuda de cada cuenta con page.goto() (navegación real)
+      // IMPORTANTE: fetch() siempre retorna la cuenta activa sin cambiarla.
+      // Se debe navegar con page.goto() para que Liferay cambie la cuenta en sesión.
+      for (const link of accountLinks) {
+        try {
+          await page.goto(link.href, { waitUntil: 'networkidle2', timeout: 30000 });
+          const deuda = await page.$eval('span.total_deuda', el => el.textContent.trim()).catch(() => '$0');
+          const divText = await page.$eval('#divmonto', el => el.innerText).catch(() => '');
+          const fecha = (divText.match(/\\d{2}\\/\\d{2}\\/\\d{4}/) || [])[0] || null;
+          results[link.id] = { deuda, vencimiento: fecha };
+        } catch (e) {
+          results[link.id] = { deuda: null, error: e.message };
+        }
+        // Pausa mínima entre cuentas
+        await new Promise(r => setTimeout(r, 300));
       }
 
       return { accounts: results, total: Object.keys(results).length };
@@ -177,6 +172,7 @@ export default async function handler(req, res) {
     console.log(`[aa-refresh] Scraping OK: ${blData.total} cuentas`);
 
     const cacheData = {
+      ok: true,
       updatedAt: new Date().toISOString(),
       source: 'browserless',
       accounts: blData.accounts
@@ -198,3 +194,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ ok: false, error: e.message });
   }
 }
+                                                                                                 
