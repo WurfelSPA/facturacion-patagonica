@@ -133,6 +133,14 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 .user-dropdown button{display:flex;align-items:center;gap:8px;width:100%;padding:9px 12px;border:none;background:transparent;text-align:left;font-size:12px;font-weight:500;color:var(--tx);cursor:pointer;font-family:'DM Sans',sans-serif;}
 .user-dropdown button:hover{background:var(--surf2);}
 .user-dropdown button.danger{color:#e53935;}
+@media print{
+  .sidebar{display:none!important;}
+  header{position:relative!important;}
+  #root>div{display:block!important;overflow:visible!important;height:auto!important;}
+  main{overflow:visible!important;height:auto!important;max-height:none!important;flex:none!important;display:block!important;}
+  main>div{overflow:visible!important;height:auto!important;max-height:none!important;flex:none!important;}
+  .fade-up{animation:none!important;}
+}
 </style>
 </head>
 <body>
@@ -2385,8 +2393,34 @@ function ContratosView({dashData,driveLoading}){
 ══════════════════════════════════════════════════════════ */
 function CuentasServiciosView({dashData,driveLoading}){
   const [search,setSearch]=useState("");
-  const [sortCol,setSortCol]=useState(null);
-  const [sortDir,setSortDir]=useState("asc");
+  useEffect(()=>{
+    function beforePrint(){
+      document.querySelectorAll('main,main>div,#root>div').forEach(el=>{
+        el.dataset.pOvY=el.style.overflowY||'';
+        el.dataset.pOvX=el.style.overflowX||'';
+        el.dataset.pH=el.style.height||'';
+        el.dataset.pMH=el.style.maxHeight||'';
+        el.dataset.pF=el.style.flex||'';
+        el.style.overflowY='visible';
+        el.style.overflowX='visible';
+        el.style.height='auto';
+        el.style.maxHeight='none';
+        el.style.flex='none';
+      });
+    }
+    function afterPrint(){
+      document.querySelectorAll('main,main>div,#root>div').forEach(el=>{
+        el.style.overflowY=el.dataset.pOvY||'';
+        el.style.overflowX=el.dataset.pOvX||'';
+        el.style.height=el.dataset.pH||'';
+        el.style.maxHeight=el.dataset.pMH||'';
+        el.style.flex=el.dataset.pF||'';
+      });
+    }
+    window.addEventListener('beforeprint',beforePrint);
+    window.addEventListener('afterprint',afterPrint);
+    return()=>{window.removeEventListener('beforeprint',beforePrint);window.removeEventListener('afterprint',afterPrint);};
+  },[]);
   const normQ=s=>(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," ").trim();
   const clientes=dashData
     ?(()=>{
@@ -2397,45 +2431,25 @@ function CuentasServiciosView({dashData,driveLoading}){
       })()
     :[];
   const q=normQ(search);
-  let filtered=!q?clientes:clientes.filter(c=>
+  const filtered=!q?clientes:clientes.filter(c=>
     normQ(c.nombre).includes(q)||normQ(c.sitio).includes(q)||normQ(c.edificio).includes(q)||
     (c.rut&&c.rut.replace(/[.\-]/g,"").includes(q.replace(/[.\-]/g,"")))
   );
-  /* Ordenamiento por columna */
-  const COL_FIELD={"Sitio":c=>c.sitio||"","Edificio":c=>c.edificio||"","RUT":c=>c.rut||"","Cliente":c=>c.nombre||"","Dirección":c=>c.dir||"","ID Aguas Andinas":c=>c.idAgua||"","N° Medidor AA":c=>c.medAgua||"","ID Enel":c=>c.idEnel||"","N° Medidor Enel":c=>c.medEnel||""};
-  if(sortCol&&COL_FIELD[sortCol]){
-    const get=COL_FIELD[sortCol];
-    filtered=[...filtered].sort((a,b)=>{
-      const va=normQ(get(a)),vb=normQ(get(b));
-      return sortDir==="asc"?va.localeCompare(vb,"es"):vb.localeCompare(va,"es");
-    });
-  }
-  const toggleSort=col=>{if(sortCol===col)setSortDir(d=>d==="asc"?"desc":"asc");else{setSortCol(col);setSortDir("asc");}};
   if(!dashData)return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,overflow:"hidden",minHeight:0}},
     driveLoading
-      ?h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},h("span",{className:"spin",style:{fontSize:18}},"⦳"),"Cargando planilla desde Drive...")
-      :h("div",{style:{fontSize:13,color:"var(--txd)"}},"Sin datos — carga la planilla de facturación")
+      ?h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},h("span",{className:"spin",style:{fontSize:18}},"\u29B3"),"Cargando planilla desde Drive...")
+      :h("div",{style:{fontSize:13,color:"var(--txd)"}},"Sin datos \u2014 carga la planilla de facturac\u00e9n")
   );
-  const COLS=["Sitio","Edificio","RUT","Cliente","Dirección","ID Aguas Andinas","N° Medidor AA","ID Enel","N° Medidor Enel"];
+  const COLS=["Sitio","Edificio","RUT","Cliente","Direcci\u00f3n","ID Aguas Andinas","N\u00b0 Medidor AA","ID Enel","N\u00b0 Medidor Enel"];
   return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up"},
     h("div",{style:{padding:"14px 24px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,flexShrink:0,borderBottom:"1px solid var(--bdr)"}},
       h("div",{style:{display:"flex",alignItems:"center",gap:8}},
-        h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"🔌 CUENTAS DE SERVICIOS"),
+        h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"\uD83D\uDD0C CUENTAS DE SERVICIOS"),
         h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},filtered.length+" / "+clientes.length)
       ),
       h("div",{style:{display:"flex",alignItems:"center",gap:8}},
         h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente, sitio, RUT...",style:{width:220}}),
-        h("button",{onClick:()=>window.print(),title:"Imprimir tabla",style:{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)",fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}},"🖨️ Imprimir"),
-        h("button",{onClick:()=>{
-          const HEADERS=["Sitio","Edificio","RUT","Cliente","Dirección","ID Aguas Andinas","Nº Medidor AA","ID Enel","Nº Medidor Enel"];
-          const rows=filtered.map(c=>[c.sitio||"",c.edificio||"",c.rut||"",c.isVacante?"VACANTE":(c.nombre||""),c.dir||"",c.idAgua||"",c.medAgua||"",c.idEnel||"",c.medEnel||""]);
-          const ws=XLSX.utils.aoa_to_sheet([HEADERS,...rows]);
-          /* Ancho de columnas automático según contenido */
-          ws["!cols"]=[{wch:8},{wch:24},{wch:14},{wch:32},{wch:36},{wch:18},{wch:16},{wch:14},{wch:16}];
-          const wb=XLSX.utils.book_new();
-          XLSX.utils.book_append_sheet(wb,ws,"Cuentas Servicios");
-          XLSX.writeFile(wb,"Cuentas_Servicios.xlsx");
-        },title:"Descargar Excel",style:{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,border:"1px solid #1d6f42",background:"#e8f5e9",color:"#1d6f42",fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}},"📥 Excel")
+        h("button",{onClick:()=>window.print(),title:"Imprimir tabla completa",style:{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)",fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}},"🖨️ Imprimir")
       )
     ),
     h("div",{style:{flex:1,overflowY:"auto",overflowX:"auto",minHeight:0}},
@@ -2446,30 +2460,26 @@ function CuentasServiciosView({dashData,driveLoading}){
           :h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
               h("thead",null,
                 h("tr",{style:{background:"#f0f4f8",position:"sticky",top:0,zIndex:2}},
-                  COLS.map(col=>{
-                    const active=sortCol===col;
-                    const arrow=active?(sortDir==="asc"?" ▲":" ▼"):" ⇅";
-                    return h("th",{key:col,onClick:()=>toggleSort(col),style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:active?"var(--acc)":"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap",background:"#f0f4f8",cursor:"pointer",userSelect:"none",transition:"color .15s"}},col.toUpperCase()+arrow);
-                  })
+                  COLS.map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap",background:"#f0f4f8"}},col.toUpperCase()))
                 )
               ),
               h("tbody",null,
                 filtered.map((c,i)=>{
                   const sCol=SITIO_C[c.sitio]||"#888";
                   return h("tr",{key:c.rut+"|"+c.sitio+"|"+c.edificio+i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"var(--surf2)"}},
-                    h("td",{style:{padding:"9px 12px"}},h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},c.sitio||"—")),
-                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)"}},c.edificio||"—"),
-                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txd)"}},c.rut||"—"),
+                    h("td",{style:{padding:"9px 12px"}},h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},c.sitio||"\u2014")),
+                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)"}},c.edificio||"\u2014"),
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txd)"}},c.rut||"\u2014"),
                     h("td",{style:{padding:"9px 12px",fontWeight:600,fontSize:11,maxWidth:200}},
                       c.isVacante
                         ?h("span",{style:{padding:"2px 8px",borderRadius:6,fontSize:10,fontWeight:700,background:"var(--abg)",color:"var(--amber)",border:"1px solid var(--adim)"}},"VACANTE")
                         :c.nombre
                     ),
-                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",maxWidth:220}},c.dir||"—"),
-                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:c.idAgua?"var(--tx)":"var(--bdr)"}},c.idAgua||"—"),
-                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:c.medAgua?"var(--tx)":"var(--bdr)"}},c.medAgua||"—"),
-                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:c.idEnel?"var(--tx)":"var(--bdr)"}},c.idEnel||"—"),
-                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:c.medEnel?"var(--tx)":"var(--bdr)"}},c.medEnel||"—")
+                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",maxWidth:220}},c.dir||"\u2014"),
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:c.idAgua?"var(--tx)":"var(--bdr)"}},c.idAgua||"\u2014"),
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:c.medAgua?"var(--tx)":"var(--bdr)"}},c.medAgua||"\u2014"),
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:c.idEnel?"var(--tx)":"var(--bdr)"}},c.idEnel||"\u2014"),
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:c.medEnel?"var(--tx)":"var(--bdr)"}},c.medEnel||"\u2014")
                   );
                 })
               )
@@ -2477,6 +2487,7 @@ function CuentasServiciosView({dashData,driveLoading}){
     )
   );
 }
+
 /* ═══════════════════════════════════
    APP PRINCIPAL
 ═══════════════════════════════════ */
@@ -3415,8 +3426,6 @@ function App(){
   const [histClient,setHistClient]=useState(null);
   const [splitLoading,setSplitLoading]=useState(false);
   const [splitResult,setSplitResult]=useState(null);
-  const [pdfUploadNeeded,setPdfUploadNeeded]=useState(false);
-  const [pdfUploadLoading,setPdfUploadLoading]=useState(false);
   const [ufSII,setUfSII]=useState(null);
   const [histAnio,setHistAnio]=useState(2026);
   const [unlocked,setUnlocked]=useState(false);
@@ -3562,26 +3571,6 @@ function App(){
 
   /* Refs de control de flujo automático */
   const autoProcesado=React.useRef(false);
-  const handlePdfUpload=React.useCallback(async(e)=>{
-    const file=e.target.files[0];if(!file)return;
-    const [mesNombre,anio]=periodo.split(" ");
-    const mesNum=MES_STR[mesNombre];
-    const pdfNombre=`Facturas_PISA_${anio}-${mesNum}.pdf`;
-    setPdfUploadLoading(true);
-    try{
-      notify(`Subiendo ${pdfNombre} a Drive...`,"info");
-      const r1=await fetch("/api/storage",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({action:"upload-url",filename:pdfNombre,mimeType:"application/pdf",folderId:DRIVE_FACTURACION_FOLDER_ID})});
-      const d1=await r1.json();
-      if(!r1.ok)throw new Error(d1.error||"Error al iniciar subida");
-      const r2=await fetch(d1.uploadUrl,{method:"PUT",body:file,headers:{"Content-Type":"application/pdf"}});
-      if(!r2.ok)throw new Error("Error Drive "+r2.status);
-      notify("\u2713 PDF subido. Separando facturas...","ok");
-      setPdfUploadNeeded(false);setSplitResult(null);
-      splitPDF();
-    }catch(err){notify("Error al subir PDF: "+err.message,"err");}
-    finally{setPdfUploadLoading(false);}
-  },[periodo]);
   const autoNuboxRef=React.useRef(false);
   const periodoActivado=React.useRef(false);  /* true solo cuando el usuario elige período */
   useEffect(()=>{
@@ -3596,10 +3585,6 @@ function App(){
       autoProcesado.current=false;
       autoNuboxRef.current=false;
     }
-  },[view]);
-  /* Verificar Drive al entrar en vista facturación */
-  useEffect(()=>{
-    if(view==="upload"&&periodo&&zipStatus==="idle") buscarZip(periodo);
   },[view]);
 
   /* Auto-procesar cuando planilla OK + ZIP listo — solo si el usuario activó el período */
@@ -3972,7 +3957,6 @@ function App(){
       notify("✓ "+data.zipName+" descargado ("+data.totalFacturas+" facturas)","ok");
       buscarZip(periodo);
     }catch(e){
-      if(e.message.includes("Nubox:"))setPdfUploadNeeded(true);
       setSplitResult({error:e.message});
       notify("Error: "+e.message,"err");
     }finally{setSplitLoading(false);}
@@ -4928,7 +4912,7 @@ function App(){
           disabled:zipStatus==="loading"||zipStatus==="splitting"||splitLoading,
           onClick:()=>{
             periodoActivado.current=true;autoProcesado.current=false;autoNuboxRef.current=false;
-            setData([]);setCanGenerate(true);setPdfUploadNeeded(false);
+            setData([]);setCanGenerate(true);
             /* Llamar splitPDF() directamente para evitar el bug donde
                setZipStatus("missing") no dispara re-render si ya era "missing" */
             splitPDF();
@@ -5033,18 +5017,6 @@ function App(){
           onClick:()=>buscarZip(periodo),
           style:{fontSize:11,padding:"4px 12px",borderRadius:7,border:"1px solid var(--rdim)",background:"transparent",color:"var(--red)",cursor:"pointer"}
         },"\u21ba Reintentar"),
-        pdfUploadNeeded&&h("label",{
-          style:{display:"inline-flex",alignItems:"center",gap:8,
-            cursor:pdfUploadLoading?"not-allowed":"pointer",
-            background:"#fff8e1",border:"1px solid #f5c842",
-            borderRadius:8,padding:"5px 14px",fontSize:12,color:"#7c5c00",fontWeight:600,
-            opacity:pdfUploadLoading?0.6:1}
-        },
-          pdfUploadLoading?h("span",{className:"spin"},"⧗"):" 📄",
-          pdfUploadLoading?" Subiendo...":" Subir PDF de Nubox manualmente",
-          h("input",{type:"file",accept:".pdf",style:{display:"none"},
-            disabled:pdfUploadLoading,onChange:handlePdfUpload})
-        ),
         ),
       files.planilla
         ?h(LlenarPlanillaView,{periodo,planillaFile:files.planilla,embedded:true})

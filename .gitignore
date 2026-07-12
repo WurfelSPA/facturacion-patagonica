@@ -1,2 +1,4 @@
 .vercel
 .env*
+node_modules/
+render-service/node_modules/
