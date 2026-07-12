@@ -283,6 +283,20 @@ export default async function handler(req, res) {
   const results = [];
   const errors  = [];
 
+  // Modo debug: retorna el HTML del login para diagnosticar
+  if (req.body?.debug) {
+    const r = await fetch(`${BASE}${LOGIN_PATH}`, { headers: { 'User-Agent': UA } });
+    const html = await r.text();
+    return res.status(200).json({
+      status: r.status,
+      htmlLen: html.length,
+      htmlStart: html.slice(0, 1500),
+      allActions: (html.match(/action="[^"]+"/gi) || []).slice(0, 10),
+      hasRutField: html.includes('LoginPortlet_rut'),
+      hasReese84: html.includes('reese84') || html.includes('Imperva'),
+    });
+  }
+
   try {
     // Login único para toda la sesión
     console.log('[aguas-andinas] Iniciando sesión...');
