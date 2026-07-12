@@ -2393,11 +2393,12 @@ function ContratosView({dashData,driveLoading}){
 ══════════════════════════════════════════════════════════ */
 function CuentasServiciosView({dashData,driveLoading}){
   const [search,setSearch]=useState("");
-  const [aaData,setAaData]=useState({});   /* { idAgua: { deuda, vencimiento, ultimaBoleta } } */
+  const [aaData,setAaData]=useState({});
   const [aaLoading,setAaLoading]=useState(false);
+  const [aaProgress,setAaProgress]=useState({done:0,total:0});
   const [aaError,setAaError]=useState(null);
 
-  /* Fetch automático de datos AA cuando la planilla está cargada */
+  /* Fetch automático en lotes de 10 cuentas, con progreso */
   useEffect(()=>{
     if(!dashData)return;
     const cuentas=[...new Set(
@@ -2405,25 +2406,47 @@ function CuentasServiciosView({dashData,driveLoading}){
         .map(c=>c.idAgua).filter(Boolean)
     )];
     if(!cuentas.length)return;
-    setAaLoading(true);
-    setAaError(null);
-    fetch("/api/aguas-andinas",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({cuentas})
-    })
-    .then(r=>r.json())
-    .then(data=>{
-      if(data.ok&&data.results){
-        const map={};
-        for(const r of data.results) map[r.idAgua]=r;
-        setAaData(map);
-      } else {
-        setAaError(data.error||"Error desconocido");
+
+    let cancelled=false;
+    const BATCH=10;
+    const batches=[];
+    for(let i=0;i<cuentas.length;i+=BATCH) batches.push(cuentas.slice(i,i+BATCH));
+
+    (async()=>{
+      setAaLoading(true);
+      setAaError(null);
+      setAaProgress({done:0,total:cuentas.length});
+      const map={};
+      let lastError=null;
+
+      for(const batch of batches){
+        if(cancelled)break;
+        try{
+          const r=await fetch("/api/aguas-andinas",{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({cuentas:batch})
+          });
+          const data=await r.json();
+          if(data.ok&&data.results){
+            for(const res of data.results) map[res.idAgua]=res;
+            setAaData({...map});
+          } else {
+            lastError=data.error||"Error del servidor AA";
+          }
+        }catch(e){
+          lastError=e.message;
+        }
+        setAaProgress(p=>({...p,done:p.done+batch.length}));
       }
-    })
-    .catch(e=>setAaError(e.message))
-    .finally(()=>setAaLoading(false));
+
+      if(!cancelled){
+        setAaLoading(false);
+        if(lastError&&Object.keys(map).length===0) setAaError(lastError);
+      }
+    })();
+
+    return()=>{cancelled=true;};
   },[dashData]);
 
   useEffect(()=>{
@@ -2479,8 +2502,14 @@ function CuentasServiciosView({dashData,driveLoading}){
       h("div",{style:{display:"flex",alignItems:"center",gap:8}},
         h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"\uD83D\uDD0C CUENTAS DE SERVICIOS"),
         h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},filtered.length+" / "+clientes.length),
-        aaLoading&&h("span",{style:{fontSize:10,color:"var(--txm)",display:"flex",alignItems:"center",gap:4}},h("span",{className:"spin",style:{fontSize:12}},"\u29B3"),"Consultando Aguas Andinas..."),
-        aaError&&h("span",{style:{fontSize:10,color:"var(--err)",cursor:"default"},title:"Error AA: "+aaError},"\u26A0\uFE0F Error AA")
+        aaLoading&&h("div",{style:{display:"flex",alignItems:"center",gap:6}},
+          h("div",{style:{width:100,height:6,borderRadius:3,background:"var(--bdr)",overflow:"hidden"}},
+            h("div",{style:{height:"100%",borderRadius:3,background:"var(--accent)",width:aaProgress.total?Math.round(aaProgress.done/aaProgress.total*100)+"%":"10%",transition:"width .4s ease"}})
+          ),
+          h("span",{style:{fontSize:10,color:"var(--txm)",whiteSpace:"nowrap"}},
+            aaProgress.total?`AA ${aaProgress.done}/${aaProgress.total}`:"Conectando...")
+        ),
+        !aaLoading&&aaError&&h("span",{style:{fontSize:10,color:"var(--err)",cursor:"default"},title:aaError},"\u26A0\uFE0F Error AA")
       ),
       h("div",{style:{display:"flex",alignItems:"center",gap:8}},
         h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente, sitio, RUT...",style:{width:220}}),
@@ -2516,29 +2545,26 @@ function CuentasServiciosView({dashData,driveLoading}){
                     h("td",{style:{padding:"9px 12px",fontSize:10,fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap"}},
                       !c.idAgua
                         ?h("span",{style:{color:"var(--bdr)"}},"\u2014")
-                        :aaLoading
-                          ?h("span",{style:{color:"var(--txd)",fontSize:9}},"\u29b3 cargando...")
-                          :aaError
-                            ?h("span",{style:{color:"var(--err)",fontSize:9}},"\u26a0")
-                            :(()=>{const d=aaData[c.idAgua];return d
-                              ?h("span",{style:{color:d.deuda&&d.deuda!=="$0"?"#dc2626":"var(--txm)",fontWeight:d.deuda&&d.deuda!=="$0"?700:400}},d.deuda||"\u2014")
-                              :h("span",{style:{color:"var(--bdr)"}},"\u2014");
-                            })()
+                        :(()=>{
+                          const d=aaData[c.idAgua];
+                          if(d) return h("span",{style:{color:d.deuda&&d.deuda!=="$0"?"#dc2626":"var(--txm)",fontWeight:d.deuda&&d.deuda!=="$0"?700:400}},d.deuda||"\u2014");
+                          if(aaLoading) return h("span",{style:{color:"var(--bdr)",fontSize:9}},"\u00b7\u00b7\u00b7");
+                          if(aaError) return h("span",{style:{color:"var(--err)",fontSize:9}},"\u26a0");
+                          return h("span",{style:{color:"var(--bdr)"}},"\u2014");
+                        })()
                     ),
                     h("td",{style:{padding:"9px 12px",fontSize:10,whiteSpace:"nowrap"}},
                       !c.idAgua
                         ?h("span",{style:{color:"var(--bdr)"}},"\u2014")
-                        :aaLoading
-                          ?h("span",{style:{color:"var(--txd)",fontSize:9}},"\u29b3")
-                          :aaError
-                            ?h("span",{style:{color:"var(--err)",fontSize:9}},"\u26a0")
-                            :(()=>{const d=aaData[c.idAgua];const b=d?.ultimaBoleta;return b?.sovosUrl
-                              ?h("a",{href:b.sovosUrl,target:"_blank",rel:"noopener",title:`${b.mes} \u2014 ${b.monto} (${b.estado})`,style:{display:"inline-flex",alignItems:"center",gap:4,color:"var(--accent)",textDecoration:"none",fontSize:10}},
-                                "\ud83d\udcc4 ",h("span",null,b.mes||"PDF"))
-                              :b
-                                ?h("span",{style:{color:"var(--txd)",fontSize:9}},b.mes||"\u2014")
-                                :h("span",{style:{color:"var(--bdr)"}},"\u2014");
-                            })()
+                        :(()=>{
+                          const d=aaData[c.idAgua];
+                          const b=d?.ultimaBoleta;
+                          if(b?.sovosUrl) return h("a",{href:b.sovosUrl,target:"_blank",rel:"noopener",title:`${b.mes} \u2014 ${b.monto} (${b.estado})`,style:{display:"inline-flex",alignItems:"center",gap:4,color:"var(--accent)",textDecoration:"none",fontSize:10}},"\ud83d\udcc4 ",h("span",null,b.mes||"PDF"));
+                          if(b) return h("span",{style:{color:"var(--txd)",fontSize:9}},b.mes||"\u2014");
+                          if(aaLoading) return h("span",{style:{color:"var(--bdr)",fontSize:9}},"\u00b7\u00b7\u00b7");
+                          if(aaError) return h("span",{style:{color:"var(--err)",fontSize:9}},"\u26a0");
+                          return h("span",{style:{color:"var(--bdr)"}},"\u2014");
+                        })()
                     ),
                     h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:c.idEnel?"var(--tx)":"var(--bdr)"}},c.idEnel||"\u2014"),
                     h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:c.medEnel?"var(--tx)":"var(--bdr)"}},c.medEnel||"\u2014")
