@@ -99,11 +99,48 @@ async function login(rut, clave) {
   const { response: r1, jar: jar1 } = await fetchFollowingRedirects(`${BASE}${LOGIN_PATH}`, {});
   const html1 = await r1.text();
 
-  // Extraer action URL del form de login
-  const actionMatch = html1.match(/action="([^"]*cl_aguasandinas_login_LoginPortlet[^"]*)"/i);
-  if (!actionMatch) throw new Error('No se encontró el formulario de login en el portal AA');
-  const actionUrl = actionMatch[1].replace(/&amp;/g, '&');
-  const fullAction = actionUrl.startsWith('http') ? actionUrl : `${BASE}${actionUrl}`;
+  console.log('[aguas-andinas] Login page response:', r1.status, 'len:', html1.length,
+    'hasRut:', html1.includes('LoginPortlet_rut'));
+
+  // Extraer action URL del form de login (múltiples patrones)
+  let fullAction = null;
+  let pAuth = null;
+
+  // Patrón 1: action contiene el portlet ID en la URL
+  const m1 = html1.match(/action="(https?:\/\/[^"]*cl_aguasandinas_login_LoginPortlet[^"]*)"/i)
+           || html1.match(/action="([^"]*cl_aguasandinas_login_LoginPortlet[^"]*)"/i);
+  if (m1) {
+    const url = m1[1].replace(/&amp;/g, '&');
+    fullAction = url.startsWith('http') ? url : `${BASE}${url}`;
+    console.log('[aguas-andinas] Action encontrado via portlet ID');
+  }
+
+  // Extraer p_auth del HTML (para construir la URL si no se encontró)
+  const authM = html1.match(/["']p_auth["']\s*[=:]\s*["']([^"']{6,})/i)
+             || html1.match(/name="p_auth"[^>]*value="([^"]+)"/i)
+             || html1.match(/Liferay\.authToken\s*=\s*["']([^"']+)/i);
+  if (authM) pAuth = authM[1];
+
+  // Patrón 2: construir URL manualmente si tenemos p_auth
+  if (!fullAction && pAuth) {
+    const portletNs = '_cl_aguasandinas_login_LoginPortlet_';
+    const params = new URLSearchParams({
+      'p_p_id'       : 'cl_aguasandinas_login_LoginPortlet',
+      'p_p_lifecycle': '1',
+      'p_p_state'    : 'normal',
+      'p_p_mode'     : 'view',
+      'p_auth'       : pAuth,
+      [`${portletNs}javax.portlet.action`]: '/login/customlogin',
+    });
+    fullAction = `${BASE}${LOGIN_PATH}?${params}`;
+    console.log('[aguas-andinas] Action construido manualmente con p_auth');
+  }
+
+  if (!fullAction) {
+    // Log del HTML para diagnóstico
+    const snippet = html1.slice(0, 2000);
+    throw new Error(`No se encontró el formulario de login. HTML snippet: ${snippet}`);
+  }
 
   // 2. POST login
   const body = new URLSearchParams({
@@ -117,23 +154,30 @@ async function login(rut, clave) {
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
       'Referer'     : `${BASE}${LOGIN_PATH}`,
+      'Origin'      : BASE,
     },
   }, jar1);
 
   const html2 = await r2.text();
+  console.log('[aguas-andinas] Post-login status:', r2.status, 'len:', html2.length);
 
   // Verificar login exitoso
-  if (html2.includes('_cl_aguasandinas_login_LoginPortlet_rut') && !html2.includes('informacion-de-la-cuenta')) {
-    throw new Error('Login fallido: credenciales incorrectas o portal no disponible');
+  if (html2.includes('_cl_aguasandinas_login_LoginPortlet_rut')) {
+    throw new Error('Login fallido: credenciales incorrectas o el portal rechazó el acceso');
   }
 
   // Extraer authToken y rolRender de la página post-login
   const authToken = html2.match(/Liferay\.authToken\s*[=:]\s*['"]([^'"]+)['"]/)?.[1]
                  || html2.match(/authToken["']?\s*[:=]\s*["']([^"']+)["']/)?.[1];
-  const rolRender = html2.match(/_priv_r_p_rolRender[="](\d+)/)?.[1] || '26197';
+  const rolRender = html2.match(/_priv_r_p_rolRender[="](\d+)/)?.[1]
+                 || html2.match(/rolRender[^0-9]*(\d{4,})/)?.[1]
+                 || '26197';
 
-  if (!authToken) throw new Error('No se pudo extraer authToken del portal AA');
+  if (!authToken) {
+    throw new Error('Login OK pero no se pudo extraer authToken. HTML len: ' + html2.length);
+  }
 
+  console.log('[aguas-andinas] authToken extraído, rolRender:', rolRender);
   return { jar: jar2, authToken, rolRender };
 }
 
@@ -303,46 +347,49 @@ export default async function handler(req, res) {
     const { jar: sessionJar, authToken, rolRender } = await login(RUT, CLAVE);
     console.log('[aguas-andinas] Login OK, procesando', cuentas.length, 'cuentas');
 
+    const deudaOnly = req.body?.deudaOnly !== false; // default: true (solo deuda por ahora)
+
     for (const idAgua of cuentas) {
       const accountBase = String(idAgua).split('-')[0]; // "672977" de "672977-0"
 
       try {
         console.log(`[aguas-andinas] Cuenta ${idAgua} (base: ${accountBase})`);
 
-        // 1. Cambiar a esta cuenta
+        // 1. Cambiar a esta cuenta y obtener HTML de la página
         const { jar: accountJar, html: pageHtml } = await switchAccount(
           sessionJar, authToken, rolRender, accountBase
         );
 
         // 2. Parsear deuda del HTML de la página
-        const deuda      = parseDeuda(pageHtml);
+        const deuda       = parseDeuda(pageHtml);
         const vencimiento = parseVencimiento(pageHtml);
         console.log(`[aguas-andinas]   Deuda: ${deuda}, Vence: ${vencimiento}`);
 
-        // 3. Obtener lista de boletas
-        const { rows, inputs } = await getBoletas(accountJar);
-        const ultimaBoleta = rows[0] || null;
-        console.log(`[aguas-andinas]   Boletas: ${rows.length}, última: ${ultimaBoleta?.mes}`);
+        const result = {
+          idAgua,
+          deuda:       deuda || '$0',
+          vencimiento: vencimiento || null,
+          ultimaBoleta: null,
+        };
 
-        // 4. Obtener URL del PDF de la última boleta
-        let sovosUrl = null;
-        if (ultimaBoleta) {
-          sovosUrl = await getBoletaUrl(accountJar, inputs, 0);
-          console.log(`[aguas-andinas]   PDF URL: ${sovosUrl ? 'OK' : 'no disponible'}`);
+        // 3+4. Boleta y PDF — solo si deudaOnly=false
+        if (!deudaOnly) {
+          const { rows, inputs } = await getBoletas(accountJar);
+          const ultimaBoleta = rows[0] || null;
+          console.log(`[aguas-andinas]   Boletas: ${rows.length}`);
+
+          let sovosUrl = null;
+          if (ultimaBoleta) {
+            sovosUrl = await getBoletaUrl(accountJar, inputs, 0);
+          }
+
+          result.ultimaBoleta = ultimaBoleta ? {
+            mes: ultimaBoleta.mes, monto: ultimaBoleta.monto,
+            estado: ultimaBoleta.estado, fecha: ultimaBoleta.fecha, sovosUrl,
+          } : null;
         }
 
-        results.push({
-          idAgua,
-          deuda:        deuda || '$0',
-          vencimiento:  vencimiento || null,
-          ultimaBoleta: ultimaBoleta ? {
-            mes    : ultimaBoleta.mes,
-            monto  : ultimaBoleta.monto,
-            estado : ultimaBoleta.estado,
-            fecha  : ultimaBoleta.fecha,
-            sovosUrl,
-          } : null,
-        });
+        results.push(result);
 
       } catch (err) {
         console.error(`[aguas-andinas] Error en cuenta ${idAgua}:`, err.message);
