@@ -1,14 +1,19 @@
 services:
   - type: web
     name: nubox-sync
-    runtime: docker
-    dockerfilePath: ./render-service/Dockerfile
-    dockerContext: ./render-service
-    plan: standard
+    runtime: node
+    rootDir: render-service
+    buildCommand: npm install
+    startCommand: npm start
+    plan: free
     envVars:
       - key: NODE_ENV
         value: production
-      - key: NUBOX_UTN
+      - key: NUBOX_RUT
+        sync: false
+      - key: NUBOX_PASSWORD
+        sync: false
+      - key: BROWSERLESS_TOKEN
         sync: false
       - key: VERCEL_HISTORIAL_URL
         sync: false

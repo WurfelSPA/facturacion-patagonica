@@ -1,54 +1,17 @@
 {
   "functions": {
-    "api/split-pdf.js": {
-      "maxDuration": 300
-    },
-    "api/drive-pdf.js": {
-      "maxDuration": 300
-    },
-    "api/historial-batch.js": {
-      "maxDuration": 300
-    },
-    "api/historial.js": {
-      "includeFiles": "historial-excel-2026.json",
-      "maxDuration": 120
-    },
-    "api/planilla.js": {
-      "maxDuration": 60
-    },
-    "api/upload-aguas.js": {
-      "maxDuration": 60
-    }
+    "api/split-pdf.js": { "maxDuration": 300 },
+    "api/drive-pdf.js": { "maxDuration": 300 },
+    "api/historial-batch.js": { "maxDuration": 300 },
+    "api/historial.js": { "includeFiles": "historial-excel-2026.json", "maxDuration": 120 },
+    "api/planilla.js": { "maxDuration": 60 }
   },
   "crons": [
-    {
-      "path": "/api/planilla?addMonth=1",
-      "schedule": "0 12 25 * *"
-    }
+    { "path": "/api/planilla?addMonth=1", "schedule": "0 12 25 * *" }
   ],
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        },
-        {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET, POST, OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type, x-sync-secret, Authorization"
-        }
-      ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/((?!api/).*)",
-      "destination": "/index.html"
-    }
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/(.+\\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2))", "dest": "/$1" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }

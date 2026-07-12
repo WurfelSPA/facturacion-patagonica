@@ -1,5 +1,7 @@
+import JSZip from "jszip";
+import { PDFDocument, PDFName, PDFArray } from "pdf-lib";
+
 export const config = { api: { bodyParser: true, responseLimit: '60mb' } };
-import { deflateRawSync, inflateSync } from 'node:zlib';
 
 // ── JWT / OAuth ──────────────────────────────────────────────────────────────
 async function signJWT(payload, privateKey) {
@@ -36,66 +38,10 @@ async function driveDownload(token, fileId) {
   return Buffer.from(await res.arrayBuffer());
 }
 
-// ── CRC32 (necesario para construir ZIP sin JSZip) ───────────────────────────
-const CRC32_TABLE = (() => {
-  const t = new Uint32Array(256);
-  for (let i = 0; i < 256; i++) {
-    let c = i;
-    for (let j = 0; j < 8; j++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
-    t[i] = c;
-  }
-  return t;
-})();
-function crc32(buf) {
-  let c = 0xFFFFFFFF;
-  for (let i = 0; i < buf.length; i++) c = (c >>> 8) ^ CRC32_TABLE[(c ^ buf[i]) & 0xFF];
-  return (c ^ 0xFFFFFFFF) >>> 0;
-}
-
-// ── Construir ZIP acumulando sólo datos comprimidos (no todos los buffers sin comprimir) ─
-// entries: [{name, compressed: Buffer, uncompressedSize, fileCrc}]
-function buildZip(entries) {
-  const localParts = [];
-  const cdParts = [];
-  let localOffset = 0;
-  for (const { name, compressed, uncompressedSize, fileCrc } of entries) {
-    const nameBytes = Buffer.from(name, "utf8");
-    const compressedSize = compressed.length;
-    // Local file header (30 + filename)
-    const lh = Buffer.allocUnsafe(30 + nameBytes.length);
-    lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0, 6);
-    lh.writeUInt16LE(8, 8);          // DEFLATE
-    lh.writeUInt16LE(0, 10); lh.writeUInt16LE(0, 12);
-    lh.writeUInt32LE(fileCrc, 14); lh.writeUInt32LE(compressedSize, 18);
-    lh.writeUInt32LE(uncompressedSize, 22); lh.writeUInt16LE(nameBytes.length, 26);
-    lh.writeUInt16LE(0, 28); nameBytes.copy(lh, 30);
-    localParts.push(lh, compressed);
-    // Central directory record (46 + filename)
-    const cd = Buffer.allocUnsafe(46 + nameBytes.length);
-    cd.writeUInt32LE(0x02014b50, 0); cd.writeUInt16LE(20, 4); cd.writeUInt16LE(20, 6);
-    cd.writeUInt16LE(0, 8); cd.writeUInt16LE(8, 10);
-    cd.writeUInt16LE(0, 12); cd.writeUInt16LE(0, 14);
-    cd.writeUInt32LE(fileCrc, 16); cd.writeUInt32LE(compressedSize, 20);
-    cd.writeUInt32LE(uncompressedSize, 24); cd.writeUInt16LE(nameBytes.length, 28);
-    cd.writeUInt16LE(0, 30); cd.writeUInt16LE(0, 32); cd.writeUInt16LE(0, 34);
-    cd.writeUInt16LE(0, 36); cd.writeUInt32LE(0, 38);
-    cd.writeUInt32LE(localOffset, 42); nameBytes.copy(cd, 46);
-    cdParts.push(cd);
-    localOffset += lh.length + compressedSize;
-  }
-  const cdBuf = Buffer.concat(cdParts);
-  const eocd = Buffer.allocUnsafe(22);
-  eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(0, 4); eocd.writeUInt16LE(0, 6);
-  eocd.writeUInt16LE(entries.length, 8); eocd.writeUInt16LE(entries.length, 10);
-  eocd.writeUInt32LE(cdBuf.length, 12); eocd.writeUInt32LE(localOffset, 16);
-  eocd.writeUInt16LE(0, 20);
-  return Buffer.concat([...localParts, cdBuf, eocd]);
-}
-
 
 // ── PDF parser puro en JS ────────────────────────────────────────────────────
 // Separar un PDF multipágina en PDFs individuales de 1 página
-function* iteratePDFPages(buf) {
+function splitPDFPages(buf) {
   const src = buf.toString("binary");
 
   // 1. Parsear xref para obtener offsets de todos los objetos
@@ -114,53 +60,24 @@ function* iteratePDFPages(buf) {
     return end > off ? src.slice(off, end + 6) : src.slice(off, off + 4096);
   }
 
-  // 2. Encontrar páginas — BFS desde /Catalog → /Pages (soporta árboles multi-nivel)
+  // 2. Encontrar el objeto Pages (catálogo)
   function findPages() {
-    // Estrategia 1: desde /Catalog → raíz /Pages → BFS colectando sólo hojas /Page
     for (const num of Object.keys(objOffsets)) {
       const o = getObj(parseInt(num));
-      if (o.includes("/Type /Catalog") || o.includes("/Type/Catalog")) {
-        const m = o.match(/\/Pages\s+(\d+)\s+0\s+R/);
-        if (!m) continue;
-        const result = [];
-        const queue = [parseInt(m[1])];
-        const seen = new Set();
-        while (queue.length > 0) {
-          const ref = queue.shift();
-          if (seen.has(ref)) continue;
-          seen.add(ref);
-          const node = getObj(ref);
-          const isPages = node.includes("/Type /Pages") || node.includes("/Type/Pages");
-          // Nota: /Type/Pages contiene /Type/Page como subcadena → revisar isPages primero
-          const isPage = !isPages && (node.includes("/Type /Page") || node.includes("/Type/Page"));
-          if (isPage) { result.push(ref); continue; }
-          // Nodo intermedio Pages → expandir Kids
-          const kidsM = node.match(/\/Kids\s*\[([^\]]+)\]/);
-          if (kidsM) {
-            const kids = kidsM[1].trim().split(/\s+R/).filter(s => s.trim())
-              .map(s => parseInt(s.trim().split(/\s+/)[0])).filter(n => !isNaN(n));
-            queue.push(...kids);
-          }
-        }
-        if (result.length > 0) return result;
+      if (o.includes("/Type /Pages") || o.includes("/Type/Pages")) {
+        const kidsM = o.match(/\/Kids\s*\[([^\]]+)\]/);
+        if (kidsM) return kidsM[1].trim().split(/\s+R/).filter(s => s.trim())
+          .map(s => parseInt(s.trim().split(/\s+/)[0])).filter(n => !isNaN(n));
       }
     }
-    // Estrategia 2: escanear todos los objetos /Type/Page directamente (orden por posición)
-    const pages = [];
-    for (const num of Object.keys(objOffsets)) {
-      const n = parseInt(num);
-      const o = getObj(n);
-      const isPages = o.includes("/Type /Pages") || o.includes("/Type/Pages");
-      const isPage  = !isPages && (o.includes("/Type /Page") || o.includes("/Type/Page"));
-      if (isPage) pages.push(n);
-    }
-    return pages.sort((a, b) => objOffsets[a] - objOffsets[b]);
+    return [];
   }
 
   const pageNums = findPages();
   if (pageNums.length === 0) return null;
 
   // 3. Para cada página, construir un PDF mínimo válido
+  const pages = [];
   for (const pageNum of pageNums) {
     const pageObj = getObj(pageNum);
 
@@ -286,8 +203,10 @@ function* iteratePDFPages(buf) {
     }
     newPdf += `trailer\n<< /Size ${totalObjs} /Root ${catalogNum} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
 
-    yield Buffer.from(newPdf, "binary");
+    pages.push(Buffer.from(newPdf, "binary"));
   }
+
+  return pages;
 }
 
 // ── Parsear CMap y extraer texto (igual que pdftext.js) ──────────────────────
@@ -311,6 +230,77 @@ function parseCMap(t) {
   return mapping;
 }
 
+/* ── Extracción de texto usando el PDF ya parseado por pdf-lib ──────────────
+   En vez de regex sobre bytes crudos, usamos los objetos ya parseados en
+   srcDoc.context. Esto es O(streams de la página), no O(tamaño del PDF).
+   Garantiza alineación: misma página lógica que pageBufs[i].
+*/
+
+function decodeStreamContent(rawBytes) {
+  try {
+    return require("zlib").inflateSync(Buffer.from(rawBytes)).toString("latin1");
+  } catch {
+    return Buffer.from(rawBytes).toString("latin1");
+  }
+}
+
+function applyTextOps(decoded, mapping) {
+  let text = "";
+  for (const [, h] of decoded.matchAll(/<([0-9a-fA-F]+)>\s*Tj/g)) {
+    const code = parseInt(h, 16);
+    text += mapping[code] !== undefined ? mapping[code] : (code >= 32 && code < 127 ? String.fromCharCode(code) : " ");
+  }
+  for (const [, arr] of decoded.matchAll(/\[([^\]]+)\]\s*TJ/g)) {
+    for (const [, h] of arr.matchAll(/<([0-9a-fA-F]+)>/g)) {
+      const code = parseInt(h, 16);
+      text += mapping[code] !== undefined ? mapping[code] : (code >= 32 && code < 127 ? String.fromCharCode(code) : " ");
+    }
+  }
+  for (const [, s] of decoded.matchAll(/\(([^)]*)\)\s*Tj/g)) {
+    text += s.replace(/\\n/g, " ").replace(/\\r/g, " ") + " ";
+  }
+  for (const [, arr] of decoded.matchAll(/\[([^\]]*)\]\s*TJ/g)) {
+    for (const [, s] of arr.matchAll(/\(([^)]*)\)/g)) {
+      text += s.replace(/\\n/g, " ").replace(/\\r/g, " ");
+    }
+    text += " ";
+  }
+  return text;
+}
+
+/* Construye CMap iterando objetos ya parseados — sin regex sobre bytes crudos */
+function buildCMapFromDoc(srcDoc) {
+  const mapping = {};
+  for (const [, obj] of srcDoc.context.indirectObjects) {
+    if (!obj || !obj.contents) continue;
+    try {
+      const decoded = decodeStreamContent(obj.contents);
+      if (decoded.includes("beginbfchar") || decoded.includes("beginbfrange")) {
+        Object.assign(mapping, parseCMap(decoded));
+      }
+    } catch { /* ignorar streams no procesables */ }
+  }
+  return mapping;
+}
+
+/* Extrae texto de la página pageIndex usando content streams del PDF ya parseado.
+   Es O(streams de esa página) — rápido, y garantiza alineación con pageBufs[i]. */
+function extractPageText(srcDoc, pageIndex, mapping) {
+  try {
+    const page = srcDoc.getPage(pageIndex);
+    const contentsVal = page.node.get(PDFName.of("Contents"));
+    if (!contentsVal) return "";
+    const refs = (contentsVal instanceof PDFArray) ? contentsVal.asArray() : [contentsVal];
+    let text = "";
+    for (const ref of refs) {
+      const streamObj = srcDoc.context.lookup(ref);
+      if (!streamObj || !streamObj.contents) continue;
+      text += applyTextOps(decodeStreamContent(streamObj.contents), mapping);
+    }
+    return text.replace(/\s+/g, " ").trim();
+  } catch { return ""; }
+}
+
 /* Compatibilidad: mantener extractText para código que aún lo use */
 function getDecodedStreams(pdfBuf) {
   const str = pdfBuf.toString("latin1");
@@ -320,7 +310,7 @@ function getDecodedStreams(pdfBuf) {
   while ((m = re.exec(str)) !== null) streams.push(Buffer.from(m[1], "latin1"));
   const decoded = [];
   for (const s of streams) {
-    try { decoded.push(inflateSync(s).toString("latin1")); } catch {
+    try { decoded.push(require("zlib").inflateSync(s).toString("latin1")); } catch {
       const raw = s.toString("latin1");
       if (raw.includes("Tj") || raw.includes("TJ")) decoded.push(raw);
     }
@@ -420,50 +410,69 @@ export default async function handler(req, res) {
     const pdfBuf = await driveDownload(token, pdfFileId);
     console.log(`PDF: ${pdfBuf.length} bytes`);
 
-    // 2. Separar páginas y construir ZIP — una página a la vez (generator) para minimizar RAM.
-    //    Cada pageBuf se comprime inmediatamente con zlib; sólo datos comprimidos se acumulan.
-    const zipEntries = [];
+    // 2. Separar páginas — custom parser SIN pdf-lib en ruta principal.
+    //    pdf-lib solo se carga como fallback si el parser mínimo falla.
+    //    Cargar pdf-lib + splitPDFPages simultáneamente duplicaba RAM → OOM.
+    let usedCustomSplit = true;
+    let pageBufs = splitPDFPages(pdfBuf);
+    if (!pageBufs || pageBufs.length === 0) {
+      // Fallback a pdf-lib solo si el parser mínimo falla (PDF no estándar)
+      console.log("splitPDFPages sin resultado, fallback a pdf-lib");
+      usedCustomSplit = false;
+      const srcDocFb = await PDFDocument.load(pdfBuf, { ignoreEncryption: true });
+      const totalPagesFb = srcDocFb.getPageCount();
+      pageBufs = [];
+      for (let i = 0; i < totalPagesFb; i++) {
+        const singleDoc = await PDFDocument.create();
+        const [copiedPage] = await singleDoc.copyPages(srcDocFb, [i]);
+        singleDoc.addPage(copiedPage);
+        pageBufs.push(Buffer.from(await singleDoc.save()));
+      }
+    }
+    if (pageBufs.length === 0) throw new Error("No se pudieron separar las páginas del PDF");
+    console.log(`Páginas separadas: ${pageBufs.length} (método: ${usedCustomSplit ? "custom-minimal" : "pdf-lib-fallback"})`);
+
+    // 3. Extraer texto de cada página via regex sobre streams binarios
+    //    (sin pdf-lib: ahorra 100-200 MB RAM; extractText() usa CMap embebido en cada pageBuf)
+    const zip = new JSZip();
     const sinCod = [];
     const breakdown = {};
-    let pageCount = 0;
 
-    for (const pageBuf of iteratePDFPages(pdfBuf)) {
-      pageCount++;
-      const text = extractText(pageBuf);
+    for (let i = 0; i < pageBufs.length; i++) {
+      const text = extractText(pageBufs[i]);
       const cod = detectCod(text);
       const nro = detectNro(text);
 
-      let zipPath;
       if (!cod) {
         if (!nro) {
-          sinCod.push(pageCount);
-          console.log(`Pág ${pageCount}: sin COD ni NRO — texto: "${text.slice(0,80)}"`);
+          sinCod.push(i + 1);
+          console.log(`Pág ${i+1}: sin COD ni NRO — texto: "${text.slice(0,80)}"`);
           continue;
         }
         // Tiene NRO pero sin COD reconocido → Serv. Adm. u otro tipo sin código de sitio
         const clienteSinCod = detectCliente(text);
         const fnameSinCod = clienteSinCod ? `F-${nro} ${clienteSinCod}.pdf` : `F-${nro}.pdf`;
-        zipPath = `default/${fnameSinCod}`;
+        zip.file(`default/${fnameSinCod}`, pageBufs[i]);
         breakdown['default'] = (breakdown['default'] || 0) + 1;
-        console.log(`Pág ${pageCount}: sin COD reconocido, NRO=${nro} → ${zipPath}`);
-      } else {
-        if (!nro) console.warn(`Pág ${pageCount}: sin Nº (COD=${cod}) — texto: "${text.slice(0,120)}"`);
-        const cliente = detectCliente(text);
-        const fname = nro && cliente ? `F-${nro} ${cliente}.pdf` : nro ? `F-${nro}.pdf` : `F-p${pageCount}.pdf`;
-        zipPath = `${cod}/${fname}`;
-        breakdown[cod] = (breakdown[cod] || 0) + 1;
-        console.log(`Pág ${pageCount}: ${cod} → ${fname}`);
+        console.log(`Pág ${i+1}: sin COD reconocido, NRO=${nro} → default/${fnameSinCod}`);
+        continue;
       }
-      // Comprimir al vuelo y liberar buffer sin comprimir antes de la siguiente página
-      const uncompressedSize = pageBuf.length;
-      const fileCrc = crc32(pageBuf);
-      zipEntries.push({ name: zipPath, compressed: deflateRawSync(pageBuf, { level: 6 }), uncompressedSize, fileCrc });
+      if (!nro) {
+        console.warn(`Pág ${i+1}: sin Nº (COD=${cod}) — texto: "${text.slice(0,120)}"`);
+      }
+
+      const cliente = detectCliente(text);
+      let fname;
+      if (nro && cliente) fname = `F-${nro} ${cliente}.pdf`;
+      else if (nro)       fname = `F-${nro}.pdf`;
+      else                fname = `F-p${i+1}.pdf`;
+      zip.file(`${cod}/${fname}`, pageBufs[i]);
+      breakdown[cod] = (breakdown[cod] || 0) + 1;
+      console.log(`Pág ${i+1}: ${cod} → ${fname}`);
     }
-    console.log(`Páginas separadas: ${pageCount}`);
 
     if (sinCod.length > 0) {
-      const d = Buffer.from(`Páginas sin COD: ${sinCod.join(", ")}\n`);
-      zipEntries.push({ name: "sin_cod.txt", compressed: deflateRawSync(d, { level: 6 }), uncompressedSize: d.length, fileCrc: crc32(d) });
+      zip.file(`sin_cod.txt`, `Páginas sin COD: ${sinCod.join(", ")}\n`);
     }
 
     /* Resumen legible para verificación */
@@ -471,11 +480,10 @@ export default async function handler(req, res) {
     for (const [cod, cnt] of Object.entries(breakdown).sort(([a],[b])=>a.localeCompare(b))) {
       resumenLines.push(`  ${cod}: ${cnt} facturas`);
     }
-    const resumenBuf = Buffer.from(resumenLines.join("\n") + "\n");
-    zipEntries.push({ name: "resumen.txt", compressed: deflateRawSync(resumenBuf, { level: 6 }), uncompressedSize: resumenBuf.length, fileCrc: crc32(resumenBuf) });
+    zip.file(`resumen.txt`, resumenLines.join("\n") + "\n");
 
-    // 4. Construir ZIP — sólo datos comprimidos en memoria (sin acumular descomprimidos)
-    const zipBuf = buildZip(zipEntries);
+    // 4. Generar ZIP
+    const zipBuf = Buffer.from(await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }));
     console.log(`ZIP: ${zipBuf.length} bytes`);
 
     // 5. Subir ZIP directo a Drive con Service Account (sin pasar por el frontend)
@@ -549,3 +557,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: e.message, stack: e.stack?.slice(0,300) });
   }
 }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          

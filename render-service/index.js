@@ -1,33 +1,24 @@
 /**
  * render-service/index.js
  *
- * Servidor Express en Render.com — sincronización mensual.
+ * Servidor Express en Render.com — sincronización mensual Nubox → Drive.
  *
  * Variables de entorno requeridas:
- *   PORT                         — asignado automáticamente por Render
- *   SYNC_SECRET                  — token compartido con n8n y Vercel
- *   NUBOX_UTN                    — token UTN Nubox
- *   VERCEL_HISTORIAL_URL         — URL del endpoint /api/historial en Vercel
- *   BROWSERLESS_TOKEN            — token Browserless.io
- *   AGUAS_ANDINAS_USER           — RUT de acceso al portal Aguas Andinas
- *   AGUAS_ANDINAS_PASS           — Contraseña del portal Aguas Andinas
- *   AGUAS_ANDINAS_DRIVE_FOLDER_ID — ID de la carpeta "agua" en Google Drive
- *   VERCEL_UPLOAD_URL             — URL del endpoint upload-aguas en Vercel
+ *   PORT                 — asignado automáticamente por Render
+ *   SYNC_SECRET          — token compartido con n8n y con Vercel
+ *   NUBOX_UTN            — token UTN de sesión Nubox
+ *   VERCEL_HISTORIAL_URL — URL del endpoint /api/historial en Vercel
  *
  * Endpoints:
- *   GET  /                         — health check
- *   GET  /sync-nubox/status        — estado de env vars Nubox
- *   POST /sync-nubox               — sincronización Nubox → Drive (requiere secret)
- *   GET  /sync-aguas-andinas/status — estado de env vars Aguas Andinas
- *   POST /sync-aguas-andinas        — descarga boletas + sube a Drive (requiere secret)
+ *   GET  /                       — health check
+ *   GET  /sync-nubox/status      — estado de env vars
+ *   POST /sync-nubox             — sincronización completa (requiere secret)
  */
 
 const express = require('express');
 const fetch   = require('node-fetch');
-const { scrapeNuboxResumen }    = require('./nubox-scraper');
+const { scrapeNuboxResumen }  = require('./nubox-scraper');
 const { formatearResumenNubox } = require('./excel-parser');
-const { scrapeAguasAndinas }    = require('./aguas-andinas-scraper');
-const { uploadBoletas }         = require('./drive-uploader');
 
 const app    = express();
 const PORT   = process.env.PORT || 3000;
@@ -37,10 +28,10 @@ app.use(express.json());
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/', (_req, res) => {
-  res.json({ status: 'ok', service: 'patagonica-sync-v3', ts: new Date().toISOString() });
+  res.json({ status: 'ok', service: 'nubox-sync-v2', ts: new Date().toISOString() });
 });
 
-// ── Nubox status ──────────────────────────────────────────────────────────────
+// ── Status ────────────────────────────────────────────────────────────────────
 app.get('/sync-nubox/status', (_req, res) => {
   res.json({
     ok: true,
@@ -52,32 +43,19 @@ app.get('/sync-nubox/status', (_req, res) => {
   });
 });
 
-// ── Aguas Andinas status ──────────────────────────────────────────────────────
-app.get('/sync-aguas-andinas/status', (_req, res) => {
-  res.json({
-    ok: true,
-    env: {
-      SYNC_SECRET:                   process.env.SYNC_SECRET                   ? '✓ set' : '✗ missing',
-      BROWSERLESS_TOKEN:             process.env.BROWSERLESS_TOKEN             ? '✓ set' : '✗ missing',
-      AGUAS_ANDINAS_USER:            process.env.AGUAS_ANDINAS_USER            ? '✓ set' : '✗ missing',
-      AGUAS_ANDINAS_PASS:            process.env.AGUAS_ANDINAS_PASS            ? '✓ set' : '✗ missing',
-      AGUAS_ANDINAS_DRIVE_FOLDER_ID: process.env.AGUAS_ANDINAS_DRIVE_FOLDER_ID ? '✓ set' : '✗ missing',
-      VERCEL_UPLOAD_URL:             process.env.VERCEL_UPLOAD_URL             ? '✓ set' : '✗ missing',
-    },
-  });
-});
-
 // ── POST /sync-nubox ──────────────────────────────────────────────────────────
 app.post('/sync-nubox', async (req, res) => {
   const start = Date.now();
-  console.log('[nubox] Iniciando sincronización —', new Date().toISOString());
+  console.log('[sync] Iniciando sincronización Nubox —', new Date().toISOString());
 
+  // 1. Autenticación
   const { secret } = req.body || {};
   if (!SECRET || secret !== SECRET) {
-    console.warn('[nubox] Acceso no autorizado');
+    console.warn('[sync] Acceso no autorizado');
     return res.status(401).json({ ok: false, error: 'No autorizado' });
   }
 
+  // 2. Verificar env vars
   if (!process.env.NUBOX_UTN) {
     return res.status(500).json({ ok: false, error: 'Falta NUBOX_UTN' });
   }
@@ -86,28 +64,37 @@ app.post('/sync-nubox', async (req, res) => {
   }
 
   try {
-    console.log('[nubox] Paso 1: scraping Nubox...');
+    // 3. Scraping Nubox con Puppeteer
+    console.log('[sync] Paso 1: scraping Nubox (Puppeteer)...');
     const scraped = await scrapeNuboxResumen();
-    console.log(`[nubox] Paso 1 OK — ${scraped.clientes.length} clientes`);
+    console.log(`[sync] Paso 1 OK — ${scraped.clientes.length} clientes, meses: ${scraped.meses.join(', ')}`);
 
     if (scraped.clientes.length === 0) {
       return res.status(200).json({
         ok: false,
-        warning: 'No se encontraron clientes',
+        warning: 'No se encontraron clientes en el Resumen de Ventas',
         elapsed: Date.now() - start,
       });
     }
 
-    console.log('[nubox] Paso 2: formateando...');
+    // 4. Formatear datos
+    console.log('[sync] Paso 2: formateando datos...');
     const resumen = formatearResumenNubox(scraped);
-    console.log(`[nubox] Paso 2 OK — ${resumen.stats.totalClientes} clientes`);
+    console.log(
+      `[sync] Paso 2 OK — ${resumen.stats.totalClientes} clientes, ` +
+      `total: $${resumen.stats.totalGeneral.toLocaleString('es-CL')}`
+    );
 
-    console.log('[nubox] Paso 3: guardando en Drive...');
-    const saveUrl  = process.env.VERCEL_HISTORIAL_URL + '?syncResumen=1';
+    // 5. Guardar en Drive vía endpoint Vercel
+    console.log('[sync] Paso 3: guardando en Drive...');
+    const saveUrl = process.env.VERCEL_HISTORIAL_URL + '?syncResumen=1';
     const saveResp = await fetch(saveUrl, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json', 'x-sync-secret': SECRET },
-      body:    JSON.stringify({ resumen }),
+      headers: {
+        'Content-Type':   'application/json',
+        'x-sync-secret':  SECRET,
+      },
+      body: JSON.stringify({ resumen }),
       timeout: 30000,
     });
 
@@ -117,85 +104,27 @@ app.post('/sync-nubox', async (req, res) => {
     }
 
     const saveResult = await saveResp.json();
-    console.log('[nubox] Paso 3 OK:', JSON.stringify(saveResult));
+    console.log('[sync] Paso 3 OK:', JSON.stringify(saveResult));
 
     return res.json({
       ok: true,
       clientes:     resumen.stats.totalClientes,
       totalGeneral: resumen.stats.totalGeneral,
+      columnas:     resumen._columnas,
+      generado:     resumen._generado,
       elapsed:      Date.now() - start,
     });
 
   } catch (err) {
-    console.error('[nubox] ERROR:', err.message);
-    return res.status(500).json({ ok: false, error: err.message, elapsed: Date.now() - start });
-  }
-});
-
-// ── POST /sync-aguas-andinas ──────────────────────────────────────────────────
-app.post('/sync-aguas-andinas', async (req, res) => {
-  const start = Date.now();
-  console.log('[aguas] Iniciando sincronización —', new Date().toISOString());
-
-  // Auth
-  const { secret } = req.body || {};
-  if (!SECRET || secret !== SECRET) {
-    console.warn('[aguas] Acceso no autorizado');
-    return res.status(401).json({ ok: false, error: 'No autorizado' });
-  }
-
-  // Verify env
-  const missing = [
-    'BROWSERLESS_TOKEN',
-    'AGUAS_ANDINAS_USER',
-    'AGUAS_ANDINAS_PASS',
-    'AGUAS_ANDINAS_DRIVE_FOLDER_ID',
-    'VERCEL_UPLOAD_URL',
-  ].filter(k => !process.env[k]);
-
-  if (missing.length > 0) {
-    return res.status(500).json({ ok: false, error: 'Faltan env vars: ' + missing.join(', ') });
-  }
-
-  try {
-    // Step 1: Scrape portal
-    console.log('[aguas] Paso 1: scraping portal Aguas Andinas...');
-    const scraped = await scrapeAguasAndinas();
-    console.log(`[aguas] Paso 1 OK — ${scraped.total} boletas, ${scraped.failures} fallos`);
-
-    if (scraped.results.length === 0) {
-      return res.status(200).json({
-        ok:      false,
-        warning: 'No se descargaron boletas',
-        failures: scraped.failureList,
-        elapsed: Date.now() - start,
-      });
-    }
-
-    // Step 2: Upload to Drive
-    console.log('[aguas] Paso 2: subiendo PDFs a Google Drive...');
-    const driveResult = await uploadBoletas(scraped.results);
-    console.log(
-      `[aguas] Paso 2 OK — ${driveResult.uploaded.length} subidos, ` +
-      `${driveResult.errors.length} errores Drive`
-    );
-
-    return res.json({
-      ok:             true,
-      scraped:        scraped.total,
-      scrapeFailures: scraped.failures,
-      uploaded:       driveResult.uploaded.length,
-      uploadErrors:   driveResult.errors.length,
-      uploadedFiles:  driveResult.uploaded.map(u => ({ name: u.filename, skipped: u.skipped || false })),
-      elapsed:        Date.now() - start,
+    console.error('[sync] ERROR:', err.message);
+    return res.status(500).json({
+      ok:      false,
+      error:   err.message,
+      elapsed: Date.now() - start,
     });
-
-  } catch (err) {
-    console.error('[aguas] ERROR:', err.message);
-    return res.status(500).json({ ok: false, error: err.message, elapsed: Date.now() - start });
   }
 });
 
 app.listen(PORT, () =>
-  console.log(`[sync] Servidor patagonica-sync-v3 en puerto ${PORT}`)
+  console.log(`[sync] Servidor nubox-sync-v2 en puerto ${PORT}`)
 );

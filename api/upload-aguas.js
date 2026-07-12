@@ -175,7 +175,7 @@ export default async function handler(req, res) {
   }
 
   const saJson       = process.env.GOOGLE_SERVICE_ACCOUNT;
-  const parentFolder = req.body.parentFolderId || process.env.AGUAS_ANDINAS_DRIVE_FOLDER_ID;
+  const parentFolder = process.env.AGUAS_ANDINAS_DRIVE_FOLDER_ID;
   if (!saJson)       return res.status(500).json({ error: 'Falta GOOGLE_SERVICE_ACCOUNT' });
   if (!parentFolder) return res.status(500).json({ error: 'Falta AGUAS_ANDINAS_DRIVE_FOLDER_ID' });
 
