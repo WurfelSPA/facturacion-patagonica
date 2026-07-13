@@ -17,6 +17,7 @@
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1" },
     { "src": "/aa-cache.json", "dest": "/aa-cache.json" },
+    { "src": "/nubox-resumen-cache.json", "dest": "/nubox-resumen-cache.json" },
     { "src": "/(.+\\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2))", "dest": "/$1" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
