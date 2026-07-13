@@ -1,0 +1,1151 @@
+{
+  "ok": true,
+  "updatedAt": "2026-07-13T00:00:00.000Z",
+  "source": "nubox-excel",
+  "columnas": [
+    "Enero 2026",
+    "Febrero 2026",
+    "Marzo 2026",
+    "Abril 2026",
+    "Mayo 2026",
+    "Junio 2026",
+    "Julio 2026"
+  ],
+  "clientes": [
+    {
+      "rut": "16.198.538-4",
+      "nombre": "PATRICIO RODRIGO OLMEDO NUNEZ",
+      "meses": {
+        "Enero 2026": 1103000,
+        "Febrero 2026": 1095000,
+        "Marzo 2026": 1098000,
+        "Abril 2026": 1099000,
+        "Mayo 2026": 1106000,
+        "Junio 2026": 1121000,
+        "Julio 2026": 1124000
+      },
+      "total": 7746000
+    },
+    {
+      "rut": "59.005.950-1",
+      "nombre": "NCH CHILE S A",
+      "meses": {
+        "Enero 2026": 5463000,
+        "Febrero 2026": 5404000,
+        "Marzo 2026": 5421000,
+        "Abril 2026": 5424000,
+        "Mayo 2026": 5466000,
+        "Junio 2026": 5536000,
+        "Julio 2026": 5556000
+      },
+      "total": 38270000
+    },
+    {
+      "rut": "59.170.310-2",
+      "nombre": "CONGO FILMS S.A.S. AGENCIA EN CHILE",
+      "meses": {
+        "Enero 2026": 9187000,
+        "Febrero 2026": 9013000,
+        "Marzo 2026": 9042000,
+        "Abril 2026": 9047000,
+        "Mayo 2026": 9127000,
+        "Junio 2026": 9244000,
+        "Julio 2026": 9276000
+      },
+      "total": 63936000
+    },
+    {
+      "rut": "61.981.060-0",
+      "nombre": "SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE LOS LIBERTADORES",
+      "meses": {
+        "Enero 2026": 32298000,
+        "Febrero 2026": 32325000,
+        "Marzo 2026": 32429000,
+        "Abril 2026": 32447000,
+        "Mayo 2026": 32723000,
+        "Junio 2026": 33141000,
+        "Julio 2026": 33256000
+      },
+      "total": 228619000
+    },
+    {
+      "rut": "70.016.160-9",
+      "nombre": "LA ARAUCANA C C A F",
+      "meses": {
+        "Enero 2026": 3458000,
+        "Febrero 2026": 3453000,
+        "Marzo 2026": 3464000,
+        "Abril 2026": 3466000,
+        "Mayo 2026": 3496000,
+        "Junio 2026": 3540000,
+        "Julio 2026": 3552000
+      },
+      "total": 24429000
+    },
+    {
+      "rut": "76.009.361-0",
+      "nombre": "SOCIEDAD DE SERVICIOS Y ELECTRONICA SPA",
+      "meses": {
+        "Enero 2026": 4948000
+      },
+      "total": 4948000
+    },
+    {
+      "rut": "76.011.809-5",
+      "nombre": "MEGAMIN S.A.",
+      "meses": {
+        "Enero 2026": 11069000,
+        "Febrero 2026": 10831000,
+        "Marzo 2026": 10866000,
+        "Abril 2026": 10872000,
+        "Mayo 2026": 10968000,
+        "Junio 2026": 11110000,
+        "Julio 2026": 11148000
+      },
+      "total": 76864000
+    },
+    {
+      "rut": "76.014.805-9",
+      "nombre": "CFMEDICA LIMITADA",
+      "meses": {
+        "Enero 2026": 1079000,
+        "Febrero 2026": 1081000,
+        "Marzo 2026": 1084000,
+        "Abril 2026": 1297000,
+        "Mayo 2026": 1305000,
+        "Junio 2026": 1321000,
+        "Julio 2026": 1326000
+      },
+      "total": 8493000
+    },
+    {
+      "rut": "76.016.809-2",
+      "nombre": "UNEX APARELLAJE ELECTRICO (CHILE) LIMITADA",
+      "meses": {
+        "Enero 2026": 2038000,
+        "Febrero 2026": 2040000,
+        "Marzo 2026": 2046000,
+        "Abril 2026": 2047000,
+        "Mayo 2026": 2061000,
+        "Junio 2026": 2087000,
+        "Julio 2026": 2094000
+      },
+      "total": 14413000
+    },
+    {
+      "rut": "76.033.880-K",
+      "nombre": "DRAGER CHILE LIMITADA",
+      "meses": {
+        "Enero 2026": 24372000,
+        "Febrero 2026": 23713000,
+        "Marzo 2026": 23791000,
+        "Abril 2026": 23805000,
+        "Mayo 2026": 24016000,
+        "Junio 2026": 24328000,
+        "Julio 2026": 24413000
+      },
+      "total": 168438000
+    },
+    {
+      "rut": "76.071.923-4",
+      "nombre": "COMERCIAL GRANJA MARINA LIMITADA",
+      "meses": {
+        "Enero 2026": 3902000,
+        "Febrero 2026": 3840000,
+        "Marzo 2026": 3850000,
+        "Abril 2026": 3852000,
+        "Mayo 2026": 3879000,
+        "Junio 2026": 3918000,
+        "Julio 2026": 3928000
+      },
+      "total": 27169000
+    },
+    {
+      "rut": "76.132.677-5",
+      "nombre": "COMERCIALIZADORA JUANA CATALDO E HIJO SPA",
+      "meses": {
+        "Enero 2026": 4469000,
+        "Febrero 2026": 4392000,
+        "Marzo 2026": 4406000,
+        "Abril 2026": 4409000,
+        "Mayo 2026": 4448000,
+        "Junio 2026": 4505000,
+        "Julio 2026": 4520000
+      },
+      "total": 31149000
+    },
+    {
+      "rut": "76.166.263-5",
+      "nombre": "COMERCIAL HUSSMANN CHILE LIMITADA",
+      "meses": {
+        "Enero 2026": 2450000,
+        "Febrero 2026": 2427000,
+        "Marzo 2026": 2435000,
+        "Abril 2026": 2436000,
+        "Mayo 2026": 2452000,
+        "Junio 2026": 2484000,
+        "Julio 2026": 2492000
+      },
+      "total": 17176000
+    },
+    {
+      "rut": "76.247.371-2",
+      "nombre": "Inversiones AMV SpA",
+      "meses": {
+        "Marzo 2026": 71000,
+        "Junio 2026": 72000
+      },
+      "total": 143000
+    },
+    {
+      "rut": "76.319.324-1",
+      "nombre": "SOCIEDAD DE ALIMENTOS LEEFOOD SPA.",
+      "meses": {
+        "Enero 2026": 13960000,
+        "Febrero 2026": 13660000,
+        "Marzo 2026": 13704000,
+        "Abril 2026": 13712000,
+        "Mayo 2026": 13833000,
+        "Junio 2026": 14012000,
+        "Julio 2026": 14060000
+      },
+      "total": 96941000
+    },
+    {
+      "rut": "76.336.383-K",
+      "nombre": "INVERSIONES AHIMSA LIMITADA",
+      "meses": {
+        "Marzo 2026": 142000,
+        "Junio 2026": 145000
+      },
+      "total": 287000
+    },
+    {
+      "rut": "76.349.968-5",
+      "nombre": "Inversiones MV Limitada",
+      "meses": {
+        "Marzo 2026": 142000,
+        "Junio 2026": 145000
+      },
+      "total": 287000
+    },
+    {
+      "rut": "76.350.009-8",
+      "nombre": "Inversiones ML Limitada",
+      "meses": {
+        "Marzo 2026": 71000,
+        "Junio 2026": 72000
+      },
+      "total": 143000
+    },
+    {
+      "rut": "76.350.021-7",
+      "nombre": "Inversiones BS Limitada",
+      "meses": {
+        "Marzo 2026": 142000,
+        "Junio 2026": 145000
+      },
+      "total": 287000
+    },
+    {
+      "rut": "76.350.335-6",
+      "nombre": "Inversiones SM Limitada",
+      "meses": {
+        "Marzo 2026": 284000,
+        "Junio 2026": 291000
+      },
+      "total": 575000
+    },
+    {
+      "rut": "76.350.563-4",
+      "nombre": "Inversiones CS Limitada",
+      "meses": {
+        "Marzo 2026": 142000,
+        "Junio 2026": 145000
+      },
+      "total": 287000
+    },
+    {
+      "rut": "76.396.720-4",
+      "nombre": "Inversiones BMA Limitada",
+      "meses": {
+        "Marzo 2026": 71000,
+        "Junio 2026": 72000
+      },
+      "total": 143000
+    },
+    {
+      "rut": "76.398.094-4",
+      "nombre": "SOCIEDAD COMERCIAL E INDUSTRIAL HYDROTORC LIMITADA",
+      "meses": {
+        "Enero 2026": 4985000,
+        "Febrero 2026": 4998000,
+        "Marzo 2026": 5014000,
+        "Abril 2026": 5017000,
+        "Mayo 2026": 5040000,
+        "Junio 2026": 5105000,
+        "Julio 2026": 5123000
+      },
+      "total": 35282000
+    },
+    {
+      "rut": "76.413.425-7",
+      "nombre": "PERFOMEX CHILE SPA",
+      "meses": {
+        "Enero 2026": 5330000,
+        "Febrero 2026": 5236000,
+        "Marzo 2026": 5253000,
+        "Abril 2026": 5256000,
+        "Mayo 2026": 5302000,
+        "Junio 2026": 5370000
+      },
+      "total": 31747000
+    },
+    {
+      "rut": "76.442.099-3",
+      "nombre": "SOCIEDAD FABRICA Y DISTRIBUIDORA DE ALIMENTOS JP LIMITADA",
+      "meses": {
+        "Enero 2026": 4548000,
+        "Febrero 2026": 4582000,
+        "Marzo 2026": 4597000,
+        "Abril 2026": 4600000,
+        "Mayo 2026": 4597000
+      },
+      "total": 22924000
+    },
+    {
+      "rut": "76.577.652-K",
+      "nombre": "LABORATORIO DENTAL Y SERVICIOS ODONTOLOGICOS ILAB LIMITADA",
+      "meses": {
+        "Enero 2026": 3497000,
+        "Febrero 2026": 3464000,
+        "Marzo 2026": 3475000,
+        "Abril 2026": 3477000,
+        "Mayo 2026": 3501000,
+        "Junio 2026": 3546000,
+        "Julio 2026": 3738000
+      },
+      "total": 24698000
+    },
+    {
+      "rut": "76.634.820-3",
+      "nombre": "VISIBILITY S. A.",
+      "meses": {
+        "Enero 2026": 1707000,
+        "Febrero 2026": 1482000,
+        "Marzo 2026": 5403000,
+        "Abril 2026": 1668000,
+        "Mayo 2026": 1672000,
+        "Junio 2026": 5337000,
+        "Julio 2026": 1700000
+      },
+      "total": 18969000
+    },
+    {
+      "rut": "76.693.045-K",
+      "nombre": "SOCIEDAD FABRICA Y DISTRIBUCION DE ALIMENTOS RENAM LIMITADA",
+      "meses": {
+        "Junio 2026": 3620000,
+        "Julio 2026": 3633000
+      },
+      "total": 7253000
+    },
+    {
+      "rut": "76.720.580-5",
+      "nombre": "SEGAFREDO ZANETTI CHILE S.A.",
+      "meses": {
+        "Enero 2026": 6570000,
+        "Febrero 2026": 6454000,
+        "Marzo 2026": 6474000,
+        "Abril 2026": 6478000,
+        "Mayo 2026": 6508000,
+        "Junio 2026": 6592000,
+        "Julio 2026": 6615000
+      },
+      "total": 45691000
+    },
+    {
+      "rut": "76.722.153-3",
+      "nombre": "Inversiones Lagunas El Parral SpA",
+      "meses": {
+        "Marzo 2026": 142000,
+        "Junio 2026": 145000
+      },
+      "total": 287000
+    },
+    {
+      "rut": "76.722.520-2",
+      "nombre": "ENLACES REGIONALES DE CHILE SOCIEDAD ANONIMA",
+      "meses": {
+        "Enero 2026": 662000,
+        "Febrero 2026": 661000,
+        "Marzo 2026": 663000,
+        "Abril 2026": 663000,
+        "Mayo 2026": 669000,
+        "Junio 2026": 677000,
+        "Julio 2026": 680000
+      },
+      "total": 4675000
+    },
+    {
+      "rut": "76.731.985-1",
+      "nombre": "SAN MIGUEL SPA",
+      "meses": {
+        "Marzo 2026": 8534000,
+        "Junio 2026": 8743000
+      },
+      "total": 17277000
+    },
+    {
+      "rut": "76.731.991-6",
+      "nombre": "CHICUREO NORTE SPA",
+      "meses": {
+        "Marzo 2026": 2844000,
+        "Junio 2026": 2914000
+      },
+      "total": 5758000
+    },
+    {
+      "rut": "76.736.449-0",
+      "nombre": "Campo San Miguel",
+      "meses": {
+        "Marzo 2026": 142000,
+        "Junio 2026": 145000
+      },
+      "total": 287000
+    },
+    {
+      "rut": "76.748.813-0",
+      "nombre": "CORSUD SPA",
+      "meses": {
+        "Enero 2026": 4327000,
+        "Febrero 2026": 4250000,
+        "Marzo 2026": 4264000,
+        "Abril 2026": 4267000,
+        "Mayo 2026": 4304000,
+        "Junio 2026": 4359000,
+        "Julio 2026": 4375000
+      },
+      "total": 30146000
+    },
+    {
+      "rut": "76.754.296-8",
+      "nombre": "FEDEX EXPRESS CHILE SPA",
+      "meses": {
+        "Enero 2026": 4825000,
+        "Febrero 2026": 4741000,
+        "Marzo 2026": 4756000,
+        "Abril 2026": 4759000,
+        "Mayo 2026": 4800000,
+        "Junio 2026": 4862000,
+        "Julio 2026": 4879000
+      },
+      "total": 33622000
+    },
+    {
+      "rut": "76.769.243-9",
+      "nombre": "Inversiones JBS SpA",
+      "meses": {
+        "Marzo 2026": 142000,
+        "Junio 2026": 145000
+      },
+      "total": 287000
+    },
+    {
+      "rut": "76.821.886-2",
+      "nombre": "CAMPO MAR SPA",
+      "meses": {
+        "Marzo 2026": 23468000,
+        "Junio 2026": 24045000
+      },
+      "total": 47513000
+    },
+    {
+      "rut": "76.832.139-6",
+      "nombre": "WEIDMULLER SPA",
+      "meses": {
+        "Enero 2026": 2517000,
+        "Febrero 2026": 2594000,
+        "Marzo 2026": 2602000,
+        "Abril 2026": 2603000,
+        "Mayo 2026": 2626000,
+        "Junio 2026": 2660000,
+        "Julio 2026": 2669000
+      },
+      "total": 18271000
+    },
+    {
+      "rut": "76.863.132-8",
+      "nombre": "TEZMAN CHILE SPA",
+      "meses": {
+        "Enero 2026": 4534000,
+        "Febrero 2026": 4461000,
+        "Marzo 2026": 4475000,
+        "Abril 2026": 4478000,
+        "Mayo 2026": 4517000,
+        "Junio 2026": 4575000,
+        "Julio 2026": 4591000
+      },
+      "total": 31631000
+    },
+    {
+      "rut": "76.863.375-4",
+      "nombre": "PMGD CALLE LARGA SPA",
+      "meses": {
+        "Marzo 2026": 284000,
+        "Junio 2026": 291000
+      },
+      "total": 575000
+    },
+    {
+      "rut": "76.914.556-7",
+      "nombre": "ALIMENTOS NEVA SPA",
+      "meses": {
+        "Enero 2026": 4259000,
+        "Febrero 2026": 4193000,
+        "Marzo 2026": 4207000,
+        "Abril 2026": 4209000,
+        "Mayo 2026": 4246000,
+        "Junio 2026": 4301000,
+        "Julio 2026": 4316000
+      },
+      "total": 29731000
+    },
+    {
+      "rut": "77.084.987-K",
+      "nombre": "PMGD PUENTE SPA",
+      "meses": {
+        "Marzo 2026": 284000,
+        "Junio 2026": 291000
+      },
+      "total": 575000
+    },
+    {
+      "rut": "77.086.580-8",
+      "nombre": "INVERSIONES P. S. D. SPA",
+      "meses": {
+        "Marzo 2026": 284000,
+        "Junio 2026": 291000
+      },
+      "total": 575000
+    },
+    {
+      "rut": "77.086.590-5",
+      "nombre": "INVERSIONES T. S. D. SPA",
+      "meses": {
+        "Marzo 2026": 284000,
+        "Junio 2026": 291000
+      },
+      "total": 575000
+    },
+    {
+      "rut": "77.113.577-3",
+      "nombre": "FEN INGENIERÍA SPA",
+      "meses": {
+        "Enero 2026": 3095000,
+        "Febrero 2026": 3100000,
+        "Marzo 2026": 3110000,
+        "Abril 2026": 3112000,
+        "Mayo 2026": 3129000,
+        "Junio 2026": 3169000,
+        "Julio 2026": 3180000
+      },
+      "total": 21895000
+    },
+    {
+      "rut": "77.128.238-5",
+      "nombre": "Inversiones TSD ZF SpA",
+      "meses": {
+        "Marzo 2026": 142000,
+        "Junio 2026": 145000
+      },
+      "total": 287000
+    },
+    {
+      "rut": "77.128.272-5",
+      "nombre": "Inversiones ByA ZF SpA",
+      "meses": {
+        "Marzo 2026": 142000,
+        "Junio 2026": 145000
+      },
+      "total": 287000
+    },
+    {
+      "rut": "77.133.757-0",
+      "nombre": "Inversiones PSD ZF SpA",
+      "meses": {
+        "Marzo 2026": 142000,
+        "Junio 2026": 145000
+      },
+      "total": 287000
+    },
+    {
+      "rut": "77.183.912-6",
+      "nombre": "PMGD SALERNO SPA",
+      "meses": {
+        "Marzo 2026": 284000,
+        "Junio 2026": 291000
+      },
+      "total": 575000
+    },
+    {
+      "rut": "77.343.790-4",
+      "nombre": "PARKER HANNIFIN CORPORATION CHILE LIMITADA",
+      "meses": {
+        "Enero 2026": 5008000,
+        "Febrero 2026": 4915000,
+        "Marzo 2026": 4931000,
+        "Abril 2026": 4933000,
+        "Mayo 2026": 4977000,
+        "Junio 2026": 5041000,
+        "Julio 2026": 5058000
+      },
+      "total": 34863000
+    },
+    {
+      "rut": "77.406.040-5",
+      "nombre": "COMERCIAL KPC CHILE LIMITADA",
+      "meses": {
+        "Enero 2026": 3754000,
+        "Febrero 2026": 3702000,
+        "Marzo 2026": 3714000,
+        "Abril 2026": 3716000,
+        "Mayo 2026": 3737000,
+        "Junio 2026": 3785000,
+        "Julio 2026": 3798000
+      },
+      "total": 26206000
+    },
+    {
+      "rut": "77.454.587-5",
+      "nombre": "SANCHEZ HERMANOS SPA",
+      "meses": {
+        "Enero 2026": 77117000,
+        "Febrero 2026": 75614000,
+        "Marzo 2026": 90560000,
+        "Abril 2026": 75907000,
+        "Mayo 2026": 76523000,
+        "Junio 2026": 88613000,
+        "Julio 2026": 69255000
+      },
+      "total": 553589000
+    },
+    {
+      "rut": "77.478.992-8",
+      "nombre": "LOINCO CAPITAL SPA",
+      "meses": {
+        "Enero 2026": 141000,
+        "Febrero 2026": 354000,
+        "Marzo 2026": 355000,
+        "Abril 2026": 355000,
+        "Mayo 2026": 358000
+      },
+      "total": 1563000
+    },
+    {
+      "rut": "77.481.481-7",
+      "nombre": "VERONA SOLAR SPA",
+      "meses": {
+        "Marzo 2026": 284000,
+        "Junio 2026": 291000
+      },
+      "total": 575000
+    },
+    {
+      "rut": "77.529.470-1",
+      "nombre": "COMERCIAL SNA-E (CHILE) LIMITADA",
+      "meses": {
+        "Enero 2026": 19291000,
+        "Febrero 2026": 17109000,
+        "Marzo 2026": 17164000,
+        "Abril 2026": 17174000,
+        "Mayo 2026": 17325000,
+        "Junio 2026": 17548000,
+        "Julio 2026": 17609000
+      },
+      "total": 123220000
+    },
+    {
+      "rut": "77.538.786-6",
+      "nombre": "DISTRIBUIDORA SANCHEZ 4G SPA",
+      "meses": {
+        "Enero 2026": 5201000,
+        "Febrero 2026": 5189000,
+        "Marzo 2026": 8287000,
+        "Abril 2026": 5209000,
+        "Mayo 2026": 5217000,
+        "Junio 2026": 8444000,
+        "Julio 2026": 5305000
+      },
+      "total": 42852000
+    },
+    {
+      "rut": "77.542.682-9",
+      "nombre": "ROCKETMAN SPA",
+      "meses": {
+        "Enero 2026": 1797000,
+        "Febrero 2026": 1794000,
+        "Marzo 2026": 1800000,
+        "Abril 2026": 1801000,
+        "Mayo 2026": 1817000,
+        "Junio 2026": 1840000,
+        "Julio 2026": 1846000
+      },
+      "total": 12695000
+    },
+    {
+      "rut": "77.572.358-0",
+      "nombre": "IN WASSER SPA.",
+      "meses": {
+        "Enero 2026": 7358000,
+        "Febrero 2026": 7384000,
+        "Marzo 2026": 7408000,
+        "Abril 2026": 7412000,
+        "Mayo 2026": 7438000,
+        "Junio 2026": 7535000,
+        "Julio 2026": 7561000
+      },
+      "total": 52096000
+    },
+    {
+      "rut": "77.660.405-4",
+      "nombre": "SANVIL INGENIERIA SPA",
+      "meses": {
+        "Enero 2026": 916000,
+        "Febrero 2026": 945000,
+        "Marzo 2026": 948000,
+        "Abril 2026": 439000
+      },
+      "total": 3248000
+    },
+    {
+      "rut": "77.830.887-8",
+      "nombre": "SERVICIOS Y GESTION SOUTH 53 SPA",
+      "meses": {
+        "Marzo 2026": 568000,
+        "Junio 2026": 582000
+      },
+      "total": 1150000
+    },
+    {
+      "rut": "77.924.230-7",
+      "nombre": "COMERCIALIZADORA INDUSTRIAL W & L LIMITADA",
+      "meses": {
+        "Enero 2026": 17090000,
+        "Febrero 2026": 16609000,
+        "Marzo 2026": 16663000,
+        "Abril 2026": 16673000,
+        "Mayo 2026": 16821000,
+        "Junio 2026": 17040000,
+        "Julio 2026": 17099000
+      },
+      "total": 117995000
+    },
+    {
+      "rut": "78.057.250-7",
+      "nombre": "INDUSTRIA YKK CHILE LTDA",
+      "meses": {
+        "Enero 2026": 6292000,
+        "Febrero 2026": 6176000,
+        "Marzo 2026": 6196000,
+        "Abril 2026": 6199000,
+        "Mayo 2026": 6254000,
+        "Junio 2026": 6334000,
+        "Julio 2026": 6356000
+      },
+      "total": 43807000
+    },
+    {
+      "rut": "78.064.534-2",
+      "nombre": "GRUPO DROP SPA",
+      "meses": {
+        "Enero 2026": 3426000,
+        "Febrero 2026": 3362000,
+        "Marzo 2026": 3373000,
+        "Abril 2026": 3375000,
+        "Mayo 2026": 3404000,
+        "Junio 2026": 3448000,
+        "Julio 2026": 3460000
+      },
+      "total": 23848000
+    },
+    {
+      "rut": "78.216.401-5",
+      "nombre": "CASINO IMPERIO LIMITADA",
+      "meses": {
+        "Enero 2026": 6877000,
+        "Febrero 2026": 6890000,
+        "Marzo 2026": 6912000,
+        "Abril 2026": 6916000,
+        "Mayo 2026": 6953000,
+        "Junio 2026": 7043000,
+        "Julio 2026": 7067000
+      },
+      "total": 48658000
+    },
+    {
+      "rut": "78.340.100-2",
+      "nombre": "GYSLING,SANCHEZ Y MIJAC SPA",
+      "meses": {
+        "Marzo 2026": 142000,
+        "Junio 2026": 145000
+      },
+      "total": 287000
+    },
+    {
+      "rut": "78.366.970-6",
+      "nombre": "INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA",
+      "meses": {
+        "Enero 2026": 51127000,
+        "Febrero 2026": 49660000,
+        "Marzo 2026": 49822000,
+        "Abril 2026": 49851000,
+        "Mayo 2026": 50223000,
+        "Junio 2026": 50877000,
+        "Julio 2026": 51055000
+      },
+      "total": 352615000
+    },
+    {
+      "rut": "78.371.217-2",
+      "nombre": "2R SPA",
+      "meses": {
+        "Junio 2026": 5428000,
+        "Julio 2026": 5420000
+      },
+      "total": 10848000
+    },
+    {
+      "rut": "78.790.320-7",
+      "nombre": "Inversiones ByA SpA",
+      "meses": {
+        "Marzo 2026": 142000,
+        "Junio 2026": 145000
+      },
+      "total": 287000
+    },
+    {
+      "rut": "78.844.240-8",
+      "nombre": "Inversiones MyR SpA",
+      "meses": {
+        "Marzo 2026": 142000,
+        "Junio 2026": 145000
+      },
+      "total": 287000
+    },
+    {
+      "rut": "79.913.320-2",
+      "nombre": "GALLYAS TELECOM S.A.",
+      "meses": {
+        "Enero 2026": 5649000,
+        "Febrero 2026": 5537000,
+        "Marzo 2026": 5555000,
+        "Abril 2026": 5558000,
+        "Mayo 2026": 5607000,
+        "Junio 2026": 5680000,
+        "Julio 2026": 5699000
+      },
+      "total": 39285000
+    },
+    {
+      "rut": "81.826.800-9",
+      "nombre": "CAJA DE COMPENSACION DE ASIGNACION FAMILIAR DE LOS ANDES",
+      "meses": {
+        "Enero 2026": 11606000,
+        "Febrero 2026": 11590000,
+        "Marzo 2026": 11627000,
+        "Abril 2026": 11634000
+      },
+      "total": 46457000
+    },
+    {
+      "rut": "82.606.800-0",
+      "nombre": "CAJA DE COMPENSACION ASIGNACION FAMILIAR 18 DE SEPTIEMBRE",
+      "meses": {
+        "Enero 2026": 4769000,
+        "Febrero 2026": 4762000,
+        "Marzo 2026": 4778000,
+        "Abril 2026": 4780000,
+        "Mayo 2026": 4822000,
+        "Junio 2026": 4883000,
+        "Julio 2026": 5144000
+      },
+      "total": 33938000
+    },
+    {
+      "rut": "82.623.500-4",
+      "nombre": "IDEAL S.A.",
+      "meses": {
+        "Enero 2026": 297000,
+        "Marzo 2026": 297000,
+        "Abril 2026": 297000,
+        "Mayo 2026": 297000,
+        "Junio 2026": 297000,
+        "Julio 2026": 297000
+      },
+      "total": 1782000
+    },
+    {
+      "rut": "85.864.400-3",
+      "nombre": "ADECCO SERVICIOS EMPRESARIALES S A",
+      "meses": {
+        "Enero 2026": 3371000,
+        "Febrero 2026": 3335000,
+        "Marzo 2026": 3344000,
+        "Abril 2026": 3346000,
+        "Mayo 2026": 3364000,
+        "Junio 2026": 3402000,
+        "Julio 2026": 3412000
+      },
+      "total": 23574000
+    },
+    {
+      "rut": "89.066.200-5",
+      "nombre": "SOC COMERCIAL JOSE MARIN ANTONIN Y COMPANIA LIMITADA",
+      "meses": {
+        "Enero 2026": 5563000,
+        "Febrero 2026": 5414000,
+        "Marzo 2026": 5432000,
+        "Abril 2026": 5435000,
+        "Mayo 2026": 5484000,
+        "Junio 2026": 5555000,
+        "Julio 2026": 5574000
+      },
+      "total": 38457000
+    },
+    {
+      "rut": "89.622.400-K",
+      "nombre": "PULLMAN CARGO S A",
+      "meses": {
+        "Enero 2026": 8560000,
+        "Febrero 2026": 4454000,
+        "Marzo 2026": 4469000,
+        "Abril 2026": 4471000,
+        "Mayo 2026": 4510000,
+        "Junio 2026": 4800000,
+        "Julio 2026": 4817000
+      },
+      "total": 36081000
+    },
+    {
+      "rut": "93.737.000-8",
+      "nombre": "GTD MANQUEHUE S.A.",
+      "meses": {
+        "Enero 2026": 274000,
+        "Febrero 2026": 273000,
+        "Marzo 2026": 274000,
+        "Abril 2026": 274000,
+        "Mayo 2026": 277000,
+        "Junio 2026": 280000,
+        "Julio 2026": 281000
+      },
+      "total": 1933000
+    },
+    {
+      "rut": "96.620.660-8",
+      "nombre": "Sanchez y Sanchez SpA",
+      "meses": {
+        "Marzo 2026": 9719000,
+        "Junio 2026": 9958000
+      },
+      "total": 19677000
+    },
+    {
+      "rut": "96.799.250-K",
+      "nombre": "CLARO CHILE SPA",
+      "meses": {
+        "Febrero 2026": 1073000,
+        "Mayo 2026": 1075000,
+        "Julio 2026": 1102000
+      },
+      "total": 3250000
+    },
+    {
+      "rut": "96.836.580-0",
+      "nombre": "TRANE DE CHILE S A",
+      "meses": {
+        "Enero 2026": 19129000,
+        "Febrero 2026": 18629000,
+        "Marzo 2026": 18690000,
+        "Abril 2026": 18701000,
+        "Mayo 2026": 18867000,
+        "Junio 2026": 19112000,
+        "Julio 2026": 19178000
+      },
+      "total": 132306000
+    },
+    {
+      "rut": "96.866.330-5",
+      "nombre": "VOITH TURBO S A",
+      "meses": {
+        "Enero 2026": 9829000,
+        "Febrero 2026": 9617000,
+        "Marzo 2026": 9649000,
+        "Abril 2026": 9654000,
+        "Mayo 2026": 9739000,
+        "Junio 2026": 9865000,
+        "Julio 2026": 9899000
+      },
+      "total": 68252000
+    },
+    {
+      "rut": "96.885.670-7",
+      "nombre": "COMERCIAL INGERSOLL RAND (CHILE) LIMITADA",
+      "meses": {
+        "Enero 2026": 31260000,
+        "Febrero 2026": 17917000,
+        "Marzo 2026": 10163000,
+        "Abril 2026": 10174000,
+        "Mayo 2026": 10335000,
+        "Junio 2026": 18385000
+      },
+      "total": 98234000
+    },
+    {
+      "rut": "96.896.480-1",
+      "nombre": "SONEPAR CHILE SA",
+      "meses": {
+        "Enero 2026": 47632000,
+        "Febrero 2026": 46387000,
+        "Marzo 2026": 46538000,
+        "Abril 2026": 46565000,
+        "Mayo 2026": 46979000,
+        "Junio 2026": 47588000,
+        "Julio 2026": 47754000
+      },
+      "total": 329443000
+    },
+    {
+      "rut": "96.951.450-8",
+      "nombre": "FESTO S A",
+      "meses": {
+        "Enero 2026": 8395000,
+        "Febrero 2026": 8299000,
+        "Marzo 2026": 8325000,
+        "Abril 2026": 8330000,
+        "Mayo 2026": 8403000,
+        "Junio 2026": 8510000,
+        "Julio 2026": 8540000
+      },
+      "total": 58802000
+    },
+    {
+      "rut": "96.955.880-7",
+      "nombre": "A3D CHILE S A",
+      "meses": {
+        "Enero 2026": 7320000,
+        "Febrero 2026": 7058000,
+        "Marzo 2026": 7081000,
+        "Abril 2026": 7086000,
+        "Mayo 2026": 5034000,
+        "Junio 2026": 5101000,
+        "Julio 2026": 5120000
+      },
+      "total": 43800000
+    },
+    {
+      "rut": "97.006.000-6",
+      "nombre": "BANCO DE CREDITO E INVERSIONES",
+      "meses": {
+        "Enero 2026": 16097000,
+        "Febrero 2026": 16075000,
+        "Marzo 2026": 16126000,
+        "Abril 2026": 16135000,
+        "Mayo 2026": 16275000,
+        "Junio 2026": 16481000,
+        "Julio 2026": 16537000
+      },
+      "total": 113726000
+    },
+    {
+      "rut": "97.023.000-9",
+      "nombre": "BANCO ITAU CHILE",
+      "meses": {
+        "Enero 2026": 1077000,
+        "Marzo 2026": 1079000,
+        "Abril 2026": 1080000,
+        "Mayo 2026": 1089000,
+        "Junio 2026": 1103000,
+        "Julio 2026": 1107000
+      },
+      "total": 6535000
+    },
+    {
+      "rut": "97.030.000-7",
+      "nombre": "BANCO DEL ESTADO DE CHILE",
+      "meses": {
+        "Enero 2026": 18255000,
+        "Febrero 2026": 18231000,
+        "Marzo 2026": 18288000,
+        "Abril 2026": 18299000,
+        "Mayo 2026": 18457000,
+        "Junio 2026": 18691000,
+        "Julio 2026": 18755000
+      },
+      "total": 128976000
+    },
+    {
+      "rut": "97.053.000-2",
+      "nombre": "BANCO SECURITY",
+      "meses": {
+        "Enero 2026": 5196000,
+        "Febrero 2026": 5189000,
+        "Marzo 2026": 5205000
+      },
+      "total": 15590000
+    },
+    {
+      "rut": "97.080.000-K",
+      "nombre": "BANCO BICE",
+      "meses": {
+        "Abril 2026": 5208000,
+        "Mayo 2026": 5253000,
+        "Junio 2026": 5576000,
+        "Julio 2026": 5595000
+      },
+      "total": 21632000
+    },
+    {
+      "rut": "99.517.650-5",
+      "nombre": "JOHN CRANE CHILE S A",
+      "meses": {
+        "Enero 2026": 10266000,
+        "Febrero 2026": 10030000,
+        "Marzo 2026": 10062000,
+        "Abril 2026": 10068000,
+        "Mayo 2026": 10157000,
+        "Junio 2026": 10288000,
+        "Julio 2026": 10324000
+      },
+      "total": 71195000
+    },
+    {
+      "rut": "99.550.230-5",
+      "nombre": "MEDILAND SPA",
+      "meses": {
+        "Enero 2026": 6897000,
+        "Febrero 2026": 6763000,
+        "Marzo 2026": 6785000,
+        "Abril 2026": 6789000,
+        "Mayo 2026": 6849000,
+        "Junio 2026": 6937000,
+        "Julio 2026": 6961000
+      },
+      "total": 47981000
+    },
+    {
+      "rut": "99.576.080-0",
+      "nombre": "OLYMPUS CORPORATION CHILE SPA",
+      "meses": {
+        "Enero 2026": 15047000,
+        "Febrero 2026": 21534000,
+        "Marzo 2026": 117430000,
+        "Abril 2026": 20580000,
+        "Mayo 2026": 144775000,
+        "Junio 2026": 189612000,
+        "Julio 2026": 27707000
+      },
+      "total": 536685000
+    }
+  ]
+}
