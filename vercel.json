@@ -6,16 +6,15 @@
     "api/historial.js": { "includeFiles": "historial-excel-2026.json", "maxDuration": 120 },
     "api/planilla.js": { "maxDuration": 60 },
     "api/aguas-andinas.js": { "maxDuration": 300 },
-    "api/aa-refresh.js": { "maxDuration": 300 }
+    "api/aa-refresh.js": { "maxDuration": 300 },
+    "api/nubox-refresh.js": { "maxDuration": 300 }
   },
   "crons": [
     { "path": "/api/planilla?addMonth=1", "schedule": "0 12 25 * *" },
-    { "path": "/api/aa-refresh", "schedule": "0 9 * * *" }
+    { "path": "/api/aa-refresh", "schedule": "0 9 * * *" },
+    { "path": "/api/nubox-refresh", "schedule": "0 10 2 * *" }
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1" },
     { "src": "/aa-cache.json", "dest": "/aa-cache.json" },
-    { "src": "/(.+\\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2))", "dest": "/$1" },
-    { "src": "/(.*)", "dest": "/index.html" }
-  ]
-}
+    { "src": "/nubox
