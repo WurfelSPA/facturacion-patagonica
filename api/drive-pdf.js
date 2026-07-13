@@ -85,9 +85,13 @@ async function findPdfGlobal(token, folio) {
     `&supportsAllDrives=true&includeItemsFromAllDrives=true`);
   const files = (d && d.files) || [];
   if (!files.length) return null;
+  // Solo retornar si hay coincidencia exacta de folio (sin fallback a files[0]
+  // que devolvería el primer PDF de Drive sin importar si corresponde al folio)
   return files.find(f => f && f.name &&
-    (f.name.startsWith(`F-${folio} `) || f.name.startsWith(`F-${folio}.`))
-  ) || files[0] || null;
+    (f.name.startsWith(`F-${folio} `) || f.name.startsWith(`F-${folio}.`) ||
+     f.name === `F-${folio}.pdf` || f.name.startsWith(`FEE-${folio} `) ||
+     f.name.startsWith(`FEE-${folio}.`) || f.name === `FEE-${folio}.pdf`)
+  ) || null;
 }
 
 // ── Extracción de texto por página (portado de split-pdf.js) ─────────────────
@@ -248,9 +252,18 @@ export default async function handler(req, res) {
 
           const mapping = buildCMapFromDoc(srcDoc);
           let targetIdx = -1;
+          // Buscar el folio con contexto específico para evitar falsos positivos
+          // (ej: "14690" aparece como monto "$14.690.000" en otras páginas).
+          // Se prioriza patrón "N° XXXXX" o "N°XXXXX"; si no se encuentra, se
+          // acepta el número suelto SOLO si no está precedido/seguido de otro dígito.
+          const folioPatterns = [
+            new RegExp(`N[°°o][\\s]*${folio}(?!\\d)`),   // N° 14690 / N°14690
+            new RegExp(`(?<![\\d])${folio}(?![\\d])`),         // 14690 como número aislado
+          ];
           for (let i = 0; i < totalPages; i++) {
             const text = extractPageText(srcDoc, i, mapping);
-            if (text.includes(folio)) { targetIdx = i; break; }
+            const hit = folioPatterns.some(re => re.test(text));
+            if (hit) { targetIdx = i; break; }
           }
 
           if (targetIdx >= 0) {
@@ -263,25 +276,4 @@ export default async function handler(req, res) {
       } catch (e1) { console.warn("drive-pdf R1:", e1 && e1.message); }
     }
 
-    // ── Ruta 2: búsqueda global en Drive ─────────────────────────────────────
-    try {
-      const f2 = await findPdfGlobal(token, folio);
-      if (f2 && f2.id) {
-        console.log(`drive-pdf R2: sirviendo ${f2.name}`);
-        return sendPdf(await driveDownload(token, f2.id), 1);
-      }
-    } catch (e2) { console.warn("drive-pdf R2:", e2 && e2.message); }
-
-    res.setHeader("Access-Control-Expose-Headers", CORS);
-    return res.status(404).json({
-      error:`PDF para folio ${folio} no encontrado`,
-      periodo: periodo || "no especificado",
-      hint:"Verifica que Facturas_PISA_YYYY-MM.pdf esté en la carpeta de Drive.",
-    });
-
-  } catch (err) {
-    console.error("drive-pdf CRASH:", err && (err.stack || err.message));
-    if (!res.headersSent)
-      return res.status(500).json({ error:"Error interno", detail:String(err && err.message||err) });
-  }
-}
+    // ── Ruta 2: búsqueda global en Drive �
