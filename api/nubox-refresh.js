@@ -12,7 +12,7 @@
  *   SYNC_SECRET        - Secreto para autenticar llamadas manuales
  */
 
-import XLSX from 'xlsx';
+import * as XLSX from 'xlsx';
 
 // ── Mapa de abreviaciones de mes a nombre completo ────────────────────────────
 const MES_MAP = {
