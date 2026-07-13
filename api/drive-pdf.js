@@ -1,14 +1,17 @@
 /**
  * /api/drive-pdf  GET ?folio=14686&periodo=2026-06
  *
- * Ruta 0: busca PDF individual F-14686*.pdf en FACT_FOLDER_ID → redirect
- * Ruta 1: descarga PDF general Facturas_PISA_YYYY-MM.pdf → extrae la página
- *         exacta que contiene el folio → devuelve PDF binario de esa página
- * Ruta 2: búsqueda global en Drive → redirect
+ * Ruta 0:   busca PDF individual F-14686*.pdf en FACT_FOLDER_ID → sirve directo
+ * Ruta 0.5: abre ZIP mensual (YYYY-MM.zip) y extrae F-14686*.pdf desde dentro
+ *           ← fuente más confiable para meses con split-PDF generado
+ * Ruta 1:   descarga PDF general Facturas_PISA_YYYY-MM.pdf → extrae la página
+ *           exacta que contiene el folio → devuelve PDF binario de esa página
+ * Ruta 2:   búsqueda global en Drive por nombre exacto → sin fallback a files[0]
  */
 
 import { PDFDocument, PDFName, PDFArray } from "pdf-lib";
 import { inflateSync } from "zlib";
+import JSZip from "jszip";
 
 export const config = { api: { bodyParser: false, responseLimit: "20mb" } };
 
@@ -205,7 +208,7 @@ export default async function handler(req, res) {
       return res.send(Buffer.from(buf));
     }
 
-    // ── Ruta 0: PDF individual pre-split en carpeta ──────────────────────────
+    // ── Ruta 0: PDF individual pre-split como archivo suelto en carpeta ────────
     try {
       const q0 = encodeURIComponent(
         `'${FACT_FOLDER_ID}' in parents and mimeType='application/pdf' and trashed=false` +
@@ -222,6 +225,45 @@ export default async function handler(req, res) {
       }
     } catch (e0) { console.warn("drive-pdf R0:", e0 && e0.message); }
 
+    // ── Ruta 0.5: ZIP mensual YYYY-MM.zip → extraer F-XXXXX.pdf desde dentro ──
+    // Los split-PDFs viven en Drive como "2026-06.zip", "2026-07.zip", etc.
+    // cada uno contiene archivos como "F-14690 Megamin Chile.pdf"
+    if (periodo) {
+      try {
+        const [anio, mesNum] = periodo.split("-");
+        const zipName = `${anio}-${mesNum}.zip`;
+        const qZip = encodeURIComponent(
+          `'${FACT_FOLDER_ID}' in parents and name='${zipName}' and trashed=false`
+        );
+        const dZip = await driveGet(token,
+          `https://www.googleapis.com/drive/v3/files?q=${qZip}&fields=files(id,name)&pageSize=5` +
+          `&supportsAllDrives=true&includeItemsFromAllDrives=true`);
+        const zipFile = ((dZip && dZip.files) || []).find(f => f && f.id);
+        if (zipFile) {
+          console.log(`drive-pdf R0.5: abriendo ${zipName}`);
+          const zipBuf = await driveDownload(token, zipFile.id);
+          const zip    = await JSZip.loadAsync(zipBuf);
+          // Buscar entrada cuyo nombre coincida con el folio (F-XXXXX o FEE-XXXXX)
+          const folioRe = new RegExp(
+            `(?:^|[\\/])(F|FEE)-${folio}[\\s\\.]`, "i"
+          );
+          const exactRe = new RegExp(
+            `(?:^|[\\/])(F|FEE)-${folio}\\.pdf$`, "i"
+          );
+          const entry = Object.entries(zip.files).find(([name, f]) =>
+            !f.dir && (exactRe.test(name) || folioRe.test(name))
+          );
+          if (entry) {
+            console.log(`drive-pdf R0.5: sirviendo ${entry[0]}`);
+            const pdfBuf = Buffer.from(await entry[1].async("arraybuffer"));
+            return sendPdf(pdfBuf, 1);
+          } else {
+            console.warn(`drive-pdf R0.5: folio ${folio} no encontrado en ${zipName}`);
+          }
+        }
+      } catch (e05) { console.warn("drive-pdf R0.5:", e05 && e05.message); }
+    }
+
     // ── Ruta 1: buscar folio en PDF general → servir PDF completo + X-Pdf-Page
     if (periodo) {
       try {
@@ -235,45 +277,4 @@ export default async function handler(req, res) {
           `&supportsAllDrives=true&includeItemsFromAllDrives=true`);
         const all1 = (d1 && d1.files) || [];
         const genFile = all1.find(f => {
-          if (!f || !f.name || !f.id) return false;
-          const n = f.name.toLowerCase();
-          return n.endsWith(".pdf") && n.includes("pisa") && (
-            n.includes(`${anio}-${mesNum}`) || n.includes(`${mesNum}-${anio}`) ||
-            n.includes(`_${mesNum}_`) || n.includes(`-${mesNum}.pdf`)
-          );
-        });
-
-        if (genFile) {
-          console.log(`drive-pdf R1: descargando ${genFile.name}`);
-          const pdfBuf = await driveDownload(token, genFile.id);
-          const srcDoc = await PDFDocument.load(pdfBuf, { ignoreEncryption:true });
-          const totalPages = srcDoc.getPageCount();
-          console.log(`drive-pdf R1: ${totalPages} págs, buscando folio ${folio}`);
-
-          const mapping = buildCMapFromDoc(srcDoc);
-          let targetIdx = -1;
-          // Buscar el folio con contexto específico para evitar falsos positivos
-          // (ej: "14690" aparece como monto "$14.690.000" en otras páginas).
-          // Se prioriza patrón "N° XXXXX" o "N°XXXXX"; si no se encuentra, se
-          // acepta el número suelto SOLO si no está precedido/seguido de otro dígito.
-          const folioPatterns = [
-            new RegExp(`N[°°o][\\s]*${folio}(?!\\d)`),   // N° 14690 / N°14690
-            new RegExp(`(?<![\\d])${folio}(?![\\d])`),         // 14690 como número aislado
-          ];
-          for (let i = 0; i < totalPages; i++) {
-            const text = extractPageText(srcDoc, i, mapping);
-            const hit = folioPatterns.some(re => re.test(text));
-            if (hit) { targetIdx = i; break; }
-          }
-
-          if (targetIdx >= 0) {
-            console.log(`drive-pdf R1: folio ${folio} en página ${targetIdx+1} → sirviendo PDF completo`);
-            return sendPdf(pdfBuf, targetIdx + 1); // PDF original sin modificar + pista de página
-          } else {
-            console.warn(`drive-pdf R1: folio ${folio} no encontrado en ${genFile.name}`);
-          }
-        }
-      } catch (e1) { console.warn("drive-pdf R1:", e1 && e1.message); }
-    }
-
-    // ── Ruta 2: búsqueda global en Drive �
+          if (!f || !f.name || !f.id) return 
