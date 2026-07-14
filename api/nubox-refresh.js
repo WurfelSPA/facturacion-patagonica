@@ -275,10 +275,12 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // Autenticación: cron de Vercel o SYNC_SECRET manual
+  // Autenticación: cron de Vercel (CRON_SECRET) o llamada manual (SYNC_SECRET)
   const authHeader = req.headers['authorization'] || '';
-  const syncSecret = process.env.SYNC_SECRET;
-  const isCron     = req.headers['x-vercel-cron'] === '1';
+  const cronSecret  = process.env.CRON_SECRET;
+  const syncSecret  = process.env.SYNC_SECRET;
+  const isCron     = req.headers['x-vercel-cron'] === '1' ||
+                     (cronSecret && authHeader === `Bearer ${cronSecret}`);
   const isAuth     = isCron || (syncSecret && authHeader === `Bearer ${syncSecret}`);
   if (!isAuth) return res.status(401).json({ error: 'No autorizado' });
 
@@ -346,10 +348,4 @@ export default async function handler(req, res) {
       clientes:  clientes.length,
       columnas:  columnas.length,
       meses:     columnas
-    });
-
-  } catch (e) {
-    console.error('[nubox-refresh] Error:', e.message);
-    return res.status(500).json({ ok: false, error: e.message });
-  }
-}
+   

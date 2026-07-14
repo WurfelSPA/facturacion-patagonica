@@ -136,10 +136,14 @@ export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // Autenticación: cron de Vercel o SYNC_SECRET manual
+  // Autenticación: cron de Vercel (CRON_SECRET) o llamada manual (SYNC_SECRET)
+  // Vercel envía: Authorization: Bearer <CRON_SECRET> con User-Agent vercel-cron/1.0
+  // (en versiones antiguas usaba el header x-vercel-cron: 1, ya deprecado)
   const authHeader = req.headers['authorization'] || '';
-  const syncSecret = process.env.SYNC_SECRET;
-  const isCron = req.headers['x-vercel-cron'] === '1';
+  const cronSecret  = process.env.CRON_SECRET;
+  const syncSecret  = process.env.SYNC_SECRET;
+  const isCron = req.headers['x-vercel-cron'] === '1' ||
+                 (cronSecret && authHeader === `Bearer ${cronSecret}`);
   const isAuth = isCron || (syncSecret && authHeader === `Bearer ${syncSecret}`);
   if (!isAuth) return res.status(401).json({ error: 'No autorizado' });
 
@@ -184,13 +188,4 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ok: true,
-      updatedAt: cacheData.updatedAt,
-      total: blData.total,
-      cuentasConDeuda: Object.values(blData.accounts).filter(a => a.deuda && a.deuda !== '$0').length
-    });
-
-  } catch (e) {
-    console.error('[aa-refresh] Error:', e.message);
-    return res.status(500).json({ ok: false, error: e.message });
-  }
-}
+      up
