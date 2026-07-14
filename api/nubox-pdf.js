@@ -231,7 +231,7 @@ export default async function handler(req, res) {
     console.log(`[nubox-pdf] Descargando facturas ${mes} via Browserless...`);
 
     const blRes = await fetch(
-      `https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}`,
+      `https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}&timeout=120000`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -289,6 +289,4 @@ export default async function handler(req, res) {
 
   } catch (err) {
     console.error('[nubox-pdf] Error:', err.message);
-    return res.status(500).json({ error: err.message });
-  }
-}
+    return res.status(500).json({ error: err.mes
