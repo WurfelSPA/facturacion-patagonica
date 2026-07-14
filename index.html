@@ -3521,6 +3521,20 @@ function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlo
   );
 }
 
+function SplitTimer({loading}){
+  const [elapsed,setElapsed]=React.useState(0);
+  React.useEffect(()=>{
+    if(!loading){setElapsed(0);return;}
+    setElapsed(0);
+    const t=setInterval(()=>setElapsed(s=>s+1),1000);
+    return()=>clearInterval(t);
+  },[loading]);
+  if(!loading||elapsed===0)return null;
+  return h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},
+    `⏱ ${Math.floor(elapsed/60)}:${String(elapsed%60).padStart(2,"0")} transcurridos`
+  );
+}
+
 function App(){
   /* Config viene 100% de env vars Vercel — no hay setup manual */
   const apiKey=PRESET_KEY;
@@ -3553,8 +3567,6 @@ function App(){
   const [splitLoading,setSplitLoading]=useState(false);
   const [splitResult,setSplitResult]=useState(null);
   const [splitStatus,setSplitStatus]=useState("");
-  const [splitElapsed,setSplitElapsed]=useState(0);
-  const splitStartRef=useRef(null);
   const [ufSII,setUfSII]=useState(null);
   const [histAnio,setHistAnio]=useState(2026);
   const [unlocked,setUnlocked]=useState(false);
@@ -3766,14 +3778,6 @@ function App(){
       setMonthlyUF(map);
     });
   },[dashData]);
-
-  /* Timer para splitLoading */
-  useEffect(()=>{
-    let t;
-    if(splitLoading){splitStartRef.current=Date.now();setSplitElapsed(0);t=setInterval(()=>setSplitElapsed(Math.round((Date.now()-splitStartRef.current)/1000)),1000);}
-    else{setSplitElapsed(0);}
-    return()=>clearInterval(t);
-  },[splitLoading]);
 
   /* Auto-parsear planilla para dashboard */
   useEffect(()=>{
@@ -5150,9 +5154,7 @@ function App(){
           h("span",{style:{fontSize:12,color:"var(--txd)",fontStyle:"italic"}},
             splitStatus||(zipStatus==="splitting"?"Separando facturas...":splitLoading?"Iniciando...":"Buscando PDFs en Drive...")
           ),
-          splitLoading&&splitElapsed>0&&h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},
-            `⏱ ${Math.floor(splitElapsed/60)}:${String(splitElapsed%60).padStart(2,"0")} transcurridos`
-          )
+          h(SplitTimer,{loading:splitLoading})
         ),
         zipStatus==="error"&&h("span",{style:{fontSize:12,color:"var(--red)",marginLeft:4}},zipError||"Error al buscar PDFs"),
         zipStatus==="error"&&h("button",{

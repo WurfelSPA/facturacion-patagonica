@@ -45,8 +45,8 @@ async function getSAToken() {
 }
 
 // ── Script Browserless ───────────────────────────────────────────────────────
-// Igual flujo de login que nubox-refresh.js, pero luego navega a la sección
-// de Ventas Electrónicas (dteDocumentosTributarios.aspx) y descarga el PDF.
+// CAMBIO CLAVE: Usa waitUntil:'load' en vez de 'networkidle2' para evitar
+// timeout en el SPA de Nubox (que tiene polling de red continuo).
 const BROWSER_CODE = `
 export default async function main({ page, context }) {
   const { rut, clave, year, month } = context;
@@ -57,7 +57,8 @@ export default async function main({ page, context }) {
 
   // ── 1. Login Nubox ────────────────────────────────────────────────────────
   const LOGIN_URL = 'https://web.nubox.com/Login/Account/Login?ReturnUrl=%2FSistemaLogin';
-  await page.goto(LOGIN_URL, { waitUntil: 'networkidle2', timeout: 45000 });
+  // Usar 'load' en vez de 'networkidle2' — Nubox SPA tiene polling continuo
+  await page.goto(LOGIN_URL, { waitUntil: 'load', timeout: 60000 });
 
   const alreadyLogged = await page.$('#treeGrid');
   if (!alreadyLogged) {
@@ -72,8 +73,9 @@ export default async function main({ page, context }) {
     await rutInput.click({ clickCount: 3 });
     await rutInput.type(rut, { delay: 40 });
     await passInput.type(clave, { delay: 40 });
+    // Usar 'load' para waitForNavigation — menos restrictivo que networkidle2
     await Promise.all([
-      page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 35000 }),
+      page.waitForNavigation({ waitUntil: 'load', timeout: 60000 }),
       passInput.press('Enter')
     ]);
     const afterUrl = page.url();
@@ -87,10 +89,10 @@ export default async function main({ page, context }) {
   // ── 2. Obtener UTN (igual que nubox-refresh.js) ────────────────────────────
   await page.waitForFunction(
     () => typeof $ !== 'undefined' && document.getElementById('treeGrid') && document.getElementById('row1treeGrid'),
-    { timeout: 25000, polling: 500 }
+    { timeout: 30000, polling: 500 }
   );
   await Promise.all([
-    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 35000 }),
+    page.waitForNavigation({ waitUntil: 'load', timeout: 60000 }),
     page.evaluate(() => {
       try { $('#treeGrid').jqxTreeGrid('selectRow', '2'); }
       catch (_) {
@@ -107,7 +109,7 @@ export default async function main({ page, context }) {
   // ── 3. Navegar a Ventas Electrónicas (dteDocumentosTributarios) ────────────
   const DTE_BASE = 'https://app.nubox.com/ServiFactura/paginas/dteDocumentosTributarios.aspx';
   await page.goto(DTE_BASE + '?utn=' + encodeURIComponent(utn), {
-    waitUntil: 'networkidle2', timeout: 45000
+    waitUntil: 'load', timeout: 60000
   });
 
   // Esperar que cargue el token en la página
@@ -117,7 +119,7 @@ export default async function main({ page, context }) {
       const scripts = [...document.querySelectorAll('script')].map(s => s.textContent || '').join(' ');
       return /token\\s*=\\s*["'][A-Za-z0-9+\\/=]{20,}/.test(scripts);
     },
-    { timeout: 20000, polling: 500 }
+    { timeout: 25000, polling: 500 }
   ).catch(() => null);
 
   // ── 4. Listar documentos del período y descargar PDF (AJAX dentro del browser)
@@ -239,12 +241,12 @@ export default async function handler(req, res) {
 
     if (!blRes.ok) {
       const errText = await blRes.text();
-      throw new Error(`Browserless ${blRes.status}: ${errText.slice(0, 300)}`);
+      throw new Error(`Browserless ${blRes.status}: ${errText.slice(0, 500)}`);
     }
 
     const blData = await blRes.json();
     if (!blData.pdfBase64) {
-      throw new Error('No se recibio PDF: ' + JSON.stringify(blData).slice(0, 300));
+      throw new Error('No se recibio PDF: ' + JSON.stringify(blData).slice(0, 500));
     }
 
     console.log(`[nubox-pdf] PDF recibido — ${blData.total} docs, ${Math.round((blData.pdfSize||0)/1024)} KB`);
