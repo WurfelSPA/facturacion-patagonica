@@ -456,7 +456,7 @@ export default async function handler(req, res) {
 
     // 1. Descargar PDF
     console.log(`Descargando PDF ${pdfFileId}...`);
-    const pdfBuf = await driveDownload(token, pdfFileId);
+    let pdfBuf = await driveDownload(token, pdfFileId);
     console.log(`PDF: ${pdfBuf.length} bytes`);
 
     // 2. Separar páginas — custom parser SIN pdf-lib en ruta principal.
