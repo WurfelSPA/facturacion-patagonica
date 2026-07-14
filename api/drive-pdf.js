@@ -264,7 +264,7 @@ export default async function handler(req, res) {
       } catch (e05) { console.warn("drive-pdf R0.5:", e05 && e05.message); }
     }
 
-    // ── Ruta 1: buscar folio en PDF general → servir PDF completo + X-Pdf-Page
+    // ── Ruta 1: buscar folio en PDF general → servir sólo esa página ──────────
     if (periodo) {
       try {
         const [anio, mesNum] = periodo.split("-");
@@ -277,4 +277,62 @@ export default async function handler(req, res) {
           `&supportsAllDrives=true&includeItemsFromAllDrives=true`);
         const all1 = (d1 && d1.files) || [];
         const genFile = all1.find(f => {
-          if (!f || !f.name || !f.id) return 
+          if (!f || !f.name || !f.id) return false;
+          const nm = f.name.toLowerCase();
+          return (nm.includes(`${anio}-${mesNum}`) || nm.includes(`${anio}_${mesNum}`));
+        });
+
+        if (genFile) {
+          console.log(`drive-pdf R1: descargando ${genFile.name}`);
+          const pdfBuf = await driveDownload(token, genFile.id);
+          const srcDoc = await PDFDocument.load(pdfBuf, { ignoreEncryption: true });
+          const mapping = buildCMapFromDoc(srcDoc);
+          const nPages = srcDoc.getPageCount();
+
+          // Patrones de búsqueda más específicos para el folio (evitar falsos positivos en montos)
+          const folioPatterns = [
+            new RegExp(`N[°ºo][\\s]*${folio}(?!\\d)`),  // N° 14690 / N°14690
+            new RegExp(`(?<![\\d])${folio}(?![\\d])`),                  // 14690 como número aislado
+          ];
+
+          let foundPage = -1;
+          for (let pi = 0; pi < nPages; pi++) {
+            const text = extractPageText(srcDoc, pi, mapping);
+            if (folioPatterns.some(re => re.test(text))) {
+              foundPage = pi;
+              break;
+            }
+          }
+
+          if (foundPage >= 0) {
+            console.log(`drive-pdf R1: folio ${folio} en página ${foundPage + 1}/${nPages}`);
+            const outDoc = await PDFDocument.create();
+            const [copiedPage] = await outDoc.copyPagesFrom(srcDoc, [foundPage]);
+            outDoc.addPage(copiedPage);
+            const outBytes = await outDoc.save();
+            return sendPdf(outBytes, foundPage + 1);
+          } else {
+            console.warn(`drive-pdf R1: folio ${folio} no hallado en ${genFile.name} (${nPages} págs)`);
+          }
+        }
+      } catch (e1) { console.warn("drive-pdf R1:", e1 && e1.message); }
+    }
+
+    // ── Ruta 2: búsqueda global por nombre exacto (sin fallback a files[0]) ────
+    try {
+      const f2 = await findPdfGlobal(token, folio);
+      if (f2) {
+        console.log(`drive-pdf R2: sirviendo ${f2.name}`);
+        return sendPdf(await driveDownload(token, f2.id), 1);
+      }
+    } catch (e2) { console.warn("drive-pdf R2:", e2 && e2.message); }
+
+    return res.status(404).json({
+      error: `PDF no encontrado para folio ${folio}` + (periodo ? ` (${periodo})` : "")
+    });
+
+  } catch (err) {
+    console.error("drive-pdf error:", err && err.message);
+    return res.status(500).json({ error: err.message || "Error interno" });
+  }
+}
