@@ -3908,27 +3908,42 @@ function App(){
             if(p.tipo!==c.tipo)continue;
             if(p.sitio!=="default"&&p.sitio!==c.sitio)continue;
             let score=0;
-            /* Nombre en archivo — identificador más directo (el archivo ya lleva el nombre del cliente) */
-            if(p.nombreEnArchivo&&ncli){
-              const na=p.nombreEnArchivo; /* ya está en lowercase desde procesarPDFs */
-              const matches=ncli===na||ncli.includes(na)||(na.length>=4&&ncli.includes(na))||(ncli.length>=4&&na.includes(ncli));
-              const fwN=na.split(" ").find(w=>w.length>=4)||"";
-              const fwC=ncli.split(" ").find(w=>w.length>=4)||"";
-              if(matches||(fwN&&fwC&&fwN===fwC)) score+=300;
-            }
-            /* RUT exacto — identificador inequívoco */
+            /* ── SCORING MULTI-SEÑAL ──────────────────────────────────────────────────
+             * 1. RUT conocido y DIFERENTE → penalización severa (-400): la factura
+             *    definitivamente no corresponde a este cliente.
+             * 2. RUT exacto → +200 (identificador inequívoco)
+             * 3. Nombre en archivo → +300 solo si hay coincidencia de SUBSTRING completo.
+             *    Se elimina el match de "primera palabra" (fwN===fwC) que causaba falsos
+             *    positivos entre clientes con nombre similar (ej: dos Cajas de Compensación).
+             * 4. UF exacta / próxima → +50 / +20 / +5
+             * 5. Nombre coincide pero UF difiere >20% → descontar bonus de nombre:
+             *    archivo probablemente tiene nombre equivocado por detectCliente erróneo.
+             * ──────────────────────────────────────────────────────────────────────── */
+
+            /* 1. Penalizar RUT conocido y diferente */
+            if(rutNorm&&p.rutPdf&&p.rutPdf!==rutNorm) score-=400;
+
+            /* 2. RUT exacto */
             if(rutNorm&&p.rutPdf&&p.rutPdf===rutNorm) score+=200;
-            /* UF */
+
+            /* 3. Nombre en archivo — solo substring completo (sin match de primera palabra) */
+            if(p.nombreEnArchivo&&ncli){
+              const na=p.nombreEnArchivo;
+              const matches=ncli===na||ncli.includes(na)||(na.length>=4&&ncli.includes(na))||(ncli.length>=4&&na.includes(ncli));
+              if(matches) score+=300;
+            }
+
+            /* 4. UF */
             if(p.ufPdf!==null&&c.uf!=null){
               const diff=Math.abs(p.ufPdf-c.uf);
               if(diff<0.01)       score+=50;
               else if(diff<0.5)   score+=20;
               else if(diff<2.0)   score+=5;
             }
-            /* Si el nombre coincide pero la UF difiere >30%: el archivo puede tener
-               nombre equivocado (detectCliente leyó cliente vecino en el PDF).
-               Descartamos el bonus de nombre para que la UF exacta prevalezca. */
-            if(score>=300&&p.ufPdf!==null&&c.uf>0&&Math.abs(p.ufPdf-c.uf)/c.uf>0.30){
+
+            /* 5. Nombre coincide pero UF difiere >20%: archivo puede tener nombre
+               equivocado (detectCliente leyó cliente vecino). Descontar bonus nombre. */
+            if(score>=300&&p.ufPdf!==null&&c.uf>0&&Math.abs(p.ufPdf-c.uf)/c.uf>0.20){
               score-=300;
             }
             if(score>bestScore){bestScore=score;bestIdx=idx;}
