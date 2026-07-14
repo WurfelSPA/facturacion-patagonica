@@ -4,16 +4,16 @@
  * usando Browserless (igual que nubox-refresh.js) y lo sube a Google Drive.
  *
  * Env vars:
- *   NUBOX_API_USER      — RUT de acceso a Nubox (ej: 96673250-4)
- *   NUBOX_API_PASS      — Clave de Nubox
- *   BROWSERLESS_TOKEN   — Token de production-sfo.browserless.io
- *   GOOGLE_SERVICE_ACCOUNT — JSON de Service Account con acceso Drive
+ *   NUBOX_API_USER          — RUT de acceso a Nubox (ej: 96673250-4)
+ *   NUBOX_API_PASS          — Clave de Nubox
+ *   BROWSERLESS_TOKEN       — Token de production-sfo.browserless.io
+ *   GOOGLE_SERVICE_ACCOUNT  — JSON de Service Account con acceso Drive
  *
  * POST body: { mes: "YYYY-MM", destFolderId: "<Drive folder id>" }
  * Returns:   { ok, fileId, fileName, total, mes }
  */
 
-export const config = { api: { bodyParser: { sizeLimit: '5mb' }, responseLimit: '10mb' } };
+export const config = { api: { bodyParser: { sizeLimit: '5mb' } } };
 
 // ── JWT / Service Account ────────────────────────────────────────────────────
 async function signJWT(payload, privateKey) {
@@ -113,17 +113,15 @@ export default async function main({ page, context }) {
   // Esperar que cargue el token en la página
   await page.waitForFunction(
     () => {
-      // El token puede estar en variable global o en el HTML renderizado
       if (typeof token !== 'undefined' && token) return true;
       const scripts = [...document.querySelectorAll('script')].map(s => s.textContent || '').join(' ');
-      return /token\s*=\s*["'][A-Za-z0-9+\/=]{20,}/.test(scripts);
+      return /token\\s*=\\s*["'][A-Za-z0-9+\\/=]{20,}/.test(scripts);
     },
     { timeout: 20000, polling: 500 }
-  ).catch(() => null); // Continuar aunque no se detecte — igual intentamos
+  ).catch(() => null);
 
   // ── 4. Listar documentos del período y descargar PDF (AJAX dentro del browser)
   const result = await page.evaluate(async ({ fechaDesde, fechaHasta, DTE_BASE }) => {
-    // Extraer token y funcionarioId del contexto de la página
     let pageToken = null, pageFuncId = null;
     try { if (typeof token !== 'undefined' && token) pageToken = token; } catch(_) {}
     try { if (typeof funcionarioId !== 'undefined') pageFuncId = String(funcionarioId); } catch(_) {}
@@ -140,22 +138,14 @@ export default async function main({ page, context }) {
     if (!pageToken) return { error: 'Token no encontrado en la página DTE. URL: ' + location.href };
 
     try {
-      // Obtener lista de documentos emitidos en el rango de fechas
       const filtroRes = await fetch(DTE_BASE + '/ObtenerPorFiltro', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'X-Requested-With': 'XMLHttpRequest'
-        },
+        headers: { 'Content-Type': 'application/json; charset=utf-8', 'X-Requested-With': 'XMLHttpRequest' },
         body: JSON.stringify({
-          token: pageToken,
-          EstadoId: 3,        // 3 = Emitido
-          estadoEnvio: 0,
-          fechaDesde,
-          fechaHasta,
+          token: pageToken, EstadoId: 3, estadoEnvio: 0,
+          fechaDesde, fechaHasta,
           filtro: '<Terminos></Terminos>',
-          folioDesde: 0,
-          folioHasta: 0,
+          folioDesde: 0, folioHasta: 0,
           usaFormatoImpresionEspecial: false
         })
       });
@@ -171,18 +161,10 @@ export default async function main({ page, context }) {
       const ids = docs.map(d => d.Id || d.id).filter(Boolean).join(',');
       const total = docs.length;
 
-      // Obtener URL del PDF consolidado
       const pdfRes = await fetch(DTE_BASE + '/VerPDF', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: JSON.stringify({
-          token: pageToken,
-          funcionarioId: pageFuncId || '339708',
-          id: ids
-        })
+        headers: { 'Content-Type': 'application/json; charset=utf-8', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ token: pageToken, funcionarioId: pageFuncId || '339708', id: ids })
       });
       if (!pdfRes.ok) return { error: 'VerPDF HTTP ' + pdfRes.status };
 
@@ -192,7 +174,6 @@ export default async function main({ page, context }) {
         return { error: 'VerPDF no retornó ruta: ' + JSON.stringify(pdfRaw).slice(0, 200) };
       }
 
-      // Descargar el PDF
       const pdfUrl = pdfPath.startsWith('http') ? pdfPath : ('https://app.nubox.com' + pdfPath);
       const dlRes = await fetch(pdfUrl, { credentials: 'include' });
       if (!dlRes.ok) return { error: 'Descarga PDF HTTP ' + dlRes.status + ' url: ' + pdfUrl };
@@ -244,28 +225,15 @@ export default async function handler(req, res) {
 
   const [year, month] = mes.split('-');
 
-  // ── Streaming NDJSON para progreso en tiempo real ────────────────────────
-  res.writeHead(200, {
-    'Content-Type': 'application/x-ndjson',
-    'Transfer-Encoding': 'chunked',
-    'Cache-Control': 'no-cache',
-    'Access-Control-Allow-Origin': '*',
-  });
-  const send = (data) => { try { res.write(JSON.stringify(data) + '\n'); } catch(_) {} };
-
   try {
-    send({ msg: '🔐 Iniciando sesión en Nubox... (puede tardar 1-2 min)' });
-    console.log(`[nubox-pdf] Descargando facturas ${mes} vía Browserless...`);
+    console.log(`[nubox-pdf] Descargando facturas ${mes} via Browserless...`);
 
     const blRes = await fetch(
       `https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code:    BROWSER_CODE,
-          context: { rut: RUT, clave: CLAVE, year, month }
-        })
+        body: JSON.stringify({ code: BROWSER_CODE, context: { rut: RUT, clave: CLAVE, year, month } })
       }
     );
 
@@ -276,21 +244,17 @@ export default async function handler(req, res) {
 
     const blData = await blRes.json();
     if (!blData.pdfBase64) {
-      throw new Error('No se recibió PDF: ' + JSON.stringify(blData).slice(0, 300));
+      throw new Error('No se recibio PDF: ' + JSON.stringify(blData).slice(0, 300));
     }
 
-    const kbSize = Math.round((blData.pdfSize || 0) / 1024);
-    send({ msg: `⬆️ ${blData.total} facturas encontradas (${kbSize} KB). Subiendo a Drive...` });
-    console.log(`[nubox-pdf] PDF recibido — ${blData.total} docs, ${kbSize} KB`);
+    console.log(`[nubox-pdf] PDF recibido — ${blData.total} docs, ${Math.round((blData.pdfSize||0)/1024)} KB`);
 
     // ── Subir a Google Drive ─────────────────────────────────────────────────
     const pdfBuffer = Buffer.from(blData.pdfBase64, 'base64');
     const fileName  = `Facturas_PISA_${mes}.pdf`;
     const saToken   = await getSAToken();
     const boundary  = 'nubox_pdf_boundary';
-    const metadata  = JSON.stringify({
-      name: fileName, mimeType: 'application/pdf', parents: [destFolderId]
-    });
+    const metadata  = JSON.stringify({ name: fileName, mimeType: 'application/pdf', parents: [destFolderId] });
     const multipart = Buffer.concat([
       Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`),
       pdfBuffer,
@@ -305,4 +269,24 @@ export default async function handler(req, res) {
           'Authorization': `Bearer ${saToken}`,
           'Content-Type': `multipart/related; boundary=${boundary}`
         },
-  
+        body: multipart
+      }
+    );
+
+    if (!uploadRes.ok) {
+      const errText = await uploadRes.text();
+      throw new Error(`Drive upload ${uploadRes.status}: ${errText.slice(0, 300)}`);
+    }
+
+    const uploadData = await uploadRes.json();
+    console.log(`[nubox-pdf] Guardado en Drive: ${fileName} (id: ${uploadData.id})`);
+
+    return res.status(200).json({
+      ok: true, fileId: uploadData.id, fileName, total: blData.total, mes
+    });
+
+  } catch (err) {
+    console.error('[nubox-pdf] Error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+}
