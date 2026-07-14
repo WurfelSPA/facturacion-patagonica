@@ -481,7 +481,7 @@ const SITIO_C={"5-A":"#7c3aed","4-A":"#0d9488","A-2":"#ea580c","A-1":"#2563eb","
 const MES_NUM={"Enero":1,"Febrero":2,"Marzo":3,"Abril":4,"Mayo":5,"Junio":6,"Julio":7,"Agosto":8,"Septiembre":9,"Octubre":10,"Noviembre":11,"Diciembre":12};
 /* Convierte índice 0-based de columna a letra Excel: 0→A, 25→Z, 26→AA, 210→HC */
 function colIndexToLetter(idx){let r='',n=idx+1;while(n>0){const rem=(n-1)%26;r=String.fromCharCode(65+rem)+r;n=Math.floor((n-1)/26);}return r;}
-const SITIO_MAP={"5A":"5-A","4A":"4-A","A1":"A-1","A2":"A-2","B":"B","D2":"D-2"};
+const SITIO_MAP={"5A":"5-A","4A":"4-A","A1":"A-1","A2":"A-2","B":"B","D2":"D-2","D3":"D-3"};
 
 async function callClaude(prompt){
   const body={model:"claude-sonnet-4-5",max_tokens:4096,messages:[{role:"user",content:prompt}]};
@@ -3928,7 +3928,7 @@ function App(){
 
             /* 3. Nombre en archivo — solo substring completo (sin match de primera palabra) */
             if(p.nombreEnArchivo&&ncli){
-              const na=p.nombreEnArchivo;
+              const na=normNombre(p.nombreEnArchivo);
               const matches=ncli===na||ncli.includes(na)||(na.length>=4&&ncli.includes(na))||(ncli.length>=4&&na.includes(ncli));
               if(matches) score+=300;
             }
