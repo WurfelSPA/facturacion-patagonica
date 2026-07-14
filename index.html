@@ -513,7 +513,7 @@ async function parsePlanillaParaDashboard(file){
     return{y:d.getUTCFullYear(),m:d.getUTCMonth()+1};
   }
   const monthCols=[];
-  for(let ci=64;ci<Math.min(row3.length,220);ci++){
+  for(let ci=64;ci<Math.min(row3.length,400);ci++){
     const v=row3[ci];
     if(typeof v==="number"&&v>40000&&v<50000){
       const{y,m}=serialToYM(v);
@@ -2264,10 +2264,9 @@ function ContratosView({dashData,driveLoading}){
   const reajustes=clients.filter(c=>{
     const d=parseDate(c.fechaReajuste);
     if(!d||(d.getFullYear()!==currentYear&&d.getFullYear()!==currentYear+1))return false;
-    /* Ocultar clientes inactivos: buscar última UF > 0 en monthly (columnas dinámicas) */
-    const _mKeys=Object.keys(c.monthly||{}).sort().reverse();
-    const _lastKey=_mKeys.find(k=>(c.monthly[k]||0)>0);
-    return !!_lastKey;
+    /* Ocultar inactivos: buscar desde el mes actual hacia atrás */
+    const _n=new Date();
+    for(let _i=0;_i<12;_i++){const _d=new Date(_n.getFullYear(),_n.getMonth()-_i,1);const _k=`${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,"0")}`;if((c.monthly[_k]||0)>0)return true;}return false;
   }).filter(c=>!search||c.nombre.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>(parseDate(a.fechaReajuste)||0)-(parseDate(b.fechaReajuste)||0));
   const vencPasados=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d<0;}).length;
   const venc30=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d>=0&&d<=30;}).length;
@@ -2396,10 +2395,10 @@ function ContratosView({dashData,driveLoading}){
               const{bg,col,bdr}=urgBg(dias,true);
               const sCol=SITIO_C[c.sitio]||"#888";
               const pct=c.pctReaj&&c.pctReaj!=="-"?parseFloat(c.pctReaj):null;
-              /* Última UF facturada en planilla usando c.monthly (columnas dinámicas correctas) */
+              /* Última UF: buscar desde el mes actual hacia atrás en c.monthly */
               const _MES_L2=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-              const _mK=Object.keys(c.monthly||{}).sort().reverse();
-              const _lk=_mK.find(k=>(c.monthly[k]||0)>0)||null;
+              const _nw=new Date();let _lk=null;
+              for(let _i=0;_i<12;_i++){const _dd=new Date(_nw.getFullYear(),_nw.getMonth()-_i,1);const _k2=`${_dd.getFullYear()}-${String(_dd.getMonth()+1).padStart(2,"0")}`;if((c.monthly[_k2]||0)>0){_lk=_k2;break;}}
               const lastUF=_lk?(c.monthly[_lk]||0):0;
               const lastLabel=_lk?(_MES_L2[parseInt(_lk.slice(5,7))-1]+" "+_lk.slice(0,4)):"—";
               /* Comparación: ¿ya se aplicó el reajuste? */
