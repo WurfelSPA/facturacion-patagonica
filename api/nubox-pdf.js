@@ -244,7 +244,17 @@ export default async function handler(req, res) {
 
   const [year, month] = mes.split('-');
 
+  // ── Streaming NDJSON para progreso en tiempo real ────────────────────────
+  res.writeHead(200, {
+    'Content-Type': 'application/x-ndjson',
+    'Transfer-Encoding': 'chunked',
+    'Cache-Control': 'no-cache',
+    'Access-Control-Allow-Origin': '*',
+  });
+  const send = (data) => { try { res.write(JSON.stringify(data) + '\n'); } catch(_) {} };
+
   try {
+    send({ msg: '🔐 Iniciando sesión en Nubox... (puede tardar 1-2 min)' });
     console.log(`[nubox-pdf] Descargando facturas ${mes} vía Browserless...`);
 
     const blRes = await fetch(
@@ -269,7 +279,9 @@ export default async function handler(req, res) {
       throw new Error('No se recibió PDF: ' + JSON.stringify(blData).slice(0, 300));
     }
 
-    console.log(`[nubox-pdf] PDF recibido — ${blData.total} docs, ${Math.round(blData.pdfSize/1024)} KB`);
+    const kbSize = Math.round((blData.pdfSize || 0) / 1024);
+    send({ msg: `⬆️ ${blData.total} facturas encontradas (${kbSize} KB). Subiendo a Drive...` });
+    console.log(`[nubox-pdf] PDF recibido — ${blData.total} docs, ${kbSize} KB`);
 
     // ── Subir a Google Drive ─────────────────────────────────────────────────
     const pdfBuffer = Buffer.from(blData.pdfBase64, 'base64');
@@ -293,28 +305,4 @@ export default async function handler(req, res) {
           'Authorization': `Bearer ${saToken}`,
           'Content-Type': `multipart/related; boundary=${boundary}`
         },
-        body: multipart
-      }
-    );
-
-    if (!uploadRes.ok) {
-      const errText = await uploadRes.text();
-      throw new Error(`Drive upload ${uploadRes.status}: ${errText.slice(0, 300)}`);
-    }
-
-    const uploadData = await uploadRes.json();
-    console.log(`[nubox-pdf] Guardado en Drive: ${fileName} (id: ${uploadData.id})`);
-
-    return res.status(200).json({
-      ok:       true,
-      fileId:   uploadData.id,
-      fileName,
-      total:    blData.total,
-      mes
-    });
-
-  } catch (err) {
-    console.error('[nubox-pdf] Error:', err.message);
-    return res.status(500).json({ error: err.message });
-  }
-}
+  
