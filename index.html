@@ -3921,6 +3921,12 @@ function App(){
               else if(diff<0.5)   score+=20;
               else if(diff<2.0)   score+=5;
             }
+            /* Si el nombre coincide pero la UF difiere >30%: el archivo puede tener
+               nombre equivocado (detectCliente leyó cliente vecino en el PDF).
+               Descartamos el bonus de nombre para que la UF exacta prevalezca. */
+            if(score>=300&&p.ufPdf!==null&&c.uf>0&&Math.abs(p.ufPdf-c.uf)/c.uf>0.30){
+              score-=300;
+            }
             if(score>bestScore){bestScore=score;bestIdx=idx;}
           }
 
