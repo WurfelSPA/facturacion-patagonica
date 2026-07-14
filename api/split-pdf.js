@@ -415,11 +415,17 @@ function detectCod(text) {
   return COD_MAP[m[1].trim().replace(/-$/,"").toUpperCase()] || null;
 }
 function detectNro(text) {
-  /* Tolerante con variantes del carácter º (º, °, o, ø) y con o sin espacio.
-     Prioridades:
-     1. "N° 14548" / "Nº14548" (patrón clásico Nubox)
-     2. "F-14548" / "FEE-14548" en el texto del PDF (referencia del documento)
+  /* Prioridades:
+     0. N° en el encabezado (ANTES de "Señor(es)") — captura N° 51, N° 123, etc.
+        El encabezado solo tiene el número de documento; la dirección (N°2680) está
+        después de "Señor(es)" y no se considera aquí.
+     1. "N° 14548" / "Nº14548" (patrón Nubox, 4-6 dígitos)
+     2. "F-14548" / "FEE-14548" en el texto del PDF
      3. Fallback genérico: N + hasta 4 no-alfanuméricos + 4-6 dígitos */
+  const headerEnd = text.search(/Se[nñ]or/);
+  const header = headerEnd > 0 ? text.slice(0, headerEnd) : text.slice(0, 400);
+  const mHead = header.match(/N[°º\xBA\xB0]\s*(\d{1,6})/);
+  if (mHead) return mHead[1];
   const m = text.match(/N[\xBA\xB0o\u00BA\u00B0]?[\s°º]*\s*(\d{4,6})/i)
     || text.match(/F(?:EE)?-\s*(\d{4,6})/i)
     || text.match(/N[^a-zA-Z\d]{0,4}(\d{4,6})/);
