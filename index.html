@@ -2264,9 +2264,10 @@ function ContratosView({dashData,driveLoading}){
   const reajustes=clients.filter(c=>{
     const d=parseDate(c.fechaReajuste);
     if(!d||(d.getFullYear()!==currentYear&&d.getFullYear()!==currentYear+1))return false;
-    /* Ocultar clientes inactivos: buscar última UF > 0 en historial de planilla */
-    const lastUF=([...c.hist].reverse().find(h=>h.uf!==null&&h.uf>0)||{uf:0}).uf;
-    return lastUF>0;
+    /* Ocultar clientes inactivos: buscar última UF > 0 en monthly (columnas dinámicas) */
+    const _mKeys=Object.keys(c.monthly||{}).sort().reverse();
+    const _lastKey=_mKeys.find(k=>(c.monthly[k]||0)>0);
+    return !!_lastKey;
   }).filter(c=>!search||c.nombre.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>(parseDate(a.fechaReajuste)||0)-(parseDate(b.fechaReajuste)||0));
   const vencPasados=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d<0;}).length;
   const venc30=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d>=0&&d<=30;}).length;
@@ -2389,16 +2390,18 @@ function ContratosView({dashData,driveLoading}){
         ),
         h("div",{style:{overflowX:"auto"}},
           h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
-            h("thead",null,h("tr",{style:{background:"#f0f4f8"}},["Sitio","Cliente / RUT","Edificio","Fecha Reajuste","Días Restantes","% Reajuste","Periodicidad","UF Contrato","Últ. UF Planilla"].map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap"}},col.toUpperCase())))),
+            h("thead",{style:{position:"sticky",top:0,zIndex:2}},h("tr",{style:{background:"#f0f4f8"}},["Sitio","Cliente / RUT","Edificio","Fecha Reajuste","Días Restantes","% Reajuste","Periodicidad","UF Contrato","Últ. UF Planilla"].map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap"}},col.toUpperCase())))),
             h("tbody",null,reajustes.map((c,i)=>{
               const dias=diasDesde(c.fechaReajuste);
               const{bg,col,bdr}=urgBg(dias,true);
               const sCol=SITIO_C[c.sitio]||"#888";
               const pct=c.pctReaj&&c.pctReaj!=="-"?parseFloat(c.pctReaj):null;
-              /* Última UF facturada en planilla (hist más reciente con uf > 0) */
-              const lastHist=([...c.hist].reverse().find(h=>h.uf!==null&&h.uf>0))||null;
-              const lastUF=lastHist?lastHist.uf:0;
-              const lastLabel=lastHist?lastHist.label+" "+lastHist.anio:"—";
+              /* Última UF facturada en planilla usando c.monthly (columnas dinámicas correctas) */
+              const _MES_L2=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+              const _mK=Object.keys(c.monthly||{}).sort().reverse();
+              const _lk=_mK.find(k=>(c.monthly[k]||0)>0)||null;
+              const lastUF=_lk?(c.monthly[_lk]||0):0;
+              const lastLabel=_lk?(_MES_L2[parseInt(_lk.slice(5,7))-1]+" "+_lk.slice(0,4)):"—";
               /* Comparación: ¿ya se aplicó el reajuste? */
               const aplicado=lastUF>0&&c.ufArr>0&&Math.abs(lastUF-c.ufArr)/c.ufArr>0.03;
               return h("tr",{key:c.rut+c.nombre+i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"var(--surf2)"}},
