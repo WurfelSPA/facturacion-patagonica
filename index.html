@@ -766,11 +766,15 @@ async function guardarHistorialPeriodo(anio,periodo,filas){
   for(const f of filas){
     if(!f.factura)continue;
     if(!data[f.cliente])data[f.cliente]={};
+    /* Guardar con estructura {CLIENTE:{SITIO:{arriendo,servAdm}}} para que
+       batchPeriodo pueda desambiguar por sitio (igual que historial-excel-2026.json) */
+    const sitioKey=f.sitio||"default";
+    if(!data[f.cliente][sitioKey])data[f.cliente][sitioKey]={};
     const conc=(f.concepto||"").toLowerCase();
     const obj={nro:f.factura,uf:f.ufPdf??f.uf??null,total:f.montoTotal||null};
-    if(conc==="arriendo")data[f.cliente].arriendo=obj;
-    else if(conc==="serv. adm."||conc==="serv_adm")data[f.cliente].servAdm=obj;
-    else if(conc==="habilitación"||conc==="habilitacion")data[f.cliente].habilitacion=obj;
+    if(conc==="arriendo")data[f.cliente][sitioKey].arriendo=obj;
+    else if(conc==="serv. adm."||conc==="serv_adm")data[f.cliente][sitioKey].servAdm=obj;
+    else if(conc==="habilitación"||conc==="habilitacion")data[f.cliente][sitioKey].habilitacion=obj;
   }
   if(!Object.keys(data).length)return;
   try{

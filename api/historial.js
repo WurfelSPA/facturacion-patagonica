@@ -994,9 +994,35 @@ export default async function handler(req, res) {
         });
       }
       const clientes = {};
-      for (const [nom, sitios] of Object.entries(periodoData)) {
-        clientes[stripB(nom)] = { nombre: nom, sitios };
+      if (periodoData) {
+        for (const [nom, sitios] of Object.entries(periodoData)) {
+          clientes[stripB(nom)] = { nombre: nom, sitios };
+        }
       }
+      // También leer historial-facturas.json (escrito por guardarHistorialPeriodo al procesar)
+      // para mostrar nros de factura cuando el Excel embebido no los tiene aún.
+      try {
+        const factId = await findFile(token, HIST_NAME, PDF_FOLDER);
+        if (factId) {
+          const factText = await downloadFile(token, factId);
+          if (factText) {
+            const factData = JSON.parse(factText);
+            const factPeriodo = factData?.[anioStr]?.[periodo];
+            if (factPeriodo) {
+              for (const [nom, sitios] of Object.entries(factPeriodo)) {
+                const key = stripB(nom);
+                if (!clientes[key]) clientes[key] = { nombre: nom, sitios };
+                else {
+                  // Merge: agregar sitios que no vienen del Excel
+                  for (const [sk, sv] of Object.entries(sitios)) {
+                    if (!clientes[key].sitios[sk]) clientes[key].sitios[sk] = sv;
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch(e) { /* fallback silencioso */ }
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({
         periodo, clientes,
