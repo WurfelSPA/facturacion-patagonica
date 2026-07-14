@@ -2389,12 +2389,18 @@ function ContratosView({dashData,driveLoading}){
         ),
         h("div",{style:{overflowX:"auto"}},
           h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
-            h("thead",null,h("tr",{style:{background:"#f0f4f8"}},["Sitio","Cliente / RUT","Edificio","Fecha Reajuste","Días Restantes","% Reajuste","Periodicidad","UF Arriendo"].map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap"}},col.toUpperCase())))),
+            h("thead",null,h("tr",{style:{background:"#f0f4f8"}},["Sitio","Cliente / RUT","Edificio","Fecha Reajuste","Días Restantes","% Reajuste","Periodicidad","UF Contrato","Últ. UF Planilla"].map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap"}},col.toUpperCase())))),
             h("tbody",null,reajustes.map((c,i)=>{
               const dias=diasDesde(c.fechaReajuste);
               const{bg,col,bdr}=urgBg(dias,true);
               const sCol=SITIO_C[c.sitio]||"#888";
               const pct=c.pctReaj&&c.pctReaj!=="-"?parseFloat(c.pctReaj):null;
+              /* Última UF facturada en planilla (hist más reciente con uf > 0) */
+              const lastHist=([...c.hist].reverse().find(h=>h.uf!==null&&h.uf>0))||null;
+              const lastUF=lastHist?lastHist.uf:0;
+              const lastLabel=lastHist?lastHist.label+" "+lastHist.anio:"—";
+              /* Comparación: ¿ya se aplicó el reajuste? */
+              const aplicado=lastUF>0&&c.ufArr>0&&Math.abs(lastUF-c.ufArr)/c.ufArr>0.03;
               return h("tr",{key:c.rut+c.nombre+i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"var(--surf2)"}},
                 h("td",{style:{padding:"9px 12px"}},h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},c.sitio||"—")),
                 h("td",{style:{padding:"9px 12px",maxWidth:200}},h("div",{style:{fontWeight:600,fontSize:11,lineHeight:1.3}},c.nombre),h("div",{style:{fontSize:9,color:"var(--txd)",fontFamily:"'DM Mono',monospace",marginTop:2}},c.rut)),
@@ -2403,7 +2409,11 @@ function ContratosView({dashData,driveLoading}){
                 h("td",{style:{padding:"9px 12px"}},dias!==null?h("span",{style:{padding:"2px 8px",borderRadius:10,fontSize:10,fontWeight:700,background:bg,color:col,border:"1px solid "+bdr}},dias<0?"Hace "+Math.abs(dias)+"d":dias===0?"Hoy":dias+"d"):h("span",{style:{color:"var(--txd)"}},"—")),
                 h("td",{style:{padding:"9px 12px"}},pct!==null?h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:700,color:"var(--green)",background:"var(--gbg)",border:"1px solid var(--gdim)",padding:"3px 10px",borderRadius:8}},pct.toFixed(1)+"%"):h("span",{style:{color:"var(--txd)"}},"—")),
                 h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.cadaAnios||"—"),
-                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--blue)",fontWeight:600}},c.ufArr>0?c.ufArr.toFixed(2)+" UF":"—")
+                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--blue)",fontWeight:600}},c.ufArr>0?c.ufArr.toFixed(2)+" UF":"—"),
+                h("td",{style:{padding:"9px 12px"}},lastUF>0?h("div",{style:{display:"flex",flexDirection:"column",gap:2}},
+                  h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,color:aplicado?"var(--green)":"var(--amber)"}},lastUF.toFixed(2)+" UF"),
+                  h("span",{style:{fontSize:9,color:"var(--txd)"}},lastLabel+(aplicado?" ✓ ajustado":" ⚠ sin ajustar"))
+                ):h("span",{style:{color:"var(--txd)"}},"—"))
               );
             }))
           )
