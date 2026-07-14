@@ -459,50 +459,38 @@ export default async function handler(req, res) {
     let pdfBuf = await driveDownload(token, pdfFileId);
     console.log(`PDF: ${pdfBuf.length} bytes`);
 
-    // 2. Separar páginas — custom parser SIN pdf-lib en ruta principal.
-    //    pdf-lib solo se carga como fallback si el parser mínimo falla.
-    //    Cargar pdf-lib + splitPDFPages simultáneamente duplicaba RAM → OOM.
-    let usedCustomSplit = true;
-    let pageBufs = splitPDFPages(pdfBuf);
-    if (!pageBufs || pageBufs.length === 0) {
-      // Fallback a pdf-lib solo si el parser mínimo falla (PDF no estándar)
-      console.log("splitPDFPages sin resultado, fallback a pdf-lib");
-      usedCustomSplit = false;
-      const srcDocFb = await PDFDocument.load(pdfBuf, { ignoreEncryption: true });
-      const totalPagesFb = srcDocFb.getPageCount();
-      pageBufs = [];
-      for (let i = 0; i < totalPagesFb; i++) {
-        const singleDoc = await PDFDocument.create();
-        const [copiedPage] = await singleDoc.copyPages(srcDocFb, [i]);
-        singleDoc.addPage(copiedPage);
-        pageBufs.push(Buffer.from(await singleDoc.save()));
-      }
-    }
-    if (pageBufs.length === 0) throw new Error("No se pudieron separar las páginas del PDF");
-    console.log(`Páginas separadas: ${pageBufs.length} (método: ${usedCustomSplit ? "custom-minimal" : "pdf-lib-fallback"})`);
-
-    // 3. Extraer texto UNA VEZ del PDF original completo (no por página)
-    //    Antes se llamaba extractText(pageBufs[i]) 187 veces → cada pageBuf lleva
-    //    copias de fuentes (~3 MB c/u) → 187 × regex de 3 MB = 7+ min de CPU.
-    //    Ahora: 1 sola extracción sobre el PDF original + splitByPages.
-    // Extraer texto UNA sola vez del PDF original y dividir por anclas "FACTURA ELECTRONICA"
-    // Si el conteo coincide (caso normal Nubox: 1 factura = 1 página), usar esos textos.
-    // Si no coincide (páginas sin ancla), volver al método por página (más lento pero correcto).
+    // 2. Extraer texto UNA VEZ del PDF original (rápido, antes de cargar en pdf-lib)
     const fullText = extractText(pdfBuf);
     const pageTexts = splitByPages(fullText);
-    const usePreExtracted = pageTexts.length === pageBufs.length;
-    console.log(`Texto: ${pageTexts.length} bloques, ${pageBufs.length} páginas → ${usePreExtracted ? "pre-extraído (rápido)" : "por página (fallback)"}`);
 
-    // Liberar pdfBuf de memoria antes de construir el ZIP
-    // eslint-disable-next-line no-param-reassign
+    // 3. Cargar con pdf-lib para extracción por cliente.
+    //    ANTES: splitPDFPages copiaba fuentes a cada página → 187 × ~5 MB = ~1 GB → OOM.
+    //    AHORA: pdf-lib copyPages agrupa páginas por cliente → n_clientes (≤20) × ~5 MB → fine.
+    let srcDoc = await PDFDocument.load(pdfBuf, { ignoreEncryption: true });
+    const totalPages = srcDoc.getPageCount();
+    const usePreExtracted = pageTexts.length === totalPages;
+    console.log(`Páginas: ${totalPages}, bloques texto: ${pageTexts.length} → ${usePreExtracted ? "pre-extraído (rápido)" : "fallback por página"}`);
+
+    // Liberar pdfBuf — srcDoc ya tiene los datos internamente
     pdfBuf = null;
 
     const zip = new JSZip();
     const sinCod = [];
     const breakdown = {};
+    const clientGroups = {}; // zipPath → [pageIndex, ...]
 
-    for (let i = 0; i < pageBufs.length; i++) {
-      const text = usePreExtracted ? pageTexts[i] : extractText(pageBufs[i]);
+    // 4. Clasificar páginas por cliente (solo índices, sin copiar buffers de página)
+    for (let i = 0; i < totalPages; i++) {
+      let text;
+      if (usePreExtracted) {
+        text = pageTexts[i];
+      } else {
+        // Fallback: extraer texto de página individual via pdf-lib
+        const sd = await PDFDocument.create();
+        const [cp] = await sd.copyPages(srcDoc, [i]);
+        sd.addPage(cp);
+        text = extractText(Buffer.from(await sd.save()));
+      }
       const cod = detectCod(text);
       const nro = detectNro(text);
 
@@ -515,8 +503,10 @@ export default async function handler(req, res) {
         // Tiene NRO pero sin COD reconocido → Serv. Adm. u otro tipo sin código de sitio
         const clienteSinCod = detectCliente(text);
         const fnameSinCod = clienteSinCod ? `F-${nro} ${clienteSinCod}.pdf` : `F-${nro}.pdf`;
-        zip.file(`default/${fnameSinCod}`, pageBufs[i]);
-        breakdown['default'] = (breakdown['default'] || 0) + 1;
+        const zp = `default/${fnameSinCod}`;
+        if (!clientGroups[zp]) clientGroups[zp] = [];
+        clientGroups[zp].push(i);
+        breakdown["default"] = (breakdown["default"] || 0) + 1;
         console.log(`Pág ${i+1}: sin COD reconocido, NRO=${nro} → default/${fnameSinCod}`);
         continue;
       }
@@ -529,10 +519,26 @@ export default async function handler(req, res) {
       if (nro && cliente) fname = `F-${nro} ${cliente}.pdf`;
       else if (nro)       fname = `F-${nro}.pdf`;
       else                fname = `F-p${i+1}.pdf`;
-      zip.file(`${cod}/${fname}`, pageBufs[i]);
+      const zp = `${cod}/${fname}`;
+      if (!clientGroups[zp]) clientGroups[zp] = [];
+      clientGroups[zp].push(i);
       breakdown[cod] = (breakdown[cod] || 0) + 1;
       console.log(`Pág ${i+1}: ${cod} → ${fname}`);
     }
+
+    // 5. Generar PDFs por cliente con pdf-lib (una operación por cliente, no por página)
+    //    Memoria: n_clientes × tamaño_PDF_cliente (<<< 187 × tamaño_página_standalone)
+    const t0pdf = Date.now();
+    const nClientes = Object.keys(clientGroups).length;
+    console.log(`Generando ${nClientes} PDFs de cliente con pdf-lib...`);
+    for (const [zipPath, pageIndices] of Object.entries(clientGroups)) {
+      const newDoc = await PDFDocument.create();
+      const copiedPages = await newDoc.copyPages(srcDoc, pageIndices);
+      copiedPages.forEach(p => newDoc.addPage(p));
+      zip.file(zipPath, Buffer.from(await newDoc.save()));
+    }
+    console.log(`pdf-lib: ${nClientes} PDFs en ${Date.now()-t0pdf}ms`);
+    srcDoc = null; // Liberar memoria pdf-lib
 
     if (sinCod.length > 0) {
       zip.file(`sin_cod.txt`, `Páginas sin COD: ${sinCod.join(", ")}\n`);
