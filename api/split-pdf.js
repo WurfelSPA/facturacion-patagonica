@@ -468,14 +468,28 @@ export default async function handler(req, res) {
     if (pageBufs.length === 0) throw new Error("No se pudieron separar las páginas del PDF");
     console.log(`Páginas separadas: ${pageBufs.length} (método: ${usedCustomSplit ? "custom-minimal" : "pdf-lib-fallback"})`);
 
-    // 3. Extraer texto de cada página via regex sobre streams binarios
-    //    (sin pdf-lib: ahorra 100-200 MB RAM; extractText() usa CMap embebido en cada pageBuf)
+    // 3. Extraer texto UNA VEZ del PDF original completo (no por página)
+    //    Antes se llamaba extractText(pageBufs[i]) 187 veces → cada pageBuf lleva
+    //    copias de fuentes (~3 MB c/u) → 187 × regex de 3 MB = 7+ min de CPU.
+    //    Ahora: 1 sola extracción sobre el PDF original + splitByPages.
+    // Extraer texto UNA sola vez del PDF original y dividir por anclas "FACTURA ELECTRONICA"
+    // Si el conteo coincide (caso normal Nubox: 1 factura = 1 página), usar esos textos.
+    // Si no coincide (páginas sin ancla), volver al método por página (más lento pero correcto).
+    const fullText = extractText(pdfBuf);
+    const pageTexts = splitByPages(fullText);
+    const usePreExtracted = pageTexts.length === pageBufs.length;
+    console.log(`Texto: ${pageTexts.length} bloques, ${pageBufs.length} páginas → ${usePreExtracted ? "pre-extraído (rápido)" : "por página (fallback)"}`);
+
+    // Liberar pdfBuf de memoria antes de construir el ZIP
+    // eslint-disable-next-line no-param-reassign
+    pdfBuf = null;
+
     const zip = new JSZip();
     const sinCod = [];
     const breakdown = {};
 
     for (let i = 0; i < pageBufs.length; i++) {
-      const text = extractText(pageBufs[i]);
+      const text = usePreExtracted ? pageTexts[i] : extractText(pageBufs[i]);
       const cod = detectCod(text);
       const nro = detectNro(text);
 
