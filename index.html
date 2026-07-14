@@ -663,7 +663,19 @@ async function procesarPlanillaFacturacion(file,periodo){
   /* Fechas en fila 3 (índice 2) */
   const fila3=dataRaw[2]||[];
   for(let i=64;i<fila3.length;i++){
-    if(esTargetMes(fila3[i])){colGS=i;colGT=i+1;colEnviado=i+3;colPagado=i+4;break;}
+    if(esTargetMes(fila3[i])){
+      colGS=i;
+      /* Buscar 'GC' (Serv.Adm.) dinámicamente: en planillas antiguas está en i+1, en nuevas puede estar en i+2+ por columnas extra */
+      for(let j=i+1;j<=Math.min(i+6,fila3.length-1);j++){const h=fila3[j];if(typeof h==="string"&&h.trim()==="GC"){colGT=j;break;}}
+      if(colGT===-1)colGT=i+1;
+      /* Buscar 'Correo Enviado' dinámicamente */
+      for(let j=i+1;j<=Math.min(i+10,fila3.length-1);j++){const h=fila3[j];if(typeof h==="string"&&h.trim().toLowerCase().includes("correo enviado")){colEnviado=j;break;}}
+      if(colEnviado===-1)colEnviado=i+3;
+      /* Buscar 'Pagado' dinámicamente */
+      for(let j=i+1;j<=Math.min(i+10,fila3.length-1);j++){const h=fila3[j];if(typeof h==="string"&&h.trim().toLowerCase()==="pagado"){colPagado=j;break;}}
+      if(colPagado===-1)colPagado=i+4;
+      break;
+    }
   }
   if(colGS===-1)throw new Error(`No se encontró columna para ${periodo}. Verifica que la planilla tenga ese mes.`);
 
@@ -715,8 +727,11 @@ async function leerHistorialAnio(xlsxFile, anio){
     const mesNombre=MESES_N[mesIdx];
     const mesNum=mesIdx+1;
     if(mesesMap[mesNombre])continue; /* solo primer hit por mes */
-    const hasEnviado=(anio>2026)||(anio===2026&&mesNum>=6);
-    mesesMap[mesNombre]={colGS:i,colGT:i+1,colEnviado:hasEnviado?i+3:-1,mesNum};
+    /* Buscar GC y Correo Enviado dinámicamente (la posición varía según versión de planilla) */
+    let gtCol=-1;for(let j=i+1;j<=Math.min(i+6,fila3.length-1);j++){const h=fila3[j];if(typeof h==="string"&&h.trim()==="GC"){gtCol=j;break;}}
+    if(gtCol===-1)gtCol=i+1;
+    let envCol=-1;for(let j=i+1;j<=Math.min(i+10,fila3.length-1);j++){const h=fila3[j];if(typeof h==="string"&&h.trim().toLowerCase().includes("correo enviado")){envCol=j;break;}}
+    mesesMap[mesNombre]={colGS:i,colGT:gtCol,colEnviado:envCol,mesNum};
   }
 
   const excl=["","VACANTE","Nombre Cliente","Areas Comunes Edificio","Areas comunes Edificio (Subterraneos)","Area Comun"];
