@@ -3870,7 +3870,7 @@ function App(){
       setProcProgress(75);
       addLog("▶ Cruzando datos planilla vs PDFs...","info");
       const pdfUsado=new Set();
-      const MANUAL={"A-2|Banco Estado Express|202.6|arriendo":"FEE-39","A-2|Banco del Estado de Chile|256.7|arriendo":"FEE-39","4-A|Sociedad de Alimentos Leefood SpA|7.48|serv_adm":"F-14756","A-2|Servicio Local de Educación Pública de los Libertadores|7.92|arriendo":"F-14908","A-2|Servicio Local de Educación Pública de los Libertadores|167.73|arriendo":"F-14902"};
+      const MANUAL={"A-2|Banco Estado Express|202.6|arriendo":"FEE-39","A-2|Banco del Estado de Chile|256.7|arriendo":"FEE-39","4-A|Sociedad de Alimentos Leefood SpA|7.48|serv_adm":"F-14756","A-2|Servicio Local de Educación Pública de los Libertadores|7.92|arriendo":"F-14908","A-2|Servicio Local de Educación Pública de los Libertadores|167.73|arriendo":"F-14902","A-2|Servicio Local de Educación Pública de los Libertadores|157.14|arriendo":"F-14901"};
       const filas=[];
 
       /* CRUCE: scoring RUT + UF
@@ -3893,7 +3893,7 @@ function App(){
         const colRef=c.tipo==="arriendo"?"GS":"GT";
         const mk=`${c.sitio}|${c.cliente}|${c.uf}|${c.tipo}`;
         let factura="",ufPdf=null,montoTotal=null,ivaAmount=null,matchScore=0;
-        if(MANUAL[mk]){factura=MANUAL[mk];ufPdf=c.uf;matchScore=999;}
+        if(MANUAL[mk]){factura=MANUAL[mk];ufPdf=c.uf;matchScore=999;const _mi=pdfs.findIndex((p,i)=>!pdfUsado.has(i)&&p.nroFact===factura);if(_mi>=0)pdfUsado.add(_mi);}
         else{
           let bestIdx=-1,bestScore=0;
           const rutNorm=c.rut||"";
