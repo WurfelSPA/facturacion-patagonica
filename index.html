@@ -698,9 +698,14 @@ async function procesarPlanillaFacturacion(file,periodo){
     const sheetRow=i+1; /* fila 1-indexed en el Sheets (dataRaw[i] = fila i+1) */
     const sentColLetter=colIndexToLetter(colEnviado); /* columna dinámica: HC para Junio, HG para Julio, etc. */
     const pagadoColLetter=colPagado>0?colIndexToLetter(colPagado):"";
+    const nroFactArrColLetter=colIndexToLetter(colGS+1); /* Nro Fact Arriendo = columna inmediata después del UF Arriendo */
+    const nroFactGCColLetter=colGT>0?colIndexToLetter(colGT+1):"";   /* Nro Fact GC = columna inmediata después del UF GC */
+    /* Leer nros de factura ya escritos en planilla (si existen) — evitan re-procesar ZIP */
+    const _nfArr=row[colGS+1];const nroFactArr=(typeof _nfArr==="number"&&_nfArr>0)?String(Math.round(_nfArr)):(typeof _nfArr==="string"&&_nfArr.trim())?_nfArr.trim():null;
+    const _nfGC=colGT>0?row[colGT+1]:null;const nroFactGC=(typeof _nfGC==="number"&&_nfGC>0)?String(Math.round(_nfGC)):(typeof _nfGC==="string"&&_nfGC.trim())?_nfGC.trim():null;
     const m2Billing=row[42]!=null&&row[42]!==""?Number(row[42]):null; /* Col AQ: m² */
-    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado,sheetRow,sentColLetter,pagadoColLetter,m2:m2Billing});
-    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado,sheetRow,sentColLetter,pagadoColLetter,m2:m2Billing});
+    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado,sheetRow,sentColLetter,pagadoColLetter,nroFactArrColLetter,nroFactGCColLetter,nroFactArr,nroFactGC,m2:m2Billing});
+    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado,sheetRow,sentColLetter,pagadoColLetter,nroFactArrColLetter,nroFactGCColLetter,nroFactArr,nroFactGC,m2:m2Billing});
   }
   return clientes;
 }
@@ -3911,7 +3916,10 @@ function App(){
         const colRef=c.tipo==="arriendo"?"GS":"GT";
         const mk=`${c.sitio}|${c.cliente}|${c.uf}|${c.tipo}`;
         let factura="",ufPdf=null,montoTotal=null,ivaAmount=null,matchScore=0;
-        if(MANUAL[mk]){factura=MANUAL[mk];ufPdf=c.uf;matchScore=999;const _mi=pdfs.findIndex((p,i)=>!pdfUsado.has(i)&&p.nroFact===factura);if(_mi>=0)pdfUsado.add(_mi);}
+        /* ── Pre-carga desde planilla (nro ya escrito en Nro Fact col) ─── */
+        const _planFact=c.tipo==="arriendo"?c.nroFactArr:c.nroFactGC;
+        if(_planFact){const _pf=String(_planFact).replace(/^F(?:EE)?-/i,"");factura=`F-${_pf}`;ufPdf=c.uf;matchScore=888;const _mi=pdfs.findIndex((p,pi)=>!pdfUsado.has(pi)&&p.nroFact===factura);if(_mi>=0)pdfUsado.add(_mi);}
+        else if(MANUAL[mk]){factura=MANUAL[mk];ufPdf=c.uf;matchScore=999;const _mi=pdfs.findIndex((p,i)=>!pdfUsado.has(i)&&p.nroFact===factura);if(_mi>=0)pdfUsado.add(_mi);}
         else{
           let bestIdx=-1,bestScore=0;
           const rutNorm=c.rut||"";
@@ -3985,7 +3993,8 @@ function App(){
             }
           }
         }
-        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,montoTotal,ivaAmount,enviado:false,yaEnviado:c.yaEnviado||false,yaPagado:c.yaPagado||false,sheetRow:c.sheetRow||null,sentColLetter:c.sentColLetter||"HC",pagadoColLetter:c.pagadoColLetter||""});
+        const _nfCol=c.tipo==="arriendo"?c.nroFactArrColLetter:c.nroFactGCColLetter;
+        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,montoTotal,ivaAmount,enviado:false,yaEnviado:c.yaEnviado||false,yaPagado:c.yaPagado||false,sheetRow:c.sheetRow||null,sentColLetter:c.sentColLetter||"HC",pagadoColLetter:c.pagadoColLetter||"",nroFactCol:_nfCol||"",facturaEnPlanilla:matchScore===888});
       }
 
       /* ── Si no hay datos de planilla, mostrar igual los PDFs detectados ── */
@@ -4205,6 +4214,33 @@ function App(){
     const rj=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(rj.error||`HTTP ${r.status}`);
   },[]);
+
+  /* ── Guardar nros de factura en planilla (Nro Fact Arriendo / Nro Fact GC) ── */
+  const [savingNros,setSavingNros]=React.useState(false);
+  const guardarNrosPlanilla=useCallback(async()=>{
+    const enriched=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
+    /* Solo filas que coinciden perfecto, tienen factura, col destino, fila planilla, y NO venían ya de planilla */
+    const toWrite=enriched.filter(r=>r.estado==="ok"&&r.factura&&r.nroFactCol&&r.sheetRow&&!r.facturaEnPlanilla);
+    if(!toWrite.length){notify("No hay nros nuevos para guardar en planilla","warn");return;}
+    const cells=toWrite.map(r=>({
+      sheetRow:r.sheetRow,
+      col:r.nroFactCol,
+      value:String(r.factura).replace(/^F(?:EE)?-/i,"")
+    }));
+    setSavingNros(true);
+    try{
+      const res=await fetch("/api/planilla?action=write-cells",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({cells})});
+      const rj=await res.json().catch(()=>({}));
+      if(!res.ok)throw new Error(rj.error||`HTTP ${res.status}`);
+      notify(`✓ ${rj.updated} nros guardados en planilla`,"ok");
+      /* Marcar como "ya en planilla" para que el botón no los vuelva a escribir */
+      setData(prev=>prev.map((r,i)=>{
+        const found=toWrite.find(t=>t.i===i);
+        return found?{...r,facturaEnPlanilla:true}:r;
+      }));
+    }catch(e){notify("Error guardando nros: "+e.message,"err");}
+    setSavingNros(false);
+  },[data,getEstado]);
 
   const togglePagado=useCallback((rowI,sheetRow,pagadoColLetter,currentPaid)=>{
     const newPaid=!currentPaid;
@@ -5257,7 +5293,20 @@ function App(){
               border:"1px solid var(--bdr)",background:"var(--surf)",color:"var(--txm)",
               cursor:"pointer",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap",
               fontFamily:"'DM Sans',sans-serif"}
-          },"⬇ Reporte")
+          },"⬇ Reporte"),
+          (()=>{
+            const _enriched=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
+            const _nuevos=_enriched.filter(r=>r.estado==="ok"&&r.factura&&r.nroFactCol&&r.sheetRow&&!r.facturaEnPlanilla).length;
+            return _nuevos>0&&h("button",{
+              onClick:guardarNrosPlanilla,
+              disabled:savingNros,
+              title:`Escribir ${_nuevos} nros de factura en columnas Nro Fact de la planilla`,
+              style:{fontSize:11,fontWeight:600,padding:"5px 12px",borderRadius:8,
+                border:"1px solid #2563eb55",background:savingNros?"var(--surf)":"#2563eb12",color:"#2563eb",
+                cursor:savingNros?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap",
+                fontFamily:"'DM Sans',sans-serif"}
+            },savingNros?"⏳ Guardando...":"💾 Guardar nros en planilla ("+_nuevos+")");
+          })()
         ),
         h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:190,fontFamily:"'DM Sans',sans-serif"}}),
         h("input",{value:searchFactura,onChange:e=>setSearchFactura(e.target.value),placeholder:"N° Factura...",style:{width:130,fontFamily:"'DM Mono',monospace"}})
@@ -5378,4 +5427,4 @@ function App(){
 ReactDOM.createRoot(document.getElementById("root")).render(h(App));
 </script>
 <script>/* resumen-static: datos embebidos para fallback offline/CDN */
-window._RESUMEN_STATIC={"clientes":[{"nombre":"OLYMPUS CORPORATION CHILE SPA","meses":{"Enero 2026":15047740,"Febrero 2026":21534206,"Marzo 2026":117430080,"Abril 2026":20580013,"Mayo 2026":144775209,"Junio 2026":162000010},"total":481367258},{"nombre":"SANCHEZ HERMANOS SPA","meses":{"Enero 2026":77117322,"Febrero 2026":75614544,"Marzo 2026":90560256,"Abril 2026":75907446,"Mayo 2026":76523202,"Junio 2026":78023952},"total":473746722},{"nombre":"INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA","meses":{"Enero 2026":51127028,"Febrero 2026":49660373,"Marzo 2026":49822139,"Abril 2026":49851352,"Mayo 2026":50223222,"Junio 2026":50877425},"total":301561539},{"nombre":"SONEPAR CHILE SA","meses":{"Enero 2026":47632567,"Febrero 2026":46387694,"Marzo 2026":46538404,"Abril 2026":46565619,"Mayo 2026":46979148,"Junio 2026":47588636},"total":281692068},{"nombre":"SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE LOS LIBERTADORES","meses":{"Enero 2026":32298080,"Febrero 2026":32950083,"Marzo 2026":32429034,"Abril 2026":32447710,"Mayo 2026":32723430,"Junio 2026":33141601},"total":195989938},{"nombre":"DRAGER CHILE LIMITADA","meses":{"Enero 2026":24372758,"Febrero 2026":23713994,"Marzo 2026":23791109,"Abril 2026":23805034,"Mayo 2026":24016630,"Junio 2026":24328494},"total":144028019},{"nombre":"TRANE DE CHILE S A","meses":{"Enero 2026":19129179,"Febrero 2026":18629983,"Marzo 2026":18690507,"Abril 2026":18701437,"Mayo 2026":18867509,"Junio 2026":19112280},"total":113130895},{"nombre":"BANCO DEL ESTADO DE CHILE","meses":{"Enero 2026":18255866,"Febrero 2026":18231109,"Marzo 2026":18288871,"Abril 2026":18299302,"Mayo 2026":18457793,"Junio 2026":18691388},"total":110224329},{"nombre":"COMERCIAL SNA-E (CHILE) LIMITADA","meses":{"Enero 2026":19291278,"Febrero 2026":17109542,"Marzo 2026":17164686,"Abril 2026":17174645,"Mayo 2026":17325954,"Junio 2026":17548967},"total":105615072},{"nombre":"COMERCIALIZADORA INDUSTRIAL W & L LIMITADA","meses":{"Enero 2026":17090114,"Febrero 2026":16609352,"Marzo 2026":16663426,"Abril 2026":16673190,"Mayo 2026":16821561,"Junio 2026":17040240},"total":100897883},{"nombre":"COMERCIAL INGERSOLL RAND (CHILE) LIMITADA","meses":{"Enero 2026":31260454,"Febrero 2026":17917872,"Marzo 2026":10163768,"Abril 2026":10174360,"Mayo 2026":10335326,"Junio 2026":18385334},"total":98237114},{"nombre":"BANCO DE CREDITO E INVERSIONES","meses":{"Enero 2026":32195192,"Marzo 2026":16126699,"Abril 2026":16135897,"Mayo 2026":16275650,"Junio 2026":16481629},"total":97215067},{"nombre":"SOCIEDAD DE ALIMENTOS LEEFOOD SPA.","meses":{"Enero 2026":13960805,"Febrero 2026":13660249,"Marzo 2026":13704422,"Abril 2026":13712397,"Mayo 2026":13833600,"Junio 2026":14012237},"total":82883710},{"nombre":"MEGAMIN S.A.","meses":{"Enero 2026":11069411,"Febrero 2026":10831006,"Marzo 2026":10866030,"Abril 2026":10872355,"Mayo 2026":10968454,"Junio 2026":11110095},"total":65717351},{"nombre":"JOHN CRANE CHILE S A","meses":{"Enero 2026":10266744,"Febrero 2026":10030064,"Marzo 2026":10062548,"Abril 2026":10068414,"Mayo 2026":10157546,"Junio 2026":10288915},"total":60874231},{"nombre":"VOITH TURBO S A","meses":{"Enero 2026":9829227,"Febrero 2026":9617914,"Marzo 2026":9649014,"Abril 2026":9654631,"Mayo 2026":9739964,"Junio 2026":9865736},"total":58356486},{"nombre":"CONGO FILMS S.A.S. AGENCIA EN CHILE","meses":{"Enero 2026":9187851,"Febrero 2026":9013194,"Marzo 2026":9042264,"Abril 2026":9047515,"Mayo 2026":9127280,"Junio 2026":9244844},"total":54662948},{"nombre":"FESTO S A","meses":{"Enero 2026":8395592,"Febrero 2026":8299084,"Marzo 2026":8325648,"Abril 2026":8330444,"Mayo 2026":8403332,"Junio 2026":8510759},"total":50264859},{"nombre":"CAJA DE COMPENSACION DE ASIGNACION FAMILIAR DE LOS ANDES","meses":{"Enero 2026":11606565,"Febrero 2026":11590826,"Marzo 2026":11627549,"Abril 2026":11634181},"total":46459121},{"nombre":"IN WASSER SPA.","meses":{"Enero 2026":7358235,"Febrero 2026":7384468,"Marzo 2026":7408363,"Abril 2026":7412678,"Mayo 2026":7438859,"Junio 2026":7535494},"total":44538097},{"nombre":"CASINO IMPERIO LIMITADA","meses":{"Enero 2026":6877961,"Febrero 2026":6890049,"Marzo 2026":6912173,"Abril 2026":6916170,"Mayo 2026":6953585,"Junio 2026":7043061},"total":41592999},{"nombre":"MEDILAND SPA","meses":{"Enero 2026":6897156,"Febrero 2026":6763719,"Marzo 2026":6785541,"Abril 2026":6789483,"Mayo 2026":6849360,"Junio 2026":6937614},"total":41022873},{"nombre":"SEGAFREDO ZANETTI CHILE S.A.","meses":{"Enero 2026":6570792,"Febrero 2026":64                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+window._RESUMEN_STATIC={"clientes":[{"nombre":"OLYMPUS CORPORATION CHILE SPA","meses":{"Enero 2026":15047740,"Febrero 2026":21534206,"Marzo 2026":117430080,"Abril 2026":20580013,"Mayo 2026":144775209,"Junio 2026":162000010},"total":481367258},{"nombre":"SANCHEZ HERMANOS SPA","meses":{"Enero 2026":77117322,"Febrero 2026":75614544,"Marzo 2026":90560256,"Abril 2026":75907446,"Mayo 2026":76523202,"Junio 2026":78023952},"total":473746722},{"nombre":"INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA","meses":{"Enero 2026":51127028,"Febrero 2026":49660373,"Marzo 2026":49822139,"Abril 2026":49851352,"Mayo 2026":50223222,"Junio 2026":50877425},"total":301561539},{"nombre":"SONEPAR CHILE SA","meses":{"Enero 2026":47632567,"Febrero 2026":46387694,"Marzo 2026":46538404,"Abril 2026":46565619,"Mayo 2026":46979148,"Junio 2026":47588636},"total":281692068},{"nombre":"SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE LOS LIBERTADORES","meses":{"Enero 2026":32298080,"Febrero 2026":32950083,"Marzo 2026":32429034,"Abril 2026":32447710,"Mayo 2026":32723430,"Junio 2026":33141601},"total":195989938},{"nombre":"DRAGER CHILE LIMITADA","meses":{"Enero 2026":24372758,"Febrero 2026":23713994,"Marzo 2026":23791109,"Abril 2026":23805034,"Mayo 2026":24016630,"Junio 2026":24328494},"total":144028019},{"nombre":"TRANE DE CHILE S A","meses":{"Enero 2026":19129179,"Febrero 2026":18629983,"Marzo 2026":18690507,"Abril 2026":18701437,"Mayo 2026":18867509,"Junio 2026":19112280},"total":113130895},{"nomb
