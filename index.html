@@ -3943,7 +3943,7 @@ function App(){
 
             /* 5. Nombre coincide pero UF difiere >20%: archivo puede tener nombre
                equivocado (detectCliente leyó cliente vecino). Descontar bonus nombre. */
-            if(score>=300&&p.ufPdf!==null&&c.uf>0&&Math.abs(p.ufPdf-c.uf)/c.uf>0.20){
+            if(score>=300&&p.ufPdf!==null&&p.ufPdf<1000&&c.uf>0&&Math.abs(p.ufPdf-c.uf)/c.uf>0.20){
               score-=300;
             }
             if(score>bestScore){bestScore=score;bestIdx=idx;}
