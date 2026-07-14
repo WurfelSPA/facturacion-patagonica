@@ -3870,7 +3870,7 @@ function App(){
       setProcProgress(75);
       addLog("▶ Cruzando datos planilla vs PDFs...","info");
       const pdfUsado=new Set();
-      const MANUAL={"A-2|Banco Estado Express|202.6|arriendo":"FEE-39","A-2|Banco del Estado de Chile|256.7|arriendo":"FEE-39","4-A|Sociedad de Alimentos Leefood SpA|7.48|serv_adm":"F-14756","A-2|Servicio Local de Educación Pública de los Libertadores|7.92|arriendo":"F-14908","A-2|Servicio Local de Educación Pública de los Libertadores|167.73|arriendo":"F-14902","A-2|Servicio Local de Educación Pública de los Libertadores|157.14|arriendo":"F-14901"};
+      const MANUAL={"A-2|Banco Estado Express|202.6|arriendo":"FEE-39","A-2|Banco del Estado de Chile|256.7|arriendo":"FEE-39","4-A|Sociedad de Alimentos Leefood SpA|7.48|serv_adm":"F-14756","A-2|Servicio Local de Educación Pública de los Libertadores|7.92|arriendo":"F-14908","A-2|Servicio Local de Educación Pública de los Libertadores|167.73|arriendo":"F-14902","A-2|Servicio Local de Educación Pública de los Libertadores|157.14|arriendo":"F-14901","A-2|Visibility S.A.|31.7|arriendo":"F-14876","A-2|VISIBILITY S.A.|31.7|arriendo":"F-14876"};
       const filas=[];
 
       /* CRUCE: scoring RUT + UF
@@ -3929,7 +3929,8 @@ function App(){
             /* 3. Nombre en archivo — solo substring completo (sin match de primera palabra) */
             if(p.nombreEnArchivo&&ncli){
               const na=normNombre(p.nombreEnArchivo);
-              const matches=ncli===na||ncli.includes(na)||(na.length>=4&&ncli.includes(na))||(ncli.length>=4&&na.includes(ncli));
+              const naC=na.replace(/\s/g,"");const ncliC=ncli.replace(/\s/g,"");
+              const matches=naC===ncliC||ncliC.includes(naC)||(naC.length>=4&&ncliC.includes(naC))||(ncliC.length>=4&&naC.includes(ncliC));
               if(matches) score+=300;
             }
 
