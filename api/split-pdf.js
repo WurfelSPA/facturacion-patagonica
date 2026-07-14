@@ -545,9 +545,12 @@ export default async function handler(req, res) {
     }
     zip.file(`resumen.txt`, resumenLines.join("\n") + "\n");
 
-    // 4. Generar ZIP
-    const zipBuf = Buffer.from(await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }));
-    console.log(`ZIP: ${zipBuf.length} bytes`);
+    // 4. Generar ZIP — STORE (sin compresión): PDFs ya comprimidos internamente,
+    //    DEFLATE en JS puro (JSZip) tarda 5+ min para 187 páginas.
+    console.log(`Generando ZIP (STORE)...`);
+    const t0zip = Date.now();
+    const zipBuf = Buffer.from(await zip.generateAsync({ type: "nodebuffer", compression: "STORE" }));
+    console.log(`ZIP: ${zipBuf.length} bytes (${Date.now()-t0zip}ms)`);
 
     // 5. Subir ZIP directo a Drive con Service Account (sin pasar por el frontend)
     const zipName = `${periodo}.zip`;
@@ -560,17 +563,21 @@ export default async function handler(req, res) {
       const endPart = Buffer.from(`\r\n--${boundary}--`);
 
       // Buscar si ya existe un ZIP con ese nombre — usar SA token (puede ver todos los archivos)
+      const t0search = Date.now();
       const searchRes = await fetch(
         `https://www.googleapis.com/drive/v3/files?q=name='${zipName}'+and+'${destFolderId}'+in+parents+and+trashed=false&fields=files(id)&pageSize=5&orderBy=modifiedTime+desc&supportsAllDrives=true&includeItemsFromAllDrives=true`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const searchJson = searchRes.ok ? await searchRes.json() : { files: [] };
       const existingIds = (searchJson.files || []).map(f => f.id);
+      console.log(`Drive search: ${Date.now()-t0search}ms, existentes: ${existingIds.length}`);
 
       let uploadJson;
+      const t0upload = Date.now();
       if (existingIds.length > 0) {
         // Actualizar el primero y eliminar duplicados
         const [keepId, ...dupeIds] = existingIds;
+        console.log(`Drive upload (PATCH ${keepId})...`);
         const updateRes = await fetch(
           `https://www.googleapis.com/upload/drive/v3/files/${keepId}?uploadType=media`,
           { method: "PATCH", headers: { Authorization: `Bearer ${uploadToken}`, "Content-Type": "application/zip" }, body: zipBuf }
@@ -580,12 +587,14 @@ export default async function handler(req, res) {
           return res.status(502).json({ error: `ZIP update Drive ${updateRes.status}: ${err.slice(0,200)}` });
         }
         uploadJson = await updateRes.json();
+        console.log(`Drive PATCH: ${Date.now()-t0upload}ms`);
         // Eliminar duplicados silenciosamente
         for (const dupeId of dupeIds) {
           fetch(`https://www.googleapis.com/drive/v3/files/${dupeId}`, { method: "DELETE", headers: { Authorization: `Bearer ${uploadToken}` } }).catch(() => {});
         }
       } else {
         // Crear nuevo archivo
+        console.log(`Drive upload (POST nuevo)...`);
         const meta = JSON.stringify({ name: zipName, mimeType: "application/zip", parents: [destFolderId] });
         const metaPart = Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/zip\r\n\r\n`);
         const multipart = Buffer.concat([metaPart, zipBuf, endPart]);
@@ -598,25 +607,10 @@ export default async function handler(req, res) {
           return res.status(502).json({ error: `ZIP upload Drive ${createRes.status}: ${err.slice(0,200)}` });
         }
         uploadJson = await createRes.json();
+        console.log(`Drive POST: ${Date.now()-t0upload}ms`);
       }
 
       // Paso 6 eliminado: subir PDFs individuales causaba timeout (400+ llamadas Drive API).
       // El ZIP completo ya está en Drive — es suficiente para el flujo de envío de correos.
       return res.status(200).json({
-        ok: true, zipName, zipFileId: uploadJson.id, totalFacturas, sinCod,
-        breakdown: Object.entries(breakdown).sort(([a],[b])=>a.localeCompare(b)),
-        indivUploaded: 0, indivErrors: [],
-      });
-    }
-
-    // Fallback: devolver base64 si no se pasó destFolderId
-    return res.status(200).json({
-      ok: true, zipName, zipBase64: zipBuf.toString("base64"), totalFacturas, sinCod,
-      breakdown: Object.entries(breakdown).sort(([a],[b])=>a.localeCompare(b)),
-    });
-
-  } catch (e) {
-    console.error("split-pdf:", e);
-    return res.status(500).json({ error: e.message, stack: e.stack?.slice(0,300) });
-  }
-}
+  
