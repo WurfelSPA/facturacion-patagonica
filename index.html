@@ -2261,7 +2261,13 @@ function ContratosView({dashData,driveLoading}){
   function fechaNotif(termStr,avisoStr){const d=parseDate(termStr);const dias=avisoDias(avisoStr);if(!d||!dias)return null;const n=new Date(d);n.setDate(n.getDate()-dias);return`${String(n.getDate()).padStart(2,"0")}/${String(n.getMonth()+1).padStart(2,"0")}/${n.getFullYear()}`;}
   const clients=dashData?dashData.clients:[];
   const vencimientos=clients.filter(c=>{const d=parseDate(c.termTermino);return d&&d.getFullYear()===currentYear;}).filter(c=>!search||c.nombre.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>(parseDate(a.termTermino)||0)-(parseDate(b.termTermino)||0));
-  const reajustes=clients.filter(c=>{const d=parseDate(c.fechaReajuste);return d&&(d.getFullYear()===currentYear||d.getFullYear()===currentYear+1);}).filter(c=>!search||c.nombre.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>(parseDate(a.fechaReajuste)||0)-(parseDate(b.fechaReajuste)||0));
+  const reajustes=clients.filter(c=>{
+    const d=parseDate(c.fechaReajuste);
+    if(!d||(d.getFullYear()!==currentYear&&d.getFullYear()!==currentYear+1))return false;
+    /* Ocultar clientes inactivos: buscar última UF > 0 en historial de planilla */
+    const lastUF=([...c.hist].reverse().find(h=>h.uf!==null&&h.uf>0)||{uf:0}).uf;
+    return lastUF>0;
+  }).filter(c=>!search||c.nombre.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>(parseDate(a.fechaReajuste)||0)-(parseDate(b.fechaReajuste)||0));
   const vencPasados=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d<0;}).length;
   const venc30=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d>=0&&d<=30;}).length;
   const venc90=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d>30&&d<=90;}).length;
