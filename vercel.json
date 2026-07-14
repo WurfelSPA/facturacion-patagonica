@@ -12,7 +12,7 @@
   "crons": [
     { "path": "/api/planilla?addMonth=1", "schedule": "0 12 25 * *" },
     { "path": "/api/aa-refresh", "schedule": "0 9 * * *" },
-    { "path": "/api/nubox-refresh", "schedule": "0 10 2 * *" }
+    { "path": "/api/nubox-refresh", "schedule": "0 11 * * 1" }
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1" },
