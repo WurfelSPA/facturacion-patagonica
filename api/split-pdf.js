@@ -613,4 +613,20 @@ export default async function handler(req, res) {
       // Paso 6 eliminado: subir PDFs individuales causaba timeout (400+ llamadas Drive API).
       // El ZIP completo ya está en Drive — es suficiente para el flujo de envío de correos.
       return res.status(200).json({
-  
+        ok: true, zipName, zipFileId: uploadJson.id, totalFacturas, sinCod,
+        breakdown: Object.entries(breakdown).sort(([a],[b])=>a.localeCompare(b)),
+        indivUploaded: 0, indivErrors: [],
+      });
+    }
+
+    // Fallback: devolver base64 si no se pasó destFolderId
+    return res.status(200).json({
+      ok: true, zipName, zipBase64: zipBuf.toString("base64"), totalFacturas, sinCod,
+      breakdown: Object.entries(breakdown).sort(([a],[b])=>a.localeCompare(b)),
+    });
+
+  } catch (e) {
+    console.error("split-pdf:", e);
+    return res.status(500).json({ error: e.message, stack: e.stack?.slice(0,300) });
+  }
+}
