@@ -5203,10 +5203,10 @@ function App(){
         h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:190,fontFamily:"'DM Sans',sans-serif"}}),
         h("input",{value:searchFactura,onChange:e=>setSearchFactura(e.target.value),placeholder:"N° Factura...",style:{width:130,fontFamily:"'DM Mono',monospace"}})
       ),
-      h("div",{style:{flex:1,overflowX:"auto"}},
+      h("div",{style:{flex:1,overflowX:"auto",overflowY:"auto"}},
         h("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:940}},
           h("colgroup",null,h("col",{style:{width:58}}),h("col",{style:{width:"15%"}}),h("col",{style:{width:"17%"}}),h("col",{style:{width:88}}),h("col",{style:{width:88}}),h("col",{style:{width:72}}),h("col",{style:{width:72}}),h("col",{style:{width:96}}),h("col",{style:{width:110}}),h("col",{style:{width:60}})),
-          h("thead",null,h("tr",{style:{background:"#ddeaf8"}},
+          h("thead",null,h("tr",{style:{background:"#ddeaf8",position:"sticky",top:0,zIndex:3}},
             ["Sitio","Cliente","Correo","Concepto","Factura","UF planilla","UF PDF","Monto+IVA","Estado/Acción","Pagado"].map((hd,hi)=>
               h("th",{key:hd,style:{padding:"8px 11px",textAlign:hi===9?"center":"left",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:"0.07em",borderBottom:"1px solid var(--bdr)"}},hd.toUpperCase())
             )
