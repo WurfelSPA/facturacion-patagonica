@@ -282,15 +282,27 @@ function decodeStreamContent(rawBytes) {
 
 function applyTextOps(decoded, mapping) {
   let text = "";
+
+  // Auto-detecta CID 1-byte (<2C>) vs 2-byte (<002C>); junio 2026 usa 2-byte.
+  function decodeHex(h) {
+    const step = h.length > 4 ? 4 : 2;
+    let out = "";
+    for (let i = 0; i < h.length; i += step) {
+      const code = parseInt(h.slice(i, i + step), 16);
+      out += mapping[code] !== undefined ? mapping[code]
+           : (code >= 32 && code < 127 ? String.fromCharCode(code) : "");
+    }
+    return out;
+  }
+
   for (const [, h] of decoded.matchAll(/<([0-9a-fA-F]+)>\s*Tj/g)) {
-    const code = parseInt(h, 16);
-    text += mapping[code] !== undefined ? mapping[code] : (code >= 32 && code < 127 ? String.fromCharCode(code) : " ");
+    text += decodeHex(h);
   }
   for (const [, arr] of decoded.matchAll(/\[([^\]]+)\]\s*TJ/g)) {
     for (const [, h] of arr.matchAll(/<([0-9a-fA-F]+)>/g)) {
-      const code = parseInt(h, 16);
-      text += mapping[code] !== undefined ? mapping[code] : (code >= 32 && code < 127 ? String.fromCharCode(code) : " ");
+      text += decodeHex(h);
     }
+    text += " ";
   }
   for (const [, s] of decoded.matchAll(/\(([^)]*)\)\s*Tj/g)) {
     text += s.replace(/\\n/g, " ").replace(/\\r/g, " ") + " ";
@@ -372,8 +384,9 @@ function extractText(pdfBuf) {
 // Usamos ese patrón como delimitador de página
 function splitByPages(fullText) {
   const splits = [];
-  // Ancla: "FACTURA (EXENTA) ELECTRONICA" seguido de Nº y número de factura
-  const pageStartRegex = /FACTURA(?:\s+EXENTA)?\s+ELECTRONICA\s*N[\xBA\xB0\u00BA\u00B0]\s*\d{2,6}/g;
+  // Ancla: cualquier DTE (Factura, Nota Crédito, Nota Débito, Liquidación, etc.)
+  // seguido de Nº y número — cubre todos los tipos emitidos por Nubox
+  const pageStartRegex = /(?:FACTURA(?:\s+EXENTA)?|NOTA\s+DE\s+(?:CR[ÉE]DITO|D[ÉE]BITO)|LIQUIDACI[ÓO]N|BOLETA)\s+ELECTRONICA\s*N[\xBA\xB0\u00BA\u00B0o]\s*\d{2,6}/gi;
   let m;
   while ((m = pageStartRegex.exec(fullText)) !== null) {
     splits.push(m.index);
