@@ -3934,6 +3934,7 @@ function App(){
             if(ufData.pdfs&&(ufData.pdfs[_pdfKey]||ufData.pdfs[_pdfKeyAlt])){
               const d=ufData.pdfs[_pdfKey]||ufData.pdfs[_pdfKeyAlt];
               if(d.uf!==null&&d.uf!==undefined) p.ufPdf=d.uf;  /* no sobreescribir si servidor devuelve null */
+              if(d.ufValor) p.ufValor=d.ufValor;
               if(d.rut) p.rutPdf=d.rut;
               p.montoTotal=d.montoTotal||p.montoTotal||null;
               if(p.ufPdf!==null)conUF++;
@@ -3970,11 +3971,11 @@ function App(){
         const concepto=c.tipo==="arriendo"?"Arriendo":c.tipo==="habilitacion"?"Habilitación":"Serv. Adm.";
         const colRef=c.tipo==="arriendo"?"GS":"GT";
         const mk=`${c.sitio}|${c.cliente}|${c.uf}|${c.tipo}`;
-        let factura="",ufPdf=null,montoTotal=null,ivaAmount=null,matchScore=0;
+        let factura="",ufPdf=null,montoTotal=null,ivaAmount=null,ufValor=null,matchScore=0;
         /* ── Pre-carga desde planilla (nro ya escrito en Nro Fact col) ─── */
         const _planFact=c.tipo==="arriendo"?c.nroFactArr:c.nroFactGC;
-        if(_planFact){const _pf=String(_planFact).replace(/^F(?:EE)?-/i,"");factura=`F-${_pf}`;ufPdf=c.uf;matchScore=888;const _mi=pdfs.findIndex((p,pi)=>!pdfUsado.has(pi)&&p.nroFact===factura);if(_mi>=0)pdfUsado.add(_mi);}
-        else if(MANUAL[mk]){factura=MANUAL[mk];ufPdf=c.uf;matchScore=999;const _mi=pdfs.findIndex((p,i)=>!pdfUsado.has(i)&&p.nroFact===factura);if(_mi>=0)pdfUsado.add(_mi);}
+        if(_planFact){const _pf=String(_planFact).replace(/^F(?:EE)?-/i,"");factura=`F-${_pf}`;ufPdf=c.uf;matchScore=888;const _mi=pdfs.findIndex((p,pi)=>!pdfUsado.has(pi)&&p.nroFact===factura);if(_mi>=0){pdfUsado.add(_mi);ufValor=pdfs[_mi].ufValor||null;}}
+        else if(MANUAL[mk]){factura=MANUAL[mk];ufPdf=c.uf;matchScore=999;const _mi=pdfs.findIndex((p,i)=>!pdfUsado.has(i)&&p.nroFact===factura);if(_mi>=0){pdfUsado.add(_mi);ufValor=pdfs[_mi].ufValor||null;}}
         else{
           let bestIdx=-1,bestScore=0;
           const rutNorm=c.rut||"";
@@ -4036,7 +4037,7 @@ function App(){
           const UMBRAL_UF=50;
 
           if(bestScore>=UMBRAL_NOMBRE||bestScore>=UMBRAL_RUT||bestScore>=UMBRAL_UF){
-            pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;montoTotal=pdfs[bestIdx].montoTotal||null;ivaAmount=pdfs[bestIdx].ivaAmount||null;matchScore=bestScore;
+            pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;montoTotal=pdfs[bestIdx].montoTotal||null;ivaAmount=pdfs[bestIdx].ivaAmount||null;ufValor=pdfs[bestIdx].ufValor||null;matchScore=bestScore;
           } else {
             const candidatos=pdfs.reduce((acc,p,idx)=>{
               if(!pdfUsado.has(idx)&&p.tipo===c.tipo&&(p.sitio===c.sitio||p.sitio==="default"))acc.push(idx);
@@ -4044,12 +4045,12 @@ function App(){
             },[]);
             if(candidatos.length===1){
               bestIdx=candidatos[0];
-              pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;montoTotal=pdfs[bestIdx].montoTotal||null;ivaAmount=pdfs[bestIdx].ivaAmount||null;matchScore=1;
+              pdfUsado.add(bestIdx);factura=pdfs[bestIdx].nroFact;ufPdf=pdfs[bestIdx].ufPdf;montoTotal=pdfs[bestIdx].montoTotal||null;ivaAmount=pdfs[bestIdx].ivaAmount||null;ufValor=pdfs[bestIdx].ufValor||null;matchScore=1;
             }
           }
         }
         const _nfCol=c.tipo==="arriendo"?c.nroFactArrColLetter:c.nroFactGCColLetter;
-        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,montoTotal,ivaAmount,enviado:false,yaEnviado:c.yaEnviado||false,yaPagado:c.yaPagado||false,sheetRow:c.sheetRow||null,sentColLetter:c.sentColLetter||"HC",pagadoColLetter:c.pagadoColLetter||"",nroFactCol:_nfCol||"",facturaEnPlanilla:matchScore===888});
+        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,montoTotal,ivaAmount,ufValor,enviado:false,yaEnviado:c.yaEnviado||false,yaPagado:c.yaPagado||false,sheetRow:c.sheetRow||null,sentColLetter:c.sentColLetter||"HC",pagadoColLetter:c.pagadoColLetter||"",nroFactCol:_nfCol||"",facturaEnPlanilla:matchScore===888});
       }
 
       /* ── Si no hay datos de planilla, mostrar igual los PDFs detectados ── */
@@ -4322,7 +4323,7 @@ function App(){
         }
         /* Siempre usar ufPdf=c.uf para mostrar monto estimado en Monto+IVA */
         /* Mostrar la fila aunque no tenga factura (mes no procesado aún) */
-        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo:c.email||"",concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf:c.uf,montoTotal:null,ivaAmount:null,enviado:false,yaEnviado:c.yaEnviado||false,yaPagado:c.yaPagado||false,sheetRow:c.sheetRow||null,sentColLetter:c.sentColLetter||"HC",pagadoColLetter:c.pagadoColLetter||"",nroFactCol:nfCol||"",facturaEnPlanilla:matchScore===888});
+        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo:c.email||"",concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf:c.uf,montoTotal:null,ivaAmount:null,ufValor:null,enviado:false,yaEnviado:c.yaEnviado||false,yaPagado:c.yaPagado||false,sheetRow:c.sheetRow||null,sentColLetter:c.sentColLetter||"HC",pagadoColLetter:c.pagadoColLetter||"",nroFactCol:nfCol||"",facturaEnPlanilla:matchScore===888});
       }
       if(filas.length>0){
         setData(filas);setSoloPlanilla(true);setView("table");
@@ -5481,9 +5482,10 @@ function App(){
                     /* Usar monto total del PDF cuando disponible (exacto, incluye IVA) */
                     if(row.montoTotal&&row.montoTotal>50000)return "$"+row.montoTotal.toLocaleString("es-CL");
                     /* Fórmula exacta factura chilena: Neto=round(UF×UF_día5), IVA=round(Neto×0.19) */
+                    const _rate=row.ufValor||ufSII;
                     const uf=row.ufPdf??null;
-                    if(uf!=null&&ufSII&&uf<10000){
-                      const neto=Math.round(uf*ufSII);
+                    if(uf!=null&&_rate&&uf<10000){
+                      const neto=Math.round(uf*_rate);
                       const iva=Math.round(neto*0.19);
                       return "$"+(neto+iva).toLocaleString("es-CL");
                     }

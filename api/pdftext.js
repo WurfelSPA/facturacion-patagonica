@@ -137,21 +137,25 @@ function extractData(text, tipo) {
   //   P2: en descripción   →  "UF 85,37 x 40186,79"   (arriendo mayoría)
   //   P3: layout partido   →  línea cortada por PDF, fallback colapsando whitespace
   let uf = null;
+  let ufValor = null; // valor UF del día (ej: 40.833,91) extraído del propio PDF
   let m;
 
   const flat = text.replace(/\s+/g, " ");
+  // Parsea número en formato chileno: "40.833,91" → 40833.91
+  const _parseChile = s => parseFloat(s.replace(/\./g, "").replace(",", "."));
 
-  // P1: "11,84 UF 40.695" — decimal obligatorio antes de UF (evita capturar nº de edificio)
-  m = flat.match(/([\d]+[,.][\d]+)\s*UF\s*\d{2}[,.\d]/);
-  if (m) uf = parseFloat(m[1].replace(",", "."));
+  // P1: "11,84 UF 40.833,91" — decimal obligatorio antes de UF (evita capturar nº de edificio)
+  // Captura también el valor UF que viene después (5+ dígitos con separador de miles)
+  m = flat.match(/([\d]+[,.][\d]+)\s*UF\s*([\d]{2,3}(?:[.][\d]{3})*(?:[,][\d]+)?)/);
+  if (m) { uf = parseFloat(m[1].replace(",", ".")); ufValor = _parseChile(m[2]); }
 
-  // P2: "UF 85,37 x 40186" — número DESPUÉS de UF (Arriendo)
+  // P2: "UF 85,37 x 40.186,79" — número DESPUÉS de UF (Arriendo)
   if (!uf) {
-    m = flat.match(/UF\s*([\d]+(?:[,.][\d]+)?)\s*x\s*\d{2}/);
-    if (m) uf = parseFloat(m[1].replace(",", "."));
+    m = flat.match(/UF\s*([\d]+(?:[,.][\d]+)?)\s*x\s*([\d]{2,3}(?:[.][\d]{3})*(?:[,][\d]+)?)/);
+    if (m) { uf = parseFloat(m[1].replace(",", ".")); ufValor = _parseChile(m[2]); }
   }
 
-  // P3: fallback
+  // P3: fallback (sin captura de ufValor)
   if (!uf) {
     m = flat.match(/UF\s*([\d]+(?:[,.][\d]+)?)\s*x\s/);
     if (m) uf = parseFloat(m[1].replace(",", "."));
@@ -171,16 +175,36 @@ function extractData(text, tipo) {
     }
   }
 
-  // Extraer Monto Total directamente del PDF (más preciso que calcular UF × valor)
-  // Formato: "Monto Total 4.995.800" o "MontoTotal4995800"
+  // Validar ufValor: debe estar en rango razonable para UF chilena
+  if (ufValor && (ufValor < 25000 || ufValor > 80000)) ufValor = null;
+
+  // Extraer Monto Total directamente del PDF
+  // Búsqueda bidireccional: algunos PDFs entregan valores ANTES del label (orden columna)
   let montoTotal = null;
-  const mtMatch = text.match(/Monto\s+Total\s+([\d.]+)/i)
-    || text.replace(/\s+/g," ").match(/Monto Total ([\d.]+)/i);
-  if (mtMatch) {
-    montoTotal = parseInt(mtMatch[1].replace(/\./g, ""), 10) || null;
+  const flatForTotal = text.replace(/\s+/g, " ");
+  const parseAmts = str => [...str.matchAll(/([\d]+(?:\.[\d]{3})+|[\d]{5,})/g)]
+    .map(m => parseInt(m[1].replace(/\./g, ""), 10))
+    .filter(n => n >= 50000 && n <= 25000000);
+
+  const mtIdx = flatForTotal.toLowerCase().indexOf("monto total");
+  if (mtIdx >= 0) {
+    const numsAfter  = parseAmts(flatForTotal.slice(mtIdx + "monto total".length));
+    const numsBefore = parseAmts(flatForTotal.slice(Math.max(0, mtIdx - 300), mtIdx));
+    const cands = [...numsAfter, ...numsBefore];
+    if (cands.length > 0) montoTotal = Math.max(...cands) || null;
+  }
+  // Fallback: el mayor número al final del texto (zona de totales)
+  if (!montoTotal) {
+    const tailNums = parseAmts(flatForTotal.slice(-500));
+    if (tailNums.length > 0) montoTotal = Math.max(...tailNums) || null;
   }
 
-  return { rut, uf: uf ? Math.round(uf * 10000) / 10000 : null, montoTotal };
+  return {
+    rut,
+    uf: uf ? Math.round(uf * 10000) / 10000 : null,
+    ufValor: (ufValor && ufValor >= 25000 && ufValor <= 80000) ? Math.round(ufValor * 100) / 100 : null,
+    montoTotal
+  };
 }
 
 export default async function handler(req, res) {
@@ -215,35 +239,4 @@ export default async function handler(req, res) {
     const zipBuffer = Buffer.from(await zipRes.arrayBuffer());
 
     const SITIO_MAP = {"5A":"5-A","4A":"4-A","A1":"A-1","A2":"A-2","B":"B","D2":"D-2"};
-    const zip = await JSZip.loadAsync(zipBuffer);
-    const result = {};
-
-    for (const [path, entry] of Object.entries(zip.files)) {
-      if (entry.dir || !path.toLowerCase().endsWith(".pdf")) continue;
-      const parts = path.split("/");
-      const carpeta = parts.length > 1 ? parts[parts.length - 2] : "";
-      const nombre = parts[parts.length - 1];
-      const sitio = SITIO_MAP[carpeta] || carpeta;
-      const nroMatch = nombre.match(/^(F(?:EE)?-\d+)/i);
-      if (!nroMatch) continue;
-      const nroFact = nroMatch[1].toUpperCase();
-
-      // FIX: detectar tipo por contenido del PDF, no solo por prefijo del nombre.
-      // F-14633 empieza con "F-" pero su descripción dice "Serv. Adm." → debe ser serv_adm.
-      const pdfBuffer = Buffer.from(await entry.async("arraybuffer"));
-      const text = extractPDFText(pdfBuffer);
-      const tipo = text.includes("Serv. Adm.") || text.includes("Serv.Adm.")
-        ? "serv_adm"
-        : text.includes("Arriendo")
-        ? "arriendo"
-        : nroFact.startsWith("FEE-") ? "serv_adm" : "arriendo";
-
-      const { rut, uf } = extractData(text, tipo);
-      result[nroFact] = { rut, uf, tipo, sitio };
-    }
-
-    return res.status(200).json({ pdfs: result, count: Object.keys(result).length });
-  } catch (e) {
-    return res.status(500).json({ error: e.message, stack: e.stack?.slice(0, 500) });
-  }
-}
+    const zip = a
