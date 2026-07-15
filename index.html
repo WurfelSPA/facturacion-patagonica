@@ -5369,6 +5369,11 @@ function App(){
           disabled:zipStatus==="loading"||zipStatus==="splitting"||splitLoading,
           onClick:()=>{periodoActivado.current=true;autoProcesado.current=false;autoNuboxRef.current=false;setSoloPlanilla(false);setData([]);setCanGenerate(true);splitPDF();}
         },zipStatus==="loading"||zipStatus==="splitting"||splitLoading?h("span",{style:{display:"flex",alignItems:"center",gap:6}},h("span",{className:"spin"},"⟳")," Procesando..."):"▶ Procesar "+periodo),
+        soloPlanilla&&(zipStatus==="loading"||(zipStatus==="ready"&&Object.keys(pdfMap).length===0))&&
+          h("span",{style:{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,color:"var(--txd)",fontFamily:"'DM Sans',sans-serif",padding:"3px 10px",background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:20,whiteSpace:"nowrap"}},
+            h("span",{className:"spin",style:{fontSize:12}},"⟳"),
+            zipStatus==="loading"?"Descargando PDFs...":"Habilitando facturas..."
+          ),
         h("span",{style:{color:"var(--txd)",fontSize:11,margin:"0 4px"}},"|"),
         [{k:"all",l:`Todos (${stats.total})`},{k:"ok",l:`Coinciden (${stats.ok})`},{k:"diff",l:`Revisar (${stats.total-stats.ok})`},{k:"sent",l:`Enviados (${stats.sent})`},
          {k:"difiere",l:`Difiere (${enriched.filter(r=>r.estado==="diff"&&r.matchScore!==1).length})`},
@@ -5531,4 +5536,4 @@ function App(){
 ReactDOM.createRoot(document.getElementById("root")).render(h(App));
 </script>
 <script>/* resumen-static: datos embebidos para fallback offline/CDN */
-window._RESUMEN_STATIC={"clientes":[{"nombre":"OLYMPUS CORPORATION CHILE SPA","meses":{"Enero 2026":15047740,"Febrero 2026":21534206,"Marzo 2026":117430080,"Abril 2026":20580013,"Mayo 2026":144775209,"Junio 2026":162000010},"total":481367258},{"nombre":"SANCHEZ HERMANOS SPA","meses":{"Enero 2026":77117322,"Febrero 2026":75614544,"Marzo 2026":90560256,"Abril 2026":75907446,"Mayo 2026":76523202,"Junio 2026":78023952},"total":473746722},{"nombre":"INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA","meses":{"Enero 2026":51127028,"Febrero 2026":49660373,"Marzo 2026":49822139,"Abril 2026":49851352,"Mayo 2026":50223222,"Junio 2026":50877425},"total":301561539},{"nombre":"SONEPAR CHILE SA","meses":{"Enero 2026":47632567,"Febrero 2026":46387694,"Marzo 2026":46538404,"Abril 2026":46565619,"Mayo 2026":46979148,"Junio 202
+window._RESUMEN_STATIC={"clientes":[{"nombre":"OLYMPUS CORPORATION CHILE SPA","meses":{"Enero 2026":15047740,"Febrero 2026":21534206,"Marzo 2026":117430080,"Abril 2026":20580013,"Mayo 2026":144775209,"Junio 2026":162000010},"total":481367258},{"nombre":"SANCHEZ HERMANOS SPA","meses":{"Enero 2026
