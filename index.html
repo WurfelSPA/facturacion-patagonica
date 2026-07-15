@@ -3929,7 +3929,8 @@ function App(){
             const _pdfKeyAlt=_pdfKey.replace(/^FEE-/i,"F-");
             if(ufData.pdfs&&(ufData.pdfs[_pdfKey]||ufData.pdfs[_pdfKeyAlt])){
               const d=ufData.pdfs[_pdfKey]||ufData.pdfs[_pdfKeyAlt];
-              if(d.uf!==null&&d.uf!==undefined) p.ufPdf=d.uf;  /* no sobreescribir si servidor devuelve null */
+              /* Solo usar UF del servidor si el browser NO extrajo nada (servidor usa CMap propio, menos confiable) */
+              if(d.uf!==null&&d.uf!==undefined&&(p.ufPdf===null||p.ufPdf===undefined)) p.ufPdf=d.uf;
               if(d.ufValor) p.ufValor=d.ufValor;
               if(d.rut) p.rutPdf=d.rut;
               p.montoTotal=d.montoTotal||p.montoTotal||null;
@@ -5539,7 +5540,4 @@ function App(){
     ,view==="historial-fact"&&h(HistorialFactView,{dashData,driveLoading,notify})
   ));
 }
-ReactDOM.createRoot(document.getElementById("root")).render(h(App));
-</script>
-<script>/* resumen-static: datos embebidos para fallback offline/CDN */
-window._RESUMEN_
+ReactDOM.createRoot(document.getElementById("root")).rende
