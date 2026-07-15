@@ -1475,6 +1475,8 @@ function formatRUT(rut){
   return result+dv;
 }
 function getEstado(r){
+  // Sitio B Arriendo → facturado por SÁNCHEZ, nunca tendrá PDF propio
+  if(r.sitio==="B"&&r.concepto==="Arriendo")return"sanchez";
   if(!r.factura)return"missing";
   // Facturas grandes (>500 UF): solo verificar que tengan PDF asignado
   if(r.ufPlan>5000)return r.factura?"ok":"missing";
@@ -4360,9 +4362,9 @@ function App(){
   /* Sin SetupPanel — siempre va al dashboard */
 
   const enriched=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
-  const stats={total:enriched.length,ok:enriched.filter(r=>r.estado==="ok").length,diff:enriched.filter(r=>r.estado!=="ok").length,sent:sentSet.size,conPdf:enriched.filter(r=>r.factura&&r.ufPdf!==null).length,sinPdf:enriched.filter(r=>!r.factura||r.ufPdf===null).length};
+  const stats={total:enriched.length,ok:enriched.filter(r=>r.estado==="ok").length,diff:enriched.filter(r=>r.estado!=="ok"&&r.estado!=="sanchez").length,sent:sentSet.size,conPdf:enriched.filter(r=>r.factura&&r.ufPdf!==null&&r.estado!=="sanchez").length,sinPdf:enriched.filter(r=>(!r.factura||r.ufPdf===null)&&r.estado!=="sanchez").length,sanchez:enriched.filter(r=>r.estado==="sanchez").length};
   const filtered=enriched.filter(r=>{
-    const mf=filter==="all"||(filter==="ok"&&r.estado==="ok"&&!sentSet.has(r.i))||(filter==="diff"&&r.estado!=="ok")||(filter==="sent"&&sentSet.has(r.i))||(filter==="difiere"&&r.estado==="diff"&&r.matchScore!==1)||(filter==="sinpdf"&&!r.factura);
+    const mf=filter==="all"||(filter==="ok"&&r.estado==="ok"&&!sentSet.has(r.i))||(filter==="diff"&&r.estado!=="ok"&&r.estado!=="sanchez")||(filter==="sent"&&sentSet.has(r.i))||(filter==="difiere"&&r.estado==="diff"&&r.matchScore!==1)||(filter==="sinpdf"&&!r.factura&&r.estado!=="sanchez");
     const mc=concFilter==="all"||(concFilter==="arr"&&r.concepto==="Arriendo")||(concFilter==="srv"&&r.concepto==="Serv. Adm.")||(concFilter==="hab"&&r.concepto==="Habilitación")||(concFilter==="ppr"&&!r.yaPagado);
     const normQ=s=>(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," ").trim();
     const q=normQ(search);
@@ -5379,7 +5381,7 @@ function App(){
             zipStatus==="loading"?"Descargando PDFs...":"Habilitando facturas..."
           ),
         h("span",{style:{color:"var(--txd)",fontSize:11,margin:"0 4px"}},"|"),
-        [{k:"all",l:`Todos (${stats.total})`},{k:"ok",l:`Coinciden (${stats.ok})`},{k:"diff",l:`Revisar (${stats.total-stats.ok})`},{k:"sent",l:`Enviados (${stats.sent})`},
+        [{k:"all",l:`Todos (${stats.total})`},{k:"ok",l:`Coinciden (${stats.ok})`},{k:"diff",l:`Revisar (${stats.diff})`},{k:"sent",l:`Enviados (${stats.sent})`},
          {k:"difiere",l:`Difiere (${enriched.filter(r=>r.estado==="diff"&&r.matchScore!==1).length})`},
          {k:"sinpdf",l:`Sin PDF (${stats.sinPdf})`}]
         .map(f=>h("button",{key:f.k,className:`pill${filter===f.k?" active":""}`,onClick:()=>setFilter(f.k)},f.l)),
@@ -5491,6 +5493,7 @@ function App(){
                   })()
                 )),
                 h("td",{style:{padding:"8px 11px",background:bg}},
+                  row.estado==="sanchez"?h("span",{title:"Arriendo Sitio B facturado por Sánchez Hermanos SpA",style:{fontSize:10,fontWeight:700,padding:"3px 10px",borderRadius:20,background:"#ede9fe",color:"#5b21b6",border:"1px solid #c4b5fd",letterSpacing:"0.04em",cursor:"default"}},"SÁNCHEZ"):
                   row.estado==="missing"?h(Badge,{e:"missing",row}):
                   sent?h(Badge,{e:"sent_sheet",row}):
                   sending?h("span",{style:{color:"var(--blue)",fontSize:11,display:"inline-flex",alignItems:"center",gap:4}},h("span",{className:"spin"},"⟳")," Enviando..."):
@@ -5529,18 +5532,4 @@ function App(){
           h("button",{
               onClick:unlocked?sendAll:()=>setShowPwdModal(true),
               style:{background:unlocked?"var(--gbg)":"var(--surf2)",border:unlocked?"1px solid var(--gdim)":"1px solid var(--bdr)",color:unlocked?"var(--green)":"var(--txm)",borderRadius:8,padding:"7px 16px",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:6,cursor:"pointer"}
-            },unlocked?`✉ Enviar todos (${Math.max(0,stats.ok-stats.sent)})`:`🔒 Enviar todos (${Math.max(0,stats.ok-stats.sent)})`)
-        )
-      )
-    )
-    ,view==="ventas"&&h(VentasView,{periodo})
-    ,view==="fact-cobrar"&&h(FactxCobrarView,{notify})
-    ,view==="contratos"&&h(ContratosView,{dashData,driveLoading})
-    ,view==="cuentas"&&h(CuentasServiciosView,{dashData,driveLoading})
-    ,view==="historial-fact"&&h(HistorialFactView,{dashData,driveLoading,notify})
-  ));
-}
-ReactDOM.createRoot(document.getElementById("root")).render(h(App));
-</script>
-<script>/* resumen-static: datos embebidos para fallback offline/CDN */
-window._RESUMEN_
+            },unlocked?`✉ Enviar todos (${Math.max(0,stats.o
