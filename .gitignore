@@ -11,3 +11,5 @@ render-service/node_modules/
 # Archivos de datos generados (no deben versionarse)
 historial-*.xlsx
 historial-*.json
+# Excepción: JSON embebido en bundle de Vercel para historial (requerido por includeFiles en vercel.json)
+!historial-excel-2026.json

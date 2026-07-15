@@ -289,4 +289,6 @@ export default async function handler(req, res) {
 
   } catch (err) {
     console.error('[nubox-pdf] Error:', err.message);
-    return res.status(500).json({ error: err.mes
+    return res.status(500).json({ error: err.message });
+  }
+}

@@ -239,4 +239,35 @@ export default async function handler(req, res) {
     const zipBuffer = Buffer.from(await zipRes.arrayBuffer());
 
     const SITIO_MAP = {"5A":"5-A","4A":"4-A","A1":"A-1","A2":"A-2","B":"B","D2":"D-2"};
-    const zip = a
+    const zip = await JSZip.loadAsync(zipBuffer);
+    const result = {};
+
+    for (const [path, entry] of Object.entries(zip.files)) {
+      if (entry.dir || !path.toLowerCase().endsWith(".pdf")) continue;
+      const parts = path.split("/");
+      const carpeta = parts.length > 1 ? parts[parts.length - 2] : "";
+      const nombre = parts[parts.length - 1];
+      const sitio = SITIO_MAP[carpeta] || carpeta;
+      const nroMatch = nombre.match(/^(F(?:EE)?-\d+)/i);
+      if (!nroMatch) continue;
+      const nroFact = nroMatch[1].toUpperCase();
+
+      // FIX: detectar tipo por contenido del PDF, no solo por prefijo del nombre.
+      // F-14633 empieza con "F-" pero su descripción dice "Serv. Adm." → debe ser serv_adm.
+      const pdfBuffer = Buffer.from(await entry.async("arraybuffer"));
+      const text = extractPDFText(pdfBuffer);
+      const tipo = text.includes("Serv. Adm.") || text.includes("Serv.Adm.")
+        ? "serv_adm"
+        : text.includes("Arriendo")
+        ? "arriendo"
+        : nroFact.startsWith("FEE-") ? "serv_adm" : "arriendo";
+
+      const { rut, uf, montoTotal } = extractData(text, tipo);
+      result[nroFact] = { rut, uf, tipo, sitio, montoTotal };
+    }
+
+    return res.status(200).json({ pdfs: result, count: Object.keys(result).length });
+  } catch (e) {
+    return res.status(500).json({ error: e.message, stack: e.stack?.slice(0, 500) });
+  }
+}

@@ -5543,8 +5543,9 @@ function App(){
                   (()=>{
                     /* Fórmula exacta factura chilena: Neto=round(UF×UF_día5), IVA=round(Neto×0.19) */
                     const uf=row.ufPdf??null;
-                    if(uf!=null&&ufSII&&uf<10000){
-                      const neto=Math.round(uf*ufSII);
+                    const ufVal=ufSII??row.ufValor??null; /* fallback: UF del propio PDF si mindicador falla */
+                    if(uf!=null&&ufVal&&uf<10000){
+                      const neto=Math.round(uf*ufVal);
                       const iva=Math.round(neto*0.19);
                       return "$"+(neto+iva).toLocaleString("es-CL");
                     }

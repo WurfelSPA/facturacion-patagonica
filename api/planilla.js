@@ -193,6 +193,27 @@ async function patchXlsx(buffer, rows, value, col) {
   });
 }
 
+/**
+ * Escribe DIFERENTES valores en DIFERENTES celdas en una sola operación XLSX.
+ * cells: Array de { sheetRow: number, col: string, value: string }
+ */
+async function patchXlsxMulti(buffer, cells) {
+  const zip = await JSZip.loadAsync(buffer);
+  const sheetPath = await getSheetPath(zip);
+  let sheetXml = await zip.file(sheetPath).async("string");
+
+  for (const { sheetRow, col, value } of cells) {
+    sheetXml = patchCellXml(sheetXml, sheetRow, value, col);
+  }
+
+  zip.file(sheetPath, sheetXml);
+  return zip.generateAsync({
+    type: "nodebuffer",
+    compression: "DEFLATE",
+    compressionOptions: { level: 6 },
+  });
+}
+
 // ── Agregar mes siguiente ─────────────────────────────────────────────────────
 
 function colToNum(col) { let n=0; for(const c of col) n=n*26+(c.charCodeAt(0)-64); return n; }
@@ -529,6 +550,30 @@ export default async function handler(req, res) {
     }
   }
 
+  // POST ?action=write-cells  → escribe distintos valores en distintas celdas de una vez
+  // Body: { cells: [{ sheetRow: number, col: "HD", value: "14686" }, ...] }
+  if (req.method === "POST" && req.query.action === "write-cells") {
+    const { cells } = req.body || {};
+    if (!Array.isArray(cells) || cells.length === 0)
+      return res.status(400).json({ error: "Se requiere array cells no vacío" });
+    const validCells = cells.filter(c =>
+      typeof c.sheetRow === "number" && c.sheetRow > 0 &&
+      typeof c.col === "string" && /^[A-Z]{1,3}$/.test(c.col) &&
+      typeof c.value === "string" && c.value.trim() !== ""
+    );
+    if (!validCells.length) return res.status(400).json({ error: "Sin celdas válidas" });
+    try {
+      const token   = await getAccessToken(sa);
+      const buf     = await downloadFile(token);
+      const patched = await patchXlsxMulti(buf, validCells);
+      await uploadFile(token, patched);
+      return res.status(200).json({ ok: true, updated: validCells.length });
+    } catch (e) {
+      console.error("planilla write-cells:", e.message);
+    return res.status(500).json({ error: e.message });
+    }
+  }
+
   if (req.method === "POST") {
     const body = req.body || {};
     let rows = [];
@@ -551,7 +596,6 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── GET: descargar planilla ───────────────────────────────────────────────
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
   try {
     const token = await getAccessToken(sa);
