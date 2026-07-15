@@ -5478,6 +5478,8 @@ function App(){
 )),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",fontWeight:600,color:"var(--tx)"}},
                   (()=>{
+                    /* Usar monto total del PDF cuando disponible (exacto, incluye IVA) */
+                    if(row.montoTotal&&row.montoTotal>50000)return "$"+row.montoTotal.toLocaleString("es-CL");
                     /* Fórmula exacta factura chilena: Neto=round(UF×UF_día5), IVA=round(Neto×0.19) */
                     const uf=row.ufPdf??null;
                     if(uf!=null&&ufSII&&uf<10000){
