@@ -1934,6 +1934,9 @@ function FactxCobrarView({notify}){
   var selClientS=React.useState(null); var selClient=selClientS[0]; var setSelClient=selClientS[1];
   var filterBucketS=React.useState("all"); var filterBucket=filterBucketS[0]; var setFilterBucket=filterBucketS[1];
   var sortS=React.useState({col:"nombre",dir:"asc"}); var sort=sortS[0]; var setSort=sortS[1];
+  var drvFilesS=React.useState([]); var drvFiles=drvFilesS[0]; var setDrvFiles=drvFilesS[1];
+  var selFidS=React.useState(null); var selFid=selFidS[0]; var setSelFid=selFidS[1];
+  var allTotS=React.useState({}); var allTot=allTotS[0]; var setAllTot=allTotS[1];
   var fxcModalS=React.useState(null); var fxcModal=fxcModalS[0]; var setFxcModal=fxcModalS[1];
   function fmtCLP(v){return "$"+Math.round(v).toLocaleString("es-CL");}
 
@@ -1978,21 +1981,56 @@ function FactxCobrarView({notify}){
     }).filter(function(r){return r.monto>0||r.sdoVencido>0;});
   }
 
-  function loadFromDrive(){
+  /* Extrae "23-06-2026" del nombre de archivo */
+  function parseFCobrar(n){var m=n.match(/(\d{2}-\d{2}-\d{4})/);return m?m[1]:n.replace(/\.xlsx$/i,"").replace(/F x Cobrar Pisa ?/i,"").trim();}
+
+  /* Carga un XLSX desde ArrayBuffer y devuelve filas parseadas */
+  function xlsxFromBuf(buf){
+    var wb=XLSX.read(new Uint8Array(buf),{type:"array"});
+    var ws=wb.Sheets["Base"]||wb.Sheets["base"]||wb.Sheets["BASE"]||wb.Sheets[wb.SheetNames[0]];
+    if(!ws)throw new Error("No se encontró hoja. Hojas: "+wb.SheetNames.join(", "));
+    var raw=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
+    return parseSheetValues(raw);
+  }
+
+  /* Carga un archivo Drive por ID y muestra sus datos */
+  function loadFromDriveId(fid){
     setLoading(true); setError(null); setSelClient(null);
-    fetch("/api/historial?fileId=1otFPi_fUWBJNGVKAhG08sq46epibkvGA")
-      .then(function(r){if(!r.ok)throw new Error("Drive error "+r.status);return r.arrayBuffer();})
+    fetch("/api/historial?fileId="+fid)
+      .then(function(r){if(!r.ok)throw new Error("Drive "+r.status);return r.arrayBuffer();})
+      .then(function(buf){var p=xlsxFromBuf(buf);setRows(p);setLoading(false);if(notify)notify(p.length+" documentos cargados","ok");})
+      .catch(function(e){setError(e.message);setLoading(false);});
+  }
+
+  /* Carga solo el total de un archivo (para cuadro comparativo) */
+  function loadTotOnly(fo){
+    fetch("/api/historial?fileId="+fo.id).then(function(r){return r.arrayBuffer();})
       .then(function(buf){
-        var wb=XLSX.read(new Uint8Array(buf),{type:"array"});
-        var ws=wb.Sheets["Base"]||wb.Sheets["base"]||wb.Sheets["BASE"]||wb.Sheets[wb.SheetNames[0]];
-        if(!ws)throw new Error("No se encontró hoja. Hojas: "+wb.SheetNames.join(", "));
-        var raw=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
-        var parsed=parseSheetValues(raw);
-        if(parsed.length===0)throw new Error("0 filas con datos. Headers: "+JSON.stringify(raw[0]).slice(0,150));
-        setRows(parsed); setLoading(false);
-        if(notify)notify(parsed.length+" documentos cargados","ok");
-      })
-      .catch(function(e){setError(e.message); setLoading(false);});
+        var p=xlsxFromBuf(buf);
+        var tot=p.reduce(function(s,r){return s+r.monto;},0);
+        setAllTot(function(prev){var n=Object.assign({},prev);n[fo.id]={tot:tot,date:parseFCobrar(fo.name)};return n;});
+      }).catch(function(){});
+  }
+
+  /* Fallback: archivo hardcodeado original */
+  function loadFromDrive(){loadFromDriveId("1otFPi_fUWBJNGVKAhG08sq46epibkvGA");}
+
+  /* Descubre la carpeta "Facturas x Cobrar PISA" dentro de Facturación Mensual */
+  function discoverFolder(){
+    setLoading(true); setError(null);
+    fetch("/api/historial?ls="+DRIVE_FACTURACION_FOLDER_ID)
+      .then(function(r){return r.json();})
+      .then(function(d){
+        var sub=(d.files||[]).find(function(f){return f.name.toLowerCase().includes("cobrar")&&(f.mimeType||"").includes("folder");});
+        if(!sub){loadFromDrive();return;}
+        return fetch("/api/historial?ls="+sub.id).then(function(r){return r.json();}).then(function(d2){
+          var xl=(d2.files||[]).filter(function(f){return f.name.toLowerCase().endsWith(".xlsx");})
+                               .sort(function(a,b){return a.name.localeCompare(b.name);});
+          setDrvFiles(xl);
+          if(xl.length>0){var last=xl[xl.length-1];setSelFid(last.id);loadFromDriveId(last.id);xl.forEach(loadTotOnly);}
+          else loadFromDrive();
+        });
+      }).catch(function(e){setError(e.message);setLoading(false);});
   }
 
   function loadFromFile(file){
@@ -2010,7 +2048,7 @@ function FactxCobrarView({notify}){
     reader.readAsArrayBuffer(file);
   }
 
-  React.useEffect(function(){loadFromDrive();},[]);
+  React.useEffect(function(){discoverFolder();},[]);
 
   // ── Agregar clientes (master) ────────────────────────────────
   var clientMap={};
@@ -2053,7 +2091,7 @@ function FactxCobrarView({notify}){
       h("div",{style:{fontSize:15,fontWeight:700,color:"var(--tx)",marginBottom:6}},"No se pudo cargar desde Drive"),
       h("div",{style:{fontSize:11,color:"#ef4444",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:8,padding:"10px 14px",marginBottom:16,fontFamily:"'DM Mono',monospace",wordBreak:"break-all",textAlign:"left"}},error),
       h("div",{style:{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}},
-        h("button",{onClick:loadFromDrive,style:{padding:"9px 20px",background:"var(--acc)",color:"#fff",border:"none",borderRadius:9,fontSize:12,fontWeight:700,cursor:"pointer"}},"🔄 Reintentar"),
+        h("button",{onClick:discoverFolder,style:{padding:"9px 20px",background:"var(--acc)",color:"#fff",border:"none",borderRadius:9,fontSize:12,fontWeight:700,cursor:"pointer"}},"🔄 Reintentar"),
         h("label",{style:{display:"inline-flex",alignItems:"center",gap:6,padding:"9px 20px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:9,fontSize:12,fontWeight:600,cursor:"pointer",color:"var(--txm)"}},
           "📂 Cargar archivo manual",
           h("input",{type:"file",accept:".xlsx",style:{display:"none"},onChange:function(e){if(e.target.files[0])loadFromFile(e.target.files[0]);}})
@@ -2190,6 +2228,26 @@ function FactxCobrarView({notify}){
   function sortArrow(col){if(sort.col!==col)return" ↕";return sort.dir==="desc"?" ↓":" ↑";}
 
   return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up"},
+    /* ── Cuadro comparativo de cortes ── */
+    drvFiles.length>0&&h("div",{style:{padding:"8px 24px",background:"var(--surf)",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",flexShrink:0}},
+      h("span",{style:{fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:".07em",textTransform:"uppercase",marginRight:8}},"Deuda por corte:"),
+      drvFiles.map(function(f){
+        var t=allTot[f.id];
+        var sel=selFid===f.id;
+        return h("span",{key:f.id,
+          style:{display:"inline-flex",alignItems:"center",gap:6,fontSize:11,fontFamily:"'DM Mono',monospace",
+            padding:"4px 12px",borderRadius:20,cursor:"pointer",transition:"all .15s",
+            background:sel?"var(--acc)":"var(--surf2)",
+            color:sel?"#fff":"var(--txm)",
+            border:"1px solid "+(sel?"var(--acc)":"var(--bdr)"),
+            fontWeight:sel?700:500},
+          onClick:function(){if(!sel){setSelFid(f.id);loadFromDriveId(f.id);}}
+        },
+          h("span",{style:{opacity:.7}},parseFCobrar(f.name)),
+          h("span",{style:{fontWeight:800}},t?fmtCLP(t.tot):"…")
+        );
+      })
+    ),
     /* Toolbar */
     h("div",{style:{padding:"10px 24px",borderBottom:"1px solid var(--bdr)",background:"var(--surf)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",flexShrink:0}},
       h("input",{type:"text",placeholder:"Buscar cliente o RUT...",value:search,
@@ -2204,9 +2262,17 @@ function FactxCobrarView({notify}){
             border:"1px solid "+(active?bucketColor(b)+"55":"var(--bdr)")
           }},bucketLabel(b));
       }),
-      h("div",{style:{marginLeft:"auto",display:"flex",gap:10,alignItems:"center"}},
+      h("div",{style:{marginLeft:"auto",display:"flex",gap:8,alignItems:"center"}},
         h("span",{style:{fontSize:11,color:"var(--txd)"}},filteredClients.length+" cliente"+(filteredClients.length!==1?"s":"")),
-        h("button",{onClick:loadFromDrive,title:"Recargar",
+        drvFiles.length>1&&h("select",{
+          value:selFid||"",
+          onChange:function(e){var fid=e.target.value;if(fid&&fid!==selFid){setSelFid(fid);loadFromDriveId(fid);}},
+          style:{padding:"5px 10px",border:"1px solid var(--bdr)",borderRadius:8,fontSize:11,
+            background:"var(--surf2)",color:"var(--tx)",cursor:"pointer",fontFamily:"'DM Mono',monospace",
+            maxWidth:170,outline:"none"}},
+          drvFiles.map(function(f){return h("option",{key:f.id,value:f.id},parseFCobrar(f.name));})
+        ),
+        h("button",{onClick:discoverFolder,title:"Recargar",
           style:{padding:"5px 14px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:8,fontSize:12,cursor:"pointer",color:"var(--txm)",fontWeight:600}},"🔄")
       )
     ),
