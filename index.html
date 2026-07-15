@@ -4296,32 +4296,36 @@ function App(){
     setSavingNros(false);
   },[data,getEstado]);
 
-  /* ── Cargar datos desde planilla sin ZIP (muestra nros ya guardados) ─────── */
+  /* ── Cargar datos desde planilla sin ZIP ────────────────────────────────────
+   * Muestra TODOS los clientes del período con su UF y comentarios.
+   * Solo usa el Nro Fact cuando viene explícito de la columna de planilla
+   * para ese período (colGS+1 / colGT+1). NO aplica MANUAL_STATIC aquí porque
+   * esos números son de meses anteriores y generarían facturas falsas en meses
+   * no procesados todavía.
+   * ────────────────────────────────────────────────────────────────────────── */
   const cargarDesdePlanilla=useCallback(async()=>{
     if(!files.planilla||!periodo)return;
-    const MANUAL_STATIC={"A-2|Banco Estado Express|202.6|arriendo":"FEE-39","A-2|Banco del Estado de Chile|256.7|arriendo":"FEE-39","4-A|Sociedad de Alimentos Leefood SpA|7.48|serv_adm":"F-14756","A-2|Servicio Local de Educación Pública de los Libertadores|7.92|arriendo":"F-14908","A-2|Servicio Local de Educación Pública de los Libertadores|167.73|arriendo":"F-14902","A-2|Servicio Local de Educación Pública de los Libertadores|157.14|arriendo":"F-14901","A-2|Visibility S.A.|31.7|arriendo":"F-14876","A-2|VISIBILITY S.A.|31.7|arriendo":"F-14876"};
     try{
       const clientes=await procesarPlanillaFacturacion(files.planilla,periodo);
       const filas=[];
       for(const c of clientes){
         const concepto=c.tipo==="arriendo"?"Arriendo":"Serv. Adm.";
         const colRef=c.tipo==="arriendo"?"GS":"GT";
-        const mk=`${c.sitio}|${c.cliente}|${c.uf}|${c.tipo}`;
         const planFact=c.tipo==="arriendo"?c.nroFactArr:c.nroFactGC;
         const nfCol=c.tipo==="arriendo"?c.nroFactArrColLetter:c.nroFactGCColLetter;
-        let factura="",ufPdf=null,matchScore=0;
+        /* Solo usar Nro Fact si viene explícito de la planilla para este período */
+        let factura="",matchScore=0;
         if(planFact){
           const _pf=String(planFact).replace(/^F(?:EE)?-/i,"");
-          factura=`F-${_pf}`;ufPdf=c.uf;matchScore=888;
-        } else if(MANUAL_STATIC[mk]){
-          factura=MANUAL_STATIC[mk];ufPdf=c.uf;matchScore=999;
+          factura=`F-${_pf}`;matchScore=888;
         }
-        if(!factura)continue; /* En modo planilla-only solo mostramos los que tienen nro asignado */
-        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo:c.email||"",concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,montoTotal:null,ivaAmount:null,enviado:false,yaEnviado:c.yaEnviado||false,yaPagado:c.yaPagado||false,sheetRow:c.sheetRow||null,sentColLetter:c.sentColLetter||"HC",pagadoColLetter:c.pagadoColLetter||"",nroFactCol:nfCol||"",facturaEnPlanilla:matchScore===888});
+        /* Siempre usar ufPdf=c.uf para mostrar monto estimado en Monto+IVA */
+        /* Mostrar la fila aunque no tenga factura (mes no procesado aún) */
+        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo:c.email||"",concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf:c.uf,montoTotal:null,ivaAmount:null,enviado:false,yaEnviado:c.yaEnviado||false,yaPagado:c.yaPagado||false,sheetRow:c.sheetRow||null,sentColLetter:c.sentColLetter||"HC",pagadoColLetter:c.pagadoColLetter||"",nroFactCol:nfCol||"",facturaEnPlanilla:matchScore===888});
       }
       if(filas.length>0){
         setData(filas);setSoloPlanilla(true);setView("table");
-        /* Descargar ZIP en segundo plano para habilitar previsualización de PDFs */
+        /* Descargar ZIP en segundo plano para habilitar previsualización en meses procesados */
         if(zipStatus!=="ready"&&zipStatus!=="loading")buscarZip(periodo);
       }
     }catch(e){console.warn("cargarDesdePlanilla:",e.message);}
@@ -5536,4 +5540,4 @@ function App(){
 ReactDOM.createRoot(document.getElementById("root")).render(h(App));
 </script>
 <script>/* resumen-static: datos embebidos para fallback offline/CDN */
-window._RESUMEN_STATIC={"clientes":[{"nombre":"OLYMPUS CORPORATION CHILE SPA","meses":{"Enero 2026":15047740,"Febrero 2026":21534206,"Marzo 2026":117430080,"Abril 2026":20580013,"Mayo 2026":144775209,"Junio 2026":162000010},
+window._RESUMEN_STATIC={"clientes":[{"nombre":"OLYMPUS CORPORATION CHILE SPA","meses":{"Enero 2026":15047740,"Febrero 2026":21534206,"Marzo 2026":117430080,"Abril 2026":20580013,"May
