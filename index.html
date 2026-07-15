@@ -173,23 +173,14 @@ async function getUFDia5(year,month){
   const key=`uf5-${year}-${String(month).padStart(2,"0")}`;
   if(ufCache[key])return ufCache[key];
   try{
-    const url=`https://mindicador.cl/api/uf/${String(year)}`;
+    // Pedir el día 5 exacto a mindicador.cl (formato DD-MM-YYYY)
+    const mon=String(month).padStart(2,"0");
+    const url=`https://mindicador.cl/api/uf/05-${mon}-${year}`;
     const res=await fetch(url);
     if(!res.ok)throw new Error("HTTP "+res.status);
     const data=await res.json();
     const serie=data.serie||[];
-    // Buscar exactamente el día 05 del mes
-    const dia5=serie.find(e=>{
-      const d=new Date(e.fecha);
-      return d.getUTCFullYear()===year&&(d.getUTCMonth()+1)===month&&d.getUTCDate()===5;
-    });
-    if(dia5){ufCache[key]=dia5.valor;return dia5.valor;}
-    // Fallback: día más cercano al 05 por debajo
-    const delMes=serie.filter(e=>{
-      const d=new Date(e.fecha);
-      return d.getUTCFullYear()===year&&(d.getUTCMonth()+1)===month&&d.getUTCDate()<=5;
-    }).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
-    if(delMes.length>0){ufCache[key]=delMes[0].valor;return delMes[0].valor;}
+    if(serie.length>0){ufCache[key]=serie[0].valor;return serie[0].valor;}
     return null;
   }catch(e){console.warn("Error UF día 5",e.message);return null;}
 }
