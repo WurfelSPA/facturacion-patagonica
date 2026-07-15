@@ -3553,7 +3553,7 @@ function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlo
   ];
   const isActive = id => id==="factura" ? (view==="table"||view==="upload") : view===id;
   const handleNav = id => {
-    if(id==="factura"){ setView("upload"); }
+    if(id==="factura"){ setView(data.length>0?"table":"upload"); }
     else setView(id);
   };
   return h("aside",{className:"sidebar"},
@@ -5370,7 +5370,7 @@ function App(){
           onClick:()=>{periodoActivado.current=true;autoProcesado.current=false;autoNuboxRef.current=false;setSoloPlanilla(false);setData([]);setCanGenerate(true);splitPDF();}
         },zipStatus==="loading"||zipStatus==="splitting"||splitLoading?h("span",{style:{display:"flex",alignItems:"center",gap:6}},h("span",{className:"spin"},"⟳")," Procesando..."):"▶ Procesar "+periodo),
         soloPlanilla&&(zipStatus==="loading"||(zipStatus==="ready"&&Object.keys(pdfMap).length===0))&&
-          h("span",{style:{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,color:"var(--txd)",fontFamily:"'DM Sans',sans-serif",padding:"3px 10px",background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:20,whiteSpace:"nowrap"}},
+          h("span",{style:{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,color:"#92400e",fontFamily:"'DM Sans',sans-serif",padding:"3px 10px",background:"#fef3c7",border:"1px solid #f59e0b",borderRadius:20,whiteSpace:"nowrap",fontWeight:600}},
             h("span",{className:"spin",style:{fontSize:12}},"⟳"),
             zipStatus==="loading"?"Descargando PDFs...":"Habilitando facturas..."
           ),
@@ -5536,4 +5536,4 @@ function App(){
 ReactDOM.createRoot(document.getElementById("root")).render(h(App));
 </script>
 <script>/* resumen-static: datos embebidos para fallback offline/CDN */
-window._RESUMEN_STATIC={"clientes":[{"nombre":"OLYMPUS CORPORATION CHILE SPA","meses":{"Enero 2026":15047740,"Febrero 2026":21534206,"Marzo 2026":117430080,"Abril 2026":20580013,"Mayo 2026":144775209,"Junio 2026":162000010},"total":481367258},{"nombre":"SANCHEZ HERMANOS SPA","meses":{"Enero 2026
+window._RESUMEN_STATIC={"clientes":[{"nombre":"OLYMPUS CORPORATION CHILE SPA","meses":{"Enero 2026":15047740,"Febrero 2026":21534206,"Marzo 2026":117430080,"Abril 2026":20580013,"Mayo 2026":144775209,"Junio 2026":162000010},"total":481367258},{"nombre":"SANCHEZ HERMANO
