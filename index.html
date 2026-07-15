@@ -3540,7 +3540,7 @@ function _HistorialPanel_REMOVED({files,data,pdfMap,filesZip,periodo,getToken,no
   );
 }
 
-function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlocked,setShowPwdModal,sendAll,setUnlocked,stats,sentSet,currentUser,onChangePwd,userMenuOpen,setUserMenuOpen}){
+function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlocked,setShowPwdModal,sendAll,setUnlocked,stats,sentSet,currentUser,onChangePwd,userMenuOpen,setUserMenuOpen,hasFacturaData}){
   const pendFact = stats ? Math.max(0, stats.ok - (sentSet?.size||0)) : 0;
   const items = [
     {id:"dashboard", icon:"📊", label:"Dashboard"},
@@ -3553,7 +3553,7 @@ function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlo
   ];
   const isActive = id => id==="factura" ? (view==="table"||view==="upload") : view===id;
   const handleNav = id => {
-    if(id==="factura"){ setView(data.length>0?"table":"upload"); }
+    if(id==="factura"){ setView(hasFacturaData?"table":"upload"); }
     else setView(id);
   };
   return h("aside",{className:"sidebar"},
@@ -5115,7 +5115,7 @@ function App(){
   if(!currentUser) return h(LoginScreen,null);
   if(authMustChange) return h(ForceChangeScreen,null);
   return h("div",{style:{display:"flex",height:"100vh",overflow:"hidden"}},
-    h(Sidebar,{view,setView,procesar,files,periodo,splitLoading,splitPDF,unlocked,setShowPwdModal,sendAll,setUnlocked,stats:statsSB,sentSet,currentUser,onChangePwd:function(){setShowChangePwd(true);},userMenuOpen,setUserMenuOpen}),
+    h(Sidebar,{view,setView,procesar,files,periodo,splitLoading,splitPDF,unlocked,setShowPwdModal,sendAll,setUnlocked,stats:statsSB,sentSet,currentUser,onChangePwd:function(){setShowChangePwd(true);},userMenuOpen,setUserMenuOpen,hasFacturaData:data.length>0}),
     h("div",{className:"app-content"},
     notif&&h("div",{className:"notif",style:{background:notif.t==="ok"?"var(--gbg)":notif.t==="err"?"var(--rbg)":"var(--abg)",border:`1px solid ${notif.t==="ok"?"var(--gdim)":notif.t==="err"?"var(--rdim)":"var(--adim)"}`,color:notif.t==="ok"?"var(--green)":notif.t==="err"?"var(--red)":"var(--amber)"}},
       (notif.t==="ok"?"✓ ":notif.t==="err"?"✗ ":"△ ")+notif.msg
@@ -5536,4 +5536,4 @@ function App(){
 ReactDOM.createRoot(document.getElementById("root")).render(h(App));
 </script>
 <script>/* resumen-static: datos embebidos para fallback offline/CDN */
-window._RESUMEN_STATIC={"clientes":[{"nombre":"OLYMPUS CORPORATION CHILE SPA","meses":{"Enero 2026":15047740,"Febrero 2026":21534206,"Marzo 2026":117430080,"Abril 2026":20580013,"Mayo 2026":144775209,"Junio 2026":162000010},"total":481367258},{"nombre":"SANCHEZ HERMANO
+window._RESUMEN_STATIC={"clientes":[{"nombre":"OLYMPUS CORPORATION CHILE SPA","meses":{"Enero 2026":15047740,"Febrero 2026":21534206,"Marzo 2026":117430080,"Abril 2026":20580013,"Mayo 2026":144775209,"Junio 2026":162000010},
