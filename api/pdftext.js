@@ -171,13 +171,25 @@ function extractData(text, tipo) {
     }
   }
 
-  // Extraer Monto Total directamente del PDF (más preciso que calcular UF × valor)
-  // Formato: "Monto Total 4.995.800" o "MontoTotal4995800"
+  // Extraer Monto Total directamente del PDF
+  // Búsqueda bidireccional: algunos PDFs entregan valores ANTES del label (orden columna)
   let montoTotal = null;
-  const mtMatch = text.match(/Monto\s+Total\s+([\d.]+)/i)
-    || text.replace(/\s+/g," ").match(/Monto Total ([\d.]+)/i);
-  if (mtMatch) {
-    montoTotal = parseInt(mtMatch[1].replace(/\./g, ""), 10) || null;
+  const flatForTotal = text.replace(/\s+/g, " ");
+  const parseAmts = str => [...str.matchAll(/([\d]+(?:\.[\d]{3})+|[\d]{5,})/g)]
+    .map(m => parseInt(m[1].replace(/\./g, ""), 10))
+    .filter(n => n >= 50000 && n <= 25000000);
+
+  const mtIdx = flatForTotal.toLowerCase().indexOf("monto total");
+  if (mtIdx >= 0) {
+    const numsAfter  = parseAmts(flatForTotal.slice(mtIdx + "monto total".length));
+    const numsBefore = parseAmts(flatForTotal.slice(Math.max(0, mtIdx - 300), mtIdx));
+    const cands = [...numsAfter, ...numsBefore];
+    if (cands.length > 0) montoTotal = Math.max(...cands) || null;
+  }
+  // Fallback: el mayor número al final del texto (zona de totales)
+  if (!montoTotal) {
+    const tailNums = parseAmts(flatForTotal.slice(-500));
+    if (tailNums.length > 0) montoTotal = Math.max(...tailNums) || null;
   }
 
   return { rut, uf: uf ? Math.round(uf * 10000) / 10000 : null, montoTotal };
@@ -230,20 +242,4 @@ export default async function handler(req, res) {
 
       // FIX: detectar tipo por contenido del PDF, no solo por prefijo del nombre.
       // F-14633 empieza con "F-" pero su descripción dice "Serv. Adm." → debe ser serv_adm.
-      const pdfBuffer = Buffer.from(await entry.async("arraybuffer"));
-      const text = extractPDFText(pdfBuffer);
-      const tipo = text.includes("Serv. Adm.") || text.includes("Serv.Adm.")
-        ? "serv_adm"
-        : text.includes("Arriendo")
-        ? "arriendo"
-        : nroFact.startsWith("FEE-") ? "serv_adm" : "arriendo";
-
-      const { rut, uf } = extractData(text, tipo);
-      result[nroFact] = { rut, uf, tipo, sitio };
-    }
-
-    return res.status(200).json({ pdfs: result, count: Object.keys(result).length });
-  } catch (e) {
-    return res.status(500).json({ error: e.message, stack: e.stack?.slice(0, 500) });
-  }
-}
+      const pdfBuffer = Bu
