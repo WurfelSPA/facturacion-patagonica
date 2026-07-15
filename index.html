@@ -4134,7 +4134,7 @@ function App(){
     for(const r of rows){
       const estadoLabel=r.estado==="ok"?"Coincide":r.estado==="diff"?(r.matchScore===1?"Revisar":"Difiere"):"Sin PDF";
       const sentido=sentSet.has(r.i)?"✓ Enviado":estadoLabel;
-      const montoCLP=r.montoTotal||( r.ufPdf!=null&&ufSII?Math.round(r.ufPdf*ufSII):r.ufPlan>500?Math.round(r.ufPlan):"");
+      const _uf=r.ufPdf??null;const _neto=_uf!=null&&ufSII&&_uf<10000?Math.round(_uf*ufSII):(_uf!=null&&_uf>500?Math.round(_uf):r.ufPlan>500?Math.round(r.ufPlan):0);const montoCLP=_neto?(_neto+Math.round(_neto*0.19)):"";
       lines.push([esc(r.sitio),esc(r.edificio||""),esc(r.cliente),esc(r.rut||""),esc(r.correo||""),esc(r.concepto),esc(r.factura||""),esc(r.ufPlan!=null?r.ufPlan.toFixed(2):""),esc(r.ufPdf!=null?r.ufPdf.toFixed(2):""),esc(montoCLP),esc(sentido)].join(";"));
     }
     const bom="﻿"; // BOM para que Excel abra correctamente con caracteres especiales
@@ -5477,14 +5477,17 @@ function App(){
 )),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",fontWeight:600,color:"var(--tx)"}},
                   (()=>{
-                    /* Prioridad 1: Monto Total extraído directamente del PDF */
-                    if(row.montoTotal) return "$"+row.montoTotal.toLocaleString("es-CL");
-                    /* Prioridad 2: calcular neto × tipo de cambio + IVA */
-                    const neto=row.ufPdf!=null&&ufSII?Math.round(row.ufPdf*ufSII):row.ufPlan>500?Math.round(row.ufPlan):null;
-                    if(!neto) return "—";
-                    /* Siempre sumar IVA: exacto si viene del PDF, estimado (19%) si no */
-                    const conIva=row.ivaAmount?neto+row.ivaAmount:Math.round(neto*1.19);
-                    return "$"+conIva.toLocaleString("es-CL");
+                    /* Fórmula exacta factura chilena: Neto=round(UF×UF_día5), IVA=round(Neto×0.19) */
+                    const uf=row.ufPdf??null;
+                    if(uf!=null&&ufSII&&uf<10000){
+                      const neto=Math.round(uf*ufSII);
+                      const iva=Math.round(neto*0.19);
+                      return "$"+(neto+iva).toLocaleString("es-CL");
+                    }
+                    /* Monto CLP fijo (ufPdf o ufPlan > 500 → precio en pesos directo) */
+                    const base=(uf!=null&&uf>500)?Math.round(uf):(row.ufPlan>500)?Math.round(row.ufPlan):null;
+                    if(!base) return "—";
+                    return "$"+Math.round(base*1.19).toLocaleString("es-CL");
                   })()
                 )),
                 h("td",{style:{padding:"8px 11px",background:bg}},
@@ -5540,4 +5543,4 @@ function App(){
 ReactDOM.createRoot(document.getElementById("root")).render(h(App));
 </script>
 <script>/* resumen-static: datos embebidos para fallback offline/CDN */
-window._RESUMEN_STATIC={"clientes":[{"nombre":"OLYMPUS CORPORATION CHILE SPA","meses":{"Enero 2026":15047740,"Febrero 2026":21534206,"Marzo 2026":117430080,"Abril 2026":20580013,"May
+window._RESUMEN_
