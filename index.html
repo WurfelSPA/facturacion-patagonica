@@ -4036,8 +4036,8 @@ function App(){
         let factura="",ufPdf=null,montoTotal=null,ivaAmount=null,ufValor=null,matchScore=0;
         /* ── Pre-carga desde planilla (nro ya escrito en Nro Fact col) ─── */
         const _planFact=c.tipo==="arriendo"?c.nroFactArr:c.nroFactGC;
-        if(_planFact){const _pf=String(_planFact).replace(/^F(?:EE)?-/i,"");factura=`F-${_pf}`;ufPdf=c.uf;matchScore=888;const _mi=pdfs.findIndex((p,pi)=>!pdfUsado.has(pi)&&p.nroFact===factura);if(_mi>=0){pdfUsado.add(_mi);ufValor=pdfs[_mi].ufValor||null;}}
-        else if(MANUAL[mk]){factura=MANUAL[mk];ufPdf=c.uf;matchScore=999;const _mi=pdfs.findIndex((p,i)=>!pdfUsado.has(i)&&p.nroFact===factura);if(_mi>=0){pdfUsado.add(_mi);ufValor=pdfs[_mi].ufValor||null;}}
+        if(_planFact){const _pf=String(_planFact).replace(/^F(?:EE)?-/i,"");factura=`F-${_pf}`;ufPdf=c.uf;matchScore=888;const _mi=pdfs.findIndex((p,pi)=>!pdfUsado.has(pi)&&p.nroFact===factura);if(_mi>=0){pdfUsado.add(_mi);ufValor=pdfs[_mi].ufValor||null;if(pdfs[_mi].ufPdf!=null)ufPdf=pdfs[_mi].ufPdf;}}
+        else if(MANUAL[mk]){factura=MANUAL[mk];ufPdf=c.uf;matchScore=999;const _mi=pdfs.findIndex((p,i)=>!pdfUsado.has(i)&&p.nroFact===factura);if(_mi>=0){pdfUsado.add(_mi);ufValor=pdfs[_mi].ufValor||null;if(pdfs[_mi].ufPdf!=null)ufPdf=pdfs[_mi].ufPdf;}}
         else{
           let bestIdx=-1,bestScore=0;
           const rutNorm=c.rut||"";
