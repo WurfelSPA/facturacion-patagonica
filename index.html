@@ -865,13 +865,24 @@ async function procesarPDFs(zipFile,addLog){
       if(texto.length>10){
         const flat=texto.replace(/\s+/g," ");
         console.log(`[pdf-texto] ${nroFact}: "${flat.slice(-600)}"`);
+        /* pdf.js puede entregar texto en orden variable según cómo fue construido el PDF:
+           A) Etiquetas primero, valores después: "Monto Neto 19% IVA Monto Total → 835.012 158.701 993.713"
+           B) Valores primero, etiquetas después: "835.012 158.701 993.713 → Monto Neto 19% IVA Monto Total"
+           → Buscamos todos los números en un radio de 300 chars alrededor de "Monto Total"
+             en ambas direcciones y tomamos el máximo (el total siempre es la suma mayor). */
+        const parseAmts=str=>[...str.matchAll(/([\d]+(?:\.[\d]{3})+|[\d]{5,})/g)]
+          .map(m=>parseInt(m[1].replace(/\./g,""),10)).filter(n=>n>=50000&&n<=25000000);
         const mtIdx=flat.toLowerCase().indexOf("monto total");
         if(mtIdx>=0){
-          const afterMT=flat.slice(mtIdx+"monto total".length);
-          /* Capturar todos los números (con puntos de miles O entero puro ≥4 dígitos) */
-          const nums=[...afterMT.matchAll(/([\d]+(?:\.[\d]{3})+|[\d]{4,})/g)]
-            .map(m=>parseInt(m[1].replace(/\./g,""),10)).filter(n=>n>0);
-          if(nums.length>0) montoTotal=Math.max(...nums)||null;
+          const numsAfter=parseAmts(flat.slice(mtIdx+"monto total".length));
+          const numsBefore=parseAmts(flat.slice(Math.max(0,mtIdx-300),mtIdx));
+          const cands=[...numsAfter,...numsBefore];
+          if(cands.length>0) montoTotal=Math.max(...cands)||null;
+        }
+        /* Fallback final: máximo valor de rango facturable en los últimos 500 chars del PDF */
+        if(!montoTotal){
+          const tailNums=parseAmts(flat.slice(-500));
+          if(tailNums.length>0) montoTotal=Math.max(...tailNums)||null;
         }
         if(!montoTotal){
           /* Fallback: extraer IVA para estimación neto + IVA en columna */
@@ -3299,6 +3310,7 @@ function _HistorialPanel_REMOVED({files,data,pdfMap,filesZip,periodo,getToken,no
   const[loadingMes,setLoadingMes]=useState(null);
   const[loadedZips,setLoadedZips]=useState({});      /* mes→JSZip object */
   const[preview,setPreview]=useState(null);          /* {url,nombre} */
+  const[pdfLoading,setPdfLoading]=useState(false);   /* cargando PDF desde Drive */
   const[sending,setSending]=useState(null);
 
   const HAB_FOLDER="1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u";
@@ -3340,24 +3352,27 @@ function _HistorialPanel_REMOVED({files,data,pdfMap,filesZip,periodo,getToken,no
 
   /* Abrir preview de un PDF */
   const verPdf=useCallback(async(facturaNum,mes,blob)=>{
-    if(blob){/* habilitacion: ya tiene blob */
-      const url=URL.createObjectURL(blob);
-      setPreview({url,nombre:blob.name||facturaNum});return;
-    }
-    /* Primero buscar en sesión actual */
-    if(pdfMap[facturaNum]&&filesZip){
-      try{
-        const z=await JSZip.loadAsync(await filesZip.arrayBuffer());
-        const _re1=new RegExp("(?<![0-9])"+facturaNum.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"(?![0-9])");const entry=Object.values(z.files).find(f=>_re1.test(f.name)&&!f.dir);
-        if(entry){const d=await entry.async("uint8array");const b=new Blob([d],{type:"application/pdf"});setPreview({url:URL.createObjectURL(b),nombre:`${facturaNum}.pdf`});return;}
-      }catch(e){}
-    }
-    /* Cargar desde Drive */
-    const zip=await cargarZipMes(mes);if(!zip)return;
-    const _re2=new RegExp("(?<![0-9])"+facturaNum.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"(?![0-9])");const entry=Object.values(zip.files).find(f=>_re2.test(f.name)&&f.name.endsWith(".pdf")&&!f.dir);
-    if(!entry){notify(`PDF ${facturaNum} no encontrado en ZIP de ${mes}`,"warn");return;}
-    const d=await entry.async("uint8array");
-    setPreview({url:URL.createObjectURL(new Blob([d],{type:"application/pdf"})),nombre:`${facturaNum}.pdf`});
+    setPdfLoading(true);
+    try{
+      if(blob){/* habilitacion: ya tiene blob */
+        const url=URL.createObjectURL(blob);
+        setPreview({url,nombre:blob.name||facturaNum});return;
+      }
+      /* Primero buscar en sesión actual */
+      if(pdfMap[facturaNum]&&filesZip){
+        try{
+          const z=await JSZip.loadAsync(await filesZip.arrayBuffer());
+          const _re1=new RegExp("(?<![0-9])"+facturaNum.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"(?![0-9])");const entry=Object.values(z.files).find(f=>_re1.test(f.name)&&!f.dir);
+          if(entry){const d=await entry.async("uint8array");const b=new Blob([d],{type:"application/pdf"});setPreview({url:URL.createObjectURL(b),nombre:`${facturaNum}.pdf`});return;}
+        }catch(e){}
+      }
+      /* Cargar desde Drive */
+      const zip=await cargarZipMes(mes);if(!zip)return;
+      const _re2=new RegExp("(?<![0-9])"+facturaNum.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"(?![0-9])");const entry=Object.values(zip.files).find(f=>_re2.test(f.name)&&f.name.endsWith(".pdf")&&!f.dir);
+      if(!entry){notify(`PDF ${facturaNum} no encontrado en ZIP de ${mes}`,"warn");return;}
+      const d=await entry.async("uint8array");
+      setPreview({url:URL.createObjectURL(new Blob([d],{type:"application/pdf"})),nombre:`${facturaNum}.pdf`});
+    }finally{setPdfLoading(false);}
   },[pdfMap,filesZip,cargarZipMes]);
 
   /* Reenviar email de un mes */
@@ -3508,6 +3523,12 @@ function _HistorialPanel_REMOVED({files,data,pdfMap,filesZip,periodo,getToken,no
     ),
     /* Nota ZIPs */
     cliente&&cliData&&!zipList&&h("div",{style:{marginTop:8,fontSize:11,color:"var(--txm)"}},"Cargando lista de ZIPs..."),
+    /* Overlay carga PDF */
+    pdfLoading&&!preview&&h("div",{style:{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:2000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:18}},
+      h("div",{style:{width:52,height:52,border:"5px solid rgba(255,255,255,.2)",borderTop:"5px solid #60a5fa",borderRadius:"50%",animation:"spin 0.9s linear infinite"}}),
+      h("div",{style:{color:"#fff",fontSize:14,fontWeight:600}},"Descargando PDF..."),
+      h("div",{style:{color:"rgba(255,255,255,.55)",fontSize:12}},"Puede tomar unos segundos la primera vez")
+    ),
     /* Modal preview PDF */
     preview&&h("div",{style:{position:"fixed",inset:0,background:"rgba(0,0,0,.7)",zIndex:2000,display:"flex",flexDirection:"column"}},
       h("div",{style:{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",background:"#1a1a2e"}},
@@ -5508,4 +5529,4 @@ function App(){
 ReactDOM.createRoot(document.getElementById("root")).render(h(App));
 </script>
 <script>/* resumen-static: datos embebidos para fallback offline/CDN */
-window._RESUMEN_STATIC={"clientes":[{"nombre":"OLYMPUS CORPORATION CHILE SPA","meses":{"Enero 2026":15047740,"Febrero 2026":21534206,"Marzo 2026":117430080,"Abril 2026":20580013,"Mayo 2026":144775209,"Junio 2026":162000010},"total":481367258},{"nombre":"SANCHEZ HERMANOS SPA","meses":{"Enero 2026":77117322,"Febrero 2026":75614544,"Marzo 2026":90560256,"Abril 2026":75907446,"Mayo 2026":76523202,"Junio 2026":78023952},"total":473746722},{"nombre":"INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA","meses":{"Enero 2026":51127028,"Febrero 2026":49660373,"Marzo 2026":49822139,"Abril 2026":49851352,"Mayo 2026":50223222,"Junio 2026":50877425},"total":301561539},{"nombre":"SONEPAR CHILE SA","meses":{"Enero 2026":47632567,"Febrero 2026":46387694,"Marzo 2026":46538404,"Abril 2026":46565619,"Mayo 2026":46979148,"Junio 2026":47588636},"total":281692068},{"nombre":"SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE LOS LIBERTADORES","meses":{"Enero 2026":32298080,"Febrero 2026":32950083,"Marzo 2026":32429034,"Abril 2026":32447710,"Mayo 2026":32723430,"Junio 2026":33141601},"total":195989938},{"nombre":"DRAGER CHILE LIMITADA","meses":{"Enero 2026":24372758,"Febrero 2026":23713994,"Marzo 2026":23791109,"Abril 2026":23805034,"Mayo 2026":24016630,"Junio 2026":24328494},"total":144028019},{"nombre":"TRANE DE CHILE S A","meses":{"Enero 2026":19129179,"Febrero 2026":18629983,"Marzo 2026":18690507,"Abril 2026":18701437,"Mayo 2026":18867509,"Junio 2026":19112280},"total":113130895},{"nombre":"BANCO DEL ESTADO DE CHILE","meses":{"Enero 2026":18255866,"Febrero 2026":18231109,"Marzo 2026":18288871,"Abril 2026":18299302,"Mayo 2026":18457793,"Junio 2026":18691388},"total":110224329},{"nombre":"COMERCIAL SNA-E (CHILE) LIMITADA","meses":{"Enero 2026":19291278,"Febrero 2026":17109542,"Marzo 2026":17164686,"Abril 2026":17174645,"Mayo 2026":17325954,"Junio 2026":17548967},"total":105615072},{"nombre":"COMERCIALIZADORA INDUSTRIAL W & L LIMITADA","meses":{"Enero 2026":17090114,"Febrero 2026":16609352,"Marzo 2026":16663426,"Abril 2026":16673190,"Mayo 2026":16821561,"Junio 2026":17040240},"total":100897883},{"nombre":"COMERCIAL INGERSOLL RAND (CHILE) LIMITADA","meses":{"Enero 2026":31260454,"Febrero 2026":17917872,"Marzo 2026":10163768,"Abril 2026":10174360,"Mayo 2026":10335326,"Junio 2026":18385334},"total":98237114},{"nombre":"BANCO DE CREDITO E INVERSIONES","meses":{"Enero 2026":32195192,"Marzo 2026":16126699,"Abril 2026":16135897,"Mayo 2026":16275650,"Junio 2026":16481629},"total":97215067},{"nombre":"SOCIEDAD DE ALIMENTOS LEEFOOD SPA.","meses":{"Enero 2026":13960805,"Febrero 2026":13660249,"Marzo 2026":13704422,"Abril 2026":13712397,"Mayo 2026":
+window._RESUMEN_STATIC={"clientes":[{"nombre":"OLYMPUS CORPORATION CHILE SPA","meses":{"Enero 2026":15047740,"Febrero 2026":21534206,"Marzo 2026":117430080,"Abril 2026":20580013,"Mayo 2026":144775209,"Junio 2026":162000010},"total":481367258},{"nombre":"SANCHEZ HERMANOS SPA","meses":{"Enero 2026":77117322,"Febrero 2026":75614544,"Marzo 2026":90560256,"Abril 2026":75907446,"Mayo 2026":76523202,"Junio 2026":78023952},"total":473746722},{"nombre":"INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA","meses":{"Enero 2026":51127028,"Febrero 2026":49660373,"Marzo 2026":49822139,"Abril 2026":49851352,"Mayo 2026":50223222,"Junio 2026":50877425},"total":301561539},{"nombre":"SONEPAR CHILE SA","meses":{"Enero 2026":47632567,"Febrero 2026":46387694,"Marzo 2026":46538404,"Abril 2026":46565619,"Mayo 2026":46979148,"Junio 2026":47588636},"total":281692068},{"nombre":"SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE LOS LIBERTADORES","meses":{"Enero 2026":32298080,"Febrero 2026":32950083,"Marzo 2026":32429034,"Abril 2026":324477
