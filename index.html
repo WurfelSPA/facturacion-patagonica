@@ -855,26 +855,34 @@ async function procesarPDFs(zipFile,addLog){
       }
     }catch(e){}
 
-    /* Extraer IVA y Monto Total del PDF */
+    /* Extraer Monto Total del PDF
+       pdf.js puede extraer columnas en orden visual (todas etiquetas, luego todos valores):
+       "Monto Neto Monto Exento 19% IVA Monto Total 3.807.328 547.200 723.392 5.077.920"
+       Por eso NO tomamos el primer número tras "Monto Total", sino el MAYOR de todos
+       los números que aparecen después de esa etiqueta (el total siempre es la suma). */
     let montoTotal=null,ivaAmount=null;
     try{
       if(texto.length>10){
         const flat=texto.replace(/\s+/g," ");
-        console.log(`[pdf-texto] ${nroFact}: "${flat.slice(0,400)}"`);
-        // P1: "Monto Total 4.995.800" (con separadores de miles)
-        let mt=flat.match(/Monto\s*Total\s*([\d]+(?:\.[\d]{3})+)/i);
-        // P2: "Monto Total 621982" (sin separadores — pdf.js a veces omite los puntos)
-        if(!mt) mt=flat.match(/Monto\s*Total\s*([\d]{4,})/i);
-        if(mt) montoTotal=parseInt(mt[1].replace(/\./g,""),10)||null;
-        // P3: IVA para calcular total = subtotal + IVA (fallback extra)
+        console.log(`[pdf-texto] ${nroFact}: "${flat.slice(-600)}"`);
+        const mtIdx=flat.toLowerCase().indexOf("monto total");
+        if(mtIdx>=0){
+          const afterMT=flat.slice(mtIdx+"monto total".length);
+          /* Capturar todos los números (con puntos de miles O entero puro ≥4 dígitos) */
+          const nums=[...afterMT.matchAll(/([\d]+(?:\.[\d]{3})+|[\d]{4,})/g)]
+            .map(m=>parseInt(m[1].replace(/\./g,""),10)).filter(n=>n>0);
+          if(nums.length>0) montoTotal=Math.max(...nums)||null;
+        }
         if(!montoTotal){
-          const im=flat.match(/IVA\s+([\d]+(?:\.[\d]{3})+)/i)
-            ||flat.match(/19%\s*IVA\s*([\d]+(?:\.[\d]{3})+)/i)
+          /* Fallback: extraer IVA para estimación neto + IVA en columna */
+          const im=flat.match(/19%\s*IVA\s*([\d]+(?:\.[\d]{3})+)/i)
+            ||flat.match(/IVA\s+([\d]+(?:\.[\d]{3})+)/i)
+            ||flat.match(/19%\s*IVA\s*([\d]{3,})/i)
             ||flat.match(/IVA\s+([\d]{3,})/i);
           if(im) ivaAmount=parseInt(im[1].replace(/\./g,""),10)||null;
           console.log(`[monto] ${nroFact}: Monto Total no encontrado, IVA=${ivaAmount}`);
         } else {
-          console.log(`[monto] ${nroFact}: Monto Total directo = $${montoTotal}`);
+          console.log(`[monto] ${nroFact}: Monto Total = $${montoTotal.toLocaleString("es-CL")}`);
         }
       }
     }catch(e){console.warn("[monto] error:",e.message);}
@@ -5500,4 +5508,4 @@ function App(){
 ReactDOM.createRoot(document.getElementById("root")).render(h(App));
 </script>
 <script>/* resumen-static: datos embebidos para fallback offline/CDN */
-window._RESUMEN_STATIC={"clientes":[{"nombre":"OLYMPUS CORPORATION CHILE SPA","meses":{"Enero 2026":15047740,"Febrero 2026":21534206,"Marzo 2026":117430080,"Abril 2026":20580013,"Mayo 2026":144775209,"Junio 2026":162000010},"total":481367258},{"nombre":"SANCHEZ HERMANOS SPA","meses":{"Enero 2026":77117322,"Febrero 2026":75614544,"Marzo 2026":90560256,"Abril 2026":75907446,"Mayo 2026":76523202,"Junio 2026":78023952},"total":473746722},{"nombre":"INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA","meses":{"Enero 2026":51127028,"Febrero 2026":49660373,"Marzo 2026":49822139,"Abril 2026":49851352,"Mayo 2026":50223222,"Junio 2026":50877425},"total":301561539},{"nombre":"SONEPAR CHILE SA","meses":{"Enero 2026":47632567,"Febrero 2026":46387694,"Marzo 2026":46538404,"Abril 2026":46565619,"Mayo 2026":46979148,"Junio 2026":47588636},"total":281692068},{"nombre":"SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE LOS LIBERTADORES","meses":{"Enero 2026":32298080,"Febrero 2026":32950083,"Marzo 2026":32429034,"Abril 2026":32447710,"Mayo 2026":32723430,"Junio 2026":33141601},"total":195989938},{"nombre":"DRAGER CHILE LIMITADA","meses":{"Enero 2026":24372758,"Febrero 2026":23713994,"Marzo 2026":23791109,"Abril 2026":23805034,"Mayo 2026":24016630,"Junio 2026":24328494},"total":144028019},{"nombre":"TRANE DE CHILE S A","meses":{"Enero 2026":19129179,"Febrero 2026":18629983,"Marzo 2026":18690507,"Abril 2026":18701437,"Mayo 2026":18867509,"Junio 2026":19112280},"total":113130895},{"nombre":"BANCO DEL ESTADO DE CHILE","meses":{"Enero 2026":18255866,"Febrero 2026":18231109,"Marzo 2026":18288871,"Abril 2026":18299302,"Mayo 2026":18457793,"Junio 2026":18691388},"total":110224329},{"nombre":"COMERCIAL SNA-E (CHILE) LIMITADA","meses":{"Enero 2026":19291278,"Febrero 2026":17109542,"Marzo 2026":17164686,"Abril 2026":17174645,"Mayo 2026":17325954,"Junio 2026":17548967},"total":105615072},{"nombre":"COMERCIALIZADORA INDUSTRIAL W & L LIMITADA","meses":{"Enero 2026":17090114,"Febrero 2026":16609352,"Marzo 2026":16663426,"Abril 2026":16673190,"Mayo 2026":16821561,"Junio 2026":17040240},"total":100897883},{"nombre":"COMERCIAL INGERSOLL RAND (CHILE) LIMITADA","meses":{"Enero 2026":31260454,"Febrero 2026":17917872,"Marzo 2026":10163768,"Abril 2026":10174360,"Mayo 2026":10335326,"Junio 2026":18385334},"total":98237114},{"nombre":"BANCO DE CREDITO E INVERSIONES","meses":{"Enero 2026":32195192,"Marzo 2026":16126699,"Abril 2026":16135897,"Mayo 2026":16275650,"Junio 2026":16481629},"total":97215067},{"nombre":"SOCIEDAD DE ALIMENTOS LEEFOOD SPA.","meses":{"Enero 2026":13960805,"Febrero 2026":13660249,"Marzo 2026":13704422,"Abril 2026":13712397,"Mayo 2026":13833600,"Junio 2026":14012237},"total":82883710},{"nombre":"MEGAMIN S.A.","meses":{"Enero 2026":11069411,"Febrero 2026":10831006,"Marzo 2026":10866030,"Abril 2026":10872355,"Mayo 2026":10968454,"Junio 2026":11110095},"total":65717351},{"nombre":"JOHN CRANE CHILE S A","meses":{"Enero 2026":10266744,"Febrero 2026":10030064,"Marzo 2026":10062548,"Abril 2026":10068414,"Mayo 2026":10157546,"Junio 2026":10288915},"total":60874231},{"nombre":"VOITH TURBO S A","meses":{"Enero 2026":9829227,"Febrero 2026":9617914,"Marzo 2026":9649014,"A
+window._RESUMEN_STATIC={"clientes":[{"nombre":"OLYMPUS CORPORATION CHILE SPA","meses":{"Enero 2026":15047740,"Febrero 2026":21534206,"Marzo 2026":117430080,"Abril 2026":20580013,"Mayo 2026":144775209,"Junio 2026":162000010},"total":481367258},{"nombre":"SANCHEZ HERMANOS SPA","meses":{"Enero 2026":77117322,"Febrero 2026":75614544,"Marzo 2026":90560256,"Abril 2026":75907446,"Mayo 2026":76523202,"Junio 2026":78023952},"total":473746722},{"nombre":"INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA","meses":{"Enero 2026":51127028,"Febrero 2026":49660373,"Marzo 2026":49822139,"Abril 2026":49851352,"Mayo 2026":50223222,"Junio 2026":50877425},"total":301561539},{"nombre":"SONEPAR CHILE SA","meses":{"Enero 2026":47632567,"Febrero 2026":46387694,"Marzo 2026":46538404,"Abril 2026":46565619,"Mayo 2026":46979148,"Junio 2026":47588636},"total":281692068},{"nombre":"SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE LOS LIBERTADORES","meses":{"Enero 2026":32298080,"Febrero 2026":32950083,"Marzo 2026":32429034,"Abril 2026":32447710,"Mayo 2026":32723430,"Junio 2026":33141601},"total":195989938},{"nombre":"DRAGER CHILE LIMITADA","meses":{"Enero 2026":24372758,"Febrero 2026":23713994,"Marzo 2026":23791109,"Abril 2026":23805034,"Mayo 2026":24016630,"Junio 2026":24328494},"total":144028019},{"nombre":"TRANE DE CHILE S A","meses":{"Enero 2026":19129179,"Febrero 2026":18629983,"Marzo 2026":18690507,"Abril 2026":18701437,"Mayo 2026":18867509,"Junio 2026":19112280},"total":113130895},{"nombre":"BANCO DEL ESTADO DE CHILE","meses":{"Enero 2026":18255866,"Febrero 2026":18231109,"Marzo 2026":18288871,"Abril 2026":18299302,"Mayo 2026":18457793,"Junio 2026":18691388},"total":110224329},{"nombre":"COMERCIAL SNA-E (CHILE) LIMITADA","meses":{"Enero 2026":19291278,"Febrero 2026":17109542,"Marzo 2026":17164686,"Abril 2026":17174645,"Mayo 2026":17325954,"Junio 2026":17548967},"total":105615072},{"nombre":"COMERCIALIZADORA INDUSTRIAL W & L LIMITADA","meses":{"Enero 2026":17090114,"Febrero 2026":16609352,"Marzo 2026":16663426,"Abril 2026":16673190,"Mayo 2026":16821561,"Junio 2026":17040240},"total":100897883},{"nombre":"COMERCIAL INGERSOLL RAND (CHILE) LIMITADA","meses":{"Enero 2026":31260454,"Febrero 2026":17917872,"Marzo 2026":10163768,"Abril 2026":10174360,"Mayo 2026":10335326,"Junio 2026":18385334},"total":98237114},{"nombre":"BANCO DE CREDITO E INVERSIONES","meses":{"Enero 2026":32195192,"Marzo 2026":16126699,"Abril 2026":16135897,"Mayo 2026":16275650,"Junio 2026":16481629},"total":97215067},{"nombre":"SOCIEDAD DE ALIMENTOS LEEFOOD SPA.","meses":{"Enero 2026":13960805,"Febrero 2026":13660249,"Marzo 2026":13704422,"Abril 2026":13712397,"Mayo 2026":
