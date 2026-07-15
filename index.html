@@ -5222,7 +5222,7 @@ function App(){
       h("div",{style:{display:"flex",alignItems:"center",gap:12,padding:"14px 28px",borderBottom:"1px solid var(--bdr)",flexShrink:0,flexWrap:"wrap"}},
         h("select",{
           value:periodo,
-          onChange:e=>{ const p=e.target.value; if(p!==periodo){ periodoActivado.current=false;autoProcesado.current=false;autoNuboxRef.current=false;setPeriodo(p);setZipStatus("idle");setData([]);setSoloPlanilla(false); } },
+          onChange:e=>{ const p=e.target.value; if(p!==periodo){ periodoActivado.current=false;autoProcesado.current=false;autoNuboxRef.current=false;setPeriodo(p);setZipStatus("idle");setData([]);setSoloPlanilla(false);setPdfMap({}); } },
           style:{fontSize:14,fontWeight:600,padding:"9px 14px",background:"var(--surf)",color:"var(--tx)",border:"1px solid var(--bdr)",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",minWidth:170}
         },
           [...PERIODOS].reverse().map(p=>h("option",{key:p,value:p},p))
@@ -5360,7 +5360,7 @@ function App(){
       h("div",{style:{background:"#ddeaf8",borderBottom:"1px solid #b8d0ee",padding:"8px 18px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
         h("select",{
           value:periodo,
-          onChange:e=>{const p=e.target.value;if(p!==periodo){periodoActivado.current=false;autoProcesado.current=false;autoNuboxRef.current=false;setPeriodo(p);setZipStatus("idle");setData([]);setSoloPlanilla(false);}},
+          onChange:e=>{const p=e.target.value;if(p!==periodo){periodoActivado.current=false;autoProcesado.current=false;autoNuboxRef.current=false;setPeriodo(p);setZipStatus("idle");setData([]);setSoloPlanilla(false);setPdfMap({});}},
           style:{fontSize:12,fontWeight:600,padding:"4px 10px",background:"var(--surf)",color:"var(--tx)",border:"1px solid var(--bdr)",borderRadius:8,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}
         },[...PERIODOS].reverse().map(p=>h("option",{key:p,value:p},p))),
         h("button",{
@@ -5531,4 +5531,4 @@ function App(){
 ReactDOM.createRoot(document.getElementById("root")).render(h(App));
 </script>
 <script>/* resumen-static: datos embebidos para fallback offline/CDN */
-window._RESUMEN_STATIC={"clientes":[{"nombre":"OLYMPUS CORPORATION CHILE SPA","meses":{"Enero 2026":15047740,"Febrero 2026":21534206,"Marzo 2026":117430080,"Abril 2026":20580013,"Mayo 2026":144775209,"Junio 2026":162000010},"total":481367258},{"nombre":"SANCHEZ HERMANOS SPA","meses":{"Enero 2026":77117322,"Febrero 2026":75614544,"Marzo 2026":90560256,"Abril 2026":75907446,"Mayo 2026":76523202,"Junio 2026":78023952},"total":473746722},{"nombre":"INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA","meses":{"Enero 2026":51127028,"Febrero 2026":49660373,"Marzo 2026":49822139,"Abril 2026":49851352,"Mayo 2026":50223222,"Junio 2026":50877425},"total":301561539},{"nombre":"SONEPAR CHILE SA","meses":{"Enero 2026":47632567,"Febrero 2026":46387694,"Marzo 2026":46538404,"Abril 2026":46565619,"Mayo 2026":46979148,"Junio 2026":47588636},"total":2816920
+window._RESUMEN_STATIC={"clientes":[{"nombre":"OLYMPUS CORPORATION CHILE SPA","meses":{"Enero 2026":15047740,"Febrero 2026":21534206,"Marzo 2026":117430080,"Abril 2026":20580013,"Mayo 2026":144775209,"Junio 2026":162000010},"total":481367258},{"nombre":"SANCHEZ HERMANOS SPA","meses":{"Enero 2026":77117322,"Febrero 2026":75614544,"Marzo 2026":90560256,"Abril 2026":75907446,"Mayo 2026":76523202,"Junio 2026":78023952},"total":473746722},{"nombre":"INDUSTRIAL Y COMERCIAL BAXTER DE CHILE LTDA","meses":{"Enero 2026":51127028,"Febrero 2026":49660373,"Marzo 2026":49822139,"Abril 2026":49851352,"Mayo 2026":50223222,"Junio 2026":50877425},"total":301561539},{"nombre":"SONEPAR CHILE SA","meses":{"Enero 2026":47632567,"Febrero 2026":46387694,"Marzo 2026":46538404,"Abril 2026":46565619,"Mayo 2026":46979148,"Junio 202
