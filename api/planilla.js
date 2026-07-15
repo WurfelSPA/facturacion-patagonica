@@ -569,4 +569,42 @@ export default async function handler(req, res) {
       await uploadFile(token, patched);
       return res.status(200).json({ ok: true, updated: validCells.length });
     } catch (e) {
-      console.error("planilla write-
+      console.error("planilla write-cells:", e.message);
+    return res.status(500).json({ error: e.message });
+    }
+  }
+
+  if (req.method === "POST") {
+    const body = req.body || {};
+    let rows = [];
+    if (Array.isArray(body.sheetRows))            rows = body.sheetRows.filter(n=>typeof n==="number"&&n>0);
+    else if (typeof body.sheetRow==="number"&&body.sheetRow>0) rows = [body.sheetRow];
+    if (!rows.length) return res.status(400).json({ error: "Se requiere sheetRow o sheetRows" });
+    const sentCol = (typeof body.sentCol==="string"&&/^[A-Z]{1,3}$/.test(body.sentCol))
+      ? body.sentCol : HC_COL_DEFAULT;
+    const writeValue = typeof body.value==="string" ? body.value : "Enviado";
+
+    try {
+      const token  = await getAccessToken(sa);
+      const buf    = await downloadFile(token);
+      const patched = await patchXlsx(buf, rows, writeValue, sentCol);
+      await uploadFile(token, patched);
+      return res.status(200).json({ ok: true, updated: rows.length, rows, sentCol });
+    } catch (e) {
+      console.error("planilla POST:", e.message);
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+  try {
+    const token = await getAccessToken(sa);
+    const buf   = await downloadFile(token);
+    res.setHeader("Content-Type","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Cache-Control","no-store");
+    res.setHeader("Content-Length", String(buf.length));
+    return res.status(200).send(buf);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+}
