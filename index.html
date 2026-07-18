@@ -2519,65 +2519,76 @@ function ContratosView({dashData,driveLoading}){
    EL CORTIJO
 ══════════════════════════════════════════════════════════ */
 function ElCortijoView(){
-  const [fileId,setFileId]=useState(null);
+  /* estado: "loading" buscando en Drive | "fetching" descargando PDF | "ready" | "error" */
+  const [phase,setPhase]=useState("loading");
+  const [blobUrl,setBlobUrl]=useState(null);
   const [fileName,setFileName]=useState(null);
-  const [loading,setLoading]=useState(true);
   const [error,setError]=useState(null);
-  const [pdfBusy,setPdfBusy]=useState(false);
 
   useEffect(function(){
+    let alive=true;
+    let _url=null;
+    /* Paso 1: listar carpeta para encontrar el archivo exacto */
     fetch("/api/historial?ls="+DRIVE_FACTURACION_FOLDER_ID)
       .then(function(r){return r.json();})
       .then(function(d){
-        const f=(d.files||[]).find(function(f){return /cortijo/i.test(f.name)&&/\.pdf$/i.test(f.name);});
-        if(!f){setError("No se encontró el plano en Drive");setLoading(false);return;}
-        setFileId(f.id);setFileName(f.name);setLoading(false);
+        if(!alive)return;
+        /* Buscar "El Cortijo 2026_Arriendos.pdf" — requiere ambas palabras clave */
+        const f=(d.files||[]).find(function(f){
+          return /cortijo/i.test(f.name)&&/arriendos/i.test(f.name)&&/\.pdf$/i.test(f.name);
+        });
+        if(!f){setError("No se encontró 'El Cortijo 2026_Arriendos.pdf' en Drive");setPhase("error");return null;}
+        setFileName(f.name);setPhase("fetching");
+        /* Paso 2: descargar el PDF */
+        return fetch("/api/historial?fileId="+f.id);
       })
-      .catch(function(e){setError(e.message);setLoading(false);});
+      .then(function(r){
+        if(!r||!alive)return;
+        if(!r.ok)throw new Error("Error "+r.status+" al descargar el PDF");
+        return r.arrayBuffer();
+      })
+      .then(function(buf){
+        if(!buf||!alive)return;
+        const blob=new Blob([buf],{type:"application/pdf"});
+        _url=URL.createObjectURL(blob);
+        setBlobUrl(_url);setPhase("ready");
+      })
+      .catch(function(e){if(alive){setError(e.message);setPhase("error");}});
+    return function(){alive=false;if(_url)URL.revokeObjectURL(_url);};
   },[]);
 
-  async function handlePdf(download){
-    if(!fileId||pdfBusy)return;
-    setPdfBusy(true);
-    try{
-      const r=await fetch("/api/historial?fileId="+fileId);
-      if(!r.ok)throw new Error("Error "+r.status);
-      const buf=await r.arrayBuffer();
-      const blob=new Blob([buf],{type:"application/pdf"});
-      const url=URL.createObjectURL(blob);
-      if(download){
-        const a=document.createElement("a");a.href=url;a.download=fileName||"El_Cortijo.pdf";a.click();
-        setTimeout(()=>URL.revokeObjectURL(url),5000);
-      }else{
-        const w=window.open("","_blank");
-        w.document.write(`<html><body style="margin:0"><iframe src="${url}" style="width:100%;height:100vh;border:none"></iframe></body></html>`);
-      }
-    }catch(e){alert("Error al cargar PDF: "+e.message);}
-    finally{setPdfBusy(false);}
+  function download(){
+    if(!blobUrl)return;
+    const a=document.createElement("a");a.href=blobUrl;a.download=fileName||"El_Cortijo_2026_Arriendos.pdf";a.click();
   }
 
   return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up"},
-    h("div",{style:{padding:"14px 24px",borderBottom:"1px solid var(--bdr)",flexShrink:0,display:"flex",alignItems:"center",gap:10}},
-      h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"🏡 EL CORTIJO — PLANO DEL COMPLEJO")
-    ),
-    h("div",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}},
-      loading?h("div",{style:{color:"var(--txd)",fontSize:13}},"Buscando plano en Drive..."):
-      error?h("div",{style:{color:"var(--red)",fontSize:13}},"⚠ "+error):
-      h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",gap:20,padding:40}},
-        h("div",{style:{fontSize:64}},"🗺"),
-        h("div",{style:{fontSize:15,fontWeight:700,color:"var(--tx)"}},"Plano El Cortijo 2026"),
-        h("div",{style:{fontSize:12,color:"var(--txd)",maxWidth:320,textAlign:"center"}},fileName),
-        h("div",{style:{display:"flex",gap:12,marginTop:8}},
-          h("button",{onClick:function(){handlePdf(false);},disabled:pdfBusy,
-            style:{display:"flex",alignItems:"center",gap:8,padding:"10px 22px",background:"var(--acc)",color:"#fff",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:pdfBusy?"wait":"pointer",opacity:pdfBusy?0.7:1}},
-            pdfBusy?"⏳ Cargando...":"👁 Visualizar PDF"
-          ),
-          h("button",{onClick:function(){handlePdf(true);},disabled:pdfBusy,
-            style:{display:"flex",alignItems:"center",gap:8,padding:"10px 22px",background:"var(--surf2)",color:"var(--tx)",border:"1px solid var(--bdr)",borderRadius:10,fontSize:13,fontWeight:700,cursor:pdfBusy?"wait":"pointer",opacity:pdfBusy?0.7:1}},
-            "⬇ Descargar"
-          )
-        )
+    /* Barra superior con botón de descarga */
+    h("div",{style:{padding:"8px 20px",borderBottom:"1px solid var(--bdr)",flexShrink:0,display:"flex",alignItems:"center",gap:10,background:"var(--surf)"}},
+      h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",flex:1}},"🏡 EL CORTIJO — PLANO DE ARRIENDOS 2026"),
+      phase==="ready"&&h("button",{onClick:download,
+        style:{display:"flex",alignItems:"center",gap:6,padding:"5px 14px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:8,fontSize:12,cursor:"pointer",color:"var(--txm)",fontWeight:600}},
+        "⬇ Descargar"
       )
+    ),
+    /* Área del viewer — ocupa todo el espacio restante */
+    h("div",{style:{flex:1,position:"relative",overflow:"hidden",background:"#404040"}},
+      phase==="loading"&&h("div",{style:{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",color:"#ccc",fontSize:13}},
+        "Buscando plano en Drive..."
+      ),
+      phase==="fetching"&&h("div",{style:{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,color:"#ccc"}},
+        h("div",{className:"spin",style:{fontSize:28,display:"inline-block"}},"⧭"),
+        h("div",{style:{fontSize:13}},"Cargando plano..."),
+        fileName&&h("div",{style:{fontSize:11,opacity:.6}},fileName)
+      ),
+      phase==="error"&&h("div",{style:{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",color:"#f88",fontSize:13}},
+        "⚠ "+error
+      ),
+      phase==="ready"&&h("iframe",{
+        src:blobUrl,
+        title:"Plano El Cortijo 2026",
+        style:{width:"100%",height:"100%",border:"none",display:"block"}
+      })
     )
   );
 }
