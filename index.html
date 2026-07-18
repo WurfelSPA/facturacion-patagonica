@@ -2516,6 +2516,73 @@ function ContratosView({dashData,driveLoading}){
 }
 
 /* ══════════════════════════════════════════════════════════
+   EL CORTIJO
+══════════════════════════════════════════════════════════ */
+function ElCortijoView(){
+  const [fileId,setFileId]=useState(null);
+  const [fileName,setFileName]=useState(null);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState(null);
+  const [pdfBusy,setPdfBusy]=useState(false);
+
+  useEffect(function(){
+    fetch("/api/historial?ls="+DRIVE_FACTURACION_FOLDER_ID)
+      .then(function(r){return r.json();})
+      .then(function(d){
+        const f=(d.files||[]).find(function(f){return /cortijo/i.test(f.name)&&/\.pdf$/i.test(f.name);});
+        if(!f){setError("No se encontró el plano en Drive");setLoading(false);return;}
+        setFileId(f.id);setFileName(f.name);setLoading(false);
+      })
+      .catch(function(e){setError(e.message);setLoading(false);});
+  },[]);
+
+  async function handlePdf(download){
+    if(!fileId||pdfBusy)return;
+    setPdfBusy(true);
+    try{
+      const r=await fetch("/api/historial?fileId="+fileId);
+      if(!r.ok)throw new Error("Error "+r.status);
+      const buf=await r.arrayBuffer();
+      const blob=new Blob([buf],{type:"application/pdf"});
+      const url=URL.createObjectURL(blob);
+      if(download){
+        const a=document.createElement("a");a.href=url;a.download=fileName||"El_Cortijo.pdf";a.click();
+        setTimeout(()=>URL.revokeObjectURL(url),5000);
+      }else{
+        const w=window.open("","_blank");
+        w.document.write(`<html><body style="margin:0"><iframe src="${url}" style="width:100%;height:100vh;border:none"></iframe></body></html>`);
+      }
+    }catch(e){alert("Error al cargar PDF: "+e.message);}
+    finally{setPdfBusy(false);}
+  }
+
+  return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up"},
+    h("div",{style:{padding:"14px 24px",borderBottom:"1px solid var(--bdr)",flexShrink:0,display:"flex",alignItems:"center",gap:10}},
+      h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"🏡 EL CORTIJO — PLANO DEL COMPLEJO")
+    ),
+    h("div",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}},
+      loading?h("div",{style:{color:"var(--txd)",fontSize:13}},"Buscando plano en Drive..."):
+      error?h("div",{style:{color:"var(--red)",fontSize:13}},"⚠ "+error):
+      h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",gap:20,padding:40}},
+        h("div",{style:{fontSize:64}},"🗺"),
+        h("div",{style:{fontSize:15,fontWeight:700,color:"var(--tx)"}},"Plano El Cortijo 2026"),
+        h("div",{style:{fontSize:12,color:"var(--txd)",maxWidth:320,textAlign:"center"}},fileName),
+        h("div",{style:{display:"flex",gap:12,marginTop:8}},
+          h("button",{onClick:function(){handlePdf(false);},disabled:pdfBusy,
+            style:{display:"flex",alignItems:"center",gap:8,padding:"10px 22px",background:"var(--acc)",color:"#fff",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:pdfBusy?"wait":"pointer",opacity:pdfBusy?0.7:1}},
+            pdfBusy?"⏳ Cargando...":"👁 Visualizar PDF"
+          ),
+          h("button",{onClick:function(){handlePdf(true);},disabled:pdfBusy,
+            style:{display:"flex",alignItems:"center",gap:8,padding:"10px 22px",background:"var(--surf2)",color:"var(--tx)",border:"1px solid var(--bdr)",borderRadius:10,fontSize:13,fontWeight:700,cursor:pdfBusy?"wait":"pointer",opacity:pdfBusy?0.7:1}},
+            "⬇ Descargar"
+          )
+        )
+      )
+    )
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
    CUENTAS SERVICIOS
 ══════════════════════════════════════════════════════════ */
 function CuentasServiciosView({dashData,driveLoading}){
@@ -3613,6 +3680,7 @@ function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlo
     {id:"fact-cobrar", icon:"💰", label:"Facturas x Cobrar"},
     {id:"contratos", icon:"📄", label:"Contratos"},
     {id:"cuentas",   icon:"🔌", label:"Cuentas Servicios"},
+    {id:"cortijo",   icon:"🏡", label:"El Cortijo"},
   ];
   const isActive = id => id==="factura" ? (view==="table"||view==="upload") : view===id;
   const handleNav = id => {
@@ -5294,7 +5362,7 @@ function App(){
     h("header",{style:{background:view==="table"?"#1e3a5f":"var(--surf)",borderBottom:view==="table"?"1px solid #152d4a":"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:49,gap:10}},
       h("div",{style:{display:"flex",alignItems:"center",gap:10}},
         h("div",{style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px",color:view==="table"?"#fff":"var(--tx)"}},
-          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="cuentas"?"🔌 Cuentas Servicios":view==="fact-cobrar"?"💰 Facturas x Cobrar":"📋 Facturación"
+          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="cuentas"?"🔌 Cuentas Servicios":view==="fact-cobrar"?"💰 Facturas x Cobrar":view==="cortijo"?"🏡 El Cortijo":"📋 Facturación"
         ),
         view==="table"&&h("span",{style:{fontSize:14,fontWeight:600,color:"#93b5d4",marginLeft:6}},periodo)
       ),
@@ -5637,6 +5705,7 @@ function App(){
     ,view==="fact-cobrar"&&h(FactxCobrarView,{notify})
     ,view==="contratos"&&h(ContratosView,{dashData,driveLoading})
     ,view==="cuentas"&&h(CuentasServiciosView,{dashData,driveLoading})
+    ,view==="cortijo"&&h(ElCortijoView,null)
     ,view==="historial-fact"&&h(HistorialFactView,{dashData,driveLoading,notify})
   ));
 }
