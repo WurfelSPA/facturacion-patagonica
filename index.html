@@ -2557,19 +2557,9 @@ function ElCortijoView(){
     return function(){alive=false;if(_url)URL.revokeObjectURL(_url);};
   },[]);
 
-  function download(){
-    if(!blobUrl)return;
-    const a=document.createElement("a");a.href=blobUrl;a.download=fileName||"El_Cortijo_2026_Arriendos.pdf";a.click();
-  }
-
   return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up"},
-    /* Barra superior con botón de descarga */
-    h("div",{style:{padding:"8px 20px",borderBottom:"1px solid var(--bdr)",flexShrink:0,display:"flex",alignItems:"center",gap:10,background:"var(--surf)"}},
-      h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",flex:1}},"🏡 EL CORTIJO — PLANO DE ARRIENDOS 2026"),
-      phase==="ready"&&h("button",{onClick:download,
-        style:{display:"flex",alignItems:"center",gap:6,padding:"5px 14px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:8,fontSize:12,cursor:"pointer",color:"var(--txm)",fontWeight:600}},
-        "⬇ Descargar"
-      )
+    h("div",{style:{padding:"8px 20px",borderBottom:"1px solid var(--bdr)",flexShrink:0,background:"var(--surf)"}},
+      h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"🏡 EL CORTIJO — PLANO DE ARRIENDOS 2026")
     ),
     /* Área del viewer — ocupa todo el espacio restante */
     h("div",{style:{flex:1,position:"relative",overflow:"hidden",background:"#404040"}},
