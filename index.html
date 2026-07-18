@@ -4636,24 +4636,23 @@ function App(){
               const maxCnt=Math.max(...Object.values(dashData.siteMap).map(s=>s.count));
               const color=SITIO_C[sitio]||"#888";
               const isActive=curSitio===sitio;
-              return h("div",{key:sitio,style:{display:"flex",flexDirection:"column",gap:5}},
-                h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}},
-                  h("div",{style:{display:"flex",alignItems:"center",gap:7,minWidth:0}},
-                    info.arrendadora&&h("span",{style:{fontSize:9,fontWeight:700,color:"var(--txm)",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:5,padding:"1px 6px",letterSpacing:".04em",whiteSpace:"nowrap",maxWidth:90,overflow:"hidden",textOverflow:"ellipsis",flexShrink:0},title:info.arrendadora},info.arrendadora.toUpperCase()),
-                    h("button",{
-                      onClick:()=>setDashSitio(isActive?"all":sitio),
-                      style:{
-                        padding:"2px 9px",borderRadius:10,fontSize:10,fontWeight:700,
-                        background:isActive?color:`${color}18`,
-                        color:isActive?"#fff":color,
-                        border:`1px solid ${color}${isActive?"":"40"}`,
-                        cursor:"pointer",transition:"all .15s",flexShrink:0
-                      }
-                    },sitio+(isActive?" ×":""))
-                  ),
-                  h("div",{style:{fontSize:11,color:"var(--txm)",fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap"}},
-                    `${info.count} cli · `,h("span",{style:{color:"var(--blue)"}},formatCLPCompact(info.clpTotal))
-                  )
+              return h("div",{key:sitio,style:{display:"flex",flexDirection:"column",gap:4}},
+                h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6}},
+                  h("button",{
+                    onClick:()=>setDashSitio(isActive?"all":sitio),
+                    style:{
+                      padding:"2px 9px",borderRadius:10,fontSize:10,fontWeight:700,flexShrink:0,
+                      background:isActive?color:`${color}18`,
+                      color:isActive?"#fff":color,
+                      border:`1px solid ${color}${isActive?"":"40"}`,
+                      cursor:"pointer",transition:"all .15s"
+                    }
+                  },sitio+(isActive?" ×":"")),
+                  h("span",{style:{fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap",flexShrink:0}},
+                    info.count+" cli")
+                ),
+                h("div",{style:{fontSize:10,color:"var(--blue)",fontFamily:"'DM Mono',monospace",paddingLeft:2,fontWeight:600}},
+                  formatCLPCompact(info.clpTotal)
                 ),
                 h("div",{className:"site-bar-wrap"},
                   h("div",{className:"site-bar-fill",style:{width:`${(info.count/maxCnt)*100}%`,background:color,opacity:isActive?1:0.5}})
