@@ -4738,40 +4738,6 @@ function App(){
             h("div",{style:{color:"var(--txd)",fontSize:12,textAlign:"center",padding:"20px 0"}},"Sin datos")
         ),
 
-        /* Gráfico mensual en CLP */
-        h("div",{className:"dash-card"},
-          h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}},
-            h("div",{style:{fontWeight:700,fontSize:12}},"Arriendo Mensual (CLP)"),
-            h("div",{style:{display:"flex",gap:14,fontSize:10,color:"var(--txm)"}},
-              h("span",null,h("span",{style:{display:"inline-block",width:8,height:8,background:"#378add",borderRadius:2,marginRight:4,verticalAlign:"middle"}}),"Arriendo"),
-              h("span",null,h("span",{style:{display:"inline-block",width:8,height:8,background:"#ef9f27",borderRadius:2,marginRight:4,verticalAlign:"middle"}}),"Serv. Adm. (est.)")
-            )
-          ),
-          chartData.length>0?
-            h("div",{style:{overflowX:"auto",paddingBottom:4}},
-              h("div",{style:{display:"flex",gap:4,alignItems:"flex-end",paddingBottom:2,minWidth:"fit-content"}},
-                chartData.map(({key,label,arr,srv})=>{
-                  const hArr=Math.max(2,Math.round((arr/maxVal)*CHART_H));
-                  const hSrv=Math.round((srv/maxVal)*CHART_H);
-                  const total=arr+srv;
-                  return h("div",{key,className:"month-col",title:`${label}: ${formatCLP(arr)} arr + ${formatCLP(srv)} srv = ${formatCLP(total)}`},
-                    h("div",{className:"month-bar-wrap"},
-                      hSrv>0&&h("div",{className:"month-seg-srv",style:{height:hSrv+"px"}}),
-                      h("div",{className:"month-seg-arr",style:{height:hArr+"px"}})
-                    ),
-                    h("div",{className:"month-lbl"},label),
-                    h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",gap:1}},
-                      h("div",{style:{fontSize:8,fontFamily:"'DM Mono',monospace",color:"#378add",textAlign:"center"}},formatCLPCompact(arr)),
-                      h("div",{style:{fontSize:8,fontFamily:"'DM Mono',monospace",color:"#ba7517",textAlign:"center"}},srv>0?formatCLPCompact(srv):"—")
-                    )
-                  );
-                })
-              )
-            ):
-            h("div",{style:{color:"var(--txd)",fontSize:12,textAlign:"center",padding:"30px 0"}},
-              dashLoading?"Cargando...":"Sin datos — carga la planilla de facturación"
-            )
-        )
       ),
 
       /* Estado carga Drive o upload manual fallback */
