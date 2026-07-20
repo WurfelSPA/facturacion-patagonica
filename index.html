@@ -2736,8 +2736,8 @@ function CuentasServiciosView({dashData,driveLoading}){
       ),
       h("div",{style:{display:"flex",alignItems:"center",gap:8}},
         h("div",{style:{display:"flex",flexDirection:"column",gap:2,alignItems:"flex-end",marginRight:4}},
-          h("span",{style:{fontSize:9,color:AA_BLUE,whiteSpace:"nowrap",fontWeight:500},title:"Deuda AA: actualizada automáticamente cada día a las 6:00 AM"},
-            "💧 AA — "+(aaUpdatedAt?"act. "+new Date(aaUpdatedAt).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"})+" (cada día)":"sin datos")
+          h("span",{style:{fontSize:9,color:AA_BLUE,whiteSpace:"nowrap",fontWeight:500},title:"Deuda AA: actualizada automáticamente el día 1 de cada mes"},
+            "💧 AA — "+(aaUpdatedAt?"act. "+new Date(aaUpdatedAt).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"})+" (cada mes)":"sin datos")
           ),
           h("span",{style:{fontSize:9,color:ENEL_GRN,whiteSpace:"nowrap",fontWeight:500},title:"Deuda Enel: actualizada automáticamente el día 1 de cada mes"},
             "⚡ Enel — "+(enelUpdatedAt?"act. "+new Date(enelUpdatedAt).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"})+" (cada mes)":"sin datos")
