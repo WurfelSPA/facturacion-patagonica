@@ -25,6 +25,9 @@
     "api/nubox-refresh.js": {
       "maxDuration": 300
     },
+    "api/enel-refresh.js": {
+      "maxDuration": 300
+    },
     "api/nubox-pdf.js": {
       "maxDuration": 300
     },
@@ -44,6 +47,10 @@
     {
       "path": "/api/nubox-refresh",
       "schedule": "0 11 * * 1"
+    },
+    {
+      "path": "/api/enel-refresh",
+      "schedule": "0 9 1 * *"
     }
   ],
   "routes": [
@@ -58,6 +65,10 @@
     {
       "src": "/nubox-resumen-cache.json",
       "dest": "/nubox-resumen-cache.json"
+    },
+    {
+      "src": "/enel-cache.json",
+      "dest": "/enel-cache.json"
     },
     {
       "src": "/(.+\\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2))",
