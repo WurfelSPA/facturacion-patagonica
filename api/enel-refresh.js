@@ -4,8 +4,8 @@
  * las deudas de todas las cuentas. Actualiza enel-cache.json vía GitHub API.
  *
  * Env vars requeridas:
- *   ENEL_RUT            - RUT de acceso al portal Enel
- *   ENEL_CLAVE          - Clave del portal Enel
+ *   ENEL_USER           - RUT de acceso al portal Enel (o ENEL_RUT)
+ *   ENEL_PASS           - Clave del portal Enel (o ENEL_CLAVE)
  *   BROWSERLESS_TOKEN   - Token de api.browserless.io
  *   GITHUB_TOKEN        - Personal Access Token con permiso repo (para actualizar enel-cache.json)
  *   GITHUB_REPO         - "usuario/repositorio" (ej: "WurfelSPA/facturacion-patagonica")
@@ -158,8 +158,8 @@ export default async function handler(req, res) {
   const isAuth = isCron || (syncSecret && authHeader === `Bearer ${syncSecret}`);
   if (!isAuth) return res.status(401).json({ error: 'No autorizado' });
 
-  const RUT   = process.env.ENEL_RUT;
-  const CLAVE = process.env.ENEL_CLAVE;
+  const RUT   = process.env.ENEL_USER || process.env.ENEL_RUT;
+  const CLAVE = process.env.ENEL_PASS || process.env.ENEL_CLAVE;
   const BROWSERLESS_TOKEN = process.env.BROWSERLESS_TOKEN;
 
   if (!RUT || !CLAVE)         return res.status(500).json({ error: 'Faltan credenciales Enel' });
