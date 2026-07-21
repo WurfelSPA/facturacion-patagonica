@@ -42,7 +42,7 @@
     },
     {
       "path": "/api/aa-refresh",
-      "schedule": "0 9 1 * *"
+      "schedule": "0 9 * * *"
     },
     {
       "path": "/api/nubox-refresh",
@@ -50,7 +50,7 @@
     },
     {
       "path": "/api/enel-refresh",
-      "schedule": "0 9 1 * *"
+      "schedule": "0 9 * * *"
     }
   ],
   "routes": [
