@@ -19,55 +19,82 @@ function setCors(res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
-// ── Cuentas Enel a scrapear ───────────────────────────────────────────────────
-// Se llenará con los IDs de cliente Enel una vez explorado el portal
-const cuentas = [
-  // Ejemplo: { id: '123456789', nombre: 'Nombre Cliente' }
-];
-
 // ── Script que corre en Browserless ──────────────────────────────────────────
+// Selectores confirmados inspeccionando el portal en sesión activa (julio 2026):
+//   - Login:    #username  /  #password  (WSO2 IS)
+//   - Cuentas:  .pvtArea-account-select-option[data-target]  → data-target = ID
+//   - Deuda:    #saldoVigenteText  → "Deuda actual: $2.540.774"  → regex \$[\d.]+
+//   - Navegación: /es/private-area.html?supplyCode=<ID>
 function buildBrowserlessScript(rut, clave) {
   return `
     async function main({ page }) {
+      const PORTAL  = 'https://www.enel.cl';
       const results = {};
 
-      /* TODO: implementar scraping Enel
-       *
-       * Pasos a implementar (explorar el portal para confirmar los selectores):
-       *
-       * 1. Navegar al login del portal Enel Chile
-       *    - URL base a confirmar: https://www.enel.cl o portal empresas
-       *    - Esperar el formulario de login (selector a confirmar)
-       *
-       * 2. Ingresar credenciales
-       *    - Campo RUT: selector a confirmar
-       *    - Campo clave: input[type="password"]
-       *    - Botón submit: selector a confirmar
-       *
-       * 3. Verificar login exitoso
-       *    - Comprobar que la URL no incluya "login"
-       *    - Capturar mensaje de error si falla
-       *
-       * 4. Iterar sobre las cuentas (IDs de cliente Enel)
-       *    - Para cada cuenta, navegar a la página de deuda/boleta
-       *    - Extraer monto de deuda: selector a confirmar
-       *    - Extraer fecha de vencimiento: selector a confirmar
-       *    - Guardar resultado en results[idCuenta]
-       *
-       * 5. Retornar resultados
-       */
+      // 1. Login ──────────────────────────────────────────────────────────────
+      await page.goto(PORTAL + '/es/Ingresar.html', { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-      // Cuentas a consultar (se pasan desde el contexto)
-      const cuentas = ${JSON.stringify(cuentas)};
+      // Esperar: formulario de login O redirección directa al área privada
+      await Promise.race([
+        page.waitForSelector('#username', { timeout: 20000 }),
+        page.waitForSelector('.pvtArea-account-select-option', { timeout: 20000 }),
+      ]).catch(() => {});
 
-      for (const cuenta of cuentas) {
+      const usernameInput = await page.$('#username');
+      if (usernameInput) {
+        // Ingresa RUT (sin puntos, con guion: ej. 12345678-9)
+        await usernameInput.click({ clickCount: 3 });
+        await usernameInput.type('${rut}', { delay: 60 });
+
+        const passInput = await page.$('#password, input[type="password"]');
+        if (!passInput) throw new Error('Campo de clave no encontrado');
+        await passInput.click({ clickCount: 3 });
+        await passInput.type('${clave}', { delay: 60 });
+
+        // Submit
+        const submitBtn = await page.$('button[type="submit"], input[type="submit"]');
+        if (submitBtn) await submitBtn.click();
+        else await passInput.press('Enter');
+
+        // Esperar redirección al área privada
+        await page.waitForSelector('.pvtArea-account-select-option', { timeout: 30000 });
+      }
+
+      // Verificar que estamos en el área privada
+      if (!page.url().includes('private-area')) {
+        throw new Error('Login fallido: URL actual = ' + page.url());
+      }
+
+      // 2. Obtener todos los IDs de cuenta disponibles ─────────────────────────
+      const accountIds = await page.evaluate(() =>
+        [...document.querySelectorAll('.pvtArea-account-select-option[data-target]')]
+          .map(el => el.dataset.target)
+          .filter(Boolean)
+      );
+
+      if (!accountIds.length) throw new Error('No se encontraron cuentas Enel en el portal');
+
+      // 3. Scrapear deuda de cada cuenta ────────────────────────────────────────
+      // Usa page.goto() con supplyCode para cambiar de cuenta (AJAX no funciona sin navegación)
+      for (const id of accountIds) {
         try {
-          // TODO: navegar a la página de la cuenta y scrapear deuda/vencimiento
-          results[cuenta.id] = { deuda: '$0', vencimiento: null };
+          await page.goto(
+            PORTAL + '/es/private-area.html?supplyCode=' + id,
+            { waitUntil: 'domcontentloaded', timeout: 30000 }
+          );
+
+          // Esperar el label de deuda (se carga dinámicamente con el saldo)
+          await page.waitForSelector('#saldoVigenteText', { timeout: 15000 });
+
+          const texto = await page.$eval('#saldoVigenteText', el => el.textContent.trim());
+          // Ej: "Deuda actual: $2.540.774"  →  "$2.540.774"
+          const deuda = texto.includes('$') ? '$' + texto.split('$')[1].trim() : '$0';
+
+          results[id] = { deuda };
         } catch (e) {
-          results[cuenta.id] = { deuda: null, error: e.message };
+          results[id] = { deuda: null, error: e.message };
         }
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r => setTimeout(r, 200));
       }
 
       return { accounts: results, total: Object.keys(results).length };
