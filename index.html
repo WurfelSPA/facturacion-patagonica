@@ -4051,8 +4051,11 @@ function App(){
       procesarPDFs(files.zip,()=>{}).then(pdfs=>{
         const mapa={};
         for(const p of pdfs){if(p.nroFact&&p.zipPath)mapa[p.nroFact]={zipPath:p.zipPath,nombre:p.pdfNombre};}
-        if(Object.keys(mapa).length>0)setPdfMap(mapa);
-      }).catch(()=>{});
+        if(Object.keys(mapa).length>0) setPdfMap(mapa);
+        else setSoloPlanilla(false); /* ZIP sin facturas reconocibles — salir del spinner */
+      }).catch(()=>{
+        setSoloPlanilla(false); /* Error leyendo ZIP — salir del spinner */
+      });
     }
   },[zipStatus,soloPlanilla,files.zip]);
 
@@ -5606,7 +5609,7 @@ function App(){
           className:"btn-primary",
           style:{fontSize:12,padding:"4px 14px",minWidth:160,opacity:(zipStatus==="loading"||zipStatus==="splitting"||splitLoading)?0.6:1},
           disabled:zipStatus==="loading"||zipStatus==="splitting"||splitLoading,
-          onClick:()=>{periodoActivado.current=true;autoProcesado.current=false;autoNuboxRef.current=false;setSoloPlanilla(false);setData([]);setCanGenerate(true);splitPDF();}
+          onClick:()=>{periodoActivado.current=true;autoProcesado.current=false;autoNuboxRef.current=false;setSoloPlanilla(false);setData([]);setCanGenerate(true);setZipStatus("idle");setPdfMap({});setFiles(prev=>({...prev,zip:null}));splitPDF();}
         },zipStatus==="loading"||zipStatus==="splitting"||splitLoading?h("span",{style:{display:"flex",alignItems:"center",gap:6}},h("span",{className:"spin"},"⟳")," Procesando..."):"▶ Procesar "+periodo),
         soloPlanilla&&(zipStatus==="loading"||(zipStatus==="ready"&&Object.keys(pdfMap).length===0))&&
           h("span",{style:{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,color:"#92400e",fontFamily:"'DM Sans',sans-serif",padding:"3px 10px",background:"#fef3c7",border:"1px solid #f59e0b",borderRadius:20,whiteSpace:"nowrap",fontWeight:600}},
