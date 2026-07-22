@@ -1972,10 +1972,18 @@ function FactxCobrarView({notify}){
     var iMonto=fi(["monto","c/d(ml)","c/d(m"]); if(iMonto<0)iMonto=13;
     var iSdo=fi(["sdo","vencido"]); if(iSdo<0)iSdo=14;
     function n(v){return parseFloat(String(v||"0").replace(/[^0-9.\-]/g,""))||0;}
+    function fmtFecha(v){
+      var s=String(v||"").trim();
+      /* ISO YYYY-MM-DD → DD-MM-YYYY */
+      var m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if(m)return m[3]+"-"+m[2]+"-"+m[1];
+      /* DD/MM/YYYY → DD-MM-YYYY */
+      return s.replace(/\//g,"-");
+    }
     return values.slice(1).filter(function(r){
       return r.length>4&&String(r[iCliente]||"").trim()!==""&&String(r[iCliente]||"").trim()!=="Cliente";
     }).map(function(r){
-      return{fecha:String(r[iFecha]||"").trim(),tipo:String(r[iTipo]||"").trim(),rut:String(r[iCod]||"").trim(),
+      return{fecha:fmtFecha(r[iFecha]),tipo:String(r[iTipo]||"").trim(),rut:String(r[iCod]||"").trim(),
         cliente:String(r[iCliente]||"").trim(),glosa:String(r[iGlosa]||"").trim(),folio:String(r[iFolio]||"").trim(),
         vcto:String(r[iVcto]||"").trim(),diasDoc:n(r[iDiasDoc]),monto:n(r[iMonto]),sdoVencido:n(r[iSdo])};
     }).filter(function(r){return r.monto>0||r.sdoVencido>0;});
@@ -1986,10 +1994,10 @@ function FactxCobrarView({notify}){
 
   /* Carga un XLSX desde ArrayBuffer y devuelve filas parseadas */
   function xlsxFromBuf(buf){
-    var wb=XLSX.read(new Uint8Array(buf),{type:"array"});
+    var wb=XLSX.read(new Uint8Array(buf),{type:"array",cellDates:true});
     var ws=wb.Sheets["Base"]||wb.Sheets["base"]||wb.Sheets["BASE"]||wb.Sheets[wb.SheetNames[0]];
     if(!ws)throw new Error("No se encontró hoja. Hojas: "+wb.SheetNames.join(", "));
-    var raw=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
+    var raw=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:""});
     return parseSheetValues(raw);
   }
 
