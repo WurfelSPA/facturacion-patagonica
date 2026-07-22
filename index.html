@@ -5718,7 +5718,7 @@ function App(){
               const diffSII=row.ufSII!=null&&row.ufPlan<=500&&Math.abs(row.ufPlan-row.ufSII)>0.5;
               const diff=diffPdf||diffSII;
               const esArr=row.concepto==="Arriendo";
-              const bg=sent?"#e6f7ef":esArr?"#ffffff":"#fffdf5";
+              const bg=esArr?"#ffffff":"#fffdf5";
               return h("tr",{key:i,className:"row-tr"},
                 h("td",{style:{padding:"8px 11px",background:bg}},
                   h("div",{style:{display:"flex",flexDirection:"column",gap:2}},
