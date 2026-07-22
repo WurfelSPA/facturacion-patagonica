@@ -2032,8 +2032,9 @@ function FactxCobrarView({notify}){
         var sub=(d.files||[]).find(function(f){return f.name.toLowerCase().includes("cobrar")&&(f.mimeType||"").includes("folder");});
         if(!sub){loadFromDrive();return;}
         return fetch("/api/historial?ls="+sub.id).then(function(r){return r.json();}).then(function(d2){
+          function dateKey(name){var m=name.match(/(\d{2})-(\d{2})-(\d{4})/);return m?m[3]+m[2]+m[1]:name;}
           var xl=(d2.files||[]).filter(function(f){return f.name.toLowerCase().endsWith(".xlsx");})
-                               .sort(function(a,b){return a.name.localeCompare(b.name);});
+                               .sort(function(a,b){return dateKey(a.name).localeCompare(dateKey(b.name));});
           setDrvFiles(xl);
           if(xl.length>0){var last=xl[xl.length-1];setSelFid(last.id);loadFromDriveId(last.id);xl.forEach(loadTotOnly);}
           else loadFromDrive();
@@ -2238,14 +2239,22 @@ function FactxCobrarView({notify}){
   function descargarExcel(){
     if(!rows.length)return;
     var wb=XLSX.utils.book_new();
+    /* Hoja 1: Resumen por cliente */
+    var resumen=[["Cliente","RUT","Antigüedad (días)","Total"]];
+    clients.slice().sort(function(a,b){return b.total-a.total;}).forEach(function(c){
+      resumen.push([c.nombre,c.rut,c.maxDias,c.total]);
+    });
+    var wsRes=XLSX.utils.aoa_to_sheet(resumen);
+    wsRes["!cols"]=[{wch:36},{wch:14},{wch:18},{wch:16}];
+    XLSX.utils.book_append_sheet(wb,wsRes,"Resumen");
+    /* Hoja 2: Detalle completo */
     var data=[["Fecha","Tipo","RUT","Cliente","Glosa","Folio","Vencimiento","Días Doc.","Monto","Saldo Vencido"]];
     rows.forEach(function(r){
       data.push([r.fecha,r.tipo,r.rut,r.cliente,r.glosa,r.folio,r.vcto,r.diasDoc,r.monto,r.sdoVencido]);
     });
     var ws=XLSX.utils.aoa_to_sheet(data);
-    /* Ancho de columnas */
     ws["!cols"]=[{wch:12},{wch:10},{wch:14},{wch:36},{wch:30},{wch:10},{wch:12},{wch:10},{wch:14},{wch:14}];
-    XLSX.utils.book_append_sheet(wb,ws,"Facturas x Cobrar");
+    XLSX.utils.book_append_sheet(wb,ws,"Detalle");
     var fecha=new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric"}).replace(/\//g,"-");
     XLSX.writeFile(wb,"Facturas_x_Cobrar_"+fecha+".xlsx");
   }
