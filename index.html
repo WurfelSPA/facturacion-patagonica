@@ -2692,9 +2692,11 @@ function CuentasServiciosView({dashData,driveLoading}){
       ?h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},h("span",{className:"spin",style:{fontSize:18}},"\u29B3"),"Cargando planilla desde Drive...")
       :h("div",{style:{fontSize:13,color:"var(--txd)"}},"Sin datos \u2014 carga la planilla de facturac\u00e9n")
   );
-  const conId=clientes.filter(c=>c.idAgua).length;
-  const sinId=clientes.filter(c=>!c.idAgua).length;
+  const conIdAA=clientes.filter(c=>c.idAgua).length;
+  const sinIdAA=clientes.filter(c=>!c.idAgua).length;
   const conDeuda=clientes.filter(c=>c.idAgua&&aaData[c.idAgua]?.deuda&&aaData[c.idAgua].deuda!=='$0').length;
+  const conIdEnel=clientes.filter(c=>c.idEnel).length;
+  const sinIdEnel=clientes.filter(c=>!c.idEnel).length;
   const conDeudaEnel=clientes.filter(c=>c.idEnel&&enelData[c.idEnel]?.deuda&&parseInt((enelData[c.idEnel].deuda||'$0').replace(/[$\.]/g,''))||0>0).length;
   function getSortVal(c,col){
     switch(col){
@@ -2724,15 +2726,22 @@ function CuentasServiciosView({dashData,driveLoading}){
       h("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
         h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"\uD83D\uDD0C CUENTAS DE SERVICIOS"),
         h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},filtered.length+" / "+clientes.length),
-        h("span",{style:{width:1,height:12,background:"var(--bdr)",display:"inline-block",margin:"0 2px"}}),
-        h("span",{title:"Cuentas con N\u00b0 de ID Aguas Andinas asignado",style:{fontSize:10,color:"var(--green)",background:"var(--gbg)",border:"1px solid var(--gdim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",cursor:"default"}},conId+" identificadas"),
-        h("span",{title:"Cuentas sin N\u00b0 de ID Aguas Andinas",style:{fontSize:10,color:"var(--amber)",background:"var(--abg)",border:"1px solid var(--adim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",cursor:"default"}},sinId+" sin ID"),
+        h("span",{style:{width:1,height:16,background:"var(--bdr)",display:"inline-block",margin:"0 4px"}}),
+        /* \u2500\u2500 Aguas Andinas \u2500\u2500 */
+        h("span",{style:{fontSize:10,fontWeight:700,color:AA_BLUE,marginRight:2}},"\uD83D\uDCA7 AA"),
+        h("span",{title:"Cuentas con ID Aguas Andinas",style:{fontSize:10,color:"var(--green)",background:"var(--gbg)",border:"1px solid var(--gdim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",cursor:"default"}},conIdAA+" con ID"),
+        h("span",{title:"Cuentas sin ID Aguas Andinas",style:{fontSize:10,color:"var(--amber)",background:"var(--abg)",border:"1px solid var(--adim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",cursor:"default"}},sinIdAA+" sin ID"),
+        aaLoading&&h("span",{style:{fontSize:9,color:AA_BLUE},className:"spin"},"\u29B3"),
+        !aaLoading&&aaError&&h("span",{style:{fontSize:10,color:"var(--err)",cursor:"default"},title:aaError},"\u26A0\uFE0F"),
         !aaLoading&&conDeuda>0&&h("span",{title:"Cuentas con deuda vigente en Aguas Andinas",style:{fontSize:10,color:"var(--red)",background:"var(--rbg)",border:"1px solid var(--rdim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",fontWeight:700,cursor:"default"}},"\uD83D\uDD34 "+conDeuda+" con deuda"),
-        aaLoading&&h("span",{style:{fontSize:9,color:"var(--txm)"},className:"spin"},"\u29B3"),
-        !aaLoading&&aaError&&h("span",{style:{fontSize:10,color:"var(--err)",cursor:"default"},title:aaError},"\u26A0\uFE0F Sin datos AA"),
-        !enelLoading&&conDeudaEnel>0&&h("span",{title:"Cuentas con deuda vigente en Enel",style:{fontSize:10,color:"#dc2626",background:"var(--rbg)",border:"1px solid var(--rdim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",fontWeight:700,cursor:"default"}},"\u26A1 "+conDeudaEnel+" con deuda"),
+        h("span",{style:{width:1,height:16,background:"var(--bdr)",display:"inline-block",margin:"0 4px"}}),
+        /* \u2500\u2500 Enel \u2500\u2500 */
+        h("span",{style:{fontSize:10,fontWeight:700,color:ENEL_GRN,marginRight:2}},"\u26A1 Enel"),
+        h("span",{title:"Cuentas con ID Enel",style:{fontSize:10,color:"var(--green)",background:"var(--gbg)",border:"1px solid var(--gdim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",cursor:"default"}},conIdEnel+" con ID"),
+        h("span",{title:"Cuentas sin ID Enel",style:{fontSize:10,color:"var(--amber)",background:"var(--abg)",border:"1px solid var(--adim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",cursor:"default"}},sinIdEnel+" sin ID"),
         enelLoading&&h("span",{style:{fontSize:9,color:ENEL_GRN},className:"spin"},"\u29B3"),
-        !enelLoading&&enelError&&h("span",{style:{fontSize:10,color:"var(--err)",cursor:"default"},title:enelError},"\u26A0\uFE0F Sin datos Enel")
+        !enelLoading&&enelError&&h("span",{style:{fontSize:10,color:"var(--err)",cursor:"default"},title:enelError},"\u26A0\uFE0F"),
+        !enelLoading&&conDeudaEnel>0&&h("span",{title:"Cuentas con deuda vigente en Enel",style:{fontSize:10,color:"#dc2626",background:"var(--rbg)",border:"1px solid var(--rdim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",fontWeight:700,cursor:"default"}},"\u26A1 "+conDeudaEnel+" con deuda")
       ),
       h("div",{style:{display:"flex",alignItems:"center",gap:8}},
         h("div",{style:{display:"flex",flexDirection:"column",gap:2,alignItems:"flex-end",marginRight:4}},
