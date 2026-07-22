@@ -2239,31 +2239,22 @@ function FactxCobrarView({notify}){
   function descargarExcel(){
     if(!rows.length)return;
     var wb=XLSX.utils.book_new();
-    var fmtPeso='"$"#,##0';
-    function fmtCol(ws,colIdx){
-      var rng=XLSX.utils.decode_range(ws["!ref"]);
-      for(var ri=1;ri<=rng.e.r;ri++){
-        var addr=XLSX.utils.encode_cell({r:ri,c:colIdx});
-        if(ws[addr]&&ws[addr].t==="n")ws[addr].z=fmtPeso;
-      }
-    }
+    function clp(v){return"$"+Math.round(v||0).toLocaleString("es-CL");}
     /* Hoja 1: Resumen por cliente */
     var resumen=[["Cliente","RUT","Antigüedad (días)","Total"]];
     clients.slice().sort(function(a,b){return b.total-a.total;}).forEach(function(c){
-      resumen.push([c.nombre,c.rut,c.maxDias,c.total]);
+      resumen.push([c.nombre,c.rut,c.maxDias,clp(c.total)]);
     });
     var wsRes=XLSX.utils.aoa_to_sheet(resumen);
     wsRes["!cols"]=[{wch:36},{wch:14},{wch:18},{wch:16}];
-    fmtCol(wsRes,3); /* D = Total */
     XLSX.utils.book_append_sheet(wb,wsRes,"Resumen");
     /* Hoja 2: Detalle completo */
     var data=[["Fecha","Tipo","RUT","Cliente","Glosa","Folio","Vencimiento","Días Doc.","Monto","Saldo Vencido"]];
     rows.forEach(function(r){
-      data.push([r.fecha,r.tipo,r.rut,r.cliente,r.glosa,r.folio,r.vcto,r.diasDoc,r.monto,r.sdoVencido]);
+      data.push([r.fecha,r.tipo,r.rut,r.cliente,r.glosa,r.folio,r.vcto,r.diasDoc,clp(r.monto),r.sdoVencido]);
     });
     var ws=XLSX.utils.aoa_to_sheet(data);
     ws["!cols"]=[{wch:12},{wch:10},{wch:14},{wch:36},{wch:30},{wch:10},{wch:12},{wch:10},{wch:14},{wch:14}];
-    fmtCol(ws,8); /* I = Monto */
     XLSX.utils.book_append_sheet(wb,ws,"Detalle");
     var fecha=new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric"}).replace(/\//g,"-");
     XLSX.writeFile(wb,"Facturas_x_Cobrar_"+fecha+".xlsx");
