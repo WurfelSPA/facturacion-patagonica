@@ -4047,14 +4047,14 @@ function App(){
 
   /* Poblar pdfMap silenciosamente cuando el ZIP termina de descargarse en modo planilla-only */
   useEffect(()=>{
-    if(zipStatus==="ready"&&soloPlanilla&&files.zip&&Object.keys(pdfMap).length===0){
+    if(zipStatus==="ready"&&files.zip&&Object.keys(pdfMap).length===0){
       procesarPDFs(files.zip,()=>{}).then(pdfs=>{
         const mapa={};
         for(const p of pdfs){if(p.nroFact&&p.zipPath)mapa[p.nroFact]={zipPath:p.zipPath,nombre:p.pdfNombre};}
         if(Object.keys(mapa).length>0) setPdfMap(mapa);
-        else setSoloPlanilla(false); /* ZIP sin facturas reconocibles — salir del spinner */
+        else if(soloPlanilla) setSoloPlanilla(false); /* ZIP sin facturas reconocibles — salir del spinner */
       }).catch(()=>{
-        setSoloPlanilla(false); /* Error leyendo ZIP — salir del spinner */
+        if(soloPlanilla) setSoloPlanilla(false); /* Error leyendo ZIP — salir del spinner */
       });
     }
   },[zipStatus,soloPlanilla,files.zip]);
@@ -5754,8 +5754,13 @@ function App(){
                                 const _fn=p.split("/").pop();
                                 return _fn.match(new RegExp("^"+row.factura.replace(/[-]/g,"\\$&")+"\\b","i"));
                               });
-                              if(_key)b64=await getPdfBase64FromZip(files.zip,_key);
-                            }catch(_){}
+                              if(_key){
+                                const _pdfBuf=await _zip.files[_key].async("uint8array");
+                                let _bin="";const _cs=8192;
+                                for(let _i=0;_i<_pdfBuf.length;_i+=_cs)_bin+=String.fromCharCode(..._pdfBuf.slice(_i,_i+_cs));
+                                b64=btoa(_bin);
+                              }
+                            }catch(e){console.warn("PDF fallback:",e);}
                           }
                           if(!b64){
                             if(soloPlanilla&&zipStatus==="loading")notify("Cargando PDFs desde Drive, intenta en un momento...","warn");
