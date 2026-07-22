@@ -303,7 +303,6 @@ export default async function handler(req, res) {
   const syncSecret  = process.env.SYNC_SECRET;
   const isCron      = req.headers['x-vercel-cron'] === '1' || (cronSecret && authHeader === `Bearer ${cronSecret}`);
   const isAuth      = isCron || (syncSecret && authHeader === `Bearer ${syncSecret}`);
-  console.log('[auth] header:', JSON.stringify(authHeader), '| syncSecret len:', syncSecret?.length, '| match:', authHeader === `Bearer ${syncSecret}`);
   if (!isAuth) return res.status(401).json({ error: 'No autorizado' });
 
   // Verificar env vars de Gmail
