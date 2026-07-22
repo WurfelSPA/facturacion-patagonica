@@ -4384,7 +4384,7 @@ function App(){
     // Filas
     for(const r of rows){
       const estadoLabel=r.estado==="ok"?"Coincide":r.estado==="diff"?(r.matchScore===1?"Revisar":"Difiere"):"Sin PDF";
-      const sentido=sentSet.has(r.i)?"✓ Enviado":estadoLabel;
+      const sentido=(sentSet.has(r.i)||r.yaEnviado)?"✓ Enviado":estadoLabel;
       const _uf=r.ufPdf??null;const _neto=_uf!=null&&ufSII&&_uf<10000?Math.round(_uf*ufSII):(_uf!=null&&_uf>500?Math.round(_uf):r.ufPlan>500?Math.round(r.ufPlan):0);const montoCLP=_neto?(_neto+Math.round(_neto*0.19)):"";
       lines.push([esc(r.sitio),esc(r.edificio||""),esc(r.cliente),esc(r.rut||""),esc(r.correo||""),esc(r.concepto),esc(r.factura||""),esc(r.ufPlan!=null?r.ufPlan.toFixed(2):""),esc(r.ufPdf!=null?r.ufPdf.toFixed(2):""),esc(montoCLP),esc(sentido)].join(";"));
     }
@@ -4611,9 +4611,9 @@ function App(){
   /* Sin SetupPanel — siempre va al dashboard */
 
   const enriched=data.map((r,i)=>({...r,i,estado:getEstado(r)}));
-  const stats={total:enriched.length,ok:enriched.filter(r=>r.estado==="ok").length,diff:enriched.filter(r=>r.estado!=="ok"&&r.estado!=="sanchez").length,sent:sentSet.size,conPdf:enriched.filter(r=>r.factura&&r.ufPdf!==null&&r.estado!=="sanchez").length,sinPdf:enriched.filter(r=>(!r.factura||r.ufPdf===null)&&r.estado!=="sanchez").length,sanchez:enriched.filter(r=>r.estado==="sanchez").length};
+  const stats={total:enriched.length,ok:enriched.filter(r=>r.estado==="ok").length,diff:enriched.filter(r=>r.estado!=="ok"&&r.estado!=="sanchez").length,sent:enriched.filter(r=>sentSet.has(r.i)||r.yaEnviado).length,conPdf:enriched.filter(r=>r.factura&&r.ufPdf!==null&&r.estado!=="sanchez").length,sinPdf:enriched.filter(r=>(!r.factura||r.ufPdf===null)&&r.estado!=="sanchez").length,sanchez:enriched.filter(r=>r.estado==="sanchez").length};
   const filtered=enriched.filter(r=>{
-    const mf=filter==="all"||(filter==="ok"&&r.estado==="ok"&&!sentSet.has(r.i))||(filter==="diff"&&r.estado!=="ok"&&r.estado!=="sanchez")||(filter==="sent"&&sentSet.has(r.i))||(filter==="difiere"&&r.estado==="diff"&&r.matchScore!==1)||(filter==="sinpdf"&&!r.factura&&r.estado!=="sanchez");
+    const mf=filter==="all"||(filter==="ok"&&r.estado==="ok"&&!sentSet.has(r.i)&&!r.yaEnviado)||(filter==="diff"&&r.estado!=="ok"&&r.estado!=="sanchez")||(filter==="sent"&&(sentSet.has(r.i)||r.yaEnviado))||(filter==="difiere"&&r.estado==="diff"&&r.matchScore!==1)||(filter==="sinpdf"&&!r.factura&&r.estado!=="sanchez");
     const mc=concFilter==="all"||(concFilter==="arr"&&r.concepto==="Arriendo")||(concFilter==="srv"&&r.concepto==="Serv. Adm.")||(concFilter==="hab"&&r.concepto==="Habilitación")||(concFilter==="ppr"&&!r.yaPagado);
     const normQ=s=>(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," ").trim();
     const q=normQ(search);
@@ -5713,7 +5713,7 @@ function App(){
           h("tbody",null,filtered.length===0?
             h("tr",null,h("td",{colSpan:10,style:{padding:"48px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados")):
             filtered.map(row=>{
-              const i=row.i,sent=sentSet.has(i),sending=sendingIdx===i,noEmail=!row.correo;
+              const i=row.i,sent=sentSet.has(i)||!!row.yaEnviado,sending=sendingIdx===i,noEmail=!row.correo;
               const diffPdf=row.ufPdf!==null&&row.ufPdf!==undefined&&(row.ufPdf>5000?Math.abs(row.ufPdf-row.ufPlan)>500:Math.abs(row.ufPdf-row.ufPlan)>0.5);
               const diffSII=row.ufSII!=null&&row.ufPlan<=500&&Math.abs(row.ufPlan-row.ufSII)>0.5;
               const diff=diffPdf||diffSII;
