@@ -33,6 +33,9 @@
     },
     "api/storage.js": {
       "maxDuration": 60
+    },
+    "api/planilla-email.js": {
+      "maxDuration": 120
     }
   },
   "crons": [
@@ -51,6 +54,14 @@
     {
       "path": "/api/enel-refresh",
       "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/planilla-email?recipients=preview",
+      "schedule": "0 12 24 * *"
+    },
+    {
+      "path": "/api/planilla-email?recipients=contabilidad",
+      "schedule": "0 12 26 * *"
     }
   ],
   "routes": [
