@@ -2737,10 +2737,10 @@ function CuentasServiciosView({dashData,driveLoading}){
       h("div",{style:{display:"flex",alignItems:"center",gap:8}},
         h("div",{style:{display:"flex",flexDirection:"column",gap:2,alignItems:"flex-end",marginRight:4}},
           h("span",{style:{fontSize:9,color:AA_BLUE,whiteSpace:"nowrap",fontWeight:500},title:"Deuda AA: actualizada automáticamente cada día a las 6:00 AM"},
-            "💧 AA — "+(aaUpdatedAt?"act. "+new Date(aaUpdatedAt).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"})+" (cada día)":"sin datos")
+            "💧 AA — "+(aaUpdatedAt?"act. "+new Date(aaUpdatedAt).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"})+" (cada día 6 am)":"sin datos")
           ),
           h("span",{style:{fontSize:9,color:ENEL_GRN,whiteSpace:"nowrap",fontWeight:500},title:"Deuda Enel: actualizada automáticamente cada día a las 6:00 AM"},
-            "⚡ Enel — "+(enelUpdatedAt?"act. "+new Date(enelUpdatedAt).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"})+" (cada día)":"sin datos")
+            "⚡ Enel — "+(enelUpdatedAt?"act. "+new Date(enelUpdatedAt).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"})+" (cada día 6 am)":"sin datos")
           )
         ),
         h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente, sitio, RUT...",style:{width:200}}),
@@ -2796,7 +2796,33 @@ function CuentasServiciosView({dashData,driveLoading}){
                 )
               ),
               h("tbody",null,
-                sorted.map((c,i)=>{
+                (()=>{
+                  /* IDs Enel ya registrados en la planilla */
+                  const enelIdsEnPlanilla=new Set(clientes.map(c=>c.idEnel).filter(Boolean));
+                  /* Cuentas del cache sin match en planilla */
+                  const huerfanas=Object.keys(enelData).filter(id=>!enelIdsEnPlanilla.has(id));
+                  const filaHuerfana=(id,idx)=>{
+                    const d=enelData[id];
+                    const tieneDeuda=d?.deuda&&d.deuda!=="$0";
+                    return h("tr",{key:"hrf-"+id,style:{borderBottom:"1px solid var(--bdr)",background:`${ENEL_GRN}08`,opacity:0.85}},
+                      h("td",{style:{padding:"9px 12px"}},h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${ENEL_GRN}18`,color:ENEL_GRN,border:`1px solid ${ENEL_GRN}40`}},"⚡ Sin asignar")),
+                      h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txd)",fontStyle:"italic"}},"—"),
+                      h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--bdr)"}},"—"),
+                      h("td",{style:{padding:"9px 12px",fontSize:11,color:"var(--txm)",fontStyle:"italic"}},"Sin cliente asignado"),
+                      h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},"—"),
+                      h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--bdr)",borderLeft:`2px solid ${AA_BLUE}25`}},"—"),
+                      h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--bdr)"}},"—"),
+                      h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},"—"),
+                      h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:ENEL_GRN,fontWeight:600,borderLeft:`2px solid ${ENEL_GRN}40`,background:`${ENEL_GRN}0d`}},id),
+                      h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--bdr)",background:`${ENEL_GRN}06`}},"—"),
+                      h("td",{style:{padding:"9px 12px",fontSize:10,fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap",background:`${ENEL_GRN}06`}},
+                        d?h("span",{style:{color:tieneDeuda?"#dc2626":ENEL_GRN,fontWeight:tieneDeuda?700:400}},d.deuda||"$0")
+                         :h("span",{style:{color:"var(--bdr)"}},"—")
+                      )
+                    );
+                  };
+                  return [
+                    ...sorted.map((c,i)=>{
                   const sCol=SITIO_C[c.sitio]||"#888";
                   return h("tr",{key:c.rut+"|"+c.sitio+"|"+c.edificio+i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"var(--surf2)"}},
                     h("td",{style:{padding:"9px 12px"}},h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},c.sitio||"\u2014")),
@@ -2835,7 +2861,10 @@ function CuentasServiciosView({dashData,driveLoading}){
                         })()
                     )
                   );
-                })
+                }),
+                    ...huerfanas.map((id,idx)=>filaHuerfana(id,idx))
+                  ];
+                })()
               )
             )
     )
