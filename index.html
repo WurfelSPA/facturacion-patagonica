@@ -5738,13 +5738,25 @@ function App(){
                   row.factura
                   ?h("button",{
                       title:"Ver PDF de "+row.factura,
-                      style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:pdfMap[row.factura]?"var(--blue)":"var(--txm)",background:"none",border:"none",cursor:"pointer",padding:0,textDecoration:pdfMap[row.factura]?"underline":"none",fontWeight:600},
+                      style:{fontSize:11,fontFamily:"'DM Mono',monospace",color:(pdfMap[row.factura]||files.zip)?"var(--blue)":"var(--txm)",background:"none",border:"none",cursor:"pointer",padding:0,textDecoration:(pdfMap[row.factura]||files.zip)?"underline":"none",fontWeight:600},
                       onClick:async()=>{
                         try{
                           const pdf=pdfMap[row.factura];
                           let b64=null;
                           if(pdf?.zipPath&&files.zip){b64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}
                           else if(pdf?.driveFileId){b64=await getPdfBase64FromDrive(pdf.driveFileId);}
+                          /* Fallback: buscar en el ZIP por número de factura si pdfMap no tiene la entrada */
+                          if(!b64&&files.zip&&row.factura){
+                            try{
+                              const _buf=await readFileAsBuffer(files.zip);
+                              const _zip=await JSZip.loadAsync(_buf);
+                              const _key=Object.keys(_zip.files).find(p=>{
+                                const _fn=p.split("/").pop();
+                                return _fn.match(new RegExp("^"+row.factura.replace(/[-]/g,"\\$&")+"\\b","i"));
+                              });
+                              if(_key)b64=await getPdfBase64FromZip(files.zip,_key);
+                            }catch(_){}
+                          }
                           if(!b64){
                             if(soloPlanilla&&zipStatus==="loading")notify("Cargando PDFs desde Drive, intenta en un momento...","warn");
                             else notify("PDF no disponible — procesa el mes para verlo","warn");
