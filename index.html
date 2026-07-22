@@ -5630,6 +5630,27 @@ function App(){
           files.planilla&&h("button",{
             onClick:async()=>{
               try{
+                notify("Generando planilla para Contabilidad...","info");
+                const b64=await generarExcelResumen(files.planilla,periodo);
+                const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+                const blob=new Blob([bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+                const url=URL.createObjectURL(blob);
+                const a=document.createElement("a");
+                a.href=url;a.download=`Planilla Facturación ${periodo}.xlsx`;
+                document.body.appendChild(a);a.click();
+                setTimeout(()=>{URL.revokeObjectURL(url);document.body.removeChild(a);},1000);
+                notify("✓ Planilla descargada","ok");
+              }catch(e){notify("Error: "+e.message,"err");}
+            },
+            title:"Descargar la planilla Excel que se enviará a Contabilidad",
+            style:{fontSize:11,fontWeight:600,padding:"5px 12px",borderRadius:8,
+              border:"1px solid var(--gdim)",background:"var(--gbg)",color:"var(--green)",
+              cursor:"pointer",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap",
+              fontFamily:"'DM Sans',sans-serif"}
+          },"⬇ Planilla"),
+          files.planilla&&h("button",{
+            onClick:async()=>{
+              try{
                 notify("Leyendo comentarios de la planilla...","info");
                 const grupos=await extraerComentariosMes(files.planilla,periodo);
                 const sitiosConComentarios=Object.keys(grupos).filter(s=>grupos[s].length>0);
