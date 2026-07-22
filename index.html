@@ -5627,6 +5627,35 @@ function App(){
             color:"var(--blue)",whiteSpace:"nowrap"}},
             `UF día 5: ${ufSII.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`
           ),
+          files.planilla&&h("button",{
+            onClick:async()=>{
+              try{
+                notify("Leyendo comentarios de la planilla...","info");
+                const grupos=await extraerComentariosMes(files.planilla,periodo);
+                const sitiosConComentarios=Object.keys(grupos).filter(s=>grupos[s].length>0);
+                let bodyHtml=`<p>Estimados,</p><p>Adjunto planilla facturación <strong>${periodo}</strong></p>`;
+                if(sitiosConComentarios.length===0){
+                  bodyHtml+=`<p>Sin comentarios especiales para este período.</p>`;
+                } else {
+                  for(const sitio of sitiosConComentarios){
+                    bodyHtml+=`<p><strong>Sitio ${sitio}</strong></p><ul>`;
+                    for(const {edif,cliente,comentario} of grupos[sitio]){
+                      bodyHtml+=`<li><strong>${cliente}</strong>${edif?` ${edif}`:""}:&nbsp;${comentario}</li>`;
+                    }
+                    bodyHtml+=`</ul>`;
+                  }
+                }
+                bodyHtml+=`<br><p>Quedo atento a sus comentarios</p><p>Saludos</p>`;
+                bodyHtml+=`<br><hr><p style="color:#999;font-size:11px">Este correo fue generado automáticamente con apoyo de inteligencia artificial.</p>`;
+                setPreviewPlanilla({grupos,bodyHtml,periodo,loading:false,sending:false});
+              }catch(e){notify("Error: "+e.message,"err");}
+            },
+            title:"Ver correo a Contabilidad antes de enviarlo",
+            style:{fontSize:11,fontWeight:600,padding:"5px 12px",borderRadius:8,
+              border:"1px solid var(--bdr)",background:"var(--surf)",color:"var(--tx)",
+              cursor:"pointer",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap",
+              fontFamily:"'DM Sans',sans-serif"}
+          },"👁 Vista Previa"),
           data.length>0&&h("button",{
             onClick:descargarReporte,
             title:"Descargar reporte CSV con el estado actual",
