@@ -2227,6 +2227,21 @@ function FactxCobrarView({notify}){
   function toggleSort(col){setSort(function(p){return p.col===col&&p.dir==="desc"?{col:col,dir:"asc"}:{col:col,dir:"desc"};});}
   function sortArrow(col){if(sort.col!==col)return" ↕";return sort.dir==="desc"?" ↓":" ↑";}
 
+  function descargarExcel(){
+    if(!rows.length)return;
+    var wb=XLSX.utils.book_new();
+    var data=[["Fecha","Tipo","RUT","Cliente","Glosa","Folio","Vencimiento","Días Doc.","Monto","Saldo Vencido"]];
+    rows.forEach(function(r){
+      data.push([r.fecha,r.tipo,r.rut,r.cliente,r.glosa,r.folio,r.vcto,r.diasDoc,r.monto,r.sdoVencido]);
+    });
+    var ws=XLSX.utils.aoa_to_sheet(data);
+    /* Ancho de columnas */
+    ws["!cols"]=[{wch:12},{wch:10},{wch:14},{wch:36},{wch:30},{wch:10},{wch:12},{wch:10},{wch:14},{wch:14}];
+    XLSX.utils.book_append_sheet(wb,ws,"Facturas x Cobrar");
+    var fecha=new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric"}).replace(/\//g,"-");
+    XLSX.writeFile(wb,"Facturas_x_Cobrar_"+fecha+".xlsx");
+  }
+
   return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up"},
     /* ── Cuadro comparativo de cortes ── */
     drvFiles.length>0&&h("div",{style:{padding:"8px 24px",background:"var(--surf)",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",flexShrink:0}},
@@ -2263,6 +2278,9 @@ function FactxCobrarView({notify}){
           }},bucketLabel(b));
       }),
       h("div",{style:{marginLeft:"auto",display:"flex",gap:8,alignItems:"center"}},
+        h("button",{onClick:descargarExcel,disabled:!rows.length,title:"Descargar tabla completa como Excel",
+          style:{padding:"5px 14px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:8,fontSize:12,cursor:rows.length?"pointer":"default",color:"var(--txm)",fontWeight:600,display:"flex",alignItems:"center",gap:5,opacity:rows.length?1:0.5}},
+          "⬇ Descargar"),
         h("span",{style:{fontSize:11,color:"var(--txd)"}},filteredClients.length+" cliente"+(filteredClients.length!==1?"s":"")),
         drvFiles.length>1&&h("select",{
           value:selFid||"",
