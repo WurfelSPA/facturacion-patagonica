@@ -250,23 +250,42 @@ export default async function handler(req, res) {
   if (!BROWSERLESS_TOKEN)     return res.status(500).json({ error: 'Falta BROWSERLESS_TOKEN' });
 
   try {
-    console.log('[enel-refresh] Iniciando scraping con Browserless...');
+    // El login SSO de Enel (WSO2 IS + SAML) es intermitente cuando se
+    // automatiza: en pruebas fallo con 3 errores transitorios distintos
+    // (stale DOM node, CSRF vacío, timeout) en 3 intentos consecutivos, sin
+    // que ninguno se repitiera. Reintentamos el flujo completo antes de
+    // rendirnos, en vez de perseguir cada síntoma como si fuera un bug fijo.
+    const MAX_ATTEMPTS = 3;
+    let blData = null;
+    let lastError = null;
 
-    const blRes = await fetch(`https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        code: buildBrowserlessScript(RUT, CLAVE),
-        context: {}
-      })
-    });
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS && !blData; attempt++) {
+      console.log(`[enel-refresh] Intento ${attempt}/${MAX_ATTEMPTS} con Browserless...`);
+      try {
+        const blRes = await fetch(`https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: buildBrowserlessScript(RUT, CLAVE),
+            context: {}
+          })
+        });
 
-    if (!blRes.ok) {
-      const errText = await blRes.text();
-      throw new Error(`Browserless error ${blRes.status}: ${errText.slice(0, 300)}`);
+        if (!blRes.ok) {
+          const errText = await blRes.text();
+          throw new Error(`Browserless error ${blRes.status}: ${errText.slice(0, 300)}`);
+        }
+
+        blData = await blRes.json();
+      } catch (e) {
+        lastError = e;
+        console.warn(`[enel-refresh] Intento ${attempt} falló:`, e.message);
+        if (attempt < MAX_ATTEMPTS) await new Promise(r => setTimeout(r, 3000));
+      }
     }
 
-    const blData = await blRes.json();
+    if (!blData) throw lastError || new Error('Browserless falló sin detalle');
+
     console.log(`[enel-refresh] Scraping OK: ${blData.total} cuentas, ${blData.conDeuda} con deuda`);
 
     const cacheData = {
