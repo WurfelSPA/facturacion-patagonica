@@ -178,13 +178,12 @@ export default async function handler(req, res) {
     console.log('[aa-refresh] Iniciando scraping con Browserless...');
 
     // Llamar a Browserless
-    const blRes = await fetch(`https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}`, {
+    const blRes = await fetch(`https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}&stealth=true`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         code: buildBrowserlessScript(RUT, CLAVE),
-        context: {},
-        launch: { stealth: true, args: ['--no-sandbox','--disable-setuid-sandbox','--disable-blink-features=AutomationControlled'] }
+        context: {}
       })
     });
 
