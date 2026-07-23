@@ -2746,6 +2746,7 @@ function CuentasServiciosView({dashData,driveLoading}){
       case 'ID Aguas Andinas':return(c.idAgua||'').toLowerCase();
       case 'N° Medidor AA':return(c.medAgua||'').toLowerCase();
       case 'Deuda AA':{const d=aaData[c.idAgua];return d?.deuda?parseInt((d.deuda||'$0').replace(/[$\.]/g,''))||0:0;}
+      case 'Nombre Factura AA':{const d=aaData[c.idAgua];return(d?.nombre||'').toLowerCase();}
       case 'ID Enel':return(c.idEnel||'').toLowerCase();
       case 'N° Medidor Enel':return(c.medEnel||'').toLowerCase();
       case 'Deuda Enel':{const d=enelData[c.idEnel];return d?.deuda?parseInt((d.deuda||'$0').replace(/[$\.]/g,''))||0:0;}
@@ -2754,10 +2755,10 @@ function CuentasServiciosView({dashData,driveLoading}){
   }
   function toggleSort(col){if(sortCol===col)setSortDir(d=>d==='asc'?'desc':'asc');else{setSortCol(col);setSortDir('asc');}}
   const sorted=sortCol?[...filtered].sort((a,b)=>{const va=getSortVal(a,sortCol),vb=getSortVal(b,sortCol);const cmp=typeof va==='number'?va-vb:va.localeCompare(vb,'es');return sortDir==='asc'?cmp:-cmp;}):filtered;
-  const COLS=["Sitio","Edificio","RUT","Cliente","Direcci\u00f3n","ID Aguas Andinas","N\u00b0 Medidor AA","Deuda AA","ID Enel","N\u00b0 Medidor Enel","Deuda Enel"];
+  const COLS=["Sitio","Edificio","RUT","Cliente","Direcci\u00f3n","ID Aguas Andinas","N\u00b0 Medidor AA","Deuda AA","Nombre Factura AA","ID Enel","N\u00b0 Medidor Enel","Deuda Enel"];
   const AA_BLUE="#0074BF";   /* Azul corporativo Aguas Andinas */
   const ENEL_GRN="#00873D";  /* Verde corporativo Enel Chile  */
-  const AA_COLS=["ID Aguas Andinas","N\u00b0 Medidor AA","Deuda AA"];
+  const AA_COLS=["ID Aguas Andinas","N\u00b0 Medidor AA","Deuda AA","Nombre Factura AA"];
   const ENEL_COLS=["ID Enel","N\u00b0 Medidor Enel","Deuda Enel"];
   return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up"},
     h("div",{style:{padding:"14px 24px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,flexShrink:0,borderBottom:"1px solid var(--bdr)"}},
@@ -2803,7 +2804,7 @@ function CuentasServiciosView({dashData,driveLoading}){
                 "Cliente":c.isVacante?"VACANTE":(c.nombre||""),
                 "Dirección":c.dir||"",
                 "ID Aguas Andinas":c.idAgua||"","N° Medidor AA":c.medAgua||"",
-                "Deuda AA":d.deuda||"","Vencimiento AA":d.vencimiento||"",
+                "Deuda AA":d.deuda||"","Nombre Factura AA":d.nombre||"","Vencimiento AA":d.vencimiento||"",
                 "ID Enel":c.idEnel||"","N° Medidor Enel":c.medEnel||"",
                 "Deuda Enel":(enelData[c.idEnel]?.deuda)||""
 
@@ -2861,6 +2862,7 @@ function CuentasServiciosView({dashData,driveLoading}){
                       h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--bdr)",borderLeft:`2px solid ${AA_BLUE}25`}},"—"),
                       h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--bdr)"}},"—"),
                       h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},"—"),
+                      h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--bdr)"}},"—"),
                       h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:ENEL_GRN,fontWeight:600,borderLeft:`2px solid ${ENEL_GRN}40`,background:`${ENEL_GRN}0d`}},id),
                       h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--bdr)",background:`${ENEL_GRN}06`}},"—"),
                       h("td",{style:{padding:"9px 12px",fontSize:10,fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap",background:`${ENEL_GRN}06`}},
@@ -2892,6 +2894,22 @@ function CuentasServiciosView({dashData,driveLoading}){
                           if(aaLoading) return h("span",{style:{color:"var(--bdr)",fontSize:9}},"\u00b7\u00b7\u00b7");
                           if(!d&&aaError) return h("span",{style:{color:"var(--err)",fontSize:9}},"\u26a0");
                           if(d) return h("span",{style:{color:d.deuda&&d.deuda!=="$0"?"#dc2626":AA_BLUE,fontWeight:d.deuda&&d.deuda!=="$0"?700:400}},d.deuda||"$0");
+                          return h("span",{style:{color:"var(--bdr)"}},"\u2014");
+                        })()
+                    ),
+                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--tx)",background:c.idAgua?`${AA_BLUE}06`:"transparent",maxWidth:200}},
+                      !c.idAgua
+                        ?h("span",{style:{color:"var(--bdr)"}},"\u2014")
+                        :(()=>{
+                          const d=aaData[c.idAgua];
+                          if(aaLoading) return h("span",{style:{color:"var(--bdr)",fontSize:9}},"\u00b7\u00b7\u00b7");
+                          if(d?.nombre){
+                            const mismo=d.nombre.trim().toLowerCase()===c.nombre?.trim().toLowerCase();
+                            return h("span",{
+                              title:mismo?"Coincide con cliente planilla":"\u26a0 Difiere del cliente en planilla",
+                              style:{color:mismo?"var(--txm)":"#dc2626",fontWeight:mismo?400:700}
+                            },d.nombre);
+                          }
                           return h("span",{style:{color:"var(--bdr)"}},"\u2014");
                         })()
                     ),

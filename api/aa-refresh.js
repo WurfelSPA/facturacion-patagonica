@@ -77,7 +77,27 @@ function buildBrowserlessScript(rut, clave) {
           const deuda = await page.$eval('span.total_deuda', el => el.textContent.trim()).catch(() => '$0');
           const divText = await page.$eval('#divmonto', el => el.innerText).catch(() => '');
           const fecha = (divText.match(/\\d{2}\\/\\d{2}\\/\\d{4}/) || [])[0] || null;
-          results[link.id] = { deuda, vencimiento: fecha };
+          const nombre = await page.evaluate(() => {
+            /* Selectores conocidos en el portal AA (Liferay) */
+            const sels=['.nombre-cuenta','.nombre_cliente','#nombre-cliente','.razon-social','#razon-social','.cuenta-nombre','.client-name'];
+            for(const s of sels){const el=document.querySelector(s);if(el&&el.textContent.trim())return el.textContent.trim();}
+            /* Buscar en filas de tabla: celda "Razón Social" o "Nombre" seguida del valor */
+            for(const tr of [...document.querySelectorAll('tr')]){
+              const cells=[...tr.querySelectorAll('td,th')];
+              for(let i=0;i<cells.length-1;i++){
+                const lbl=cells[i].textContent.trim().toLowerCase();
+                if(lbl.includes('razón social')||lbl.includes('razon social')||lbl==='nombre'){
+                  const val=cells[i+1].textContent.trim();
+                  if(val)return val;
+                }
+              }
+            }
+            /* Fallback: primer <strong> o <b> en el área de datos de la cuenta */
+            const strong=document.querySelector('.portlet-body strong,.datos-cuenta strong,.info-cuenta strong');
+            if(strong&&strong.textContent.trim())return strong.textContent.trim();
+            return null;
+          }).catch(()=>null);
+          results[link.id] = { deuda, vencimiento: fecha, nombre };
         } catch (e) {
           results[link.id] = { deuda: null, error: e.message };
         }
