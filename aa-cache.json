@@ -1,76 +1,352 @@
 {
   "ok": true,
-  "updatedAt": "2026-07-11T14:30:00.000Z",
-  "source": "browserless",
+  "updatedAt": "2026-07-23T15:26:58.539Z",
+  "source": "khipu",
   "accounts": {
-    "672977-0": { "deuda": "$0", "vencimiento": null },
-    "1009146-2": { "deuda": "$0", "vencimiento": null },
-    "1009152-7": { "deuda": "$0", "vencimiento": null },
-    "1127130-8": { "deuda": "$0", "vencimiento": null },
-    "1127131-6": { "deuda": "$0", "vencimiento": null },
-    "1127132-4": { "deuda": "$0", "vencimiento": null },
-    "1127133-2": { "deuda": "$0", "vencimiento": null },
-    "1127134-0": { "deuda": "$0", "vencimiento": null },
-    "1127135-9": { "deuda": "$0", "vencimiento": null },
-    "1127136-7": { "deuda": "$86.650", "vencimiento": null },
-    "1127137-5": { "deuda": "$0", "vencimiento": null },
-    "1127138-3": { "deuda": "$0", "vencimiento": null },
-    "1127139-1": { "deuda": "$85.390", "vencimiento": null },
-    "1127140-5": { "deuda": "$0", "vencimiento": null },
-    "1127141-3": { "deuda": "$0", "vencimiento": null },
-    "1127142-1": { "deuda": "$0", "vencimiento": null },
-    "1127144-8": { "deuda": "$0", "vencimiento": null },
-    "1127145-6": { "deuda": "$0", "vencimiento": null },
-    "1127146-4": { "deuda": "$0", "vencimiento": null },
-    "1127147-2": { "deuda": "$588.490", "vencimiento": null },
-    "1127148-0": { "deuda": "$0", "vencimiento": null },
-    "1127149-9": { "deuda": "$203.060", "vencimiento": null },
-    "1127150-2": { "deuda": "$0", "vencimiento": null },
-    "1127151-0": { "deuda": "$0", "vencimiento": null },
-    "1127152-9": { "deuda": "$0", "vencimiento": null },
-    "1127153-7": { "deuda": "$0", "vencimiento": null },
-    "1127203-7": { "deuda": "$0", "vencimiento": null },
-    "1127204-5": { "deuda": "$0", "vencimiento": null },
-    "1127206-1": { "deuda": "$0", "vencimiento": null },
-    "1127208-8": { "deuda": "$0", "vencimiento": null },
-    "1127209-6": { "deuda": "$0", "vencimiento": null },
-    "1127211-8": { "deuda": "$0", "vencimiento": null },
-    "1127212-6": { "deuda": "$0", "vencimiento": null },
-    "1136296-6": { "deuda": "$0", "vencimiento": null },
-    "1534317-6": { "deuda": "$0", "vencimiento": null },
-    "1534318-4": { "deuda": "$0", "vencimiento": null },
-    "1534319-2": { "deuda": "$1.038.530", "vencimiento": null },
-    "1534320-6": { "deuda": "$0", "vencimiento": null },
-    "1534321-4": { "deuda": "$0", "vencimiento": null },
-    "1534322-2": { "deuda": "$5.170", "vencimiento": null },
-    "1534323-0": { "deuda": "$0", "vencimiento": null },
-    "1534324-9": { "deuda": "$0", "vencimiento": null },
-    "1534325-7": { "deuda": "$0", "vencimiento": null },
-    "1534326-5": { "deuda": "$0", "vencimiento": null },
-    "1534327-3": { "deuda": "$0", "vencimiento": null },
-    "1534328-1": { "deuda": "$0", "vencimiento": null },
-    "1534330-3": { "deuda": "$0", "vencimiento": null },
-    "1534331-1": { "deuda": "$0", "vencimiento": null },
-    "1534333-8": { "deuda": "$0", "vencimiento": null },
-    "1534334-6": { "deuda": "$0", "vencimiento": null },
-    "1534335-4": { "deuda": "$0", "vencimiento": null },
-    "1534336-2": { "deuda": "$0", "vencimiento": null },
-    "1596662-9": { "deuda": "$0", "vencimiento": null },
-    "1596663-7": { "deuda": "$0", "vencimiento": null },
-    "1596664-5": { "deuda": "$0", "vencimiento": null },
-    "1596665-3": { "deuda": "$225.400", "vencimiento": null },
-    "1596666-1": { "deuda": "$46.420", "vencimiento": null },
-    "1637811-9": { "deuda": "$0", "vencimiento": null },
-    "1637812-7": { "deuda": "$0", "vencimiento": null },
-    "1637814-3": { "deuda": "$0", "vencimiento": null },
-    "1664822-1": { "deuda": "$0", "vencimiento": null },
-    "1664824-8": { "deuda": "$0", "vencimiento": null },
-    "1717631-5": { "deuda": "$0", "vencimiento": null },
-    "1717632-3": { "deuda": "$0", "vencimiento": null },
-    "1717633-1": { "deuda": "$0", "vencimiento": null },
-    "1752045-8": { "deuda": "$0", "vencimiento": null },
-    "1782609-3": { "deuda": "$0", "vencimiento": null },
-    "1973010-7": { "deuda": "$39.050", "vencimiento": null },
-    "1973011-5": { "deuda": "$0", "vencimiento": null }
+    "1127131-6": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127131-6: \"Authorization failed\""
+    },
+    "1127130-8": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127130-8: \"Authorization failed\""
+    },
+    "1009146-2": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1009146-2: \"Authorization failed\""
+    },
+    "672977-0": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 672977-0: \"Authorization failed\""
+    },
+    "1009152-7": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1009152-7: \"Authorization failed\""
+    },
+    "1127136-7": {
+      "deuda": "$86.650",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127136-7: \"Authorization failed\""
+    },
+    "1127135-9": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127135-9: \"Authorization failed\""
+    },
+    "1127133-2": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127133-2: \"Authorization failed\""
+    },
+    "1127134-0": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127134-0: \"Authorization failed\""
+    },
+    "1127132-4": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127132-4: \"Authorization failed\""
+    },
+    "1127140-5": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127140-5: \"Authorization failed\""
+    },
+    "1127141-3": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127141-3: \"Authorization failed\""
+    },
+    "1127138-3": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127138-3: \"Authorization failed\""
+    },
+    "1127137-5": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127137-5: \"Authorization failed\""
+    },
+    "1127139-1": {
+      "deuda": "$85.390",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127139-1: \"Authorization failed\""
+    },
+    "1127146-4": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127146-4: \"Authorization failed\""
+    },
+    "1127144-8": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127144-8: \"Authorization failed\""
+    },
+    "1127147-2": {
+      "deuda": "$588.490",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127147-2: \"Authorization failed\""
+    },
+    "1127145-6": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127145-6: \"Authorization failed\""
+    },
+    "1127142-1": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127142-1: \"Authorization failed\""
+    },
+    "1127152-9": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127152-9: \"Authorization failed\""
+    },
+    "1127151-0": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127151-0: \"Authorization failed\""
+    },
+    "1127150-2": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127150-2: \"Authorization failed\""
+    },
+    "1127148-0": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127148-0: \"Authorization failed\""
+    },
+    "1127149-9": {
+      "deuda": "$203.060",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127149-9: \"Authorization failed\""
+    },
+    "1127206-1": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127206-1: \"Authorization failed\""
+    },
+    "1127203-7": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127203-7: \"Authorization failed\""
+    },
+    "1127208-8": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127208-8: \"Authorization failed\""
+    },
+    "1127204-5": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127204-5: \"Authorization failed\""
+    },
+    "1127153-7": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127153-7: \"Authorization failed\""
+    },
+    "1136296-6": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1136296-6: \"Authorization failed\""
+    },
+    "1534317-6": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1534317-6: \"Authorization failed\""
+    },
+    "1127212-6": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127212-6: \"Authorization failed\""
+    },
+    "1127211-8": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127211-8: \"Authorization failed\""
+    },
+    "1127209-6": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1127209-6: \"Authorization failed\""
+    },
+    "1534321-4": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1534321-4: \"Authorization failed\""
+    },
+    "1534319-2": {
+      "deuda": "$1.038.530",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1534319-2: \"Authorization failed\""
+    },
+    "1534322-2": {
+      "deuda": "$5.170",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1534322-2: \"Authorization failed\""
+    },
+    "1534318-4": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1534318-4: \"Authorization failed\""
+    },
+    "1534320-6": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1534320-6: \"Authorization failed\""
+    },
+    "1534327-3": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1534327-3: \"Authorization failed\""
+    },
+    "1534326-5": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1534326-5: \"Authorization failed\""
+    },
+    "1534325-7": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1534325-7: \"Authorization failed\""
+    },
+    "1534324-9": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1534324-9: \"Authorization failed\""
+    },
+    "1534323-0": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1534323-0: \"Authorization failed\""
+    },
+    "1534333-8": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1534333-8: \"Authorization failed\""
+    },
+    "1534334-6": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1534334-6: \"Authorization failed\""
+    },
+    "1534330-3": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1534330-3: \"Authorization failed\""
+    },
+    "1534328-1": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1534328-1: \"Authorization failed\""
+    },
+    "1534331-1": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1534331-1: \"Authorization failed\""
+    },
+    "1596663-7": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1596663-7: \"Authorization failed\""
+    },
+    "1596664-5": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1596664-5: \"Authorization failed\""
+    },
+    "1534336-2": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1534336-2: \"Authorization failed\""
+    },
+    "1534335-4": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1534335-4: \"Authorization failed\""
+    },
+    "1596662-9": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1596662-9: \"Authorization failed\""
+    },
+    "1637814-3": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1637814-3: \"Authorization failed\""
+    },
+    "1637812-7": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1637812-7: \"Authorization failed\""
+    },
+    "1596666-1": {
+      "deuda": "$46.420",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1596666-1: \"Authorization failed\""
+    },
+    "1637811-9": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1637811-9: \"Authorization failed\""
+    },
+    "1596665-3": {
+      "deuda": "$225.400",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1596665-3: \"Authorization failed\""
+    },
+    "1717633-1": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1717633-1: \"Authorization failed\""
+    },
+    "1717632-3": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1717632-3: \"Authorization failed\""
+    },
+    "1664824-8": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1664824-8: \"Authorization failed\""
+    },
+    "1717631-5": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1717631-5: \"Authorization failed\""
+    },
+    "1664822-1": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1664822-1: \"Authorization failed\""
+    },
+    "1973011-5": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1973011-5: \"Authorization failed\""
+    },
+    "1752045-8": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1752045-8: \"Authorization failed\""
+    },
+    "1973010-7": {
+      "deuda": "$39.050",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1973010-7: \"Authorization failed\""
+    },
+    "1782609-3": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "error": "Khipu 401 para 1782609-3: \"Authorization failed\""
+    }
   }
 }
