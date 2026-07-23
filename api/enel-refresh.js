@@ -121,8 +121,13 @@ function buildBrowserlessScript(rut, clave) {
       async function getCsrfToken() {
         return page.evaluate(async () => {
           const r = await fetch('/libs/granite/csrf/token.json', { credentials: 'include' });
-          if (!r.ok) throw new Error('CSRF fetch HTTP ' + r.status);
-          const j = await r.json();
+          const bodyText = await r.text();
+          if (!r.ok) throw new Error('CSRF fetch HTTP ' + r.status + ': ' + bodyText.slice(0, 200));
+          let j;
+          try { j = JSON.parse(bodyText); } catch (e) {
+            throw new Error('CSRF respuesta no-JSON: ' + bodyText.slice(0, 200));
+          }
+          if (!j.token) throw new Error('CSRF JSON sin campo token: ' + bodyText.slice(0, 200));
           return j.token;
         });
       }
