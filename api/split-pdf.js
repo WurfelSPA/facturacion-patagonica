@@ -465,6 +465,13 @@ export default async function handler(req, res) {
     let pdfBuf = await driveDownload(token, pdfFileId);
     console.log(`PDF: ${pdfBuf.length} bytes`);
 
+    // Diagnóstico: detectar si el PDF trae diccionario /Encrypt (streams cifrados
+    // que pdf-lib con ignoreEncryption:true carga pero no descifra).
+    const hasEncryptDict = pdfBuf.toString("latin1", 0, Math.min(pdfBuf.length, 2_000_000)).includes("/Encrypt");
+    const filterMatches = [...pdfBuf.toString("latin1", 0, Math.min(pdfBuf.length, 2_000_000)).matchAll(/\/Filter\s*\/?(\w+)/g)].map(m=>m[1]);
+    const filterCounts = {};
+    for (const f of filterMatches) filterCounts[f] = (filterCounts[f]||0)+1;
+
     // 2. Extraer texto UNA VEZ del PDF original (rápido, antes de cargar en pdf-lib)
     const fullText = extractText(pdfBuf);
     const pageTexts = splitByPages(fullText);
@@ -476,6 +483,7 @@ export default async function handler(req, res) {
     const totalPages = srcDoc.getPageCount();
     const usePreExtracted = pageTexts.length === totalPages;
     console.log(`Páginas: ${totalPages}, bloques texto: ${pageTexts.length} → ${usePreExtracted ? "pre-extraído (rápido)" : "fallback por página"}`);
+    console.log(`hasEncryptDict=${hasEncryptDict} filterCounts=${JSON.stringify(filterCounts)}`);
 
     // Liberar pdfBuf — srcDoc ya tiene los datos internamente
     pdfBuf = null;
@@ -543,6 +551,7 @@ export default async function handler(req, res) {
     if (debug) {
       return res.status(200).json({
         ok: true, debug: true,
+        hasEncryptDict, filterCounts,
         totalPages, anchorsFound: pageTexts.length, usePreExtracted,
         fullTextLength: fullText.length, fullTextSample: fullText.slice(0, 800),
         textSamples,
