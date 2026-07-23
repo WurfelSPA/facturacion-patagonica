@@ -4574,7 +4574,7 @@ function App(){
   },[]);
 
   const marcarPagadoSheet=useCallback(async(sheetRow,pagadoCol,paid)=>{
-    const body={sheetRow,sentCol:pagadoCol,value:paid?"Si":""};
+    const body={sheetRow,sentCol:pagadoCol,value:paid?"Pagado":""};
     const r=await fetch("/api/planilla",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     const rj=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(rj.error||`HTTP ${r.status}`);
