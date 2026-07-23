@@ -99,7 +99,7 @@ async function main() {
     if (submitBtn) await submitBtn.click();
     else await page.keyboard.press('Enter');
 
-    await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 });
+    await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 });
 
     if (page.url().includes('login')) {
       throw new Error('Login fallido — verificar credenciales. URL: ' + page.url());
@@ -107,7 +107,7 @@ async function main() {
     console.log('[aa-scraper] Login OK. URL: ' + page.url());
 
     // ── 2. Obtener links de cuentas ───────────────────────────────────────────
-    await page.goto(BASE_URL + ACCOUNT_PATH, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto(BASE_URL + ACCOUNT_PATH, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(2000);
 
     const accountLinks = await page.evaluate(() =>
@@ -134,8 +134,8 @@ async function main() {
     for (let i = 0; i < accountLinks.length; i++) {
       const link = accountLinks[i];
       try {
-        await page.goto(link.href, { waitUntil: 'networkidle', timeout: 30000 });
-        await page.waitForTimeout(1000);
+        await page.goto(link.href, { waitUntil: 'domcontentloaded', timeout: 20000 });
+        await page.waitForTimeout(1500);
 
         const deudaRaw = await page.$eval('span.total_deuda', el => el.textContent.trim()).catch(() => '$0');
         const divText  = await page.$eval('#divmonto', el => el.innerText).catch(() => '');
