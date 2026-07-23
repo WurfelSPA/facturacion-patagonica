@@ -485,6 +485,11 @@ export default async function handler(req, res) {
     const breakdown = {};
     const clientGroups = {}; // zipPath → [pageIndex, ...]
 
+    // Modo diagnóstico: no genera ni sube nada, solo reporta qué extrae el
+    // parser de cada página para depurar sin tocar el ZIP en Drive.
+    const debug = !!(req.body && req.body.debug);
+    const textSamples = [];
+
     // 4. Clasificar páginas por cliente (solo índices, sin copiar buffers de página)
     for (let i = 0; i < totalPages; i++) {
       let text;
@@ -496,6 +501,9 @@ export default async function handler(req, res) {
         const [cp] = await sd.copyPages(srcDoc, [i]);
         sd.addPage(cp);
         text = extractText(Buffer.from(await sd.save()));
+      }
+      if (debug && textSamples.length < 5) {
+        textSamples.push({ page: i + 1, len: text.length, sample: text.slice(0, 400) });
       }
       const cod = detectCod(text);
       const nro = detectNro(text);
@@ -530,6 +538,18 @@ export default async function handler(req, res) {
       clientGroups[zp].push(i);
       breakdown[cod] = (breakdown[cod] || 0) + 1;
       console.log(`Pág ${i+1}: ${cod} → ${fname}`);
+    }
+
+    if (debug) {
+      return res.status(200).json({
+        ok: true, debug: true,
+        totalPages, anchorsFound: pageTexts.length, usePreExtracted,
+        fullTextLength: fullText.length, fullTextSample: fullText.slice(0, 800),
+        textSamples,
+        sinCodCount: sinCod.length,
+        totalFacturasDetectadas: Object.values(breakdown).reduce((a, b) => a + b, 0),
+        breakdown: Object.entries(breakdown).sort(([a], [b]) => a.localeCompare(b)),
+      });
     }
 
     // 5. Generar PDFs por cliente con pdf-lib (una operación por cliente, no por página)
