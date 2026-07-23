@@ -1,20 +1,19 @@
 /**
  * POST /api/aa-refresh  (o GET vía cron de Vercel)
- * Usa Browserless para hacer login en Aguas Andinas y scrapear
- * las deudas de todas las cuentas. Actualiza aa-cache.json vía GitHub API.
+ * Usa la API de Khipu Open Data para consultar el estado de deuda
+ * de cada cuenta de Aguas Andinas por su ClientIdentifier.
+ * Actualiza aa-cache.json vía GitHub API.
  *
  * Env vars requeridas:
- *   AGUAS_ANDINASc      - RUT de acceso al portal empresa
- *   AGUAS_ANDINAS_PASS  - Clave del portal empresa
- *   BROWSERLESS_TOKEN   - Token de api.browserless.io
- *   GITHUB_TOKEN        - Personal Access Token con permiso repo (para actualizar aa-cache.json)
- *   GITHUB_REPO         - "usuario/repositorio" (ej: "WurfelSPA/facturacion-patagonica")
- *   SYNC_SECRET         - Secreto para autenticar llamadas manuales
+ *   KHIPU_API_KEY   - API key de Khipu (panel en khipu.com)
+ *   GITHUB_TOKEN    - Personal Access Token con permiso repo
+ *   GITHUB_REPO     - "usuario/repositorio" (ej: "WurfelSPA/facturacion-patagonica")
+ *   SYNC_SECRET     - Secreto para autenticar llamadas manuales
  */
 
-const BASE_URL    = 'https://www.aguasandinas.cl';
-const LOGIN_PATH  = '/web/aguasandinas/login';
-const ACCOUNT_PATH = '/web/aguasandinas/informacion-de-la-cuenta';
+const KHIPU_URL = 'https://api.khipu.com/v1/cl/services/aguasandinas.cl/debt-status-by-client-identifier';
+const GITHUB_REPO_DEFAULT = 'WurfelSPA/facturacion-patagonica';
+const CACHE_FILE = 'aa-cache.json';
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -22,133 +21,74 @@ function setCors(res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
-// ── Script que corre en Browserless ──────────────────────────────────────────
-function buildBrowserlessScript(rut, clave) {
-  return `
-    export default async ({ page }) => {
-      const BASE = '${BASE_URL}';
-      const results = {};
+// ── Formatear monto como "$86.650" (estilo AA) ────────────────────────────────
+function fmtDeuda(amount) {
+  if (!amount || amount === 0) return '$0';
+  return '$' + Math.round(amount).toLocaleString('es-CL');
+}
 
-      // 1. Navegar al login
-      await page.goto(BASE + '${LOGIN_PATH}', { waitUntil: 'domcontentloaded', timeout: 60000 });
+// ── Consultar deuda de una cuenta vía Khipu ───────────────────────────────────
+async function fetchDeuda(clientId, apiKey) {
+  const res = await fetch(KHIPU_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey
+    },
+    body: JSON.stringify({ RequestData: { ClientIdentifier: clientId } })
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Khipu ${res.status} para ${clientId}: ${txt.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  if (data.Status !== 'OK' || !data.Data?.DebtStatus) {
+    throw new Error(`Khipu Status=${data.Status} para ${clientId}: ${data.Error?.Description || 'sin datos'}`);
+  }
+  const ds = data.Data.DebtStatus;
+  return {
+    deuda: fmtDeuda(ds.Debt?.TotalAmount),
+    nombre: ds.HolderName || ds.ClientName || null,
+    direccion: ds.Address || null,
+    vencimiento: null  // Khipu no retorna fecha de vencimiento
+  };
+}
 
-      // 2. Esperar que Liferay renderice el formulario (JS-driven)
-      await page.waitForSelector('input', { timeout: 30000 }).catch(async () => {
-        const dbgUrl = page.url();
-        const dbgTitle = await page.title().catch(()=>'');
-        const dbgHtml = await page.evaluate(()=>document.body?.innerHTML?.slice(0,500)||'').catch(()=>'');
-        throw new Error('Sin inputs tras 30s. URL: '+dbgUrl+' | Title: '+dbgTitle+' | HTML: '+dbgHtml);
-      });
-      // Buscar campo RUT por múltiples estrategias
-      const rutInput = await page.$([
-        'input[name*="rut"]','input[id*="rut"]','input[name*="Rut"]',
-        'input[placeholder*="RUT"]','input[placeholder*="Rut"]','input[placeholder*="rut"]',
-        'input[name*="usuario"]','input[id*="usuario"]','input[name*="user"]',
-        'input[type="text"]'
-      ].join(','));
-      const claveInput = await page.$('input[type="password"]');
-      // Screenshot de debug para ver qué muestra la página
-      const dbgScreenshot = await page.screenshot({ encoding: 'base64', fullPage: false }).catch(()=>null);
-      const dbgInputs = await page.evaluate(()=>[...document.querySelectorAll('input')].map(i=>({type:i.type,name:i.name,id:i.id,placeholder:i.placeholder}))).catch(()=>[]);
-      if (!rutInput || !claveInput) throw new Error('Campos de login no encontrados. URL: '+page.url()+' | Inputs: '+JSON.stringify(dbgInputs).slice(0,300));
-      await rutInput.type('${rut}', { delay: 50 });
-      await claveInput.type('${clave}', { delay: 50 });
-      const submitBtn = await page.$('button[type="submit"], input[type="submit"], .btn-login, [class*="login-btn"], button[class*="login"]');
-      if (submitBtn) await submitBtn.click();
-      else await page.keyboard.press('Enter');
-      await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 });
-
-      // 3. Verificar login
-      if (page.url().includes('login')) {
-        const errMsg = await page.$eval('.error, .alert, [class*="error"]', el => el.textContent.trim()).catch(() => 'Login fallido');
-        throw new Error('Login fallido: ' + errMsg);
-      }
-
-      // 4. Obtener links de cuentas
-      await page.goto(BASE + '${ACCOUNT_PATH}', { waitUntil: 'networkidle2', timeout: 30000 });
-      const accountLinks = await page.evaluate(() => {
-        return [...document.querySelectorAll('a')]
-          .filter(a => /\\d{6,}-\\d/.test(a.textContent) && a.href.includes('cuentaRender'))
-          .map(a => ({ id: (a.textContent.match(/(\\d{6,}-\\d)/) || [])[1], href: a.href }))
-          .filter(l => l.id);
-      });
-      if (!accountLinks.length) throw new Error('No se encontraron cuentas');
-
-      // 5. Scrapear cada cuenta
-      for (const link of accountLinks) {
-        try {
-          await page.goto(link.href, { waitUntil: 'networkidle2', timeout: 30000 });
-          const deuda = await page.$eval('span.total_deuda', el => el.textContent.trim()).catch(() => '$0');
-          const divText = await page.$eval('#divmonto', el => el.innerText).catch(() => '');
-          const fecha = (divText.match(/\\d{2}\\/\\d{2}\\/\\d{4}/) || [])[0] || null;
-          const nombre = await page.evaluate(() => {
-            const sels=['.nombre-cuenta','.nombre_cliente','#nombre-cliente','.razon-social','#razon-social','.cuenta-nombre','.client-name'];
-            for(const s of sels){const el=document.querySelector(s);if(el&&el.textContent.trim())return el.textContent.trim();}
-            for(const tr of [...document.querySelectorAll('tr')]){
-              const cells=[...tr.querySelectorAll('td,th')];
-              for(let i=0;i<cells.length-1;i++){
-                const lbl=cells[i].textContent.trim().toLowerCase();
-                if(lbl.includes('razón social')||lbl.includes('razon social')||lbl==='nombre'){
-                  const val=cells[i+1].textContent.trim();
-                  if(val)return val;
-                }
-              }
-            }
-            const strong=document.querySelector('.portlet-body strong,.datos-cuenta strong,.info-cuenta strong');
-            if(strong&&strong.textContent.trim())return strong.textContent.trim();
-            return null;
-          }).catch(()=>null);
-          results[link.id] = { deuda, vencimiento: fecha, nombre };
-        } catch (e) {
-          results[link.id] = { deuda: null, error: e.message };
-        }
-        await new Promise(r => setTimeout(r, 300));
-      }
-
-      return { accounts: results, total: Object.keys(results).length };
-    }
-  `;
+// ── Leer aa-cache.json desde GitHub para obtener IDs existentes ───────────────
+async function readCacheFromGitHub(githubToken, repo) {
+  const apiBase = `https://api.github.com/repos/${repo}/contents/${CACHE_FILE}`;
+  const res = await fetch(apiBase, {
+    headers: { Authorization: `Bearer ${githubToken}`, Accept: 'application/vnd.github+json' }
+  });
+  if (!res.ok) return { data: null, sha: null };
+  const json = await res.json();
+  const content = Buffer.from(json.content, 'base64').toString('utf-8');
+  return { data: JSON.parse(content), sha: json.sha };
 }
 
 // ── Actualizar aa-cache.json vía GitHub API ───────────────────────────────────
-async function updateCacheViaGitHub(data) {
-  const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-  const GITHUB_REPO  = process.env.GITHUB_REPO || 'WurfelSPA/facturacion-patagonica';
-  if (!GITHUB_TOKEN) throw new Error('Falta GITHUB_TOKEN');
-
-  const filePath = 'aa-cache.json';
-  const apiBase  = `https://api.github.com/repos/${GITHUB_REPO}/contents/${filePath}`;
-
-  // Obtener SHA actual del archivo
-  let sha = null;
-  try {
-    const getRes = await fetch(apiBase, {
-      headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' }
-    });
-    if (getRes.ok) { const j = await getRes.json(); sha = j.sha; }
-  } catch (_) {}
-
+async function updateCacheViaGitHub(data, sha, githubToken, repo) {
+  const apiBase = `https://api.github.com/repos/${repo}/contents/${CACHE_FILE}`;
   const content = Buffer.from(JSON.stringify(data, null, 2), 'utf-8').toString('base64');
   const body = {
-    message: `chore: actualizar caché AA ${new Date().toISOString().slice(0,10)}`,
+    message: `chore: actualizar caché AA ${new Date().toISOString().slice(0, 10)}`,
     content,
     ...(sha ? { sha } : {})
   };
-
-  const putRes = await fetch(apiBase, {
+  const res = await fetch(apiBase, {
     method: 'PUT',
     headers: {
-      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Authorization: `Bearer ${githubToken}`,
       Accept: 'application/vnd.github+json',
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(body)
   });
-  if (!putRes.ok) {
-    const err = await putRes.text();
-    throw new Error(`GitHub API error ${putRes.status}: ${err.slice(0, 200)}`);
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`GitHub API error ${res.status}: ${err.slice(0, 200)}`);
   }
-  return await putRes.json();
+  return await res.json();
 }
 
 // ── Handler principal ─────────────────────────────────────────────────────────
@@ -156,60 +96,74 @@ export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // Autenticación: cron de Vercel (CRON_SECRET) o llamada manual (SYNC_SECRET)
-  // Vercel envía: Authorization: Bearer <CRON_SECRET> con User-Agent vercel-cron/1.0
-  // (en versiones antiguas usaba el header x-vercel-cron: 1, ya deprecado)
+  // Autenticación
   const authHeader = req.headers['authorization'] || '';
-  const cronSecret  = process.env.CRON_SECRET;
-  const syncSecret  = process.env.SYNC_SECRET;
+  const cronSecret = process.env.CRON_SECRET;
+  const syncSecret = process.env.SYNC_SECRET;
   const isCron = req.headers['x-vercel-cron'] === '1' ||
                  (cronSecret && authHeader === `Bearer ${cronSecret}`);
   const isAuth = isCron || (syncSecret && authHeader === `Bearer ${syncSecret}`);
   if (!isAuth) return res.status(401).json({ error: 'No autorizado' });
 
-  const RUT   = process.env.AGUAS_RUT || process.env.AGUAS_ANDINAS_USER || process.env.AGUAS_ANDINASc;
-  const CLAVE = process.env.AGUAS_CLAVE || process.env.AGUAS_ANDINAS_PASS;
-  const BROWSERLESS_TOKEN = process.env.BROWSERLESS_TOKEN;
+  const KHIPU_API_KEY = process.env.KHIPU_API_KEY;
+  const GITHUB_TOKEN  = process.env.GITHUB_TOKEN;
+  const GITHUB_REPO   = process.env.GITHUB_REPO || GITHUB_REPO_DEFAULT;
 
-  if (!RUT || !CLAVE)             return res.status(500).json({ error: 'Faltan credenciales AA' });
-  if (!BROWSERLESS_TOKEN)         return res.status(500).json({ error: 'Falta BROWSERLESS_TOKEN' });
+  if (!KHIPU_API_KEY) return res.status(500).json({ error: 'Falta KHIPU_API_KEY' });
+  if (!GITHUB_TOKEN)  return res.status(500).json({ error: 'Falta GITHUB_TOKEN' });
 
   try {
-    console.log('[aa-refresh] Iniciando scraping con Browserless...');
+    console.log('[aa-refresh] Leyendo IDs desde cache GitHub...');
+    const { data: oldCache, sha } = await readCacheFromGitHub(GITHUB_TOKEN, GITHUB_REPO);
+    const existingIds = oldCache?.accounts ? Object.keys(oldCache.accounts) : [];
 
-    // Llamar a Browserless
-    const blRes = await fetch(`https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}&stealth=true`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        code: buildBrowserlessScript(RUT, CLAVE),
-        context: {}
-      })
-    });
-
-    if (!blRes.ok) {
-      const errText = await blRes.text();
-      throw new Error(`Browserless error ${blRes.status}: ${errText.slice(0, 300)}`);
+    if (!existingIds.length) {
+      return res.status(400).json({ error: 'aa-cache.json no tiene cuentas. Agrega IDs manualmente primero.' });
     }
 
-    const blData = await blRes.json();
-    console.log(`[aa-refresh] Scraping OK: ${blData.total} cuentas`);
+    console.log(`[aa-refresh] Consultando ${existingIds.length} cuentas en Khipu...`);
+    const accounts = {};
+    const errors = [];
+
+    // Llamadas en lotes de 5 para no saturar la API
+    for (let i = 0; i < existingIds.length; i += 5) {
+      const lote = existingIds.slice(i, i + 5);
+      await Promise.all(lote.map(async (id) => {
+        try {
+          accounts[id] = await fetchDeuda(id, KHIPU_API_KEY);
+        } catch (e) {
+          console.warn(`[aa-refresh] Error cuenta ${id}:`, e.message);
+          errors.push({ id, error: e.message });
+          // Mantener datos anteriores si existen
+          if (oldCache?.accounts?.[id]) {
+            accounts[id] = { ...oldCache.accounts[id], error: e.message };
+          } else {
+            accounts[id] = { deuda: null, error: e.message };
+          }
+        }
+      }));
+      // Pausa entre lotes
+      if (i + 5 < existingIds.length) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
 
     const cacheData = {
       ok: true,
       updatedAt: new Date().toISOString(),
-      source: 'browserless',
-      accounts: blData.accounts
+      source: 'khipu',
+      accounts
     };
 
-    // Guardar en GitHub
-    await updateCacheViaGitHub(cacheData);
+    await updateCacheViaGitHub(cacheData, sha, GITHUB_TOKEN, GITHUB_REPO);
     console.log('[aa-refresh] Cache actualizado en GitHub');
 
     return res.status(200).json({
       ok: true,
       updatedAt: cacheData.updatedAt,
-      total: Object.keys(blData.accounts || {}).length
+      total: existingIds.length,
+      errors: errors.length,
+      ...(errors.length ? { errorDetail: errors.slice(0, 5) } : {})
     });
   } catch (e) {
     console.error('[aa-refresh] Error:', e.message);
