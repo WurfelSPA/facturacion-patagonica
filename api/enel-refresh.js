@@ -74,7 +74,20 @@ function buildBrowserlessScript(rut, clave) {
           submitBtn ? submitBtn.click() : passInput.press('Enter')
         ]);
 
-        await page.waitForSelector('.pvtArea-account-select-option', { timeout: 20000 });
+        // El login de Enel (WSO2 IS) puede encadenar más de un redirect;
+        // damos tiempo a que se asiente y reintentamos si un redirect
+        // intermedio destruye el contexto justo cuando consultamos el DOM.
+        await new Promise(r => setTimeout(r, 2000));
+        let ready = false;
+        for (let attempt = 0; attempt < 3 && !ready; attempt++) {
+          try {
+            await page.waitForSelector('.pvtArea-account-select-option', { timeout: 10000 });
+            ready = true;
+          } catch (_) {
+            await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 5000 }).catch(() => null);
+            await new Promise(r => setTimeout(r, 1000));
+          }
+        }
       }
 
       if (!page.url().includes('private-area')) {
