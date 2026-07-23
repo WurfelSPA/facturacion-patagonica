@@ -25,52 +25,42 @@ function setCors(res) {
 // ── Script que corre en Browserless ──────────────────────────────────────────
 function buildBrowserlessScript(rut, clave) {
   return `
-    async function main({ page }) {
+    module.exports = async ({ page }) => {
       const BASE = '${BASE_URL}';
       const results = {};
 
-      // 1. Navegar al login (Incapsula se resuelve automáticamente)
+      // 1. Navegar al login
       await page.goto(BASE + '${LOGIN_PATH}', { waitUntil: 'networkidle2', timeout: 60000 });
 
-      // 2. Encontrar el formulario de login y hacer submit
+      // 2. Login
       await page.waitForSelector('input[name*="rut"], input[id*="rut"], input[name*="Rut"]', { timeout: 15000 });
-
       const rutInput = await page.$('input[name*="rut"], input[id*="rut"], input[name*="Rut"]');
       const claveInput = await page.$('input[type="password"]');
       if (!rutInput || !claveInput) throw new Error('No se encontraron campos de login');
-
       await rutInput.type('${rut}', { delay: 50 });
       await claveInput.type('${clave}', { delay: 50 });
-
-      // Click en submit
       const submitBtn = await page.$('button[type="submit"], input[type="submit"], .btn-login, [class*="login-btn"]');
       if (submitBtn) await submitBtn.click();
       else await page.keyboard.press('Enter');
-
       await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 });
 
-      // 3. Verificar login exitoso
-      const currentUrl = page.url();
-      if (currentUrl.includes('login')) {
+      // 3. Verificar login
+      if (page.url().includes('login')) {
         const errMsg = await page.$eval('.error, .alert, [class*="error"]', el => el.textContent.trim()).catch(() => 'Login fallido');
         throw new Error('Login fallido: ' + errMsg);
       }
 
-      // 4. Obtener todos los links de cuentas disponibles
+      // 4. Obtener links de cuentas
       await page.goto(BASE + '${ACCOUNT_PATH}', { waitUntil: 'networkidle2', timeout: 30000 });
-
       const accountLinks = await page.evaluate(() => {
         return [...document.querySelectorAll('a')]
           .filter(a => /\\d{6,}-\\d/.test(a.textContent) && a.href.includes('cuentaRender'))
           .map(a => ({ id: (a.textContent.match(/(\\d{6,}-\\d)/) || [])[1], href: a.href }))
           .filter(l => l.id);
       });
-
       if (!accountLinks.length) throw new Error('No se encontraron cuentas');
 
-      // 5. Scrapear deuda de cada cuenta con page.goto() (navegación real)
-      // IMPORTANTE: fetch() siempre retorna la cuenta activa sin cambiarla.
-      // Se debe navegar con page.goto() para que Liferay cambie la cuenta en sesión.
+      // 5. Scrapear cada cuenta
       for (const link of accountLinks) {
         try {
           await page.goto(link.href, { waitUntil: 'networkidle2', timeout: 30000 });
@@ -78,10 +68,8 @@ function buildBrowserlessScript(rut, clave) {
           const divText = await page.$eval('#divmonto', el => el.innerText).catch(() => '');
           const fecha = (divText.match(/\\d{2}\\/\\d{2}\\/\\d{4}/) || [])[0] || null;
           const nombre = await page.evaluate(() => {
-            /* Selectores conocidos en el portal AA (Liferay) */
             const sels=['.nombre-cuenta','.nombre_cliente','#nombre-cliente','.razon-social','#razon-social','.cuenta-nombre','.client-name'];
             for(const s of sels){const el=document.querySelector(s);if(el&&el.textContent.trim())return el.textContent.trim();}
-            /* Buscar en filas de tabla: celda "Razón Social" o "Nombre" seguida del valor */
             for(const tr of [...document.querySelectorAll('tr')]){
               const cells=[...tr.querySelectorAll('td,th')];
               for(let i=0;i<cells.length-1;i++){
@@ -92,7 +80,6 @@ function buildBrowserlessScript(rut, clave) {
                 }
               }
             }
-            /* Fallback: primer <strong> o <b> en el área de datos de la cuenta */
             const strong=document.querySelector('.portlet-body strong,.datos-cuenta strong,.info-cuenta strong');
             if(strong&&strong.textContent.trim())return strong.textContent.trim();
             return null;
@@ -101,12 +88,11 @@ function buildBrowserlessScript(rut, clave) {
         } catch (e) {
           results[link.id] = { deuda: null, error: e.message };
         }
-        // Pausa mínima entre cuentas
         await new Promise(r => setTimeout(r, 300));
       }
 
       return { accounts: results, total: Object.keys(results).length };
-    }
+    };
   `;
 }
 
