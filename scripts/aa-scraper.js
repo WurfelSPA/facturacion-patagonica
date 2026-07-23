@@ -79,15 +79,23 @@ async function main() {
       await page.screenshot({ path: 'debug-incapsula.png', fullPage: false });
     }
 
-    // Esperar input visible (no hidden)
-    await page.waitForSelector('input:not([type="hidden"])', { timeout: 40000 });
+    // Esperar input visible (no hidden). El header tiene un buscador oculto
+    // (name="_3_keywords") que matchea selectores genéricos pero nunca es
+    // visible, así que filtramos por :visible para quedarnos con los del form.
+    await page.waitForSelector('input[type="text"]:visible, input[type="password"]:visible', { timeout: 40000 });
 
-    const rutInput = await page.$(
-      'input[name*="rut"], input[id*="rut"], input[name*="Rut"], ' +
-      'input[placeholder*="RUT"], input[placeholder*="rut"], ' +
-      'input[name*="usuario"], input[type="text"]'
+    async function firstVisible(selector) {
+      for (const handle of await page.$$(selector)) {
+        if (await handle.isVisible()) return handle;
+      }
+      return null;
+    }
+
+    const rutInput = await firstVisible(
+      'input[name*="rut" i], input[id*="rut" i], ' +
+      'input[placeholder*="RUT" i], input[name*="usuario" i], input[type="text"]'
     );
-    const claveInput = await page.$('input[type="password"]');
+    const claveInput = await firstVisible('input[type="password"]');
 
     if (!rutInput || !claveInput) {
       const inputs = await page.evaluate(() =>
