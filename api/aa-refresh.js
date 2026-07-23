@@ -57,13 +57,20 @@ async function fetchDeuda(clientId, apiKey) {
 // ── Leer aa-cache.json desde GitHub para obtener IDs existentes ───────────────
 async function readCacheFromGitHub(githubToken, repo) {
   const apiBase = `https://api.github.com/repos/${repo}/contents/${CACHE_FILE}`;
-  const res = await fetch(apiBase, {
-    headers: { Authorization: `Bearer ${githubToken}`, Accept: 'application/vnd.github+json' }
-  });
-  if (!res.ok) return { data: null, sha: null };
-  const json = await res.json();
-  const content = Buffer.from(json.content, 'base64').toString('utf-8');
-  return { data: JSON.parse(content), sha: json.sha };
+  try {
+    const res = await fetch(apiBase, {
+      headers: { Authorization: `Bearer ${githubToken}`, Accept: 'application/vnd.github+json' }
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      return { data: null, sha: null, readError: `GitHub ${res.status}: ${txt.slice(0,200)}` };
+    }
+    const json = await res.json();
+    const content = Buffer.from(json.content, 'base64').toString('utf-8');
+    return { data: JSON.parse(content), sha: json.sha };
+  } catch(e) {
+    return { data: null, sha: null, readError: e.message };
+  }
 }
 
 // ── Actualizar aa-cache.json vía GitHub API ───────────────────────────────────
@@ -114,11 +121,16 @@ export default async function handler(req, res) {
 
   try {
     console.log('[aa-refresh] Leyendo IDs desde cache GitHub...');
-    const { data: oldCache, sha } = await readCacheFromGitHub(GITHUB_TOKEN, GITHUB_REPO);
+    const { data: oldCache, sha, readError } = await readCacheFromGitHub(GITHUB_TOKEN, GITHUB_REPO);
     const existingIds = oldCache?.accounts ? Object.keys(oldCache.accounts) : [];
 
     if (!existingIds.length) {
-      return res.status(400).json({ error: 'aa-cache.json no tiene cuentas. Agrega IDs manualmente primero.' });
+      return res.status(400).json({
+        error: 'aa-cache.json no tiene cuentas.',
+        repo: GITHUB_REPO,
+        readError: readError || null,
+        oldCacheKeys: oldCache ? Object.keys(oldCache) : null
+      });
     }
 
     console.log(`[aa-refresh] Consultando ${existingIds.length} cuentas en Khipu...`);
