@@ -466,37 +466,6 @@ export default async function handler(req, res) {
     let pdfBuf = await driveDownload(token, pdfFileId);
     console.log(`PDF: ${pdfBuf.length} bytes`);
 
-    // Diagnóstico: detectar si el PDF trae diccionario /Encrypt (streams cifrados
-    // que pdf-lib con ignoreEncryption:true carga pero no descifra).
-    const hasEncryptDict = pdfBuf.toString("latin1", 0, Math.min(pdfBuf.length, 2_000_000)).includes("/Encrypt");
-    const filterMatches = [...pdfBuf.toString("latin1", 0, Math.min(pdfBuf.length, 2_000_000)).matchAll(/\/Filter\s*\/?(\w+)/g)].map(m=>m[1]);
-    const filterCounts = {};
-    for (const f of filterMatches) filterCounts[f] = (filterCounts[f]||0)+1;
-
-    // Diagnóstico: inspeccionar los primeros streams reales (bytes crudos +
-    // resultado de inflateSync) para ver si el corte stream/endstream está
-    // alineado o si la descompresión falla con un error concreto.
-    let streamDebug = [];
-    if (req.body && req.body.debug) {
-      const rawStr = pdfBuf.toString("latin1");
-      const re = /stream(\r\n|\r|\n)([\s\S]*?)endstream/g;
-      let sm; let n = 0;
-      while ((sm = re.exec(rawStr)) !== null && n < 5) {
-        n++;
-        const eol = JSON.stringify(sm[1]);
-        const raw = Buffer.from(sm[2], "latin1");
-        const first16Hex = raw.slice(0, 16).toString("hex");
-        let inflateResult;
-        try {
-          const out = inflateSync(raw);
-          inflateResult = { ok: true, outLen: out.length, sample: out.toString("latin1").slice(0, 150) };
-        } catch (e) {
-          inflateResult = { ok: false, error: e.message };
-        }
-        streamDebug.push({ n, eol, rawLen: raw.length, first16Hex, inflateResult });
-      }
-    }
-
     // 2. Extraer texto UNA VEZ del PDF original (rápido, antes de cargar en pdf-lib)
     const fullText = extractText(pdfBuf);
     const pageTexts = splitByPages(fullText);
@@ -508,7 +477,6 @@ export default async function handler(req, res) {
     const totalPages = srcDoc.getPageCount();
     const usePreExtracted = pageTexts.length === totalPages;
     console.log(`Páginas: ${totalPages}, bloques texto: ${pageTexts.length} → ${usePreExtracted ? "pre-extraído (rápido)" : "fallback por página"}`);
-    console.log(`hasEncryptDict=${hasEncryptDict} filterCounts=${JSON.stringify(filterCounts)}`);
 
     // Liberar pdfBuf — srcDoc ya tiene los datos internamente
     pdfBuf = null;
@@ -517,11 +485,6 @@ export default async function handler(req, res) {
     const sinCod = [];
     const breakdown = {};
     const clientGroups = {}; // zipPath → [pageIndex, ...]
-
-    // Modo diagnóstico: no genera ni sube nada, solo reporta qué extrae el
-    // parser de cada página para depurar sin tocar el ZIP en Drive.
-    const debug = !!(req.body && req.body.debug);
-    const textSamples = [];
 
     // 4. Clasificar páginas por cliente (solo índices, sin copiar buffers de página)
     for (let i = 0; i < totalPages; i++) {
@@ -534,9 +497,6 @@ export default async function handler(req, res) {
         const [cp] = await sd.copyPages(srcDoc, [i]);
         sd.addPage(cp);
         text = extractText(Buffer.from(await sd.save()));
-      }
-      if (debug && textSamples.length < 5) {
-        textSamples.push({ page: i + 1, len: text.length, sample: text.slice(0, 400) });
       }
       const cod = detectCod(text);
       const nro = detectNro(text);
@@ -571,19 +531,6 @@ export default async function handler(req, res) {
       clientGroups[zp].push(i);
       breakdown[cod] = (breakdown[cod] || 0) + 1;
       console.log(`Pág ${i+1}: ${cod} → ${fname}`);
-    }
-
-    if (debug) {
-      return res.status(200).json({
-        ok: true, debug: true,
-        hasEncryptDict, filterCounts, streamDebug,
-        totalPages, anchorsFound: pageTexts.length, usePreExtracted,
-        fullTextLength: fullText.length, fullTextSample: fullText.slice(0, 800),
-        textSamples,
-        sinCodCount: sinCod.length,
-        totalFacturasDetectadas: Object.values(breakdown).reduce((a, b) => a + b, 0),
-        breakdown: Object.entries(breakdown).sort(([a], [b]) => a.localeCompare(b)),
-      });
     }
 
     // 5. Generar PDFs por cliente con pdf-lib (una operación por cliente, no por página)
