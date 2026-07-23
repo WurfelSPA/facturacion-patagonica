@@ -109,7 +109,7 @@ async function main() {
     await claveInput.fill(CLAVE);
     await page.waitForTimeout(500);
 
-    const submitBtn = await page.$('button[type="submit"], input[type="submit"], .btn-login, button[class*="login"]');
+    const submitBtn = await firstVisible('button[type="submit"], input[type="submit"], .btn-login, button[class*="login"]');
     if (submitBtn) await submitBtn.click();
     else await page.keyboard.press('Enter');
 
