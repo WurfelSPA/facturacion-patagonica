@@ -1,5 +1,6 @@
 import JSZip from "jszip";
 import { PDFDocument, PDFName, PDFArray } from "pdf-lib";
+import { inflateSync } from "node:zlib";
 
 export const config = { api: { bodyParser: true, responseLimit: '60mb' } };
 
@@ -274,7 +275,7 @@ function parseCMap(t) {
 
 function decodeStreamContent(rawBytes) {
   try {
-    return require("zlib").inflateSync(Buffer.from(rawBytes)).toString("latin1");
+    return inflateSync(Buffer.from(rawBytes)).toString("latin1");
   } catch {
     return Buffer.from(rawBytes).toString("latin1");
   }
@@ -358,7 +359,7 @@ function getDecodedStreams(pdfBuf) {
   while ((m = re.exec(str)) !== null) streams.push(Buffer.from(m[1], "latin1"));
   const decoded = [];
   for (const s of streams) {
-    try { decoded.push(require("zlib").inflateSync(s).toString("latin1")); } catch {
+    try { decoded.push(inflateSync(s).toString("latin1")); } catch {
       const raw = s.toString("latin1");
       if (raw.includes("Tj") || raw.includes("TJ")) decoded.push(raw);
     }
@@ -487,7 +488,7 @@ export default async function handler(req, res) {
         const first16Hex = raw.slice(0, 16).toString("hex");
         let inflateResult;
         try {
-          const out = require("zlib").inflateSync(raw);
+          const out = inflateSync(raw);
           inflateResult = { ok: true, outLen: out.length, sample: out.toString("latin1").slice(0, 150) };
         } catch (e) {
           inflateResult = { ok: false, error: e.message };
