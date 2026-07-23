@@ -685,7 +685,7 @@ async function procesarPlanillaFacturacion(file,periodo){
     const emailBilling=row[12]?String(row[12]).trim():"";
     const rutBilling=row[9]?String(row[9]).replace(/\./g,"").trim().toLowerCase():""; /* Col J: RUT normalizado */
     const yaEnviado=colEnviado>0&&row[colEnviado]&&String(row[colEnviado]).trim().toLowerCase()==="enviado";
-    const yaPagado=colPagado>0&&row[colPagado]&&String(row[colPagado]).trim().toLowerCase()==="pagado";
+    const yaPagado=colPagado>0&&row[colPagado]&&String(row[colPagado]).trim()!=="";
     const sheetRow=i+1; /* fila 1-indexed en el Sheets (dataRaw[i] = fila i+1) */
     const sentColLetter=colIndexToLetter(colEnviado); /* columna dinámica: HC para Junio, HG para Julio, etc. */
     const pagadoColLetter=colPagado>0?colIndexToLetter(colPagado):"";
@@ -4574,7 +4574,7 @@ function App(){
   },[]);
 
   const marcarPagadoSheet=useCallback(async(sheetRow,pagadoCol,paid)=>{
-    const body={sheetRow,sentCol:pagadoCol,value:paid?"Pagado":""};
+    const body={sheetRow,sentCol:pagadoCol,value:paid?"Si":""};
     const r=await fetch("/api/planilla",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     const rj=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(rj.error||`HTTP ${r.status}`);
