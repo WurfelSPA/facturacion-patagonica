@@ -1,0 +1,39 @@
+name: AA Cache Refresh
+
+on:
+  schedule:
+    - cron: '0 10 * * *'   # 6 AM Chile (UTC-4 en invierno / UTC-3 en verano)
+  workflow_dispatch:         # Permite ejecución manual desde GitHub
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright + Chromium
+        run: |
+          npm install playwright
+          npx playwright install chromium --with-deps
+
+      - name: Run AA scraper
+        env:
+          AGUAS_RUT: ${{ secrets.AGUAS_RUT }}
+          AGUAS_CLAVE: ${{ secrets.AGUAS_CLAVE }}
+        run: node scripts/aa-scraper.js
+
+      - name: Commit y push aa-cache.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add aa-cache.json
+          git diff --staged --quiet && echo "Sin cambios" || git commit -m "chore: actualizar caché AA $(date -u +%Y-%m-%d)"
+          git push
