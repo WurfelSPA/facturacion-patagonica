@@ -65,16 +65,22 @@ async function main() {
     // ── 1. Login ──────────────────────────────────────────────────────────────
     console.log('[aa-scraper] Navegando al login...');
     await page.goto(BASE_URL + LOGIN_PATH, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(5000);
 
-    // Verificar si hay challenge de Incapsula
-    const bodyHtml = await page.evaluate(() => document.body?.innerHTML?.slice(0, 300) || '');
+    // Screenshot de debug
+    await page.screenshot({ path: 'debug-login.png', fullPage: false });
+
+    const bodyHtml = await page.evaluate(() => document.body?.innerHTML?.slice(0, 500) || '');
+    console.log('[aa-scraper] HTML inicio:', bodyHtml.slice(0, 300));
+
     if (bodyHtml.includes('_Incapsula_Resource') || bodyHtml.includes('incapsula')) {
-      console.log('[aa-scraper] Detectado challenge Incapsula, esperando...');
-      await page.waitForTimeout(5000);
+      console.log('[aa-scraper] Detectado challenge Incapsula, esperando 10s...');
+      await page.waitForTimeout(10000);
+      await page.screenshot({ path: 'debug-incapsula.png', fullPage: false });
     }
 
-    await page.waitForSelector('input', { timeout: 30000 });
+    // Esperar input visible (no hidden)
+    await page.waitForSelector('input:not([type="hidden"])', { timeout: 40000 });
 
     const rutInput = await page.$(
       'input[name*="rut"], input[id*="rut"], input[name*="Rut"], ' +
