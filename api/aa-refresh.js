@@ -31,14 +31,14 @@ function buildBrowserlessScript(rut, clave) {
 
       // 1. Navegar al login
       await page.goto(BASE + '${LOGIN_PATH}', { waitUntil: 'domcontentloaded', timeout: 60000 });
-      await new Promise(r => setTimeout(r, 3000)); // esperar JS de la página
 
-      // 2. Login — esperar cualquier input de texto visible
-      const dbgUrl = page.url();
-      const dbgTitle = await page.title().catch(()=>'');
-      const hasInput = await page.$('input').catch(()=>null);
-      if(!hasInput) throw new Error('Sin inputs en página de login. URL: '+dbgUrl+' | Title: '+dbgTitle);
-      await page.waitForSelector('input', { timeout: 10000 });
+      // 2. Esperar que Liferay renderice el formulario (JS-driven)
+      await page.waitForSelector('input', { timeout: 30000 }).catch(async () => {
+        const dbgUrl = page.url();
+        const dbgTitle = await page.title().catch(()=>'');
+        const dbgHtml = await page.evaluate(()=>document.body?.innerHTML?.slice(0,500)||'').catch(()=>'');
+        throw new Error('Sin inputs tras 30s. URL: '+dbgUrl+' | Title: '+dbgTitle+' | HTML: '+dbgHtml);
+      });
       // Buscar campo RUT por múltiples estrategias
       const rutInput = await page.$([
         'input[name*="rut"]','input[id*="rut"]','input[name*="Rut"]',
