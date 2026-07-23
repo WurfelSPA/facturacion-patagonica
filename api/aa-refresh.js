@@ -25,7 +25,7 @@ function setCors(res) {
 // ── Script que corre en Browserless ──────────────────────────────────────────
 function buildBrowserlessScript(rut, clave) {
   return `
-    module.exports = async ({ page }) => {
+    export default async ({ page }) => {
       const BASE = '${BASE_URL}';
       const results = {};
 
@@ -92,7 +92,7 @@ function buildBrowserlessScript(rut, clave) {
       }
 
       return { accounts: results, total: Object.keys(results).length };
-    };
+    }
   `;
 }
 
