@@ -13,6 +13,7 @@
 import JSZip from "jszip";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { inflateSync } from "node:zlib";
 
 export const config = { api: { bodyParser: true, responseLimit: "15mb" } };
 
@@ -167,7 +168,7 @@ function extractText(pdfBuf) {
   while((match=re.exec(str))!==null) streams.push(Buffer.from(match[1],"latin1"));
   const decoded=[];
   for(const s of streams){
-    try{ decoded.push(require("zlib").inflateSync(s).toString("latin1")); }
+    try{ decoded.push(inflateSync(s).toString("latin1")); }
     catch{ const raw=s.toString("latin1"); if(raw.includes("Tj")||raw.includes("TJ")) decoded.push(raw); }
   }
   const mapping={};

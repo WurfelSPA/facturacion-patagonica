@@ -1,4 +1,5 @@
 import JSZip from "jszip";
+import { inflateSync } from "node:zlib";
 
 export const config = { api: { bodyParser: false, responseLimit: '60mb' } };
 
@@ -83,9 +84,6 @@ function parseCMap(cmapText) {
 
 /* Extraer texto del PDF usando CMap para decodificar */
 function extractPDFText(pdfBuffer) {
-  const { createInflateSync } = require("zlib");
-  const inflate = createInflateSync ? createInflateSync() : null;
-
   const str = pdfBuffer.toString("latin1");
   const streamRegex = /stream\r?\n([\s\S]*?)endstream/g;
   const streams = [];
@@ -98,7 +96,7 @@ function extractPDFText(pdfBuffer) {
   const mapping = {};
   for (const s of streams) {
     try {
-      const decompressed = require("zlib").inflateSync(s).toString("latin1");
+      const decompressed = inflateSync(s).toString("latin1");
       if (decompressed.includes("beginbfchar") || decompressed.includes("beginbfrange")) {
         Object.assign(mapping, parseCMap(decompressed));
       }
@@ -109,7 +107,7 @@ function extractPDFText(pdfBuffer) {
   let text = "";
   for (const s of streams) {
     try {
-      const decompressed = require("zlib").inflateSync(s).toString("latin1");
+      const decompressed = inflateSync(s).toString("latin1");
       // Buscar operadores Tj con hex: <HHHH> Tj
       const hexTj = decompressed.matchAll(/<([0-9a-fA-F]+)>\s*Tj/g);
       for (const [, h] of hexTj) {
