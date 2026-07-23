@@ -32,7 +32,7 @@ function setCors(res) {
 //   5. Refrescar token cada 30 cuentas para evitar expiración
 function buildBrowserlessScript(rut, clave) {
   return `
-    async function main({ page }) {
+    export default async function ({ page }) {
       const PORTAL = 'https://www.enel.cl';
 
       // 1. Login ───────────────────────────────────────────────────────────────
@@ -129,9 +129,12 @@ function buildBrowserlessScript(rut, clave) {
       }
 
       return {
-        accounts: results,
-        total: accountIds.length,
-        conDeuda: Object.values(results).filter(v => v.deuda && v.deuda !== '$0').length
+        data: {
+          accounts: results,
+          total: accountIds.length,
+          conDeuda: Object.values(results).filter(v => v.deuda && v.deuda !== '$0').length
+        },
+        type: 'application/json'
       };
     }
   `;
