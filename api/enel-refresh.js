@@ -47,7 +47,9 @@ function buildBrowserlessScript(rut, clave) {
       // bounding box para quedarnos solo con el elemento realmente visible.
       async function firstVisible(selector) {
         for (const handle of await page.$$(selector)) {
-          if (await handle.boundingBox()) return handle;
+          try {
+            if (await handle.boundingBox()) return handle;
+          } catch (_) {}
         }
         return null;
       }
@@ -63,10 +65,16 @@ function buildBrowserlessScript(rut, clave) {
         await passInput.type('${clave}', { delay: 60 });
 
         const submitBtn = await firstVisible('button[type="submit"], input[type="submit"]');
-        if (submitBtn) await submitBtn.click();
-        else await passInput.press('Enter');
 
-        await page.waitForSelector('.pvtArea-account-select-option', { timeout: 30000 });
+        // El submit dispara una navegación completa; si no se espera en
+        // paralelo, el click puede pisar el contexto de CDP y tirar
+        // "Cannot find context with specified id".
+        await Promise.all([
+          page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => null),
+          submitBtn ? submitBtn.click() : passInput.press('Enter')
+        ]);
+
+        await page.waitForSelector('.pvtArea-account-select-option', { timeout: 20000 });
       }
 
       if (!page.url().includes('private-area')) {
