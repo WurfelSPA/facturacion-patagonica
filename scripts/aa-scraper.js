@@ -113,9 +113,14 @@ async function main() {
     if (submitBtn) await submitBtn.click();
     else await page.keyboard.press('Enter');
 
-    await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 });
+    // El login puede ser un redirect completo o un submit AJAX (sin navegación),
+    // así que no dependemos únicamente de waitForNavigation.
+    await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => null);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => null);
+    await page.screenshot({ path: 'debug-post-login.png', fullPage: false }).catch(() => null);
 
-    if (page.url().includes('login')) {
+    const stillOnLoginForm = await page.$('input[type="password"]');
+    if (stillOnLoginForm || page.url().includes('/login')) {
       throw new Error('Login fallido — verificar credenciales. URL: ' + page.url());
     }
     console.log('[aa-scraper] Login OK. URL: ' + page.url());
