@@ -43,6 +43,18 @@ function buildBrowserlessScript(rut, clave) {
         page.waitForSelector('.pvtArea-account-select-option', { timeout: 20000 }),
       ]).catch(() => {});
 
+      // Diagnóstico: cada fase reporta su nombre + URL actual si falla, para
+      // saber exactamente dónde se destruye el contexto sin adivinar a ciegas.
+      async function withPhase(phase, fn) {
+        try {
+          return await fn();
+        } catch (e) {
+          let url = 'desconocida';
+          try { url = page.url(); } catch (_) {}
+          throw new Error('[fase:' + phase + '] ' + e.message + ' | url=' + url);
+        }
+      }
+
       // El portal tiene marcado duplicado (desktop/mobile); filtramos por
       // bounding box para quedarnos solo con el elemento realmente visible.
       async function firstVisible(selector) {
@@ -54,52 +66,54 @@ function buildBrowserlessScript(rut, clave) {
         return null;
       }
 
-      const usernameInput = await firstVisible('#username');
-      if (usernameInput) {
-        await usernameInput.click({ clickCount: 3 });
-        await usernameInput.type('${rut}', { delay: 60 });
+      await withPhase('login', async () => {
+        const usernameInput = await firstVisible('#username');
+        if (usernameInput) {
+          await usernameInput.click({ clickCount: 3 });
+          await usernameInput.type('${rut}', { delay: 60 });
 
-        const passInput = await firstVisible('#password, input[type="password"]');
-        if (!passInput) throw new Error('Campo de clave no encontrado');
-        await passInput.click({ clickCount: 3 });
-        await passInput.type('${clave}', { delay: 60 });
+          const passInput = await firstVisible('#password, input[type="password"]');
+          if (!passInput) throw new Error('Campo de clave no encontrado');
+          await passInput.click({ clickCount: 3 });
+          await passInput.type('${clave}', { delay: 60 });
 
-        const submitBtn = await firstVisible('button[type="submit"], input[type="submit"]');
+          const submitBtn = await firstVisible('button[type="submit"], input[type="submit"]');
 
-        // El submit dispara una navegación completa; si no se espera en
-        // paralelo, el click puede pisar el contexto de CDP y tirar
-        // "Cannot find context with specified id".
-        await Promise.all([
-          page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => null),
-          submitBtn ? submitBtn.click() : passInput.press('Enter')
-        ]);
+          // El submit dispara una navegación completa; si no se espera en
+          // paralelo, el click puede pisar el contexto de CDP y tirar
+          // "Cannot find context with specified id".
+          await Promise.all([
+            page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => null),
+            submitBtn ? submitBtn.click() : passInput.press('Enter')
+          ]);
 
-        // El login de Enel (WSO2 IS) puede encadenar más de un redirect;
-        // damos tiempo a que se asiente y reintentamos si un redirect
-        // intermedio destruye el contexto justo cuando consultamos el DOM.
-        await new Promise(r => setTimeout(r, 2000));
-        let ready = false;
-        for (let attempt = 0; attempt < 3 && !ready; attempt++) {
-          try {
-            await page.waitForSelector('.pvtArea-account-select-option', { timeout: 10000 });
-            ready = true;
-          } catch (_) {
-            await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 5000 }).catch(() => null);
-            await new Promise(r => setTimeout(r, 1000));
+          // El login de Enel (WSO2 IS) puede encadenar más de un redirect;
+          // damos tiempo a que se asiente y reintentamos si un redirect
+          // intermedio destruye el contexto justo cuando consultamos el DOM.
+          await new Promise(r => setTimeout(r, 2000));
+          let ready = false;
+          for (let attempt = 0; attempt < 3 && !ready; attempt++) {
+            try {
+              await page.waitForSelector('.pvtArea-account-select-option', { timeout: 10000 });
+              ready = true;
+            } catch (_) {
+              await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 5000 }).catch(() => null);
+              await new Promise(r => setTimeout(r, 1000));
+            }
           }
         }
-      }
+      });
 
       if (!page.url().includes('private-area')) {
         throw new Error('Login fallido: URL actual = ' + page.url());
       }
 
       // 2. Obtener IDs de cuenta desde el DOM ──────────────────────────────────
-      const accountIds = await page.evaluate(() =>
+      const accountIds = await withPhase('accountIds', () => page.evaluate(() =>
         [...document.querySelectorAll('.pvtArea-account-select-option[data-target]')]
           .map(el => el.dataset.target)
           .filter(Boolean)
-      );
+      ));
 
       if (!accountIds.length) throw new Error('No se encontraron cuentas Enel en el portal');
 
@@ -115,7 +129,7 @@ function buildBrowserlessScript(rut, clave) {
 
       // 4. Consultar deuda de cada cuenta via API ───────────────────────────────
       const results = {};
-      let token = await getCsrfToken();
+      let token = await withPhase('csrf-inicial', getCsrfToken);
       if (!token) throw new Error('No se pudo obtener CSRF token inicial');
 
       for (let i = 0; i < accountIds.length; i++) {
