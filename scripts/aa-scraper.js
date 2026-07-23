@@ -4,9 +4,11 @@
  * Variables de entorno: AGUAS_RUT, AGUAS_CLAVE
  */
 
-const { chromium } = require('playwright');
-const fs = require('fs');
-const path = require('path');
+import { chromium } from 'playwright';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const BASE_URL     = 'https://www.aguasandinas.cl';
 const LOGIN_PATH   = '/web/aguasandinas/login';
