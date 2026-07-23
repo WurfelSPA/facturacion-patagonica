@@ -32,14 +32,23 @@ function buildBrowserlessScript(rut, clave) {
       // 1. Navegar al login
       await page.goto(BASE + '${LOGIN_PATH}', { waitUntil: 'networkidle2', timeout: 60000 });
 
-      // 2. Login
-      await page.waitForSelector('input[name*="rut"], input[id*="rut"], input[name*="Rut"]', { timeout: 15000 });
-      const rutInput = await page.$('input[name*="rut"], input[id*="rut"], input[name*="Rut"]');
+      // 2. Login — esperar cualquier input de texto visible
+      await page.waitForSelector('input', { timeout: 20000 });
+      // Buscar campo RUT por múltiples estrategias
+      const rutInput = await page.$([
+        'input[name*="rut"]','input[id*="rut"]','input[name*="Rut"]',
+        'input[placeholder*="RUT"]','input[placeholder*="Rut"]','input[placeholder*="rut"]',
+        'input[name*="usuario"]','input[id*="usuario"]','input[name*="user"]',
+        'input[type="text"]'
+      ].join(','));
       const claveInput = await page.$('input[type="password"]');
-      if (!rutInput || !claveInput) throw new Error('No se encontraron campos de login');
+      // Screenshot de debug para ver qué muestra la página
+      const dbgScreenshot = await page.screenshot({ encoding: 'base64', fullPage: false }).catch(()=>null);
+      const dbgInputs = await page.evaluate(()=>[...document.querySelectorAll('input')].map(i=>({type:i.type,name:i.name,id:i.id,placeholder:i.placeholder}))).catch(()=>[]);
+      if (!rutInput || !claveInput) throw new Error('Campos de login no encontrados. URL: '+page.url()+' | Inputs: '+JSON.stringify(dbgInputs).slice(0,300));
       await rutInput.type('${rut}', { delay: 50 });
       await claveInput.type('${clave}', { delay: 50 });
-      const submitBtn = await page.$('button[type="submit"], input[type="submit"], .btn-login, [class*="login-btn"]');
+      const submitBtn = await page.$('button[type="submit"], input[type="submit"], .btn-login, [class*="login-btn"], button[class*="login"]');
       if (submitBtn) await submitBtn.click();
       else await page.keyboard.press('Enter');
       await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 });
