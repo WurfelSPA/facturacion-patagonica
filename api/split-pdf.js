@@ -472,6 +472,30 @@ export default async function handler(req, res) {
     const filterCounts = {};
     for (const f of filterMatches) filterCounts[f] = (filterCounts[f]||0)+1;
 
+    // Diagnóstico: inspeccionar los primeros streams reales (bytes crudos +
+    // resultado de inflateSync) para ver si el corte stream/endstream está
+    // alineado o si la descompresión falla con un error concreto.
+    let streamDebug = [];
+    if (req.body && req.body.debug) {
+      const rawStr = pdfBuf.toString("latin1");
+      const re = /stream(\r\n|\r|\n)([\s\S]*?)endstream/g;
+      let sm; let n = 0;
+      while ((sm = re.exec(rawStr)) !== null && n < 5) {
+        n++;
+        const eol = JSON.stringify(sm[1]);
+        const raw = Buffer.from(sm[2], "latin1");
+        const first16Hex = raw.slice(0, 16).toString("hex");
+        let inflateResult;
+        try {
+          const out = require("zlib").inflateSync(raw);
+          inflateResult = { ok: true, outLen: out.length, sample: out.toString("latin1").slice(0, 150) };
+        } catch (e) {
+          inflateResult = { ok: false, error: e.message };
+        }
+        streamDebug.push({ n, eol, rawLen: raw.length, first16Hex, inflateResult });
+      }
+    }
+
     // 2. Extraer texto UNA VEZ del PDF original (rápido, antes de cargar en pdf-lib)
     const fullText = extractText(pdfBuf);
     const pageTexts = splitByPages(fullText);
@@ -551,7 +575,7 @@ export default async function handler(req, res) {
     if (debug) {
       return res.status(200).json({
         ok: true, debug: true,
-        hasEncryptDict, filterCounts,
+        hasEncryptDict, filterCounts, streamDebug,
         totalPages, anchorsFound: pageTexts.length, usePreExtracted,
         fullTextLength: fullText.length, fullTextSample: fullText.slice(0, 800),
         textSamples,
