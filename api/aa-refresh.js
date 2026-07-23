@@ -30,10 +30,15 @@ function buildBrowserlessScript(rut, clave) {
       const results = {};
 
       // 1. Navegar al login
-      await page.goto(BASE + '${LOGIN_PATH}', { waitUntil: 'networkidle2', timeout: 60000 });
+      await page.goto(BASE + '${LOGIN_PATH}', { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await new Promise(r => setTimeout(r, 3000)); // esperar JS de la página
 
       // 2. Login — esperar cualquier input de texto visible
-      await page.waitForSelector('input', { timeout: 20000 });
+      const dbgUrl = page.url();
+      const dbgTitle = await page.title().catch(()=>'');
+      const hasInput = await page.$('input').catch(()=>null);
+      if(!hasInput) throw new Error('Sin inputs en página de login. URL: '+dbgUrl+' | Title: '+dbgTitle);
+      await page.waitForSelector('input', { timeout: 10000 });
       // Buscar campo RUT por múltiples estrategias
       const rutInput = await page.$([
         'input[name*="rut"]','input[id*="rut"]','input[name*="Rut"]',
@@ -178,7 +183,8 @@ export default async function handler(req, res) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         code: buildBrowserlessScript(RUT, CLAVE),
-        context: {}
+        context: {},
+        launch: { stealth: true, args: ['--no-sandbox','--disable-setuid-sandbox','--disable-blink-features=AutomationControlled'] }
       })
     });
 
