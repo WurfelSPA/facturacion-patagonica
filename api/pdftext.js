@@ -103,16 +103,31 @@ function extractPDFText(pdfBuffer) {
     } catch {}
   }
 
+  // Decodifica un string hex de <..>Tj en bloques de 2 o 4 dígitos (CID de 1
+  // o 2 bytes) — tratarlo como un solo code point (como antes) rompía todo
+  // texto con más de un carácter por operador.
+  function decodeHex(h) {
+    const step = h.length > 4 ? 4 : 2;
+    let out = "";
+    for (let i = 0; i < h.length; i += step) {
+      const code = parseInt(h.slice(i, i + step), 16);
+      out += mapping[code] !== undefined ? mapping[code]
+           : (code >= 32 && code < 127 ? String.fromCharCode(code) : "");
+    }
+    return out;
+  }
+
   // Extraer texto del stream de contenido
   let text = "";
   for (const s of streams) {
     try {
       const decompressed = inflateSync(s).toString("latin1");
-      // Buscar operadores Tj con hex: <HHHH> Tj
-      const hexTj = decompressed.matchAll(/<([0-9a-fA-F]+)>\s*Tj/g);
-      for (const [, h] of hexTj) {
-        const code = parseInt(h, 16);
-        text += mapping[code] !== undefined ? mapping[code] : (code >= 32 && code < 127 ? String.fromCharCode(code) : " ");
+      for (const [, h] of decompressed.matchAll(/<([0-9a-fA-F]+)>\s*Tj/g)) {
+        text += decodeHex(h);
+      }
+      for (const [, arr] of decompressed.matchAll(/\[([^\]]+)\]\s*TJ/g)) {
+        for (const [, h] of arr.matchAll(/<([0-9a-fA-F]+)>/g)) text += decodeHex(h);
+        text += " ";
       }
     } catch {}
   }
