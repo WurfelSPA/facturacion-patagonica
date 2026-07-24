@@ -3982,7 +3982,7 @@ function App(){
         setDriveLoading(false);
         notify("No se pudo cargar la planilla: "+e.message,"err");
       });
-  },[]);
+  },[files.planilla]);
 
   const notify=(msg,t="ok")=>{setNotif({msg,t});setTimeout(()=>setNotif(null),4000);};
   const addLog=(txt,t="")=>setProcLogs(p=>[...p,{txt,t}]);
@@ -5576,7 +5576,7 @@ function App(){
       h("div",{style:{display:"flex",alignItems:"center",gap:12,padding:"14px 28px",borderBottom:"1px solid var(--bdr)",flexShrink:0,flexWrap:"wrap"}},
         h("select",{
           value:periodo,
-          onChange:e=>{ const p=e.target.value; if(p!==periodo){ periodoActivado.current=false;autoProcesado.current=false;autoNuboxRef.current=false;setPeriodo(p);setZipStatus("idle");setData([]);setSoloPlanilla(false);setPdfMap({}); } },
+          onChange:e=>{ const p=e.target.value; if(p!==periodo){ periodoActivado.current=false;autoProcesado.current=false;autoNuboxRef.current=false;setPeriodo(p);setZipStatus("idle");setData([]);setSoloPlanilla(false);setPdfMap({});setFiles(f=>({...f,planilla:null})); } },
           style:{fontSize:14,fontWeight:600,padding:"9px 14px",background:"var(--surf)",color:"var(--tx)",border:"1px solid var(--bdr)",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",minWidth:170}
         },
           [...PERIODOS].reverse().map(p=>h("option",{key:p,value:p},p))
@@ -5659,7 +5659,7 @@ function App(){
       h("div",{style:{background:"#ddeaf8",borderBottom:"1px solid #b8d0ee",padding:"8px 18px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
         h("select",{
           value:periodo,
-          onChange:e=>{const p=e.target.value;if(p!==periodo){periodoActivado.current=false;autoProcesado.current=false;autoNuboxRef.current=false;setPeriodo(p);setZipStatus("idle");setData([]);setSoloPlanilla(false);setPdfMap({});}},
+          onChange:e=>{const p=e.target.value;if(p!==periodo){periodoActivado.current=false;autoProcesado.current=false;autoNuboxRef.current=false;setPeriodo(p);setZipStatus("idle");setData([]);setSoloPlanilla(false);setPdfMap({});setFiles(f=>({...f,planilla:null}));}},
           style:{fontSize:12,fontWeight:600,padding:"4px 10px",background:"var(--surf)",color:"var(--tx)",border:"1px solid var(--bdr)",borderRadius:8,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}
         },[...PERIODOS].reverse().map(p=>h("option",{key:p,value:p},p))),
         h("button",{
