@@ -4444,7 +4444,7 @@ function App(){
     for(const r of rows){
       const estadoLabel=r.estado==="ok"?"Coincide":r.estado==="diff"?(r.matchScore===1?"Revisar":"Difiere"):"Sin PDF";
       const sentido=(sentSet.has(r.i)||r.yaEnviado)?"✓ Enviado":estadoLabel;
-      const _uf=r.ufPdf??null;const _neto=_uf!=null&&ufSII&&_uf<10000?Math.round(_uf*ufSII):(_uf!=null&&_uf>500?Math.round(_uf):r.ufPlan>500?Math.round(r.ufPlan):0);const montoCLP=_neto?(_neto+Math.round(_neto*0.19)):"";
+      const _uf=r.ufPdf??null;const _neto=_uf!=null&&ufSII&&_uf<10000?Math.round(_uf*ufSII):(_uf!=null&&_uf>500?Math.round(_uf):r.ufPlan>500?Math.round(r.ufPlan):0);const montoCLP=(r.montoTotal!=null&&r.montoTotal>0)?Math.round(r.montoTotal):(_neto?(_neto+Math.round(_neto*0.19)):"");
       lines.push([esc(r.sitio),esc(r.edificio||""),esc(r.cliente),esc(r.rut||""),esc(r.correo||""),esc(r.concepto),esc(r.factura||""),esc(r.ufPlan!=null?r.ufPlan.toFixed(2):""),esc(r.ufPdf!=null?r.ufPdf.toFixed(2):""),esc(montoCLP),esc(sentido)].join(";"));
     }
     const bom="﻿"; // BOM para que Excel abra correctamente con caracteres especiales
@@ -5839,9 +5839,13 @@ function App(){
 )),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",fontWeight:600,color:"var(--tx)"}},
                   (()=>{
-                    /* Fórmula exacta factura chilena: Neto=round(UF×UF_día5), IVA=round(Neto×0.19) */
+                    /* Preferir el Monto Total real extraído del PDF (contempla montos
+                       exentos de IVA, que la fórmula UF×1.19 no puede calcular). */
+                    if(row.montoTotal!=null&&row.montoTotal>0) return "$"+Math.round(row.montoTotal).toLocaleString("es-CL");
+                    /* Fallback (PDF aún no procesado): fórmula exacta factura chilena
+                       — Neto=round(UF×UF_día), IVA=round(Neto×0.19). No contempla exentos. */
                     const uf=row.ufPdf??null;
-                    const ufVal=ufSII??row.ufValor??null; /* fallback: UF del propio PDF si mindicador falla */
+                    const ufVal=ufSII??row.ufValor??null; /* fallback: UF del propio PDF si el indicador falla */
                     if(uf!=null&&ufVal&&uf<10000){
                       const neto=Math.round(uf*ufVal);
                       const iva=Math.round(neto*0.19);
