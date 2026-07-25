@@ -149,6 +149,9 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 <script>
 const {useState,useRef,useCallback,useEffect,createElement:h}=React;
 const REMITENTE="facturacion@patagonica.cl";
+/* Clientes que requieren el XML del DTE en vez del PDF (sistemas propios de ingesta) */
+const CLIENTES_XML=["Banco de Crédito e Inversiones","Servicio Local de Educación Pública de los Libertadores","Adecco Servicios Empresariales S. A."];
+function esClienteXML(cliente){const n=(cliente||"").trim().toLowerCase();return CLIENTES_XML.some(c=>c.trim().toLowerCase()===n);}
 const CCO="mmunoz@patagonica.cl";
 const TEST_DEST="";
 const MODO_PRUEBA=TEST_DEST!=="";
@@ -1490,11 +1493,12 @@ function getEstado(r){
    COMPONENTES UI
 ═══════════════════════════════════ */
 function Badge({e,row}){
+  const xml=row&&esClienteXML(row.cliente);
   const cfg={
     ok:{l:"Coincide",bg:"var(--gbg)",col:"var(--green)",bdr:"var(--gdim)",ic:"✓"},
     diff:{l:row&&row.matchScore===1?"Revisar":"Difiere",bg:"var(--abg)",col:"var(--amber)",bdr:"var(--adim)",ic:"△"},
-    missing:{l:"Sin PDF",bg:"var(--rbg)",col:"var(--red)",bdr:"var(--rdim)",ic:"○"},
-    sent_sheet:{l:"Enviado",bg:"var(--gbg)",col:"var(--green)",bdr:"var(--gdim)",ic:"✓"}
+    missing:{l:xml?"Sin XML":"Sin PDF",bg:"var(--rbg)",col:"var(--red)",bdr:"var(--rdim)",ic:"○"},
+    sent_sheet:{l:xml?"XML Enviado":"Enviado",bg:"var(--gbg)",col:"var(--green)",bdr:"var(--gdim)",ic:"✓"}
   };
   const c=cfg[e]||cfg.missing;
   return h("span",{style:{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 9px",borderRadius:20,fontSize:10,fontWeight:600,background:c.bg,color:c.col,border:`1px solid ${c.bdr}`}},c.ic," ",c.l);
@@ -1528,6 +1532,7 @@ function ProcModal({logs,progress,done,onClose}){
 function EmailModal({row,periodo,onClose,onConfirm,sending}){
   const mes=periodo.toLowerCase();
   const dest=MODO_PRUEBA?TEST_DEST:row.correo;
+  const xml=esClienteXML(row.cliente);
   return h("div",{className:"overlay"},
     h("div",{className:"modal",style:{width:620}},
       h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}},
@@ -1541,12 +1546,12 @@ function EmailModal({row,periodo,onClose,onConfirm,sending}){
           h("div",null,h("span",{style:{color:"var(--txd)"}},"Para:    "),h("span",{style:{color:MODO_PRUEBA?"var(--amber)":"var(--tx)"}},dest)),
           h("div",null,h("span",{style:{color:"var(--txd)"}},"CCO:     "),h("span",{style:{color:"var(--txm)"}},CCO)),
           h("div",null,h("span",{style:{color:"var(--txd)"}},"Asunto:  "),`${row.cliente} ${row.factura} — ${row.concepto} ${mes.charAt(0).toUpperCase()+mes.slice(1)} — Patagónica Inmobiliaria SpA`),
-          h("div",null,h("span",{style:{color:"var(--txd)"}},"Adjunto: "),h("span",{style:{color:"var(--green)"}},`${row.factura}.pdf`))
+          h("div",null,h("span",{style:{color:"var(--txd)"}},"Adjunto: "),h("span",{style:{color:"var(--green)"}},xml?`${row.factura}.xml`:`${row.factura}.pdf`))
         ),
         h("div",{style:{color:"var(--tx)",lineHeight:2}},
           h("p",null,"Estimado(a) cliente,"),
           h("p",{style:{marginTop:8}},`Junto con saludar, hacemos envío de la factura correspondiente al ${row.concepto.toLowerCase()} del mes de ${mes}, por un monto de `,h("strong",{style:{color:"var(--accl)"}},row.ufPlan>0?`${row.ufPlan.toFixed(2)} UF`:`$${(row.montoTotal||0).toLocaleString("es-CL")}`),`, factura N° ${row.factura}.`),
-          h("p",{style:{marginTop:8}},"Adjunto encontrará el documento PDF para su registro y gestión de pago."),
+          h("p",{style:{marginTop:8}},xml?"Adjunto encontrará el documento XML para su registro y gestión de pago.":"Adjunto encontrará el documento PDF para su registro y gestión de pago."),
           h("p",{style:{marginTop:12,fontWeight:700}},"📌 Aviso importante: Le solicitamos enviar los comprobantes de pago a ",h("a",{href:"mailto:facturacion@patagonica.cl",style:{color:"var(--accl)"}},"facturacion@patagonica.cl"),"."),
           h("p",{style:{marginTop:8,color:"var(--txm)"}},"Atentamente,",h("br"),h("em",null,"Área de Administración — Patagónica Inmobiliaria SpA"))
         )
@@ -4503,15 +4508,27 @@ function App(){
       const token=await getToken();
       const subject=row.cliente+" "+row.factura+" — "+row.concepto+" "+periodo+" — Patagónica Inmobiliaria SpA";
       const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura,ufSII);
-      const pdf=pdfMap[row.factura];let pdfB64=null;
-      if(pdf?.zipPath&&files.zip){try{pdfB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}}
-      else if(pdf?.driveFileId){try{pdfB64=await getPdfBase64FromDrive(pdf.driveFileId);}catch(e){console.warn("Drive PDF:",e.message);}}
-      await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);
+      let attB64=null,attNombre=null,attMime=undefined;
+      if(esClienteXML(row.cliente)){
+        /* Cliente requiere el XML del DTE — buscarlo en los ZIPs Facturas XML_PISA de Drive */
+        try{
+          const xr=await fetch(`/api/historial?folioXml=${encodeURIComponent(row.factura)}`);
+          const xd=await xr.json();
+          if(xd.found){attB64=xd.xmlBase64;attNombre=(row.factura||"factura").replace(/[^\w-]/g,"")+".xml";attMime="application/xml";}
+          else notify("⚠ XML no encontrado para "+row.factura+" — se enviará sin adjunto","warn");
+        }catch(e){console.warn("XML fetch:",e.message);}
+      }else{
+        const pdf=pdfMap[row.factura];
+        if(pdf?.zipPath&&files.zip){try{attB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}}
+        else if(pdf?.driveFileId){try{attB64=await getPdfBase64FromDrive(pdf.driveFileId);}catch(e){console.warn("Drive PDF:",e.message);}}
+        attNombre=pdf?.nombre;
+      }
+      await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,attB64,attNombre,attMime);
       const key=`${periodo}|${row.cliente}|${row.concepto}`;
       marcarEnviado(idx,key);
       /* Marcar en planilla Google Sheets — llamada directa desde frontend */
       if(row.sheetRow&&!MODO_PRUEBA){marcarEnviadoSheet(row.sheetRow,row.sentColLetter).catch(e=>console.warn("mark-sent:",e.message));}
-      notify("✓ Correo enviado"+(MODO_PRUEBA?" (PRUEBA)":"")+" → "+dest+(pdfB64?" · con PDF":""));
+      notify("✓ Correo enviado"+(MODO_PRUEBA?" (PRUEBA)":"")+" → "+dest+(attB64?(attMime==="application/xml"?" · con XML":" · con PDF"):""));
     }catch(e){if(e.message.includes("invalid_grant")||e.message.includes("Token"))setGmailToken(null);notify("Error: "+e.message,"err");}
     setSendingIdx(null);
   };
@@ -5902,9 +5919,9 @@ function App(){
                   row.estado==="ok"&&!noEmail?h("button",{
                     className:"btn-send",
                     onClick:unlocked?()=>setPreview({row,idx:i}):()=>setShowPwdModal(true),
-                    title:unlocked?"Enviar correo":"Clave requerida para enviar",
+                    title:unlocked?(esClienteXML(row.cliente)?"Enviar XML":"Enviar correo"):"Clave requerida para enviar",
                     style:{opacity:unlocked?1:0.55,cursor:unlocked?"pointer":"pointer"}
-                  },"✉ "+(unlocked?"Enviar":"🔒")):
+                  },"✉ "+(unlocked?(esClienteXML(row.cliente)?"Enviar XML":"Enviar"):"🔒")):
                   h(Badge,{e:row.estado,row})
                 ),
                 h("td",{style:{padding:"8px 11px",background:bg,textAlign:"center"}},

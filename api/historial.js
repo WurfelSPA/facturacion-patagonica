@@ -647,6 +647,39 @@ export default async function handler(req, res) {
       return res.status(200).json({ found: false, message: "Folio "+folioTarget+" no encontrado en los ZIPs de Drive" });
     }
 
+    // ── GET ?folioXml=XXXX ── devuelve el XML crudo del DTE por folio ───────
+    // (para adjuntar el XML real a clientes que lo requieren en vez del PDF)
+    if (req.method === "GET" && req.query.folioXml) {
+      const folioTarget = String(req.query.folioXml).replace(/[^0-9]/g, "");
+      if (!folioTarget) return res.status(400).json({ found: false, message: "Folio inválido" });
+      const files = await driveFiles(token, FACT_FOLDER_ID);
+      const pisaZips = files
+        .filter(f => f.name.match(/Facturas XML_PISA_/i))
+        .sort((a, b) => b.name.localeCompare(a.name));
+      for (const f of pisaZips) {
+        try {
+          const rz = await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`,
+            { headers: { Authorization: `Bearer ${token}` } });
+          if (!rz.ok) continue;
+          const zip = await JSZip.loadAsync(Buffer.from(await rz.arrayBuffer()));
+          for (const xmlName of Object.keys(zip.files)) {
+            if (!xmlName.match(/\.xml$/i)) continue;
+            const xml = await zip.files[xmlName].async("string");
+            const dte = parseXmlDTE(xml);
+            if (dte.folio === folioTarget) {
+              res.setHeader("Cache-Control", "private, max-age=3600");
+              return res.status(200).json({
+                found: true, folio: dte.folio,
+                xmlBase64: Buffer.from(xml, "utf-8").toString("base64"),
+                xmlFile: xmlName, zipFile: f.name,
+              });
+            }
+          }
+        } catch (_) { /* continuar con siguiente ZIP */ }
+      }
+      return res.status(200).json({ found: false, message: "Folio "+folioTarget+" no encontrado en los ZIPs de Drive" });
+    }
+
     // ── GET ?ls=FOLDER_ID ── lista carpeta Drive ───────────────────────────
     if (req.method === "GET" && req.query.ls) {
       const folderId = req.query.ls;
