@@ -2915,7 +2915,12 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
                     h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--tx)",background:c.idAgua?`${AA_BLUE}06`:"transparent",maxWidth:200}},
                       !c.idAgua
                         ?h("span",{style:{color:"var(--bdr)"}},"\u2014")
-                        :editingAA===c.idAgua
+                        :c.idAgua==="Administraci\u00f3n"
+                          /* Medidor de \u00e1reas comunes/administraci\u00f3n \u2014 se factura a nombre de
+                             Patag\u00f3nica por dise\u00f1o, no es un cliente individual: no comparar
+                             ni permitir editar, mostrar siempre como "coincide" (gris). */
+                          ?h("span",{title:"Cuenta de administraci\u00f3n \u2014 se factura a Patag\u00f3nica"},"PATAGONICA INMOBILIARIA SPA")
+                        :editingAA===i
                           ?h("input",{
                               autoFocus:true,
                               value:editVal,
@@ -2932,16 +2937,16 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
                           const d=aaData[c.idAgua];
                           if(aaLoading) return h("span",{style:{color:"var(--bdr)",fontSize:9}},"\u00b7\u00b7\u00b7");
                           if(d?.nombre){
-                            const mismo=d.nombre.trim().toLowerCase()===c.nombre?.trim().toLowerCase();
+                            const mismo=normQ(d.nombre)===normQ(c.nombre);
                             return h("span",{
                               title:(mismo?"Coincide con cliente planilla":"\u26a0 Difiere del cliente en planilla")+" \u2014 clic para editar",
-                              onClick:()=>{setEditingAA(c.idAgua);setEditVal(d.nombre||"");},
+                              onClick:()=>{setEditingAA(i);setEditVal(d.nombre||"");},
                               style:{color:mismo?"var(--txm)":"#dc2626",fontWeight:mismo?400:700,cursor:"pointer"}
                             },d.nombre);
                           }
                           return h("span",{
                             title:"Clic para escribir el nombre real de la cuenta AA",
-                            onClick:()=>{setEditingAA(c.idAgua);setEditVal("");},
+                            onClick:()=>{setEditingAA(i);setEditVal("");},
                             style:{color:"var(--bdr)",cursor:"pointer",borderBottom:"1px dashed var(--bdr)"}
                           },"+ agregar");
                         })()
