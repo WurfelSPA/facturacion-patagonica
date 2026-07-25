@@ -2623,9 +2623,23 @@ function ElCortijoView(){
 /* ══════════════════════════════════════════════════════════
    CUENTAS SERVICIOS
 ══════════════════════════════════════════════════════════ */
-function CuentasServiciosView({dashData,driveLoading}){
+function CuentasServiciosView({dashData,driveLoading,notify}){
   const [search,setSearch]=useState("");
   const [aaData,setAaData]=useState({});
+  const [editingAA,setEditingAA]=useState(null); /* idAgua actualmente en edición */
+  const [editVal,setEditVal]=useState("");
+  const [savingAA,setSavingAA]=useState(false);
+  const guardarNombreAA=useCallback(async(idAgua,nombre)=>{
+    setSavingAA(true);
+    try{
+      const r=await fetch("/api/aa-nombre",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idAgua,nombre})});
+      const rj=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(rj.error||"Error "+r.status);
+      setAaData(prev=>({...prev,[idAgua]:{...(prev[idAgua]||{}),nombre:rj.nombre}}));
+      setEditingAA(null);
+    }catch(e){notify?.("Error guardando nombre AA: "+e.message,"err");}
+    setSavingAA(false);
+  },[notify]);
   const [aaLoading,setAaLoading]=useState(false);
   const [aaError,setAaError]=useState(null);
   const [aaUpdatedAt,setAaUpdatedAt]=useState(null);
@@ -2901,17 +2915,35 @@ function CuentasServiciosView({dashData,driveLoading}){
                     h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--tx)",background:c.idAgua?`${AA_BLUE}06`:"transparent",maxWidth:200}},
                       !c.idAgua
                         ?h("span",{style:{color:"var(--bdr)"}},"\u2014")
-                        :(()=>{
+                        :editingAA===c.idAgua
+                          ?h("input",{
+                              autoFocus:true,
+                              value:editVal,
+                              disabled:savingAA,
+                              onChange:e=>setEditVal(e.target.value),
+                              onKeyDown:e=>{
+                                if(e.key==="Enter")guardarNombreAA(c.idAgua,editVal);
+                                else if(e.key==="Escape")setEditingAA(null);
+                              },
+                              onBlur:()=>guardarNombreAA(c.idAgua,editVal),
+                              style:{width:"100%",fontSize:10,padding:"2px 5px",border:`1px solid ${AA_BLUE}`,borderRadius:4,fontFamily:"'DM Sans',sans-serif"}
+                            })
+                          :(()=>{
                           const d=aaData[c.idAgua];
                           if(aaLoading) return h("span",{style:{color:"var(--bdr)",fontSize:9}},"\u00b7\u00b7\u00b7");
                           if(d?.nombre){
                             const mismo=d.nombre.trim().toLowerCase()===c.nombre?.trim().toLowerCase();
                             return h("span",{
-                              title:mismo?"Coincide con cliente planilla":"\u26a0 Difiere del cliente en planilla",
-                              style:{color:mismo?"var(--txm)":"#dc2626",fontWeight:mismo?400:700}
+                              title:(mismo?"Coincide con cliente planilla":"\u26a0 Difiere del cliente en planilla")+" \u2014 clic para editar",
+                              onClick:()=>{setEditingAA(c.idAgua);setEditVal(d.nombre||"");},
+                              style:{color:mismo?"var(--txm)":"#dc2626",fontWeight:mismo?400:700,cursor:"pointer"}
                             },d.nombre);
                           }
-                          return h("span",{style:{color:"var(--bdr)"}},"\u2014");
+                          return h("span",{
+                            title:"Clic para escribir el nombre real de la cuenta AA",
+                            onClick:()=>{setEditingAA(c.idAgua);setEditVal("");},
+                            style:{color:"var(--bdr)",cursor:"pointer",borderBottom:"1px dashed var(--bdr)"}
+                          },"+ agregar");
                         })()
                     ),
                     h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:c.idEnel?ENEL_GRN:"var(--bdr)",borderLeft:`2px solid ${ENEL_GRN}25`,background:c.idEnel?`${ENEL_GRN}06`:"transparent"}},c.idEnel||"\u2014"),
@@ -5904,7 +5936,7 @@ function App(){
     ,view==="ventas"&&h(VentasView,{periodo})
     ,view==="fact-cobrar"&&h(FactxCobrarView,{notify})
     ,view==="contratos"&&h(ContratosView,{dashData,driveLoading})
-    ,view==="cuentas"&&h(CuentasServiciosView,{dashData,driveLoading})
+    ,view==="cuentas"&&h(CuentasServiciosView,{dashData,driveLoading,notify})
     ,view==="cortijo"&&h(ElCortijoView,null)
     ,view==="historial-fact"&&h(HistorialFactView,{dashData,driveLoading,notify})
   ));
