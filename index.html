@@ -148,7 +148,7 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 <script src="/api/claude"></script>
 <script>
 const {useState,useRef,useCallback,useEffect,createElement:h}=React;
-const REMITENTE="amelendez@patagonica.cl";
+const REMITENTE="facturacion@patagonica.cl";
 const CCO="mmunoz@patagonica.cl";
 const TEST_DEST="";
 const MODO_PRUEBA=TEST_DEST!=="";
@@ -245,7 +245,7 @@ async function getGoogleToken(clientId,forceConsent){
   return new Promise((res,rej)=>{
     const client=google.accounts.oauth2.initTokenClient({
       client_id:clientId,scope:GOOGLE_SCOPES,
-      hint:"amelendez@patagonica.cl",
+      hint:"facturacion@patagonica.cl",
       callback:(resp)=>{
         if(resp.error)rej(new Error(resp.error));
         else{_gToken=resp.access_token;_gTokenExp=Date.now()+(resp.expires_in||3600)*1000;res(_gToken);}
@@ -4593,7 +4593,7 @@ function App(){
         try{await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(row.i,key);if(row.sheetRow&&!MODO_PRUEBA){marcarEnviadoSheet(row.sheetRow,row.sentColLetter).catch(e=>console.warn("mark-sent:",e.message));}enviados++;await new Promise(r=>setTimeout(r,400));}
         catch(e){notify("Error en "+row.cliente+": "+e.message,"err");}
       }
-      if(enviados>0){try{const resumenRows=pend.slice(0,enviados);const resumenHtml=buildResumenHtml(resumenRows,periodo);const resSubject="Resumen Facturación "+periodo+" — "+enviados+" correos enviados";await sendGmail(token,"amelendez@patagonica.cl","","amelendez@patagonica.cl",resSubject,resumenHtml,null,null);}catch(e){console.warn("Error enviando resumen:",e.message);}}
+      if(enviados>0){try{const resumenRows=pend.slice(0,enviados);const resumenHtml=buildResumenHtml(resumenRows,periodo);const resSubject="Resumen Facturación "+periodo+" — "+enviados+" correos enviados";await sendGmail(token,"amelendez@patagonica.cl","",REMITENTE,resSubject,resumenHtml,null,null);}catch(e){console.warn("Error enviando resumen:",e.message);}}
       notify("✓ "+enviados+"/"+pend.length+" correos enviados");
     }catch(e){notify(e.message.includes("popup")?"Autorización cancelada":"Error: "+e.message,"warn");}
   };

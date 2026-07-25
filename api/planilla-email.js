@@ -17,7 +17,7 @@
  *   GMAIL_CLIENT_ID       - OAuth2 client ID (Google Cloud Console)
  *   GMAIL_CLIENT_SECRET   - OAuth2 client secret
  *   GMAIL_REFRESH_TOKEN   - Refresh token con scope gmail.send + drive.readonly
- *   GMAIL_FROM            - Remitente (default: amelendez@patagonica.cl)
+ *   GMAIL_FROM            - Remitente (default: facturacion@patagonica.cl)
  *   DRIVE_PLANILLA_ID     - File ID de la planilla en Drive (default: hardcoded)
  *   CRON_SECRET           - Secreto para autenticar crons de Vercel
  *   SYNC_SECRET           - Secreto para llamadas manuales
@@ -311,7 +311,7 @@ export default async function handler(req, res) {
   }
 
   const recipients = req.query.recipients || 'preview';
-  const FROM       = process.env.GMAIL_FROM || 'amelendez@patagonica.cl';
+  const FROM       = process.env.GMAIL_FROM || 'facturacion@patagonica.cl';
   const FILE_ID    = process.env.DRIVE_PLANILLA_ID || DRIVE_PLANILLA_ID_DEFAULT;
 
   const TO  = recipients === 'contabilidad'
