@@ -95,7 +95,8 @@
     "1127145-6": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127145-6: \"Authorization failed\""
+      "error": "Khipu 401 para 1127145-6: \"Authorization failed\"",
+      "nombre": null
     },
     "1127146-4": {
       "deuda": "$0",
