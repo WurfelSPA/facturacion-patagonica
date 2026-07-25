@@ -407,6 +407,10 @@
       "vencimiento": null,
       "error": "Khipu 401 para 1973010-7: \"Authorization failed\"",
       "nombre": "Sociedad de Alimentos Leefood SpA"
+    },
+    "1534329-K": {
+      "deuda": null,
+      "nombre": "Comercial Ingersoll Rand (Chile) Limitada"
     }
   }
 }
