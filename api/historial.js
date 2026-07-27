@@ -392,7 +392,11 @@ function _resolveFacturas(multiFacturas, ufArr, ufSrv, siteIdx) {
     if (!picked) continue;
     // Facturas adicionales del mismo concepto en el mismo período (ej: retroactiva de mes anterior).
     // Solo se suman si su UF también pasa el umbral → pertenecen al mismo sitio.
-    const threshold = UFExp[tipo] > 0 ? 0.5 : Infinity;
+    // Umbral MUY ajustado: sitios distintos del mismo cliente pueden tener UF casi
+    // idénticas por casualidad (ej. dos oficinas al 6% de administración con UF de
+    // arriendo parecidas, 118.50 vs 118.80 → sólo 0.3 de diferencia) y no deben
+    // mezclarse. Una retroactiva real del mismo sitio reemite la MISMA UF exacta.
+    const threshold = UFExp[tipo] > 0 ? 0.01 : Infinity;
     const extras = candidates.filter(c =>
       c.nro !== picked.nro && c.uf != null &&
       (!(UFExp[tipo] > 0) || Math.abs(c.uf - UFExp[tipo]) <= threshold)
