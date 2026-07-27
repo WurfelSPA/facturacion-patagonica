@@ -2394,6 +2394,15 @@ function ContratosView({dashData,driveLoading}){
   function diasDesde(str){const d=parseDate(str);if(!d)return null;return Math.ceil((d-now)/86400000);}
   function urgBg(dias,isReaj){if(dias===null)return{bg:"var(--surf2)",col:"var(--txd)",bdr:"var(--bdr)"};const t1=isReaj?30:90,t2=isReaj?90:180;if(dias<0||dias<=t1)return{bg:"var(--rbg)",col:"var(--red)",bdr:"var(--rdim)"};if(dias<=t2)return{bg:"var(--abg)",col:"var(--amber)",bdr:"var(--adim)"};return{bg:"var(--gbg)",col:"var(--green)",bdr:"var(--gdim)"};}
   function fechaNotif(termStr,avisoStr){const d=parseDate(termStr);const dias=avisoDias(avisoStr);if(!d||!dias)return null;const n=new Date(d);n.setDate(n.getDate()-dias);return`${String(n.getDate()).padStart(2,"0")}/${String(n.getMonth()+1).padStart(2,"0")}/${n.getFullYear()}`;}
+  /* ¿Sigue facturando en los últimos N meses (incl. el actual)? Si un contrato
+     ya venció en papel pero el cliente sigue siendo facturado, es la mejor
+     señal de que se renovó tácitamente sin objeción — evita falsas alarmas. */
+  function facturaReciente(c,meses){
+    meses=meses||2;
+    const _n=new Date();
+    for(let _i=0;_i<meses;_i++){const _d=new Date(_n.getFullYear(),_n.getMonth()-_i,1);const _k=`${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,"0")}`;if((c.monthly[_k]||0)>0)return true;}
+    return false;
+  }
   const clients=dashData?dashData.clients:[];
   const vencimientos=clients.filter(c=>{const d=parseDate(c.termTermino);return d&&d.getFullYear()===currentYear;}).filter(c=>!search||c.nombre.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>(parseDate(a.termTermino)||0)-(parseDate(b.termTermino)||0));
   const reajustes=clients.filter(c=>{
@@ -2403,7 +2412,7 @@ function ContratosView({dashData,driveLoading}){
     const _n=new Date();
     for(let _i=0;_i<12;_i++){const _d=new Date(_n.getFullYear(),_n.getMonth()-_i,1);const _k=`${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,"0")}`;if((c.monthly[_k]||0)>0)return true;}return false;
   }).filter(c=>!search||c.nombre.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>(parseDate(a.fechaReajuste)||0)-(parseDate(b.fechaReajuste)||0));
-  const vencPasados=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d<0;}).length;
+  const vencPasados=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d<0&&!facturaReciente(c);}).length;
   const venc30=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d>=0&&d<=30;}).length;
   const venc90=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d>30&&d<=90;}).length;
   const vencMas=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d>90;}).length;
@@ -2487,12 +2496,14 @@ function ContratosView({dashData,driveLoading}){
         ),
         h("div",{style:{overflowX:"auto"}},
           h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
-            h("thead",null,h("tr",{style:{background:"#f0f4f8"}},["Sitio","Cliente / RUT","Edificio","Fecha Término","Días Restantes","Renovación Auto.","Aviso","Fecha Notificación","Serv. Admin."].map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap"}},col.toUpperCase())))),
+            h("thead",null,h("tr",{style:{background:"#f0f4f8"}},["Sitio","Cliente / RUT","Edificio","Fecha Término","Días Restantes","Aviso previo","Aviso","Fecha Notificación","Serv. Admin.","Estado"].map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap"}},col.toUpperCase())))),
             h("tbody",null,vencimientos.map((c,i)=>{
               const dias=diasDesde(c.termTermino);
               const{bg,col,bdr}=urgBg(dias,false);
               const notif=fechaNotif(c.termTermino,c.aviso);
               const sCol=SITIO_C[c.sitio]||"#888";
+              const vencido=dias!==null&&dias<0;
+              const vigente=vencido&&facturaReciente(c);
               return h("tr",{key:c.rut+c.nombre+i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"var(--surf2)"}},
                 h("td",{style:{padding:"9px 12px"}},h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},c.sitio||"—")),
                 h("td",{style:{padding:"9px 12px",maxWidth:200}},h("div",{style:{fontWeight:600,fontSize:11,lineHeight:1.3}},c.nombre),h("div",{style:{fontSize:9,color:"var(--txd)",fontFamily:"'DM Mono',monospace",marginTop:2}},c.rut)),
@@ -2506,6 +2517,11 @@ function ContratosView({dashData,driveLoading}){
                   background:c.pctAdm>0?"var(--gbg)":"var(--surf2)",
                   color:c.pctAdm>0?"var(--green)":"var(--txd)",
                   border:c.pctAdm>0?"1px solid var(--gdim)":"1px solid var(--bdr)"}},c.pctAdm>0?"SI":"NO")),
+                h("td",{style:{padding:"9px 12px",whiteSpace:"nowrap"}},
+                  !vencido?h("span",{style:{color:"var(--txd)",fontSize:10}},"En plazo"):
+                  vigente?h("span",{title:"Venció en papel pero sigue facturando — se renovó tácitamente sin objeción",style:{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:8,background:"var(--gbg)",color:"var(--green)",border:"1px solid var(--gdim)"}},"✓ Vigente"):
+                  h("span",{title:"Venció y no hay facturación reciente — requiere revisión",style:{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:8,background:"var(--rbg)",color:"var(--red)",border:"1px solid var(--rdim)"}},"⚠ Revisar")
+                ),
               );
             }))
           )
