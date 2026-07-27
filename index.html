@@ -3105,8 +3105,13 @@ function HistorialFactView({dashData,driveLoading,notify}){
               }catch(_){}
             }
             const histE2=pKey2?sc.hist?.find(h=>h.key===pKey2):null;
-            const pufArr2=histE2?.uf>0?histE2.uf:sc.ufArr;
-            const pufSrv2=histE2?.uf>0&&sc.ufArr>0&&sc.ufSrv>0
+            /* El bloque histórico (col 65+, 4 por mes) puede desalinearse cuando la planilla
+               agrega columnas nuevas a algún mes intermedio (ej. "Pagado") — en ese caso termina
+               leyendo un Nro de Factura en vez de una UF. Filtro de cordura: una UF de arriendo
+               real nunca supera ~2000; si lo supera, es una lectura corrupta, se ignora. */
+            const histUfValida=histE2?.uf>0&&histE2.uf<2000;
+            const pufArr2=histUfValida?histE2.uf:sc.ufArr;
+            const pufSrv2=histUfValida&&sc.ufArr>0&&sc.ufSrv>0
               ?Math.round(sc.ufSrv*(histE2.uf/sc.ufArr)*10000)/10000:sc.ufSrv;
             const url=`/api/historial?cliente=${encodeURIComponent(sc.nombre)}&rut=${encodeURIComponent(sc.rut||"")}`
               +`&ufArr=${encodeURIComponent(pufArr2||"")}&ufSrv=${encodeURIComponent(pufSrv2||"")}`
