@@ -160,6 +160,24 @@ export default async function handler(req, res) {
       }
     }
 
+    // Si TODAS las cuentas fallaron, no hay datos frescos que reportar: no
+    // tocar updatedAt ni el archivo, para que el cartel de la app no diga
+    // "actualizado hoy" cuando en realidad Khipu rechazó todo (401 pendiente
+    // de activación comercial).
+    const allFailed = errors.length === existingIds.length;
+    if (allFailed) {
+      console.log('[aa-refresh] Todas las cuentas fallaron — no se actualiza el cache');
+      return res.status(200).json({
+        ok: false,
+        skipped: true,
+        reason: 'Todas las consultas a Khipu fallaron — se mantiene el cache anterior sin cambios',
+        updatedAt: oldCache.updatedAt || null,
+        total: existingIds.length,
+        errors: errors.length,
+        errorDetail: errors.slice(0, 5)
+      });
+    }
+
     const cacheData = {
       ok: true,
       updatedAt: new Date().toISOString(),
