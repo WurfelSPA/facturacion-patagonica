@@ -515,7 +515,12 @@ async function parsePlanillaParaDashboard(file){
     if(typeof v==="number"&&v>40000&&v<50000){
       const{y,m}=serialToYM(v);
       if(y>=2024&&y<=2026){
-        monthCols.push({key:`${y}-${String(m).padStart(2,"0")}`,label:`${MES_L[m-1]} ${y}`,col:ci,year:y,month:m});
+        /* Columna "GC" (Serv. Admin.) del mes — su distancia a la fecha del mes
+           varía (6 o 7 columnas según si el bloque incluye "Pagado"), por eso se
+           busca dinámicamente en vez de asumir un offset fijo. */
+        let gcCol=-1;
+        for(let j=ci+1;j<=Math.min(ci+6,row3.length-1);j++){if(row3[j]==="GC"){gcCol=j;break;}}
+        monthCols.push({key:`${y}-${String(m).padStart(2,"0")}`,label:`${MES_L[m-1]} ${y}`,col:ci,gcCol,year:y,month:m});
       }
     }
   }
@@ -544,9 +549,14 @@ async function parsePlanillaParaDashboard(file){
     if(typeof pctAdm==="number"&&pctAdm>0&&pctAdm<1) ufSrv=ufArr*pctAdm;
     else if(typeof pctAdm==="number"&&pctAdm>=1&&pctAdm<=10) ufSrv=pctAdm;
     const monthly={};
+    const monthlyGC={};
     for(const mc of monthCols){
       const v=row[mc.col];
       if(typeof v==="number"&&v>0&&v<15000) monthly[mc.key]=Math.round(v*100)/100;
+      if(mc.gcCol>=0){
+        const vg=row[mc.gcCol];
+        if(typeof vg==="number"&&vg>0&&vg<15000) monthlyGC[mc.key]=Math.round(vg*100)/100;
+      }
     }
     /* Conversión serial Excel → fecha legible */
     function serialToDate(v){if(!v||typeof v!=="number")return"";try{const d=new Date(new Date(Date.UTC(1899,11,30)).getTime()+Math.round(v)*86400000);return`${d.getUTCDate().toString().padStart(2,"0")}/${(d.getUTCMonth()+1).toString().padStart(2,"0")}/${d.getUTCFullYear()}`;}catch(e){return"";}}
@@ -604,7 +614,7 @@ async function parsePlanillaParaDashboard(file){
       pctAdm:typeof pctAdm==="number"?pctAdm:0,
       afecto:String(row[48]||"").trim(),
       ufInicio:typeof row[61]==="number"?Math.round(row[61]*100)/100:0,
-      monthly,
+      monthly,monthlyGC,
     });
   }
   const siteMap={};
@@ -3111,8 +3121,14 @@ function HistorialFactView({dashData,driveLoading,notify}){
                real nunca supera ~2000; si lo supera, es una lectura corrupta, se ignora. */
             const histUfValida=histE2?.uf>0&&histE2.uf<2000;
             const pufArr2=histUfValida?histE2.uf:sc.ufArr;
-            const pufSrv2=histUfValida&&sc.ufArr>0&&sc.ufSrv>0
-              ?Math.round(sc.ufSrv*(histE2.uf/sc.ufArr)*10000)/10000:sc.ufSrv;
+            /* Preferir el GC mensual real (columna "GC" de ESE mes) sobre el %
+               Administración fijo de la planilla — este último puede quedar en
+               blanco aunque el cliente sí tenga un cobro de Serv. Admin. vigente
+               ese mes específico (ej. Olympus 4-A: %Adm sin configurar, pero GC
+               de julio = 8.69 UF, factura FEE-14936 real). */
+            const gcMes=pKey2?sc.monthlyGC?.[pKey2]:null;
+            const pufSrv2=gcMes>0?gcMes:(histUfValida&&sc.ufArr>0&&sc.ufSrv>0
+              ?Math.round(sc.ufSrv*(histE2.uf/sc.ufArr)*10000)/10000:sc.ufSrv);
             const url=`/api/historial?cliente=${encodeURIComponent(sc.nombre)}&rut=${encodeURIComponent(sc.rut||"")}`
               +`&ufArr=${encodeURIComponent(pufArr2||"")}&ufSrv=${encodeURIComponent(pufSrv2||"")}`
               +`&siteIdx=${siteIdx}&sitio=${encodeURIComponent(sc.sitio||"")}`
