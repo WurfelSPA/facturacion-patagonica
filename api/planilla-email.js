@@ -2,8 +2,8 @@
  * GET /api/planilla-email?recipients=preview|contabilidad
  *
  * Cron automático:
- *   - Día 24 08:00 AM Chile → recipients=preview  → amelendez@, mmunoz@
- *   - Día 26 08:00 AM Chile → recipients=contabilidad → bpulgar@, contabilidad@ (CC mmunoz@, alagies@, amelendez@)
+ *   - Día 24 08:00 AM Chile → recipients=preview  → mmunoz@ (BCC facturacion@)
+ *   - Día 26 08:00 AM Chile → recipients=contabilidad → bpulgar@, contabilidad@ (CC mmunoz@, alagies@ / BCC facturacion@)
  *
  * Flujo:
  *   1. Obtiene access token de Gmail via refresh token
@@ -244,7 +244,7 @@ function buildBodyHtml(grupos, periodo) {
 }
 
 // ── 7. Enviar email vía Gmail API ─────────────────────────────────────────────
-async function sendEmail(token, to, cc, from, subject, htmlBody, attachBuf, attachName) {
+async function sendEmail(token, to, cc, bcc, from, subject, htmlBody, attachBuf, attachName) {
   const boundary = `PAT_${Date.now()}`;
   const fromEncoded = `=?UTF-8?B?${Buffer.from('Patagónica Inmobiliaria').toString('base64')}?= <${from}>`;
 
@@ -252,6 +252,7 @@ async function sendEmail(token, to, cc, from, subject, htmlBody, attachBuf, atta
     `From: ${fromEncoded}`,
     `To: ${to}`,
     ...(cc ? [`Cc: ${cc}`] : []),
+    ...(bcc ? [`Bcc: ${bcc}`] : []),
     `Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`,
     'MIME-Version: 1.0',
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
@@ -316,8 +317,9 @@ export default async function handler(req, res) {
 
   const TO  = recipients === 'contabilidad'
     ? 'bpulgar@patagonica.cl, contabilidad@patagonica.cl'
-    : 'amelendez@patagonica.cl, mmunoz@patagonica.cl';
-  const CC  = recipients === 'contabilidad' ? 'mmunoz@patagonica.cl, alagies@patagonica.cl, amelendez@patagonica.cl' : '';
+    : 'mmunoz@patagonica.cl';
+  const CC  = recipients === 'contabilidad' ? 'mmunoz@patagonica.cl, alagies@patagonica.cl' : '';
+  const BCC = 'facturacion@patagonica.cl';
 
   try {
     const periodo = getPeriodo();
@@ -333,7 +335,7 @@ export default async function handler(req, res) {
       : `[Vista previa] Facturación ${periodo}`;
     const attachName  = `Planilla Facturación ${periodo}.xlsx`;
 
-    await sendEmail(token, TO, CC, FROM, subject, bodyHtml, excelBuf, attachName);
+    await sendEmail(token, TO, CC, BCC, FROM, subject, bodyHtml, excelBuf, attachName);
     console.log(`[planilla-email] ✓ Enviado a ${TO}`);
     return res.status(200).json({ ok: true, periodo, recipients: TO });
 

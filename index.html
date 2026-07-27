@@ -152,7 +152,7 @@ const REMITENTE="facturacion@patagonica.cl";
 /* Clientes que requieren el XML del DTE en vez del PDF (sistemas propios de ingesta) */
 const CLIENTES_XML=["Banco de Crédito e Inversiones","Servicio Local de Educación Pública de los Libertadores","Adecco Servicios Empresariales S. A."];
 function esClienteXML(cliente){const n=(cliente||"").trim().toLowerCase();return CLIENTES_XML.some(c=>c.trim().toLowerCase()===n);}
-const CCO="mmunoz@patagonica.cl";
+const CCO="mmunoz@patagonica.cl, facturacion@patagonica.cl";
 const TEST_DEST="";
 const MODO_PRUEBA=TEST_DEST!=="";
 const VER="v4.10.1";
@@ -264,20 +264,23 @@ async function descargarPlanillaDrive(token){
   const blob=await res.blob();
   return new File([blob],"Planilla Facturación.xlsx",{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
 }
-function makeEmail(to,cco,from,subject,body,attachBase64,attachName,attachMime){
+function makeEmail(to,cco,from,subject,body,attachBase64,attachName,attachMime,bcc){
   attachMime=attachMime||"application/pdf";
   const boundary="PAT_BOUNDARY_"+Date.now();
   const fromHeader=`=?UTF-8?B?${btoa(unescape(encodeURIComponent("Patagónica Inmobiliaria")))}?= <${from}>`;
   let msg;
   const ccLine=cco?`Cc: ${cco}`:"";
+  const bccLine=bcc?`Bcc: ${bcc}`:"";
   if(attachBase64&&attachName){
     const headers=[`From: ${fromHeader}`,`To: ${to}`];
     if(ccLine)headers.push(ccLine);
+    if(bccLine)headers.push(bccLine);
     headers.push(`Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,`MIME-Version: 1.0`,`Content-Type: multipart/mixed; boundary="${boundary}"`,``,`--${boundary}`,`Content-Type: text/html; charset=UTF-8`,`Content-Transfer-Encoding: base64`,``,btoa(unescape(encodeURIComponent(body))),``,`--${boundary}`,`Content-Type: ${attachMime}; name="${attachName}"`,`Content-Disposition: attachment; filename="${attachName}"`,`Content-Transfer-Encoding: base64`,``,attachBase64,``,`--${boundary}--`);
     msg=headers.join("\r\n");
   }else{
     const headers=[`From: ${fromHeader}`,`To: ${to}`];
     if(ccLine)headers.push(ccLine);
+    if(bccLine)headers.push(bccLine);
     headers.push(`Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,`MIME-Version: 1.0`,`Content-Type: text/html; charset=UTF-8`,`Content-Transfer-Encoding: base64`,``,btoa(unescape(encodeURIComponent(body))));
     msg=headers.join("\r\n");
   }
@@ -437,8 +440,8 @@ async function generarExcelResumen(xlsxFile,periodo){
   zipOut.file('xl/worksheets/sheet1.xml',sheetXml);
   return await zipOut.generateAsync({type:'base64'});
 }
-async function sendGmail(token,to,cco,from,subject,htmlBody,pdfBase64,pdfName,attachMime){
-  const raw=makeEmail(to,cco,from,subject,htmlBody,pdfBase64,pdfName,attachMime);
+async function sendGmail(token,to,cco,from,subject,htmlBody,pdfBase64,pdfName,attachMime,bcc){
+  const raw=makeEmail(to,cco,from,subject,htmlBody,pdfBase64,pdfName,attachMime,bcc);
   const res=await fetch("https://www.googleapis.com/gmail/v1/users/me/messages/send",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({raw})});
   if(!res.ok){const e=await res.json();throw new Error(e.error?.message||"Error Gmail API");}
   return await res.json();
@@ -4456,7 +4459,7 @@ function App(){
         const eCoinc=filas.filter(f=>getEstado(f)==="ok").length;
         const notifHtml=`<p>Las facturas PISA de <strong>${periodo}</strong> han sido separadas y subidas a Google Drive.</p><p><strong>TOTAL ${eTotal}</strong> | <strong style="color:#16a34a">CON PDF ${eConPdf}</strong> Facturas cruzadas | <strong style="color:#dc2626">SIN PDF ${eSinPdf}</strong> revisar | <strong style="color:#2563eb">COINCIDEN ${eCoinc}</strong> listos para enviar</p><p>Ingresa a la app y presiona <strong>Procesar ${periodo}</strong> para continuar.</p>`;
         const gmailTok=await getToken();
-        await sendGmail(gmailTok,"amelendez@patagonica.cl","",REMITENTE,`📋 Facturas PISA ${periodo} listas en Drive`,notifHtml,null,null);
+        await sendGmail(gmailTok,"","",REMITENTE,`📋 Facturas PISA ${periodo} listas en Drive`,notifHtml,null,null,null,"facturacion@patagonica.cl");
         addLog("✓ Email de notificación enviado","ok");
       }catch(e){console.warn("Email notif error:",e.message);}
       /* Guardar mapping factura→cliente para Historial de Facturas */
@@ -4610,7 +4613,7 @@ function App(){
         try{await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(row.i,key);if(row.sheetRow&&!MODO_PRUEBA){marcarEnviadoSheet(row.sheetRow,row.sentColLetter).catch(e=>console.warn("mark-sent:",e.message));}enviados++;await new Promise(r=>setTimeout(r,400));}
         catch(e){notify("Error en "+row.cliente+": "+e.message,"err");}
       }
-      if(enviados>0){try{const resumenRows=pend.slice(0,enviados);const resumenHtml=buildResumenHtml(resumenRows,periodo);const resSubject="Resumen Facturación "+periodo+" — "+enviados+" correos enviados";await sendGmail(token,"amelendez@patagonica.cl","",REMITENTE,resSubject,resumenHtml,null,null);}catch(e){console.warn("Error enviando resumen:",e.message);}}
+      if(enviados>0){try{const resumenRows=pend.slice(0,enviados);const resumenHtml=buildResumenHtml(resumenRows,periodo);const resSubject="Resumen Facturación "+periodo+" — "+enviados+" correos enviados";await sendGmail(token,"","",REMITENTE,resSubject,resumenHtml,null,null,null,"facturacion@patagonica.cl");}catch(e){console.warn("Error enviando resumen:",e.message);}}
       notify("✓ "+enviados+"/"+pend.length+" correos enviados");
     }catch(e){notify(e.message.includes("popup")?"Autorización cancelada":"Error: "+e.message,"warn");}
   };
