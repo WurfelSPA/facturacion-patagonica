@@ -3119,8 +3119,12 @@ function HistorialFactView({dashData,driveLoading,notify}){
                 if(cancelled) return;
                 if(facturas){
                   setInvoicesMap(prev=>({...prev,[siteKey(sc)]:{...(prev[siteKey(sc)]||{}),[p]:facturas}}));
-                  /* Si vino de FUENTE 0 (excel), actualizar localStorage para que próxima carga sea correcta */
-                  if(source==="excel"&&pKey2){
+                  /* Si vino de FUENTE 0 (excel), actualizar localStorage para que próxima carga sea correcta.
+                     Solo si el resultado está completo (trae los conceptos esperados según UF) — cachear un
+                     resultado parcial (ej. sin Serv.Adm. porque Nubox aún no lo generaba) lo dejaría
+                     "atascado" para siempre, aunque después aparezca la factura real. */
+                  const completo=!(pufArr2>0&&!facturas.arriendo)&&!(pufSrv2>0&&!facturas.servAdm);
+                  if(source==="excel"&&pKey2&&completo){
                     try{
                       const stored=localStorage.getItem(`histBatch:${pKey2}`);
                       const batch=stored?JSON.parse(stored):{sitios:[]};
@@ -3876,7 +3880,7 @@ function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlo
     {id:"dashboard", icon:"📊", label:"Dashboard"},
     {id:"ventas",    icon:"📈", label:"Detalles Ventas"},
     {id:"factura",   icon:"📋", label:"Facturación"},
-    {id:"historial-fact", icon:"📂", label:"Historial Facturación"},
+    {id:"historial-fact", icon:"📂", label:"Histórico Facturación"},
     {id:"fact-cobrar", icon:"💰", label:"Facturas x Cobrar"},
     {id:"contratos", icon:"📄", label:"Contratos"},
     {id:"cuentas",   icon:"🔌", label:"Cuentas Servicios"},
