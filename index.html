@@ -3965,6 +3965,48 @@ function SplitTimer({loading}){
   );
 }
 
+/* Enriquece filas con datos del XML real del DTE (más confiable que extracción de
+   texto de PDF): corrige ufPdf/montoTotal cuando hay match por N° de factura.
+   Compartida entre "Procesar" y la carga automática desde planilla (sin Procesar),
+   para que el Monto+IVA mostrado sea siempre el real, no la estimación UF×1.19. */
+async function enriquecerConHistorialXML(filas,clientes,periodo){
+  try{
+    const _histGrp={};
+    for(const c of clientes){
+      /* Incluir edificio en la clave: dos sitios pueden compartir el mismo código
+         de sitio (ej. dos oficinas "A-2") y no deben pisarse entre sí. */
+      const k=(c.rut||"")+"|"+(c.sitio||"")+"|"+(c.edificio||"");
+      if(!_histGrp[k])_histGrp[k]={nombre:c.cliente,rut:c.rut||"",sitio:c.sitio||"",ufArr:0,ufSrv:0};
+      if(c.tipo==="arriendo")_histGrp[k].ufArr=c.uf;
+      else _histGrp[k].ufSrv=c.uf;
+    }
+    const _histMap={};
+    const _normNro=n=>String(n||"").replace(/^F(?:EE)?-0*/i,"F-");
+    await Promise.allSettled(Object.values(_histGrp).map(async g=>{
+      try{
+        const _url=`/api/historial?cliente=${encodeURIComponent(g.nombre)}&rut=${encodeURIComponent(g.rut)}&ufArr=${encodeURIComponent(g.ufArr||"")}&ufSrv=${encodeURIComponent(g.ufSrv||"")}&siteIdx=0&sitio=${encodeURIComponent(g.sitio)}&periodo=${encodeURIComponent(periodo)}`;
+        const _r=await fetch(_url);
+        if(!_r.ok)return;
+        const {facturas}=await _r.json();
+        if(!facturas)return;
+        for(const t of Object.values(facturas)){
+          if(t&&t.nro)_histMap[_normNro(t.nro)]={uf:t.uf,total:t.total};
+        }
+      }catch(_e){}
+    }));
+    let enriched=0;
+    for(const f of filas){
+      if(!f.factura)continue;
+      const _h=_histMap[_normNro(f.factura)];
+      if(!_h)continue;
+      if(_h.uf!=null&&_h.uf>0)f.ufPdf=_h.uf;
+      if(_h.total!=null&&_h.total>0)f.montoTotal=_h.total;
+      enriched++;
+    }
+    return enriched;
+  }catch(_e){return 0;}
+}
+
 function App(){
   /* Config viene 100% de env vars Vercel — no hay setup manual */
   const apiKey=PRESET_KEY;
@@ -4452,40 +4494,8 @@ function App(){
         if(revisar.length>0){addLog(`  ⚠ Revisar (${revisar.length}): cruce por candidato único, verificar manualmente`,"warn");}
       }
       setProcProgress(100);setProcDone(true);
-      /* ── Enriquecer filas con datos del historial XML (más confiable que extracción PDF) ── */
-      try{
-        const _histGrp={};
-        for(const c of clientes){
-          const k=(c.rut||"")+"|"+( c.sitio||"");
-          if(!_histGrp[k])_histGrp[k]={nombre:c.cliente,rut:c.rut||"",sitio:c.sitio||"",ufArr:0,ufSrv:0};
-          if(c.tipo==="arriendo")_histGrp[k].ufArr=c.uf;
-          else _histGrp[k].ufSrv=c.uf;
-        }
-        const _histMap={};
-        const _normNro=n=>String(n||"").replace(/^F(?:EE)?-0*/i,"F-");
-        await Promise.allSettled(Object.values(_histGrp).map(async g=>{
-          try{
-            const _url=`/api/historial?cliente=${encodeURIComponent(g.nombre)}&rut=${encodeURIComponent(g.rut)}&ufArr=${encodeURIComponent(g.ufArr||"")}&ufSrv=${encodeURIComponent(g.ufSrv||"")}&siteIdx=0&sitio=${encodeURIComponent(g.sitio)}&periodo=${encodeURIComponent(periodo)}`;
-            const _r=await fetch(_url);
-            if(!_r.ok)return;
-            const {facturas}=await _r.json();
-            if(!facturas)return;
-            for(const t of Object.values(facturas)){
-              if(t&&t.nro)_histMap[_normNro(t.nro)]={uf:t.uf,total:t.total};
-            }
-          }catch(_e){}
-        }));
-        let _enriched=0;
-        for(const f of filas){
-          if(!f.factura)continue;
-          const _h=_histMap[_normNro(f.factura)];
-          if(!_h)continue;
-          if(_h.uf!=null&&_h.uf>0)f.ufPdf=_h.uf;
-          if(_h.total!=null&&_h.total>0)f.montoTotal=_h.total;
-          _enriched++;
-        }
-        if(_enriched>0)addLog(`✓ Historial XML: ${_enriched} facturas verificadas`,"ok");
-      }catch(_e){addLog("⚠ Historial no disponible: "+_e.message,"warn");}
+      const _enriched=await enriquecerConHistorialXML(filas,clientes,periodo);
+      if(_enriched>0)addLog(`✓ Historial XML: ${_enriched} facturas verificadas`,"ok");
       setTimeout(()=>{setShowProc(false);setView("table");},1800);
       setData(filas);
       const prevSent=new Set();
@@ -4733,6 +4743,10 @@ function App(){
         filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo:c.email||"",concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf:c.uf,montoTotal:null,ivaAmount:null,ufValor:null,enviado:false,yaEnviado:c.yaEnviado||false,yaPagado:c.yaPagado||false,sheetRow:c.sheetRow||null,sentColLetter:c.sentColLetter||"HC",pagadoColLetter:c.pagadoColLetter||"",nroFactCol:nfCol||"",facturaEnPlanilla:matchScore===888});
       }
       if(filas.length>0){
+        /* Traer montos reales del XML del DTE antes de mostrar — evita que se vea
+           la estimación UF×1.19 (no contempla montos exentos) mientras no se
+           haya hecho clic en "Procesar". */
+        await enriquecerConHistorialXML(filas,clientes,periodo);
         setData(filas);setSoloPlanilla(true);setView("table");
         /* Descargar ZIP en segundo plano para habilitar previsualización en meses procesados */
         if(zipStatus!=="ready"&&zipStatus!=="loading")buscarZip(periodo);
