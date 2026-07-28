@@ -187,6 +187,19 @@ async function getUFDia5(year,month){
     return null;
   }catch(e){console.warn("Error UF día 5",e.message);return null;}
 }
+async function getUFHoy(){
+  const now=new Date();
+  const key=`hoy-${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+  if(ufCache[key])return ufCache[key];
+  try{
+    const res=await fetch("https://mindicador.cl/api/uf");
+    if(!res.ok)throw new Error("HTTP "+res.status);
+    const data=await res.json();
+    const serie=data.serie||[];
+    if(serie.length>0){ufCache[key]=serie[0].valor;return serie[0].valor;}
+    return null;
+  }catch(e){console.warn("Error UF hoy",e.message);return null;}
+}
 async function getUFForMonth(year,month){
   const key=`${year}-${String(month).padStart(2,"0")}`;
   if(ufCache[key])return ufCache[key];
@@ -2390,13 +2403,83 @@ function FactxCobrarView({notify}){
    VISTA CONTRATOS
 ═══════════════════════════════════ */
 function ContratosView({dashData,driveLoading}){
-  const [tab,setTab]=useState("vencimientos");
+  const [tab,setTab]=useState("contrato");
   const [search,setSearch]=useState("");
   const [borradorLoading,setBorradorLoading]=useState({});
   const [borradorCliente,setBorradorCliente]=useState("");
   const [borradorTipo,setBorradorTipo]=useState("contrato");
   const [certPdf,setCertPdf]=useState(null);
   const [certNombre,setCertNombre]=useState("");
+  const [ufHoy,setUfHoy]=useState(null);
+  const [ajustes,setAjustes]=useState({});
+  const [ajusteModal,setAjusteModal]=useState(null); /* {rut,sitio,nombre} */
+  const [ajusteDraft,setAjusteDraft]=useState(null);
+  const [ajusteSaving,setAjusteSaving]=useState(false);
+  useEffect(()=>{
+    getUFHoy().then(setUfHoy);
+    fetch("/ajustes-contratos.json").then(r=>r.ok?r.json():null).then(d=>{if(d&&d.items)setAjustes(d.items);}).catch(()=>{});
+  },[]);
+  function fmtCLP(v){return v==null||isNaN(v)?"—":"$"+Math.round(v).toLocaleString("es-CL");}
+  function ajusteKey(rut,sitio){return `${String(rut||"").trim()}|${String(sitio||"").trim()}`;}
+  /* Determina el próximo paso de ajuste intermedio a resaltar para un cliente:
+     1) el primer paso manual con fecha futura/hoy; 2) si no queda ninguno pero
+     hay una regla recurrente (ej. Trane: +5% cada 3 años desde 2029), se
+     calcula la próxima fecha proyectada; 3) si todo quedó en el pasado y no
+     hay recurrencia, se muestra el último paso conocido como referencia. */
+  function nextAjusteIntermedio(item){
+    if(!item)return null;
+    const hoy0=new Date();const hoy=new Date(hoy0.getFullYear(),hoy0.getMonth(),hoy0.getDate());
+    const pasos=(item.pasos||[]).slice().filter(p=>p.fecha).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
+    for(const p of pasos){
+      const d=new Date(p.fecha+"T00:00:00");
+      if(d>=hoy)return{fecha:p.fecha,uf:p.uf,pct:p.pct,tipo:"paso",totalPasos:pasos.length};
+    }
+    if(item.recurrente&&item.recurrente.cadaAnios){
+      const base0=pasos.length?pasos[pasos.length-1].fecha:item.recurrente.desde;
+      if(base0){
+        let base=new Date(base0+"T00:00:00");
+        const cada=Number(item.recurrente.cadaAnios)||3;
+        let guard=0;
+        while(base<hoy&&guard<100){base=new Date(base.getFullYear()+cada,base.getMonth(),base.getDate());guard++;}
+        return{fecha:base.toISOString().slice(0,10),pct:item.recurrente.pct,tipo:"recurrente",totalPasos:pasos.length};
+      }
+    }
+    if(pasos.length){const u=pasos[pasos.length-1];return{fecha:u.fecha,uf:u.uf,pct:u.pct,tipo:"pasado",totalPasos:pasos.length};}
+    return null;
+  }
+  async function guardarAjuste(){
+    if(!ajusteModal||!ajusteDraft)return;
+    setAjusteSaving(true);
+    try{
+      const pasosLimpios=(ajusteDraft.pasos||[]).filter(p=>p.fecha).map(p=>{
+        const o={fecha:p.fecha};
+        if(p.uf!==""&&p.uf!=null&&!isNaN(Number(p.uf)))o.uf=Number(p.uf);
+        if(p.pct!==""&&p.pct!=null&&!isNaN(Number(p.pct)))o.pct=Number(p.pct);
+        return o;
+      });
+      const rec=ajusteDraft.recurrente;
+      const recurrente=(rec&&rec.pct!==""&&rec.pct!=null&&rec.cadaAnios!==""&&rec.cadaAnios!=null)?{pct:Number(rec.pct),cadaAnios:Number(rec.cadaAnios),...(rec.desde?{desde:rec.desde}:{})}:null;
+      const body={rut:ajusteModal.rut,sitio:ajusteModal.sitio,pasos:pasosLimpios,recurrente,notas:ajusteDraft.notas};
+      const r=await fetch("/api/ajuste-intermedio",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+      const j=await r.json();
+      if(j.ok){
+        setAjustes(p=>{const n={...p};const k=ajusteKey(ajusteModal.rut,ajusteModal.sitio);if(j.item)n[k]=j.item;else delete n[k];return n;});
+        setAjusteModal(null);setAjusteDraft(null);
+      }
+    }catch(e){console.error(e);}
+    setAjusteSaving(false);
+  }
+  function abrirAjusteModal(c){
+    const key=ajusteKey(c.rut,c.sitio);
+    const existing=ajustes[key];
+    setAjusteModal({rut:c.rut,sitio:c.sitio,nombre:c.nombre});
+    setAjusteDraft({
+      pasos:existing&&existing.pasos?existing.pasos.map(p=>({fecha:p.fecha||"",uf:p.uf!=null?p.uf:"",pct:p.pct!=null?p.pct:""})):[],
+      recurrente:existing&&existing.recurrente?{pct:existing.recurrente.pct,cadaAnios:existing.recurrente.cadaAnios,desde:existing.recurrente.desde||""}:{pct:"",cadaAnios:"",desde:""},
+      notas:existing&&existing.notas?existing.notas:""
+    });
+  }
+  function fmtISO(iso){if(!iso)return"—";const p=iso.split("-");return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso;}
   const now=new Date();
   const currentYear=now.getFullYear();
   function avisoDias(str){if(!str||str==="-"||str==="")return null;const s=str.toLowerCase();const m=s.match(/(\d+)/);if(!m)return null;const n=parseInt(m[1]);if(s.includes("año")||s.includes("ano"))return n*365;if(s.includes("mes"))return n*30;return n;}
@@ -2414,6 +2497,7 @@ function ContratosView({dashData,driveLoading}){
     return false;
   }
   const clients=dashData?dashData.clients:[];
+  const contratosList=clients.filter(c=>!search||c.nombre.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>a.nombre.localeCompare(b.nombre));
   const vencimientos=clients.filter(c=>{const d=parseDate(c.termTermino);return d&&d.getFullYear()===currentYear;}).filter(c=>!search||c.nombre.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>(parseDate(a.termTermino)||0)-(parseDate(b.termTermino)||0));
   const reajustes=clients.filter(c=>{
     const d=parseDate(c.fechaReajuste);
@@ -2489,10 +2573,64 @@ function ContratosView({dashData,driveLoading}){
     ),
     h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}},
       h("div",{style:{display:"flex",gap:6,flexWrap:"wrap"}},
+        h("button",{onClick:()=>setTab("contrato"),className:`pill${tab==="contrato"?" active":""}`},`📄 Contrato (${clients.length})`),
         h("button",{onClick:()=>setTab("vencimientos"),className:`pill${tab==="vencimientos"?" active":""}`},`📅 Vencimientos ${currentYear} (${vencimientos.length})`),
         h("button",{onClick:()=>setTab("reajustes"),className:`pill${tab==="reajustes"?" active":""}`},`📈 Reajustes ${currentYear}–${currentYear+1} (${reajustes.length})`)
       ),
       h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente...",style:{width:200}})
+    ),
+    tab==="contrato"&&h("div",{style:{display:"flex",flexDirection:"column",gap:12}},
+      contratosList.length===0?h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,padding:"40px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin clientes que coincidan con la búsqueda"):
+      h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
+        h("div",{style:{padding:"10px 16px",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
+          h("span",{style:{fontWeight:700,fontSize:12}},"Detalle de Contratos — todos los clientes"),
+          h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},contratosList.length),
+          h("span",{style:{fontSize:10,color:"var(--txd)",marginLeft:"auto"}},ufHoy?`UF hoy: ${ufHoy.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`:"UF hoy: cargando…"),
+          h("span",{title:"Haz clic en la celda de Ajuste Intermedio para registrar los pasos pactados (ej. renovaciones a UF fija) y/o una regla recurrente (ej. +5% cada 3 años).",style:{fontSize:10,color:"var(--txd)",cursor:"help"}},"ⓘ Ajuste Intermedio es editable")
+        ),
+        h("div",{style:{overflowX:"auto"}},
+          h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
+            h("thead",{style:{position:"sticky",top:0,zIndex:2}},h("tr",{style:{background:"#f0f4f8"}},["Sitio","Cliente / RUT","Edificio","Inicio","Término","Antelac.","Aviso","F.Reajuste","% Reaj.","Ajuste Intermedio","Cada","m²","UF×m²","Arriendo CLP (actual)","Serv.Adm. CLP (actual)"].map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap"}},col.toUpperCase())))),
+            h("tbody",null,contratosList.map((c,i)=>{
+              const sCol=SITIO_C[c.sitio]||"#888";
+              const item=ajustes[ajusteKey(c.rut,c.sitio)];
+              const next=nextAjusteIntermedio(item);
+              const arriendoCLP=ufHoy&&c.ufArr>0?c.ufArr*ufHoy:null;
+              const servAdmCLP=ufHoy&&c.ufSrv>0?c.ufSrv*ufHoy:null;
+              let ajusteCell;
+              if(next){
+                const diasNext=Math.ceil((new Date(next.fecha+"T00:00:00")-new Date(now.getFullYear(),now.getMonth(),now.getDate()))/86400000);
+                const{bg,col,bdr}=next.tipo==="pasado"?{bg:"var(--surf2)",col:"var(--txd)",bdr:"var(--bdr)"}:urgBg(diasNext,true);
+                const valorTxt=next.uf!=null?next.uf.toFixed(2)+" UF":(next.pct!=null?"+"+next.pct+"%":"");
+                const tipoTxt=next.tipo==="recurrente"?"proyectado":next.tipo==="pasado"?"último — revisar":"próximo paso";
+                ajusteCell=h("div",{onClick:()=>abrirAjusteModal(c),style:{cursor:"pointer",display:"inline-flex",flexDirection:"column",gap:1,padding:"3px 8px",borderRadius:8,background:bg,border:"1px solid "+bdr}},
+                  h("span",{style:{fontSize:10,fontWeight:700,color:col,fontFamily:"'DM Mono',monospace"}},fmtISO(next.fecha)+(valorTxt?" · "+valorTxt:"")),
+                  h("span",{style:{fontSize:8,color:col,opacity:.8}},tipoTxt+(next.totalPasos?" · "+next.totalPasos+" paso"+(next.totalPasos!==1?"s":""):""))
+                );
+              }else{
+                ajusteCell=h("button",{onClick:()=>abrirAjusteModal(c),style:{fontSize:10,padding:"3px 8px",borderRadius:8,border:"1px dashed var(--bdr)",background:"none",color:"var(--txd)",cursor:"pointer"}},"+ Agregar");
+              }
+              return h("tr",{key:c.rut+c.nombre+i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"var(--surf2)"}},
+                h("td",{style:{padding:"9px 12px"}},h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},c.sitio||"—")),
+                h("td",{style:{padding:"9px 12px",maxWidth:200}},h("div",{style:{fontWeight:600,fontSize:11,lineHeight:1.3}},c.nombre),h("div",{style:{fontSize:9,color:"var(--txd)",fontFamily:"'DM Mono',monospace",marginTop:2}},c.rut)),
+                h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)"}},c.edificio||"—"),
+                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.termContrato||"—"),
+                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.termTermino||"—"),
+                h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.renovacion||"—"),
+                h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.aviso||"—"),
+                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.fechaReajuste||"—"),
+                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.pctReaj&&c.pctReaj!=="-"?c.pctReaj+"%":"—"),
+                h("td",{style:{padding:"9px 12px"}},ajusteCell),
+                h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.cadaAnios||"—"),
+                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.m2!=null?c.m2:"—"),
+                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--blue)"}},c.ufM2!=null?c.ufM2.toFixed(2):"—"),
+                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600,color:"var(--tx)"}},fmtCLP(arriendoCLP)),
+                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600,color:"var(--tx)"}},fmtCLP(servAdmCLP)),
+              );
+            }))
+          )
+        )
+      )
     ),
     tab==="vencimientos"&&h("div",{style:{display:"flex",flexDirection:"column",gap:12}},
       h("div",{style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}},
@@ -2580,6 +2718,44 @@ function ContratosView({dashData,driveLoading}){
               );
             }))
           )
+        )
+      )
+    ),
+    /* ── Modal edición Ajuste Intermedio ── */
+    ajusteModal&&ajusteDraft&&h("div",{onClick:function(e){if(e.target===e.currentTarget){setAjusteModal(null);setAjusteDraft(null);}},
+      style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}},
+      h("div",{style:{background:"var(--surf)",borderRadius:16,boxShadow:"0 8px 40px rgba(0,0,0,0.25)",maxWidth:640,width:"100%",maxHeight:"85vh",overflow:"auto",padding:"24px 28px",position:"relative"}},
+        h("button",{onClick:()=>{setAjusteModal(null);setAjusteDraft(null);},style:{position:"absolute",top:14,right:16,background:"none",border:"none",fontSize:20,cursor:"pointer",color:"var(--txm)",lineHeight:1}},"×"),
+        h("div",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".1em",textTransform:"uppercase",marginBottom:4}},"Ajuste Intermedio del Contrato"),
+        h("div",{style:{fontSize:16,fontWeight:800,color:"var(--tx)",marginBottom:2}},ajusteModal.nombre),
+        h("div",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",marginBottom:16}},ajusteModal.rut+" · "+ajusteModal.sitio),
+        h("div",{style:{fontSize:11,color:"var(--txm)",marginBottom:14,lineHeight:1.5}},"Registra los pasos de renta pactados en el contrato/anexos que no siguen el % de reajuste plano (ej: renovación a UF fija en una fecha determinada). Si además hay una regla que se repite indefinidamente (ej: +5% cada 3 años), agrégala abajo — el sistema calculará sola la próxima fecha proyectada."),
+        h("div",{style:{display:"flex",flexDirection:"column",gap:8,marginBottom:14}},
+          h("div",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"PASOS PACTADOS"),
+          ajusteDraft.pasos.map((p,idx)=>h("div",{key:idx,style:{display:"flex",gap:8,alignItems:"center"}},
+            h("input",{type:"date",value:p.fecha,onChange:e=>setAjusteDraft(d=>({...d,pasos:d.pasos.map((pp,i)=>i===idx?{...pp,fecha:e.target.value}:pp)})),style:{flex:1,fontSize:11,padding:"5px 8px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)"}}),
+            h("input",{type:"number",step:"0.01",placeholder:"UF",value:p.uf,onChange:e=>setAjusteDraft(d=>({...d,pasos:d.pasos.map((pp,i)=>i===idx?{...pp,uf:e.target.value}:pp)})),style:{width:90,fontSize:11,padding:"5px 8px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)"}}),
+            h("input",{type:"number",step:"0.1",placeholder:"%",value:p.pct,onChange:e=>setAjusteDraft(d=>({...d,pasos:d.pasos.map((pp,i)=>i===idx?{...pp,pct:e.target.value}:pp)})),style:{width:70,fontSize:11,padding:"5px 8px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)"}}),
+            h("button",{onClick:()=>setAjusteDraft(d=>({...d,pasos:d.pasos.filter((_,i)=>i!==idx)})),style:{background:"none",border:"none",color:"var(--red)",cursor:"pointer",fontSize:14,padding:"0 4px"}},"✕")
+          )),
+          h("button",{onClick:()=>setAjusteDraft(d=>({...d,pasos:[...d.pasos,{fecha:"",uf:"",pct:""}]})),style:{alignSelf:"flex-start",fontSize:11,padding:"5px 12px",borderRadius:7,border:"1px dashed var(--bdr)",background:"none",color:"var(--txm)",cursor:"pointer"}},"+ Agregar paso")
+        ),
+        h("div",{style:{display:"flex",flexDirection:"column",gap:8,marginBottom:14,background:"var(--surf2)",borderRadius:10,padding:"12px 14px"}},
+          h("div",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"REGLA RECURRENTE (OPCIONAL)"),
+          h("div",{style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},
+            h("span",{style:{fontSize:11,color:"var(--txm)"}},"Ajustar"),
+            h("input",{type:"number",step:"0.1",placeholder:"%",value:ajusteDraft.recurrente.pct,onChange:e=>setAjusteDraft(d=>({...d,recurrente:{...d.recurrente,pct:e.target.value}})),style:{width:70,fontSize:11,padding:"5px 8px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf)",color:"var(--tx)"}}),
+            h("span",{style:{fontSize:11,color:"var(--txm)"}},"% cada"),
+            h("input",{type:"number",placeholder:"años",value:ajusteDraft.recurrente.cadaAnios,onChange:e=>setAjusteDraft(d=>({...d,recurrente:{...d.recurrente,cadaAnios:e.target.value}})),style:{width:60,fontSize:11,padding:"5px 8px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf)",color:"var(--tx)"}}),
+            h("span",{style:{fontSize:11,color:"var(--txm)"}},"años, desde"),
+            h("input",{type:"date",value:ajusteDraft.recurrente.desde,onChange:e=>setAjusteDraft(d=>({...d,recurrente:{...d.recurrente,desde:e.target.value}})),style:{fontSize:11,padding:"5px 8px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf)",color:"var(--tx)"}})
+          ),
+          h("div",{style:{fontSize:9,color:"var(--txd)"}},"Deja \"desde\" vacío si ya agregaste el último paso pactado arriba — se usará esa fecha como base.")
+        ),
+        h("textarea",{placeholder:"Notas (opcional) — ej. cláusula del contrato, referencia al anexo, etc.",value:ajusteDraft.notas,onChange:e=>setAjusteDraft(d=>({...d,notas:e.target.value})),style:{width:"100%",minHeight:60,fontSize:11,padding:"8px 10px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)",fontFamily:"'DM Sans',sans-serif",marginBottom:16,resize:"vertical"}}),
+        h("div",{style:{display:"flex",gap:10,justifyContent:"flex-end"}},
+          h("button",{onClick:()=>{setAjusteModal(null);setAjusteDraft(null);},style:{padding:"7px 16px",borderRadius:8,border:"1px solid var(--bdr)",background:"none",color:"var(--txm)",fontSize:12,fontWeight:600,cursor:"pointer"}},"Cancelar"),
+          h("button",{disabled:ajusteSaving,onClick:guardarAjuste,style:{padding:"7px 18px",borderRadius:8,border:"none",fontWeight:700,fontSize:12,cursor:ajusteSaving?"not-allowed":"pointer",background:ajusteSaving?"var(--surf3)":"linear-gradient(135deg,var(--acc),var(--acc2))",color:ajusteSaving?"var(--txm)":"#fff",display:"inline-flex",alignItems:"center",gap:6}},ajusteSaving?h("span",{className:"spin"},"⟳"):"💾","  Guardar")
         )
       )
     )

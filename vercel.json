@@ -82,6 +82,10 @@
       "dest": "/enel-cache.json"
     },
     {
+      "src": "/ajustes-contratos.json",
+      "dest": "/ajustes-contratos.json"
+    },
+    {
       "src": "/(.+\\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2))",
       "dest": "/$1"
     },
