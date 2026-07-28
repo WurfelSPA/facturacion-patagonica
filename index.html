@@ -2415,6 +2415,10 @@ function ContratosView({dashData,driveLoading}){
   const [ajusteModal,setAjusteModal]=useState(null); /* {rut,sitio,nombre} */
   const [ajusteDraft,setAjusteDraft]=useState(null);
   const [ajusteSaving,setAjusteSaving]=useState(false);
+  const [sortCol,setSortCol]=useState(null);
+  const [sortDir,setSortDir]=useState("asc");
+  function toggleSort(col){if(sortCol===col)setSortDir(d=>d==="asc"?"desc":"asc");else{setSortCol(col);setSortDir("asc");}}
+  function sortArrow(col){if(sortCol!==col)return" ↕";return sortDir==="asc"?" ↑":" ↓";}
   useEffect(()=>{
     getUFHoy().then(setUfHoy);
     fetch("/ajustes-contratos.json").then(r=>r.ok?r.json():null).then(d=>{if(d&&d.items)setAjustes(d.items);}).catch(()=>{});
@@ -2497,7 +2501,38 @@ function ContratosView({dashData,driveLoading}){
     return false;
   }
   const clients=dashData?dashData.clients:[];
-  const contratosList=clients.filter(c=>!search||c.nombre.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  const contratosList=clients.filter(c=>!search||c.nombre.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(c=>{
+    const _ajusteItem=ajustes[ajusteKey(c.rut,c.sitio)];
+    return{...c,_ajusteItem,_ajusteNext:nextAjusteIntermedio(_ajusteItem)};
+  });
+  function getSortValContrato(r,col){
+    switch(col){
+      case"sitio":return r.sitio||"";
+      case"cliente":return r.nombre||"";
+      case"edificio":return r.edificio||"";
+      case"inicio":return parseDate(r.termContrato)||new Date(0);
+      case"termino":return parseDate(r.termTermino)||new Date(0);
+      case"antelac":return r.renovacion||"";
+      case"aviso":return r.aviso||"";
+      case"freajuste":return parseDate(r.fechaReajuste)||new Date(0);
+      case"pctreaj":return r.pctReaj&&r.pctReaj!=="-"?parseFloat(r.pctReaj):-Infinity;
+      case"ajusteintermedio":return r._ajusteNext?new Date(r._ajusteNext.fecha+"T00:00:00"):new Date(8640000000000000);
+      case"cada":return r.cadaAnios?parseFloat(r.cadaAnios):-Infinity;
+      case"m2":return r.m2!=null?r.m2:-Infinity;
+      case"ufm2":return r.ufM2!=null?r.ufM2:-Infinity;
+      case"arriendo":return ufHoy&&r.ufArr>0?r.ufArr*ufHoy:-Infinity;
+      case"servadm":return ufHoy&&r.ufSrv>0?r.ufSrv*ufHoy:-Infinity;
+      default:return"";
+    }
+  }
+  const contratosOrdenados=sortCol?[...contratosList].sort((a,b)=>{
+    const va=getSortValContrato(a,sortCol),vb=getSortValContrato(b,sortCol);
+    let cmp;
+    if(va instanceof Date&&vb instanceof Date)cmp=va-vb;
+    else if(typeof va==="number"&&typeof vb==="number")cmp=va-vb;
+    else cmp=String(va).localeCompare(String(vb),"es");
+    return sortDir==="asc"?cmp:-cmp;
+  }):contratosList;
   const vencimientos=clients.filter(c=>{const d=parseDate(c.termTermino);return d&&d.getFullYear()===currentYear;}).filter(c=>!search||c.nombre.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>(parseDate(a.termTermino)||0)-(parseDate(b.termTermino)||0));
   const reajustes=clients.filter(c=>{
     const d=parseDate(c.fechaReajuste);
@@ -2580,21 +2615,21 @@ function ContratosView({dashData,driveLoading}){
       h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente...",style:{width:200}})
     ),
     tab==="contrato"&&h("div",{style:{display:"flex",flexDirection:"column",gap:12}},
-      contratosList.length===0?h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,padding:"40px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin clientes que coincidan con la búsqueda"):
+      contratosOrdenados.length===0?h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,padding:"40px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin clientes que coincidan con la búsqueda"):
       h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
         h("div",{style:{padding:"10px 16px",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
           h("span",{style:{fontWeight:700,fontSize:12}},"Detalle de Contratos — todos los clientes"),
-          h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},contratosList.length),
+          h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},contratosOrdenados.length),
           h("span",{style:{fontSize:10,color:"var(--txd)",marginLeft:"auto"}},ufHoy?`UF hoy: ${ufHoy.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`:"UF hoy: cargando…"),
           h("span",{title:"Haz clic en la celda de Ajuste Intermedio para registrar los pasos pactados (ej. renovaciones a UF fija) y/o una regla recurrente (ej. +5% cada 3 años).",style:{fontSize:10,color:"var(--txd)",cursor:"help"}},"ⓘ Ajuste Intermedio es editable")
         ),
-        h("div",{style:{overflowX:"auto"}},
+        h("div",{style:{overflow:"auto",maxHeight:"calc(100vh - 260px)"}},
           h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
-            h("thead",{style:{position:"sticky",top:0,zIndex:2}},h("tr",{style:{background:"#f0f4f8"}},["Sitio","Cliente / RUT","Edificio","Inicio","Término","Antelac.","Aviso","F.Reajuste","% Reaj.","Ajuste Intermedio","Cada","m²","UF×m²","Arriendo CLP (actual)","Serv.Adm. CLP (actual)"].map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap"}},col.toUpperCase())))),
-            h("tbody",null,contratosList.map((c,i)=>{
+            h("thead",{style:{position:"sticky",top:0,zIndex:2}},h("tr",{style:{background:"#f0f4f8"}},
+              [["sitio","Sitio"],["cliente","Cliente / RUT"],["edificio","Edificio"],["inicio","Inicio"],["termino","Término"],["antelac","Antelac."],["aviso","Aviso"],["freajuste","F.Reajuste"],["pctreaj","% Reaj."],["ajusteintermedio","Ajuste Intermedio"],["cada","Cada"],["m2","m²"],["ufm2","UF×m²"],["arriendo","Arriendo CLP (actual)"],["servadm","Serv.Adm. CLP (actual)"]].map(([key,label])=>h("th",{key,onClick:()=>toggleSort(key),style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:sortCol===key?"var(--acc)":"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap",cursor:"pointer",userSelect:"none"}},label.toUpperCase()+sortArrow(key))))),
+            h("tbody",null,contratosOrdenados.map((c,i)=>{
               const sCol=SITIO_C[c.sitio]||"#888";
-              const item=ajustes[ajusteKey(c.rut,c.sitio)];
-              const next=nextAjusteIntermedio(item);
+              const next=c._ajusteNext;
               const arriendoCLP=ufHoy&&c.ufArr>0?c.ufArr*ufHoy:null;
               const servAdmCLP=ufHoy&&c.ufSrv>0?c.ufSrv*ufHoy:null;
               let ajusteCell;
