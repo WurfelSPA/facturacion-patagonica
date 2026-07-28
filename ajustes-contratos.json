@@ -1,4 +1,13 @@
 {
-  "updatedAt": null,
-  "items": {}
+  "updatedAt": "2026-07-28T18:00:12.641Z",
+  "items": {
+    "96.836.580-0|5-A": {
+      "pasos": [],
+      "recurrente": {
+        "pct": 0.8,
+        "cadaAnios": 3,
+        "desde": "2023-09-01"
+      }
+    }
+  }
 }
