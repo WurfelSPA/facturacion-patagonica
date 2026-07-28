@@ -2426,6 +2426,19 @@ function ContratosView({dashData,driveLoading}){
   },[]);
   function fmtCLP(v){return v==null||isNaN(v)?"—":"$"+Math.round(v).toLocaleString("es-CL");}
   function ajusteKey(rut,sitio){return `${String(rut||"").trim()}|${String(sitio||"").trim()}`;}
+  function pasosOrdenadosDe(item){
+    return((item&&item.pasos)||[]).filter(p=>p.fecha).slice().sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
+  }
+  /* La Renovación (columna "RENOVACIÓN") es el día siguiente al término del
+     contrato vigente (c.termTermino), no el propio vencimiento — así, si un
+     paso pactado (ver pasoParaColumna) cae justo ese día, es la MISMA
+     renovación y no debe repetirse en Ajuste Intermedio. */
+  function renovacionISO(c){
+    const d=parseDate(c.termTermino);
+    if(!d)return null;
+    const d2=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1);
+    return`${d2.getFullYear()}-${String(d2.getMonth()+1).padStart(2,"0")}-${String(d2.getDate()).padStart(2,"0")}`;
+  }
   /* Devuelve el paso a mostrar en la columna "Ajuste Intermedio N" (idx 0 o 1)
      de un cliente: 1) el N-ésimo paso pactado con fecha fija (ej. Trane 1era y
      2da renovación); 2) si ese índice quedó vacío y justo a continuación de
@@ -2434,7 +2447,7 @@ function ContratosView({dashData,driveLoading}){
      detalle de cada contrato para ver si viene un ajuste. */
   function pasoParaColumna(item,idx){
     if(!item)return null;
-    const pasos=(item.pasos||[]).filter(p=>p.fecha).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
+    const pasos=pasosOrdenadosDe(item);
     if(pasos[idx])return{...pasos[idx],ord:idx,recurrente:false};
     if(idx===pasos.length&&item.recurrente&&item.recurrente.cadaAnios){
       const base0=pasos.length?pasos[pasos.length-1].fecha:item.recurrente.desde;
@@ -2458,18 +2471,15 @@ function ContratosView({dashData,driveLoading}){
     const prev=pasoParaColumna(c._ajusteItem,idx-1);
     return prev&&prev.uf!=null?prev.uf:null;
   }
-  function renderAjusteCol(c,idx){
-    const p=pasoParaColumna(c._ajusteItem,idx);
-    if(!p){
-      if(idx===0)return h("button",{onClick:e=>{e.stopPropagation();abrirAjusteModal(c);},style:{fontSize:10,padding:"3px 8px",borderRadius:8,border:"1px dashed var(--bdr)",background:"none",color:"var(--txd)",cursor:"pointer"}},"+ Agregar");
-      return h("span",{style:{color:"var(--txd)",fontSize:10}},"—");
-    }
+  /* Bloque visual compartido entre las columnas de Ajuste Intermedio y, cuando
+     corresponde, la columna Renovación (ver renderRenovacionCol). */
+  function renderPasoDetalle(c,p){
     const MESES_AJ=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
     const d=new Date(p.fecha+"T00:00:00");
     const fechaTxt=`${String(d.getDate()).padStart(2,"0")} ${MESES_AJ[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
     const ordTxt=p.recurrente?"Recurrente":(["1era","2da","3era","4ta","5ta"][p.ord]||`${p.ord+1}ª`)+" Renov";
     const fmtUF=v=>v.toFixed(2).replace(".",",");
-    const base=baseUFParaColumna(c,idx);
+    const base=baseUFParaColumna(c,p.ord);
     let valorTxt="",pctTxt=null;
     if(p.uf!=null){
       if(base>0){
@@ -2491,6 +2501,30 @@ function ContratosView({dashData,driveLoading}){
       valorTxt&&h("span",{style:{fontSize:9,color:col,fontFamily:"'DM Mono',monospace"}},valorTxt),
       pctTxt&&h("span",{style:{fontSize:9,fontWeight:800,color:col}},"("+pctTxt+")")
     );
+  }
+  function renderAjusteCol(c,idx){
+    const p=pasoParaColumna(c._ajusteItem,idx);
+    const renovIso=renovacionISO(c);
+    if(p&&renovIso&&p.fecha===renovIso)return h("span",{style:{color:"var(--txd)",fontSize:10}},"—");
+    if(!p){
+      if(idx===0)return h("button",{onClick:e=>{e.stopPropagation();abrirAjusteModal(c);},style:{fontSize:10,padding:"3px 8px",borderRadius:8,border:"1px dashed var(--bdr)",background:"none",color:"var(--txd)",cursor:"pointer"}},"+ Agregar");
+      return h("span",{style:{color:"var(--txd)",fontSize:10}},"—");
+    }
+    return renderPasoDetalle(c,p);
+  }
+  /* Columna Renovación: muestra el día siguiente al término del contrato
+     vigente. Si ese día coincide con un paso pactado de Ajuste Intermedio
+     (ej. Trane 2da renovación), se muestra el detalle completo ahí mismo en
+     vez de repetirlo también en una columna de Ajuste Intermedio. */
+  function renderRenovacionCol(c){
+    const d=parseDate(c.termTermino);
+    if(!d)return h("span",{style:{color:"var(--txd)",fontSize:10}},"—");
+    const d2=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1);
+    const fechaTxt=`${String(d2.getDate()).padStart(2,"0")}/${String(d2.getMonth()+1).padStart(2,"0")}/${d2.getFullYear()}`;
+    const renovIso=renovacionISO(c);
+    const pasoMatch=pasosOrdenadosDe(c._ajusteItem).map((p,i)=>({...p,ord:i})).find(p=>p.fecha===renovIso);
+    if(!pasoMatch)return h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},fechaTxt);
+    return renderPasoDetalle(c,pasoMatch);
   }
   async function guardarAjuste(){
     if(!ajusteModal||!ajusteDraft)return;
@@ -2684,7 +2718,7 @@ function ContratosView({dashData,driveLoading}){
                 h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.termContrato||"—"),
                 h("td",{style:{padding:"9px 12px"}},renderAjusteCol(c,0)),
                 h("td",{style:{padding:"9px 12px"}},renderAjusteCol(c,1)),
-                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.termTermino||"—"),
+                h("td",{style:{padding:"9px 12px"}},renderRenovacionCol(c)),
                 h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.renovacion||"—"),
                 h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.aviso||"—"),
                 h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.fechaReajuste||"—"),
