@@ -2474,9 +2474,8 @@ function ContratosView({dashData,driveLoading}){
   /* Bloque visual compartido entre las columnas de Ajuste Intermedio y, cuando
      corresponde, la columna Renovación (ver renderRenovacionCol). */
   function renderPasoDetalle(c,p){
-    const MESES_AJ=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
     const d=new Date(p.fecha+"T00:00:00");
-    const fechaTxt=`${String(d.getDate()).padStart(2,"0")} ${MESES_AJ[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+    const fechaTxt=`${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
     const ordTxt=p.recurrente?"Recurrente":(["1era","2da","3era","4ta","5ta"][p.ord]||`${p.ord+1}ª`)+" Renov";
     const fmtUF=v=>v.toFixed(2).replace(".",",");
     const base=baseUFParaColumna(c,p.ord);
