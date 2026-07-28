@@ -2449,6 +2449,15 @@ function ContratosView({dashData,driveLoading}){
     }
     return null;
   }
+  /* UF base contra la que se calcula el % del paso idx: para el primer paso es
+     la UF inicial pactada en el contrato (c.ufInicio); para los siguientes, el
+     valor UF del paso anterior — así "1era Renov" en Trane compara contra los
+     385,93 UF originales y "2da Renov" contra los 404,43 UF resultantes. */
+  function baseUFParaColumna(c,idx){
+    if(idx===0)return c.ufInicio>0?c.ufInicio:null;
+    const prev=pasoParaColumna(c._ajusteItem,idx-1);
+    return prev&&prev.uf!=null?prev.uf:null;
+  }
   function renderAjusteCol(c,idx){
     const p=pasoParaColumna(c._ajusteItem,idx);
     if(!p){
@@ -2458,15 +2467,29 @@ function ContratosView({dashData,driveLoading}){
     const MESES_AJ=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
     const d=new Date(p.fecha+"T00:00:00");
     const fechaTxt=`${String(d.getDate()).padStart(2,"0")} ${MESES_AJ[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
-    const valorTxt=p.uf!=null?p.uf.toFixed(2).replace(".",",")+" UF":(p.pct!=null?"+"+p.pct+"%":"");
     const ordTxt=p.recurrente?"Recurrente":(["1era","2da","3era","4ta","5ta"][p.ord]||`${p.ord+1}ª`)+" Renov";
+    const fmtUF=v=>v.toFixed(2).replace(".",",");
+    const base=baseUFParaColumna(c,idx);
+    let valorTxt="",pctTxt=null;
+    if(p.uf!=null){
+      if(base>0){
+        const pct=((p.uf-base)/base)*100;
+        valorTxt=`${fmtUF(base)} → ${fmtUF(p.uf)} UF`;
+        pctTxt=(pct>=0?"+":"")+fmtUF(pct)+"%";
+      }else{
+        valorTxt=fmtUF(p.uf)+" UF";
+      }
+    }else if(p.pct!=null){
+      valorTxt="+"+p.pct+"%";
+    }
     const hoy=new Date(now.getFullYear(),now.getMonth(),now.getDate());
     const dias=Math.ceil((d-hoy)/86400000);
     const{bg,col,bdr}=urgBg(dias,true);
     return h("div",{onClick:e=>{e.stopPropagation();abrirAjusteModal(c);},style:{cursor:"pointer",display:"inline-flex",flexDirection:"column",gap:0,padding:"3px 8px",borderRadius:8,background:bg,border:"1px solid "+bdr}},
       h("span",{style:{fontSize:8,fontWeight:700,color:col,opacity:.85}},ordTxt),
       h("span",{style:{fontSize:10,fontWeight:700,color:col,fontFamily:"'DM Mono',monospace"}},fechaTxt),
-      valorTxt&&h("span",{style:{fontSize:9,color:col}},valorTxt)
+      valorTxt&&h("span",{style:{fontSize:9,color:col,fontFamily:"'DM Mono',monospace"}},valorTxt),
+      pctTxt&&h("span",{style:{fontSize:9,fontWeight:800,color:col}},"("+pctTxt+")")
     );
   }
   async function guardarAjuste(){
