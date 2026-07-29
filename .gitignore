@@ -20,3 +20,4 @@ debug-*.png
 
 # Sesión guardada de Aguas Andinas (cookies vivas — nunca versionar)
 scripts/aa-session.json
+scripts/aa-cookie-raw.txt
