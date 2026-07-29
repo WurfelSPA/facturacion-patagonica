@@ -1,9 +1,9 @@
 @echo off
-:: ──────────────────────────────────────────────────────────────────
+:: --------------------------------------------------------------------
 :: run-aa-local.bat
 :: Scrapea Aguas Andinas y actualiza aa-cache.json en GitHub.
 :: Configurar en Task Scheduler para correr diariamente a las 6:00 AM.
-:: ──────────────────────────────────────────────────────────────────
+:: --------------------------------------------------------------------
 
 cd /d C:\Users\amelendez\Documents\GitHub\facturacion-patagonica
 
@@ -21,6 +21,6 @@ if %errorlevel% equ 0 (
     git push
     echo [OK] Push completado.
 ) else (
-    echo [ERROR] El scraper falló. Revisar logs.
+    echo [ERROR] El scraper fallo. Revisar logs.
     exit /b 1
 )

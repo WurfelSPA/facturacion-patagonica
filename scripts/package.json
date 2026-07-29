@@ -1,0 +1,10 @@
+{
+  "name": "aa-scraper-local",
+  "version": "1.0.0",
+  "description": "Scraper local de Aguas Andinas (Playwright) — corre desde run-aa-local.bat con la IP del usuario, aislado del package.json raíz para no afectar el build de Vercel.",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "playwright": "^1.47.0"
+  }
+}

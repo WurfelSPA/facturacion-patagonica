@@ -14,3 +14,6 @@ historial-*.json
 # Excepción: JSON embebido en bundle de Vercel para historial (requerido por includeFiles en vercel.json)
 !historial-excel-2026.json
 scripts/run-aa-local.bat
+
+# Capturas de depuración del scraper AA (se generan en cada corrida local)
+debug-*.png
