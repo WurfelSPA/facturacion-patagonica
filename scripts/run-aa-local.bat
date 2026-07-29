@@ -7,9 +7,9 @@
 
 cd /d C:\Users\amelendez\Documents\GitHub\facturacion-patagonica
 
-:: Credenciales AA (editar con los valores reales)
-set AGUAS_RUT=96673250-4
-set AGUAS_CLAVE=PatagonicA2680
+:: Ya no requiere credenciales: reutiliza la sesion guardada en
+:: scripts\aa-session.json (generada por aa-login-manual.bat). Si el
+:: scraper avisa que la sesion expiro, correr aa-login-manual.bat primero.
 
 :: Correr scraper
 node scripts/aa-scraper.js

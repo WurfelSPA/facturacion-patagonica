@@ -17,3 +17,6 @@ scripts/run-aa-local.bat
 
 # Capturas de depuración del scraper AA (se generan en cada corrida local)
 debug-*.png
+
+# Sesión guardada de Aguas Andinas (cookies vivas — nunca versionar)
+scripts/aa-session.json

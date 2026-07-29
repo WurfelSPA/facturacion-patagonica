@@ -1,7 +1,17 @@
 /**
  * scripts/aa-scraper.js
  * Scrapea Aguas Andinas con Playwright y escribe aa-cache.json.
- * Variables de entorno: AGUAS_RUT, AGUAS_CLAVE
+ *
+ * Login automatizado: Imperva/Incapsula bloquea el submit del formulario de
+ * login incluso desde IP local (ver debug-post-login.png histórico, "Access
+ * Denied Error 15"). En vez de pelear con esa detección, este script SIEMPRE
+ * reutiliza una sesión ya autenticada guardada en AA_SESSION_PATH (generada
+ * por scripts/aa-login-manual.mjs, donde un humano se loguea de verdad en un
+ * navegador visible). Si la sesión no existe o expiró, el script falla con
+ * un mensaje claro en vez de intentar loguearse solo.
+ *
+ * Variables de entorno:
+ *   AA_SESSION_PATH  - ruta al storageState.json (default: scripts/aa-session.json)
  */
 
 import { chromium } from 'playwright';
@@ -11,15 +21,13 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const BASE_URL     = 'https://www.aguasandinas.cl';
-const LOGIN_PATH   = '/web/aguasandinas/login';
 const ACCOUNT_PATH = '/web/aguasandinas/informacion-de-la-cuenta';
-const CACHE_PATH   = path.join(__dirname, '..', 'aa-cache.json');
+const CACHE_PATH    = path.join(__dirname, '..', 'aa-cache.json');
+const SESSION_PATH  = process.env.AA_SESSION_PATH || path.join(__dirname, 'aa-session.json');
 
-const RUT   = process.env.AGUAS_RUT;
-const CLAVE = process.env.AGUAS_CLAVE;
-
-if (!RUT || !CLAVE) {
-  console.error('Faltan AGUAS_RUT o AGUAS_CLAVE');
+if (!fs.existsSync(SESSION_PATH)) {
+  console.error(`[aa-scraper] No hay sesión guardada en ${SESSION_PATH}.`);
+  console.error('[aa-scraper] Ejecuta primero: node scripts/aa-login-manual.mjs (o scripts\\aa-login-manual.bat)');
   process.exit(1);
 }
 
@@ -45,6 +53,7 @@ async function main() {
   });
 
   const context = await browser.newContext({
+    storageState: SESSION_PATH,
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
     viewport: { width: 1366, height: 768 },
     locale: 'es-CL',
@@ -62,73 +71,20 @@ async function main() {
   const page = await context.newPage();
 
   try {
-    // ── 1. Login ──────────────────────────────────────────────────────────────
-    console.log('[aa-scraper] Navegando al login...');
-    await page.goto(BASE_URL + LOGIN_PATH, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(5000);
+    // ── 1. Verificar sesión (sin loguearse — ver cabecera del archivo) ─────────
+    console.log('[aa-scraper] Verificando sesión guardada...');
+    await page.goto(BASE_URL + ACCOUNT_PATH, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForTimeout(3000);
+    await page.screenshot({ path: 'debug-sesion.png', fullPage: false }).catch(() => null);
 
-    // Screenshot de debug
-    await page.screenshot({ path: 'debug-login.png', fullPage: false });
-
-    const bodyHtml = await page.evaluate(() => document.body?.innerHTML?.slice(0, 500) || '');
-    console.log('[aa-scraper] HTML inicio:', bodyHtml.slice(0, 300));
-
-    if (bodyHtml.includes('_Incapsula_Resource') || bodyHtml.includes('incapsula')) {
-      console.log('[aa-scraper] Detectado challenge Incapsula, esperando 10s...');
-      await page.waitForTimeout(10000);
-      await page.screenshot({ path: 'debug-incapsula.png', fullPage: false });
+    if (page.url().includes('/login') || await page.$('input[type="password"]')) {
+      console.error('[aa-scraper] La sesión guardada expiró o no es válida.');
+      console.error('[aa-scraper] Ejecuta: node scripts/aa-login-manual.mjs (o scripts\\aa-login-manual.bat) para volver a loguearte.');
+      throw new Error('Sesión expirada — URL: ' + page.url());
     }
+    console.log('[aa-scraper] Sesión válida. URL: ' + page.url());
 
-    // Esperar input visible (no hidden). El header tiene un buscador oculto
-    // (name="_3_keywords") que matchea selectores genéricos pero nunca es
-    // visible, así que filtramos por :visible para quedarnos con los del form.
-    await page.waitForSelector('input[type="text"]:visible, input[type="password"]:visible', { timeout: 40000 });
-
-    async function firstVisible(selector) {
-      for (const handle of await page.$$(selector)) {
-        if (await handle.isVisible()) return handle;
-      }
-      return null;
-    }
-
-    const rutInput = await firstVisible(
-      'input[name*="rut" i], input[id*="rut" i], ' +
-      'input[placeholder*="RUT" i], input[name*="usuario" i], input[type="text"]'
-    );
-    const claveInput = await firstVisible('input[type="password"]');
-
-    if (!rutInput || !claveInput) {
-      const inputs = await page.evaluate(() =>
-        [...document.querySelectorAll('input')].map(i => ({ type: i.type, name: i.name, id: i.id }))
-      );
-      throw new Error('Campos login no encontrados. Inputs: ' + JSON.stringify(inputs).slice(0, 300));
-    }
-
-    await rutInput.fill(RUT);
-    await page.waitForTimeout(500);
-    await claveInput.fill(CLAVE);
-    await page.waitForTimeout(500);
-
-    const submitBtn = await firstVisible('button[type="submit"], input[type="submit"], .btn-login, button[class*="login"]');
-    if (submitBtn) await submitBtn.click();
-    else await page.keyboard.press('Enter');
-
-    // El login puede ser un redirect completo o un submit AJAX (sin navegación),
-    // así que no dependemos únicamente de waitForNavigation.
-    await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => null);
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => null);
-    await page.screenshot({ path: 'debug-post-login.png', fullPage: false }).catch(() => null);
-
-    const stillOnLoginForm = await page.$('input[type="password"]');
-    if (stillOnLoginForm || page.url().includes('/login')) {
-      throw new Error('Login fallido — verificar credenciales. URL: ' + page.url());
-    }
-    console.log('[aa-scraper] Login OK. URL: ' + page.url());
-
-    // ── 2. Obtener links de cuentas ───────────────────────────────────────────
-    await page.goto(BASE_URL + ACCOUNT_PATH, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(2000);
-
+    // ── 2. Obtener links de cuentas (misma página cargada en el paso 1) ────────
     const accountLinks = await page.evaluate(() =>
       [...document.querySelectorAll('a')]
         .filter(a => /\d{6,}-\d/.test(a.textContent) && a.href.includes('cuentaRender'))
@@ -194,7 +150,7 @@ async function main() {
     const cacheData = {
       ok: true,
       updatedAt: new Date().toISOString(),
-      source: 'github-actions',
+      source: process.env.GITHUB_ACTIONS ? 'github-actions' : 'local',
       accounts
     };
     fs.writeFileSync(CACHE_PATH, JSON.stringify(cacheData, null, 2), 'utf-8');
