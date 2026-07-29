@@ -8,8 +8,8 @@
 cd /d C:\Users\amelendez\Documents\GitHub\facturacion-patagonica
 
 :: Credenciales AA (editar con los valores reales)
-set AGUAS_RUT=TU_RUT_AA
-set AGUAS_CLAVE=TU_CLAVE_AA
+set AGUAS_RUT=96673250-4
+set AGUAS_CLAVE=PatagonicA2680
 
 :: Correr scraper
 node scripts/aa-scraper.js
