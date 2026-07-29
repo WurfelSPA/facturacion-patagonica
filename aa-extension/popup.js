@@ -5,7 +5,10 @@ btn.addEventListener('click', async () => {
   btn.disabled = true;
   statusEl.textContent = 'Leyendo cookies de aguasandinas.cl...';
   try {
-    const cookies = await chrome.cookies.getAll({ domain: 'aguasandinas.cl' });
+    // "url" replica exactamente qué cookies enviaría el navegador a esa URL
+    // (incluye host-only cookies de www.aguasandinas.cl); el filtro "domain"
+    // dejaba fuera JSESSIONID/incap_ses_*/reese84 y solo traía 4 de ~24.
+    const cookies = await chrome.cookies.getAll({ url: 'https://www.aguasandinas.cl/' });
     if (!cookies.length) {
       statusEl.textContent = 'No se encontraron cookies. ¿Estás logueado en aguasandinas.cl?';
       btn.disabled = false;
