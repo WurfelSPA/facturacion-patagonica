@@ -2450,7 +2450,12 @@ function ContratosView({dashData,driveLoading}){
     const pasos=pasosOrdenadosDe(item);
     if(pasos[idx])return{...pasos[idx],ord:idx,recurrente:false};
     if(idx===pasos.length&&item.recurrente&&item.recurrente.cadaAnios){
-      const base0=pasos.length?pasos[pasos.length-1].fecha:item.recurrente.desde;
+      /* "desde" es la fecha del primer ciclo recurrente tal como se pactó en
+         el contrato (puede NO ser paso.fecha + cadaAnios exactos — ej. Caja 18
+         de Septiembre: último paso 2018, pero el primer ciclo recurrente de
+         5% cada 5 años parte recién en 2021) — siempre tiene prioridad;
+         "último paso" es solo el resguardo si no se registró "desde". */
+      const base0=item.recurrente.desde||(pasos.length?pasos[pasos.length-1].fecha:null);
       if(base0){
         const hoy0=new Date();const hoy=new Date(hoy0.getFullYear(),hoy0.getMonth(),hoy0.getDate());
         let base=new Date(base0+"T00:00:00");
@@ -2470,6 +2475,23 @@ function ContratosView({dashData,driveLoading}){
     if(idx===0)return c.ufInicio>0?c.ufInicio:null;
     const prev=pasoParaColumna(c._ajusteItem,idx-1);
     return prev&&prev.uf!=null?prev.uf:null;
+  }
+  /* Para las 2 columnas visibles priorizamos lo próximo/vigente por sobre lo
+     histórico: si un contrato ya tiene 2+ pasos pactados en el pasado (ej.
+     Caja 18 de Septiembre: pasos de 2017 y 2018) y una regla recurrente que
+     recién proyecta a futuro, mostrar los 2 pasos vencidos "tapaba" la
+     próxima fecha relevante. Se ordenan los eventos futuros/de hoy primero
+     (el más próximo primero) y solo se rellena con pasados (el más reciente
+     primero) si no alcanzan 2 eventos futuros. El "ord" cronológico de cada
+     evento se conserva para las etiquetas y el cálculo de UF base. */
+  function eventosPriorizados(item){
+    if(!item)return[];
+    const eventos=[];
+    for(let i=0;;i++){const e=pasoParaColumna(item,i);if(!e)break;eventos.push(e);}
+    const hoy0=new Date();const hoy=new Date(hoy0.getFullYear(),hoy0.getMonth(),hoy0.getDate());
+    const futuros=eventos.filter(e=>new Date(e.fecha+"T00:00:00")>=hoy).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
+    const pasados=eventos.filter(e=>new Date(e.fecha+"T00:00:00")<hoy).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+    return[...futuros,...pasados];
   }
   /* Bloque visual compartido entre las columnas de Ajuste Intermedio y, cuando
      corresponde, la columna Renovación (ver renderRenovacionCol). */
@@ -2502,7 +2524,7 @@ function ContratosView({dashData,driveLoading}){
     );
   }
   function renderAjusteCol(c,idx){
-    const p=pasoParaColumna(c._ajusteItem,idx);
+    const p=eventosPriorizados(c._ajusteItem)[idx];
     const renovIso=renovacionISO(c);
     if(p&&renovIso&&p.fecha===renovIso)return h("span",{style:{color:"var(--txd)",fontSize:10}},"—");
     if(!p){
@@ -2589,8 +2611,8 @@ function ContratosView({dashData,driveLoading}){
       case"aviso":return r.aviso||"";
       case"freajuste":return parseDate(r.fechaReajuste)||new Date(0);
       case"pctreaj":return r.pctReaj&&r.pctReaj!=="-"?parseFloat(r.pctReaj):-Infinity;
-      case"ai1":{const p=pasoParaColumna(r._ajusteItem,0);return p?new Date(p.fecha+"T00:00:00"):new Date(8640000000000000);}
-      case"ai2":{const p=pasoParaColumna(r._ajusteItem,1);return p?new Date(p.fecha+"T00:00:00"):new Date(8640000000000000);}
+      case"ai1":{const p=eventosPriorizados(r._ajusteItem)[0];return p?new Date(p.fecha+"T00:00:00"):new Date(8640000000000000);}
+      case"ai2":{const p=eventosPriorizados(r._ajusteItem)[1];return p?new Date(p.fecha+"T00:00:00"):new Date(8640000000000000);}
       case"cada":return r.cadaAnios?parseFloat(r.cadaAnios):-Infinity;
       case"m2":return r.m2!=null?r.m2:-Infinity;
       case"ufm2":return r.ufM2!=null?r.ufM2:-Infinity;
