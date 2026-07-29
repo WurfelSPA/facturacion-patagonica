@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "AA Session Exporter — Patagónica",
+  "version": "1.0",
+  "description": "Envía tu sesión de aguasandinas.cl al scraper local de Patagónica Inmobiliaria (solo uso personal).",
+  "permissions": ["cookies"],
+  "host_permissions": [
+    "https://www.aguasandinas.cl/*",
+    "http://127.0.0.1/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Enviar sesión AA"
+  }
+}
