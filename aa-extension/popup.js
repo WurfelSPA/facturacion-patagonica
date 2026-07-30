@@ -1,5 +1,41 @@
 const btn = document.getElementById('btn');
+const diagBtn = document.getElementById('diag');
 const statusEl = document.getElementById('status');
+
+diagBtn.addEventListener('click', async () => {
+  diagBtn.disabled = true;
+  statusEl.textContent = 'Probando distintas formas de buscar cookies...';
+  const lineas = [];
+  const objetivo = ['JSESSIONID', 'reese84'];
+
+  async function probar(etiqueta, filtro) {
+    try {
+      const cs = await chrome.cookies.getAll(filtro);
+      const encontradas = objetivo.filter(nombre => cs.some(c => c.name === nombre));
+      lineas.push(`${etiqueta}: ${cs.length} cookies | encontró: ${encontradas.length ? encontradas.join(',') : 'ninguna'}`);
+    } catch (e) {
+      lineas.push(`${etiqueta}: ERROR ${e.message}`);
+    }
+  }
+
+  await probar('domain=aguasandinas.cl', { domain: 'aguasandinas.cl' });
+  await probar('domain=www.aguasandinas.cl', { domain: 'www.aguasandinas.cl' });
+  await probar('url=https://www.aguasandinas.cl/', { url: 'https://www.aguasandinas.cl/' });
+  await probar('sin filtro (getAll({}))', {});
+
+  // Buscar en TODAS las cookies visibles (aunque no sean de aguasandinas) por si
+  // el Domain real no contiene ese texto.
+  try {
+    const todas = await chrome.cookies.getAll({});
+    for (const nombre of objetivo) {
+      const c = todas.find(c => c.name === nombre);
+      lineas.push(c ? `${nombre} SÍ existe → domain real: "${c.domain}", path: "${c.path}"` : `${nombre} no aparece en NINGUNA cookie visible para la extensión`);
+    }
+  } catch (e) {}
+
+  statusEl.textContent = lineas.join('\n');
+  diagBtn.disabled = false;
+});
 
 btn.addEventListener('click', async () => {
   btn.disabled = true;
