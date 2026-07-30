@@ -50,7 +50,11 @@ function runStep(cmd, args, opts) {
 }
 
 async function onCookiesRecibidas(cookies) {
-  console.log(`[aa-listen] ${cookies.length} cookies recibidas. Guardando sesión...`);
+  console.log(`[aa-listen] ${cookies.length} cookies recibidas: ${cookies.map(c => c.name).join(', ')}`);
+  const criticas = ['JSESSIONID', 'reese84', 'incap_ses'];
+  const faltantes = criticas.filter(nombre => !cookies.some(c => c.name.includes(nombre)));
+  if (faltantes.length) console.warn(`[aa-listen] AVISO: faltan cookies críticas: ${faltantes.join(', ')}`);
+  console.log('[aa-listen] Guardando sesión...');
   fs.writeFileSync(SESSION_PATH, JSON.stringify(toStorageState(cookies), null, 2), 'utf-8');
 
   console.log('[aa-listen] Corriendo scraper (puede tardar unos minutos)...');
