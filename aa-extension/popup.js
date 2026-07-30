@@ -5,18 +5,14 @@ btn.addEventListener('click', async () => {
   btn.disabled = true;
   statusEl.textContent = 'Leyendo cookies de aguasandinas.cl...';
   try {
-    // Usamos la URL real de la pestaña activa (no una fija en la raíz "/"):
-    // varias cookies clave (JSESSIONID, incap_ses_*, reese84) tienen un Path
-    // más específico que "/", así que filtrar por la raíz las dejaba fuera
-    // (solo traía 4 de ~24). Pedir por la URL exacta donde estás logueado
-    // replica lo que el navegador realmente enviaría en esa página.
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab || !tab.url || !tab.url.includes('aguasandinas.cl')) {
-      statusEl.textContent = 'Abre primero una pestaña en aguasandinas.cl (logueado) y vuelve a intentar.';
-      btn.disabled = false;
-      return;
-    }
-    const cookies = await chrome.cookies.getAll({ url: tab.url });
+    // Filtrar por url/domain dejaba fuera cookies clave (JSESSIONID,
+    // incap_ses_*, reese84) por diferencias de Path/Domain que no logramos
+    // calzar exactamente (solo traía 4 de ~24, siempre las mismas 4).
+    // chrome.cookies.getAll({}) sin filtro devuelve TODO lo que la extensión
+    // puede ver — y ese alcance ya está acotado por host_permissions en el
+    // manifest, así que no perdemos nada filtrando en código.
+    const todas = await chrome.cookies.getAll({});
+    const cookies = todas.filter(c => c.domain && c.domain.includes('aguasandinas'));
     if (!cookies.length) {
       statusEl.textContent = 'No se encontraron cookies. ¿Estás logueado en aguasandinas.cl?';
       btn.disabled = false;
