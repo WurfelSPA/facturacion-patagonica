@@ -5,10 +5,18 @@ btn.addEventListener('click', async () => {
   btn.disabled = true;
   statusEl.textContent = 'Leyendo cookies de aguasandinas.cl...';
   try {
-    // "url" replica exactamente qué cookies enviaría el navegador a esa URL
-    // (incluye host-only cookies de www.aguasandinas.cl); el filtro "domain"
-    // dejaba fuera JSESSIONID/incap_ses_*/reese84 y solo traía 4 de ~24.
-    const cookies = await chrome.cookies.getAll({ url: 'https://www.aguasandinas.cl/' });
+    // Usamos la URL real de la pestaña activa (no una fija en la raíz "/"):
+    // varias cookies clave (JSESSIONID, incap_ses_*, reese84) tienen un Path
+    // más específico que "/", así que filtrar por la raíz las dejaba fuera
+    // (solo traía 4 de ~24). Pedir por la URL exacta donde estás logueado
+    // replica lo que el navegador realmente enviaría en esa página.
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab || !tab.url || !tab.url.includes('aguasandinas.cl')) {
+      statusEl.textContent = 'Abre primero una pestaña en aguasandinas.cl (logueado) y vuelve a intentar.';
+      btn.disabled = false;
+      return;
+    }
+    const cookies = await chrome.cookies.getAll({ url: tab.url });
     if (!cookies.length) {
       statusEl.textContent = 'No se encontraron cookies. ¿Estás logueado en aguasandinas.cl?';
       btn.disabled = false;
