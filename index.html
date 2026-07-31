@@ -3178,7 +3178,7 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
             "💧 AA — "+(aaUpdatedAt?"act. "+new Date(aaUpdatedAt).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"}):"sin datos")
           ),
           h("span",{style:{fontSize:9,color:ENEL_GRN,whiteSpace:"nowrap",fontWeight:500},title:"Deuda Enel: actualizada automáticamente cada día a las 6:00 AM"},
-            "⚡ Enel — "+(enelUpdatedAt?"act. "+new Date(enelUpdatedAt).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"})+" (cada día 6 am)":"sin datos")
+            "⚡ Enel — "+(enelUpdatedAt?"act. "+new Date(enelUpdatedAt).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"}):"sin datos")
           )
         ),
         h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente, sitio, RUT...",style:{width:200}}),
