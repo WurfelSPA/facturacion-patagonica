@@ -2997,7 +2997,7 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
         });
       });
       if(!resp||!resp.ok)throw new Error((resp&&resp.error)||"Error desconocido");
-      notify?.("⟳ Sesión enviada — el scraping corre en la nube (~5-9 min)","info");
+      notify?.("⟳ Sesión enviada — el scraping corre en la nube (~5-9 min)","ok");
     }catch(e){notify?.("Error al actualizar AA: "+e.message,"err");}
     setAaRefreshing(false);
   },[aaRefreshing,notify]);
