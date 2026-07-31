@@ -64,7 +64,7 @@ diagBtn.addEventListener('click', async () => {
   diagBtn.disabled = false;
 });
 
-const N8N_WEBHOOK_URL = 'https://wurfel.app.n8n.cloud/webhook/aa-import-session';
+const N8N_WEBHOOK_URL = 'https://wurfel.app.n8n.cloud/webhook/aa-import-session-v2';
 
 // chrome.cookies usa sameSite: 'no_restriction'|'lax'|'strict'|'unspecified' y
 // expirationDate en segundos Unix; Puppeteer (que corre en Browserless) espera
