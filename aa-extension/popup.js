@@ -64,6 +64,29 @@ diagBtn.addEventListener('click', async () => {
   diagBtn.disabled = false;
 });
 
+const N8N_WEBHOOK_URL = 'https://wurfel.app.n8n.cloud/webhook/3535c25a-a7f1-4a2a-a376-23dba9b990b9/aa-import-session';
+
+// chrome.cookies usa sameSite: 'no_restriction'|'lax'|'strict'|'unspecified' y
+// expirationDate en segundos Unix; Puppeteer (que corre en Browserless) espera
+// sameSite: 'None'|'Lax'|'Strict' y expires en segundos Unix (o ausente/-1
+// para cookies de sesión). Se convierte acá para que el workflow n8n no tenga
+// que adivinar el formato.
+function toPuppeteerCookie(c) {
+  const out = {
+    name: c.name,
+    value: c.value,
+    domain: c.domain,
+    path: c.path || '/',
+    httpOnly: !!c.httpOnly,
+    secure: !!c.secure
+  };
+  if (!c.session && c.expirationDate) out.expires = c.expirationDate;
+  if (c.sameSite === 'no_restriction') out.sameSite = 'None';
+  else if (c.sameSite === 'lax') out.sameSite = 'Lax';
+  else if (c.sameSite === 'strict') out.sameSite = 'Strict';
+  return out;
+}
+
 btn.addEventListener('click', async () => {
   btn.disabled = true;
   statusEl.textContent = 'Leyendo cookies de aguasandinas.cl...';
@@ -87,19 +110,19 @@ btn.addEventListener('click', async () => {
       btn.disabled = false;
       return;
     }
-    statusEl.textContent = `Enviando ${cookies.length} cookies a scripts\\aa-listen-and-refresh...`;
-    const res = await fetch('http://127.0.0.1:8934/import', {
+    statusEl.textContent = `Enviando ${cookies.length} cookies a n8n...`;
+    const res = await fetch(N8N_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cookies })
+      body: JSON.stringify({ cookies: cookies.map(toPuppeteerCookie) })
     });
     if (res.ok) {
-      statusEl.textContent = '✅ Sesión enviada. Revisa la terminal: ya está corriendo el scraper y el push automáticamente.';
+      statusEl.textContent = '✅ Sesión enviada a n8n. El scraping corre en la nube (~5-9 min) y actualiza aa-cache.json solo.';
     } else {
-      statusEl.textContent = '❌ El listener respondió con error ' + res.status;
+      statusEl.textContent = '❌ n8n respondió con error ' + res.status;
     }
   } catch (e) {
-    statusEl.textContent = '❌ No se pudo conectar (' + e.message + '). ¿Corriste scripts\\aa-listen-and-refresh.bat antes de hacer clic?';
+    statusEl.textContent = '❌ No se pudo conectar a n8n: ' + e.message;
   } finally {
     btn.disabled = false;
   }

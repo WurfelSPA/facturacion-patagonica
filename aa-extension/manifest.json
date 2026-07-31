@@ -7,7 +7,7 @@
   "host_permissions": [
     "https://www.aguasandinas.cl/*",
     "https://aguasandinas.cl/*",
-    "http://127.0.0.1/*"
+    "https://wurfel.app.n8n.cloud/*"
   ],
   "action": {
     "default_popup": "popup.html",
