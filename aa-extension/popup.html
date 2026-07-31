@@ -6,14 +6,18 @@
   body { font-family: system-ui, sans-serif; width: 280px; padding: 14px; }
   h3 { margin: 0 0 10px; font-size: 14px; }
   button { width: 100%; padding: 10px; font-size: 13px; font-weight: 600; border: none;
-           border-radius: 8px; background: #1a5fa8; color: #fff; cursor: pointer; }
+           border-radius: 8px; color: #fff; cursor: pointer; margin-top: 8px; }
+  button:first-of-type { margin-top: 0; }
+  #btnAA { background: #1a5fa8; }
+  #btnEnel { background: #00873D; }
   button:disabled { background: #999; cursor: not-allowed; }
   #status { margin-top: 10px; font-size: 12px; color: #444; white-space: pre-wrap; }
 </style>
 </head>
 <body>
-  <h3>💧 Aguas Andinas → Patagónica</h3>
-  <button id="btn">Enviar sesión al scraper local</button>
+  <h3>Patagónica → Cuentas Servicios</h3>
+  <button id="btnAA">💧 Enviar sesión Aguas Andinas</button>
+  <button id="btnEnel">⚡ Enviar sesión Enel</button>
   <div id="status"></div>
   <script src="popup.js"></script>
 </body>

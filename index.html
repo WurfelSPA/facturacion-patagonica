@@ -2982,6 +2982,7 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
   const [enelUpdatedAt,setEnelUpdatedAt]=useState(null);
   const [sortCol,setSortCol]=useState(null);
   const [aaRefreshing,setAaRefreshing]=useState(false);
+  const [enelRefreshing,setEnelRefreshing]=useState(false);
   const AA_EXTENSION_ID="bpneagagdmfgbidenbgdmpinnpflcaif";
   const actualizarAA=useCallback(async()=>{
     if(aaRefreshing)return;
@@ -3001,6 +3002,24 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
     }catch(e){notify?.("Error al actualizar AA: "+e.message,"err");}
     setAaRefreshing(false);
   },[aaRefreshing,notify]);
+  const actualizarEnel=useCallback(async()=>{
+    if(enelRefreshing)return;
+    setEnelRefreshing(true);
+    try{
+      if(!window.chrome||!chrome.runtime||!chrome.runtime.sendMessage){
+        throw new Error("Instala la extensión de Chrome AA/Enel Session Exporter y ten la sesión de enel.cl iniciada");
+      }
+      const resp=await new Promise((resolve,reject)=>{
+        chrome.runtime.sendMessage(AA_EXTENSION_ID,{action:"exportarSesionEnel"},(r)=>{
+          if(chrome.runtime.lastError)reject(new Error(chrome.runtime.lastError.message));
+          else resolve(r);
+        });
+      });
+      if(!resp||!resp.ok)throw new Error((resp&&resp.error)||"Error desconocido");
+      notify?.("⟳ Sesión enviada — el scraping corre en la nube (~1-2 min)","ok");
+    }catch(e){notify?.("Error al actualizar Enel: "+e.message,"err");}
+    setEnelRefreshing(false);
+  },[enelRefreshing,notify]);
   const [sortDir,setSortDir]=useState('asc');
 
   /* Fetch automático del caché de deudas AA (actualizado diariamente a las 6am) */
@@ -3150,7 +3169,8 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
         enelLoading&&h("span",{style:{fontSize:9,color:ENEL_GRN},className:"spin"},"\u29B3"),
         !enelLoading&&enelError&&h("span",{style:{fontSize:10,color:"var(--err)",cursor:"default"},title:enelError},"\u26A0\uFE0F"),
         !enelLoading&&sinAsignarEnel>0&&h("span",{title:"Cuentas en el portal Enel sin cliente asignado en la planilla (ver filas al final de la tabla)",style:{fontSize:10,color:"#7c3aed",background:"#f3f0ff",border:"1px solid #c4b5fd",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",fontWeight:700,cursor:"default"}},"\u26A1 "+sinAsignarEnel+" sin asignar"),
-        !enelLoading&&conDeudaEnel>0&&h("span",{title:"Cuentas con deuda vigente en Enel",style:{fontSize:10,color:"#dc2626",background:"var(--rbg)",border:"1px solid var(--rdim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",fontWeight:700,cursor:"default"}},"\u26A1 "+conDeudaEnel+" con deuda")
+        !enelLoading&&conDeudaEnel>0&&h("span",{title:"Cuentas con deuda vigente en Enel",style:{fontSize:10,color:"#dc2626",background:"var(--rbg)",border:"1px solid var(--rdim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",fontWeight:700,cursor:"default"}},"\u26A1 "+conDeudaEnel+" con deuda"),
+        h("button",{onClick:actualizarEnel,disabled:enelRefreshing,title:"La sesi\u00F3n de Enel debe estar iniciada",style:{fontSize:10,padding:"2px 8px",borderRadius:6,border:"1px solid "+ENEL_GRN,background:"transparent",color:ENEL_GRN,cursor:enelRefreshing?"wait":"pointer",opacity:enelRefreshing?0.6:1,display:"flex",alignItems:"center",gap:4}},enelRefreshing?h("span",{className:"spin"},"\u27F3"):"\u27F3","Actualizar")
       ),
       h("div",{style:{display:"flex",alignItems:"center",gap:8}},
         h("div",{style:{display:"flex",flexDirection:"column",gap:2,alignItems:"flex-end",marginRight:4}},

@@ -1,4 +1,5 @@
-const N8N_WEBHOOK_URL = 'https://wurfel.app.n8n.cloud/webhook/aa-import-session-v2';
+const N8N_WEBHOOK_URL_AA = 'https://wurfel.app.n8n.cloud/webhook/aa-import-session-v2';
+const N8N_WEBHOOK_URL_ENEL = 'https://wurfel.app.n8n.cloud/webhook/enel-import-session';
 
 // chrome.cookies usa sameSite: 'no_restriction'|'lax'|'strict'|'unspecified' y
 // expirationDate en segundos Unix; Puppeteer/BrowserQL (que corren en Browserless)
@@ -19,26 +20,25 @@ function toPuppeteerCookie(c) {
   return out;
 }
 
-async function exportarSesionAA() {
-  // getAll({}) trae la mayoría, pero por una rareza de la API de Chrome omite
-  // JSESSIONID y reese84 aunque SÍ existen (confirmado con chrome.cookies.get()
-  // por nombre exacto). Se combinan ambos resultados para no perder las críticas.
+async function exportarSesion({ dominioFiltro, criticas, webhookUrl, urlParaCriticas }) {
+  // getAll({}) trae la mayoría, pero por una rareza de la API de Chrome a veces
+  // omite algunas cookies críticas aunque SÍ existen (confirmado con
+  // chrome.cookies.get() por nombre exacto). Se combinan ambos resultados.
   const todas = await chrome.cookies.getAll({});
-  const cookies = todas.filter(c => c.domain && c.domain.includes('aguasandinas'));
+  const cookies = todas.filter(c => c.domain && c.domain.includes(dominioFiltro));
 
-  const criticas = ['JSESSIONID', 'reese84'];
   for (const nombre of criticas) {
     if (cookies.some(c => c.name === nombre)) continue;
-    const c = await chrome.cookies.get({ url: 'https://www.aguasandinas.cl/', name: nombre }).catch(() => null);
+    const c = await chrome.cookies.get({ url: urlParaCriticas, name: nombre }).catch(() => null);
     if (c) cookies.push(c);
   }
 
   if (!cookies.length) {
-    return { ok: false, error: 'No se encontraron cookies. ¿Estás logueado en aguasandinas.cl?' };
+    return { ok: false, error: `No se encontraron cookies. ¿Estás logueado en ${dominioFiltro}?` };
   }
 
   try {
-    const res = await fetch(N8N_WEBHOOK_URL, {
+    const res = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cookies: cookies.map(toPuppeteerCookie) })
@@ -50,9 +50,31 @@ async function exportarSesionAA() {
   }
 }
 
+function exportarSesionAA() {
+  return exportarSesion({
+    dominioFiltro: 'aguasandinas',
+    criticas: ['JSESSIONID', 'reese84'],
+    webhookUrl: N8N_WEBHOOK_URL_AA,
+    urlParaCriticas: 'https://www.aguasandinas.cl/'
+  });
+}
+
+function exportarSesionEnel() {
+  return exportarSesion({
+    dominioFiltro: 'enel.cl',
+    criticas: [],
+    webhookUrl: N8N_WEBHOOK_URL_ENEL,
+    urlParaCriticas: 'https://www.enel.cl/'
+  });
+}
+
 function manejarMensaje(msg, sender, sendResponse) {
   if (msg && msg.action === 'exportarSesionAA') {
     exportarSesionAA().then(sendResponse).catch(e => sendResponse({ ok: false, error: e.message }));
+    return true; // respuesta async
+  }
+  if (msg && msg.action === 'exportarSesionEnel') {
+    exportarSesionEnel().then(sendResponse).catch(e => sendResponse({ ok: false, error: e.message }));
     return true; // respuesta async
   }
 }
