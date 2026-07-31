@@ -110,7 +110,14 @@ async function main() {
       const link = accountLinks[i];
       try {
         await page.goto(link.href, { waitUntil: 'domcontentloaded', timeout: 20000 });
-        await page.waitForTimeout(1500);
+        await page.waitForTimeout(2200 + Math.random() * 1200);
+
+        // Si a mitad de la corrida la sesión se degrada (probable rate-limit
+        // por navegar demasiado rápido entre cuentas), detectarlo temprano y
+        // frenar en vez de seguir escribiendo $0 falsos para el resto.
+        if (page.url().includes('/login') || await page.$('input[type="password"]')) {
+          throw new Error('SESION_PERDIDA_A_MITAD_DE_CORRIDA');
+        }
 
         const deudaRaw = await page.$eval('span.total_deuda', el => el.textContent.trim()).catch(() => '$0');
         const divText  = await page.$eval('#divmonto', el => el.innerText).catch(() => '');
@@ -139,11 +146,20 @@ async function main() {
         accounts[link.id] = { deuda: fmtDeuda(deudaRaw), vencimiento: fecha, nombre };
         console.log(`[aa-scraper] ${i + 1}/${accountLinks.length} ${link.id}: ${fmtDeuda(deudaRaw)}`);
       } catch (e) {
+        if (e.message === 'SESION_PERDIDA_A_MITAD_DE_CORRIDA') {
+          throw new Error(`Sesión perdida en la cuenta ${i + 1}/${accountLinks.length} (${link.id}) — abortando sin guardar cache parcial. Vuelve a exportar la sesión.`);
+        }
         console.warn(`[aa-scraper] Error ${link.id}:`, e.message);
         accounts[link.id] = existingCache.accounts?.[link.id] || { deuda: null, error: e.message };
       }
 
-      await page.waitForTimeout(300);
+      // Cada 12 cuentas, pausa más larga para no verse como ráfaga continua.
+      if ((i + 1) % 12 === 0) {
+        console.log('[aa-scraper] Pausa breve...');
+        await page.waitForTimeout(6000 + Math.random() * 3000);
+      } else {
+        await page.waitForTimeout(500);
+      }
     }
 
     // ── 4. Guardar cache ──────────────────────────────────────────────────────
