@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updatedAt": "2026-07-31T12:43:29.956Z",
+  "updatedAt": "2026-07-31T13:05:01.861Z",
   "source": "local",
   "accounts": {
     "672977-0": {
@@ -9,7 +9,7 @@
       "nombre": null
     },
     "1009146-2": {
-      "deuda": "$1.550",
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
@@ -18,68 +18,28 @@
       "vencimiento": null,
       "nombre": null
     },
-    "1127147-2": {
-      "deuda": "$621.270",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1127136-7": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1534321-4": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1973011-5": {
+    "1127130-8": {
       "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
     "1127131-6": {
-      "deuda": "$90.270",
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
     "1127132-4": {
-      "deuda": "$58.170",
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1127133-2": {
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
     "1127134-0": {
-      "deuda": "$60.470",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1127138-3": {
-      "deuda": "$164.310",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1127141-3": {
-      "deuda": "$27.460",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1127142-1": {
-      "deuda": "$7.864",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1127145-6": {
-      "deuda": "$2.340",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1127146-4": {
-      "deuda": "$950",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1127149-9": {
-      "deuda": "$395.050",
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
@@ -88,28 +48,73 @@
       "vencimiento": null,
       "nombre": null
     },
+    "1127136-7": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
     "1127137-5": {
-      "deuda": "$12.017",
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1127138-3": {
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
     "1127139-1": {
-      "deuda": "$71.540",
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
     "1127140-5": {
-      "deuda": "$12.070",
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1127141-3": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1127142-1": {
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
     "1127144-8": {
-      "deuda": "$23.092",
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1127145-6": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1127146-4": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1127147-2": {
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
     "1127148-0": {
-      "deuda": "$12.690",
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1127149-9": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1127150-2": {
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
@@ -123,27 +128,7 @@
       "vencimiento": null,
       "nombre": null
     },
-    "1127204-5": {
-      "deuda": "$164.240",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1127206-1": {
-      "deuda": "$74.920",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1127150-2": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1127130-8": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1127133-2": {
+    "1127153-7": {
       "deuda": "$0",
       "vencimiento": null,
       "nombre": null
@@ -153,28 +138,33 @@
       "vencimiento": null,
       "nombre": null
     },
-    "1127153-7": {
+    "1127204-5": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1127206-1": {
       "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
     "1127208-8": {
-      "deuda": "$50.750",
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
     "1127209-6": {
-      "deuda": "$14.780",
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
     "1127211-8": {
-      "deuda": "$79.100",
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
     "1127212-6": {
-      "deuda": "$58.170",
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
@@ -183,18 +173,68 @@
       "vencimiento": null,
       "nombre": null
     },
+    "1534317-6": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
     "1534318-4": {
-      "deuda": "$203.290",
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
     "1534319-2": {
-      "deuda": "$1.399.990",
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
     "1534320-6": {
-      "deuda": "$42.760",
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1534321-4": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1534322-2": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1534323-0": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1534324-9": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1534325-7": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1534326-5": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1534327-3": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1534328-1": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1534330-3": {
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
@@ -223,103 +263,53 @@
       "vencimiento": null,
       "nombre": null
     },
-    "1596665-3": {
-      "deuda": "$374.690",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1637811-9": {
-      "deuda": "$16.300",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1637812-7": {
-      "deuda": "$47.000",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1637814-3": {
-      "deuda": "$16.300",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1664824-8": {
-      "deuda": "$28.020",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1752045-8": {
-      "deuda": "$18.220",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1973010-7": {
-      "deuda": "$38.750",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1534317-6": {
+    "1596662-9": {
       "deuda": "$0",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1534322-2": {
-      "deuda": "$950",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1534323-0": {
-      "deuda": "$32.783",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1534324-9": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1534325-7": {
-      "deuda": "$6.480",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1534326-5": {
-      "deuda": "$18.940",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1534327-3": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1534328-1": {
-      "deuda": "$52.160",
-      "vencimiento": null,
-      "nombre": null
-    },
-    "1534330-3": {
-      "deuda": "$158.765",
       "vencimiento": null,
       "nombre": null
     },
     "1596663-7": {
-      "deuda": "$10.634",
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
     "1596664-5": {
-      "deuda": "$9.630",
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1596665-3": {
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
     "1596666-1": {
-      "deuda": "$85.370",
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1637811-9": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1637812-7": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1637814-3": {
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
     "1664822-1": {
-      "deuda": "$23.092",
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1664824-8": {
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
@@ -334,17 +324,27 @@
       "nombre": null
     },
     "1717633-1": {
-      "deuda": "$54.934",
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1752045-8": {
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
     "1782609-3": {
-      "deuda": "$1.513.262",
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
-    "1596662-9": {
-      "deuda": "$240.446",
+    "1973010-7": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1973011-5": {
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     }
