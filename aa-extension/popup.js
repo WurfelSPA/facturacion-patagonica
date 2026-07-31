@@ -68,14 +68,20 @@ btn.addEventListener('click', async () => {
   btn.disabled = true;
   statusEl.textContent = 'Leyendo cookies de aguasandinas.cl...';
   try {
-    // Filtrar por url/domain dejaba fuera cookies clave (JSESSIONID,
-    // incap_ses_*, reese84) por diferencias de Path/Domain que no logramos
-    // calzar exactamente (solo traía 4 de ~24, siempre las mismas 4).
-    // chrome.cookies.getAll({}) sin filtro devuelve TODO lo que la extensión
-    // puede ver — y ese alcance ya está acotado por host_permissions en el
-    // manifest, así que no perdemos nada filtrando en código.
+    // getAll({}) trae la mayoría, pero por alguna rareza de la API de Chrome
+    // omite JSESSIONID y reese84 aunque SÍ existen (confirmado con
+    // chrome.cookies.get() por nombre exacto, que a esas dos sí las
+    // encuentra). Se combinan ambos resultados para no perder las críticas.
     const todas = await chrome.cookies.getAll({});
     const cookies = todas.filter(c => c.domain && c.domain.includes('aguasandinas'));
+
+    const criticas = ['JSESSIONID', 'reese84'];
+    for (const nombre of criticas) {
+      if (cookies.some(c => c.name === nombre)) continue;
+      const c = await chrome.cookies.get({ url: 'https://www.aguasandinas.cl/', name: nombre }).catch(() => null);
+      if (c) cookies.push(c);
+    }
+
     if (!cookies.length) {
       statusEl.textContent = 'No se encontraron cookies. ¿Estás logueado en aguasandinas.cl?';
       btn.disabled = false;
