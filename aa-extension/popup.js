@@ -33,6 +33,33 @@ diagBtn.addEventListener('click', async () => {
     }
   } catch (e) {}
 
+  // chrome.cookies.get() por nombre exacto (distinto de getAll) — probar con
+  // varias combinaciones de url, por si el matching de getAll es el problema.
+  const urlsAProbar = [
+    'https://www.aguasandinas.cl/',
+    'https://www.aguasandinas.cl',
+    'https://aguasandinas.cl/'
+  ];
+  for (const nombre of objetivo) {
+    for (const url of urlsAProbar) {
+      try {
+        const c = await chrome.cookies.get({ url, name: nombre });
+        lineas.push(`get(${nombre}, ${url}) → ${c ? 'ENCONTRADA valor=' + c.value.slice(0, 20) + '...' : 'null'}`);
+      } catch (e) {
+        lineas.push(`get(${nombre}, ${url}) → ERROR ${e.message}`);
+      }
+    }
+  }
+
+  // Listar los cookie stores disponibles (por si hay más de uno y estamos
+  // consultando el que no corresponde a la pestaña real).
+  try {
+    const stores = await chrome.cookies.getAllCookieStores();
+    lineas.push('Cookie stores: ' + JSON.stringify(stores.map(s => ({ id: s.id, tabIds: s.tabIds }))));
+  } catch (e) {
+    lineas.push('getAllCookieStores ERROR: ' + e.message);
+  }
+
   statusEl.textContent = lineas.join('\n');
   diagBtn.disabled = false;
 });
