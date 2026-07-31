@@ -1,438 +1,352 @@
 {
   "ok": true,
-  "updatedAt": "2026-07-27T10:00:20.864Z",
-  "source": "khipu",
+  "updatedAt": "2026-07-31T12:31:51.727Z",
+  "source": "local",
   "accounts": {
-    "1009146-2": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "error": "Khipu 401 para 1009146-2: \"Authorization failed\"",
-      "nombre": "Sánchez Hermanos SpA"
-    },
-    "1127130-8": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "error": "Khipu 401 para 1127130-8: \"Authorization failed\"",
-      "nombre": "Patagónica Inmobiliaria S. A."
-    },
     "672977-0": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 672977-0: \"Authorization failed\""
+      "nombre": null
     },
-    "1127131-6": {
+    "1009146-2": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127131-6: \"Authorization failed\"",
-      "nombre": "Patagónica Inmobiliaria S. A."
+      "nombre": null
     },
     "1009152-7": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1009152-7: \"Authorization failed\"",
-      "nombre": "SR RESIDENTE"
+      "nombre": null
     },
-    "1127134-0": {
+    "1127130-8": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127134-0: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
+      "nombre": null
     },
-    "1127136-7": {
-      "deuda": "$86.650",
+    "1127131-6": {
+      "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127136-7: \"Authorization failed\"",
-      "nombre": "Casino Imperio Limitada"
+      "nombre": null
     },
     "1127132-4": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127132-4: \"Authorization failed\"",
-      "nombre": "Patagónica Inmobiliaria S. A."
+      "nombre": null
+    },
+    "1127133-2": {
+      "deuda": "$58.170",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1127134-0": {
+      "deuda": "$60.470",
+      "vencimiento": null,
+      "nombre": null
     },
     "1127135-9": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127135-9: \"Authorization failed\"",
-      "nombre": "Banco Estado Express"
+      "nombre": null
     },
-    "1127133-2": {
+    "1127136-7": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127133-2: \"Authorization failed\"",
-      "nombre": "Patagónica Inmobiliaria S. A."
-    },
-    "1127138-3": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "error": "Khipu 401 para 1127138-3: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
-    },
-    "1127140-5": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "error": "Khipu 401 para 1127140-5: \"Authorization failed\"",
-      "nombre": "Caja de Compensación de Asignación Familiar La Araucana"
-    },
-    "1127141-3": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "error": "Khipu 401 para 1127141-3: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
-    },
-    "1127139-1": {
-      "deuda": "$85.390",
-      "vencimiento": null,
-      "error": "Khipu 401 para 1127139-1: \"Authorization failed\"",
-      "nombre": "Sociedad Fábrica y Distribuidora De Alimentos JP LTDA."
+      "nombre": null
     },
     "1127137-5": {
-      "deuda": "$0",
+      "deuda": "$12.017",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127137-5: \"Authorization failed\"",
-      "nombre": "DIMACOFI NEGOCIOS AVANZADOS S.A"
+      "nombre": null
     },
-    "1127146-4": {
-      "deuda": "$0",
+    "1127138-3": {
+      "deuda": "$164.310",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127146-4: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
+      "nombre": null
+    },
+    "1127139-1": {
+      "deuda": "$71.540",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1127140-5": {
+      "deuda": "$12.070",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1127141-3": {
+      "deuda": "$27.460",
+      "vencimiento": null,
+      "nombre": null
     },
     "1127142-1": {
-      "deuda": "$0",
+      "deuda": "$7.864",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127142-1: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
+      "nombre": null
     },
     "1127144-8": {
-      "deuda": "$0",
+      "deuda": "$23.092",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127144-8: \"Authorization failed\"",
-      "nombre": "Segafredo Zanetti Chile S.A."
+      "nombre": null
     },
     "1127145-6": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127145-6: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
+      "nombre": null
+    },
+    "1127146-4": {
+      "deuda": "$950",
+      "vencimiento": null,
+      "nombre": null
     },
     "1127147-2": {
-      "deuda": "$588.490",
+      "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127147-2: \"Authorization failed\"",
-      "nombre": "SR RESIDENTE"
+      "nombre": null
     },
     "1127148-0": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127148-0: \"Authorization failed\"",
-      "nombre": "SR RESIDENTE"
+      "nombre": null
     },
-    "1127151-0": {
+    "1127149-9": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127151-0: \"Authorization failed\"",
-      "nombre": "BANCO INTERNACIONAL"
+      "nombre": null
     },
     "1127150-2": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127150-2: \"Authorization failed\""
+      "nombre": null
     },
-    "1127149-9": {
-      "deuda": "$203.060",
+    "1127151-0": {
+      "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127149-9: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
+      "nombre": null
     },
     "1127152-9": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127152-9: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
+      "nombre": null
     },
     "1127153-7": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127153-7: \"Authorization failed\"",
-      "nombre": "SANCHEZ Y SANCHEZ CHILE LIMITADA"
+      "nombre": null
     },
     "1127203-7": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127203-7: \"Authorization failed\""
+      "nombre": null
     },
     "1127204-5": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127204-5: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
-    },
-    "1127208-8": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "error": "Khipu 401 para 1127208-8: \"Authorization failed\"",
-      "nombre": "Sánchez Hermanos SpA"
+      "nombre": null
     },
     "1127206-1": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127206-1: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
+      "nombre": null
+    },
+    "1127208-8": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
     },
     "1127209-6": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127209-6: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
-    },
-    "1534317-6": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "error": "Khipu 401 para 1534317-6: \"Authorization failed\""
-    },
-    "1127212-6": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "error": "Khipu 401 para 1127212-6: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
-    },
-    "1136296-6": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "error": "Khipu 401 para 1136296-6: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
+      "nombre": null
     },
     "1127211-8": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1127211-8: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
+      "nombre": null
+    },
+    "1127212-6": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1136296-6": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1534317-6": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
     },
     "1534318-4": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1534318-4: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
-    },
-    "1534322-2": {
-      "deuda": "$5.170",
-      "vencimiento": null,
-      "error": "Khipu 401 para 1534322-2: \"Authorization failed\"",
-      "nombre": "Mediland SpA"
+      "nombre": null
     },
     "1534319-2": {
-      "deuda": "$1.038.530",
+      "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1534319-2: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
+      "nombre": null
     },
     "1534320-6": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1534320-6: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
+      "nombre": null
     },
     "1534321-4": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1534321-4: \"Authorization failed\"",
-      "nombre": "A3D Chile S. A."
+      "nombre": null
     },
-    "1534327-3": {
+    "1534322-2": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1534327-3: \"Authorization failed\"",
-      "nombre": "SEÑOR RESIDENTE"
-    },
-    "1534326-5": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "error": "Khipu 401 para 1534326-5: \"Authorization failed\"",
-      "nombre": "Industria YKK Chile LTDA"
-    },
-    "1534324-9": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "error": "Khipu 401 para 1534324-9: \"Authorization failed\"",
-      "nombre": "Parker Hannifin Corporation Chile Limitada"
+      "nombre": null
     },
     "1534323-0": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1534323-0: \"Authorization failed\"",
-      "nombre": "PERFOMEX CHILE SPA"
+      "nombre": null
+    },
+    "1534324-9": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
     },
     "1534325-7": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1534325-7: \"Authorization failed\"",
-      "nombre": "Fedex Express Chile SpA"
+      "nombre": null
     },
-    "1534334-6": {
+    "1534326-5": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1534334-6: \"Authorization failed\""
+      "nombre": null
     },
-    "1534330-3": {
+    "1534327-3": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1534330-3: \"Authorization failed\"",
-      "nombre": "Drager Chile Limitada"
-    },
-    "1534333-8": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "error": "Khipu 401 para 1534333-8: \"Authorization failed\""
-    },
-    "1534331-1": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "error": "Khipu 401 para 1534331-1: \"Authorization failed\"",
-      "nombre": "Trane de Chile S.A."
+      "nombre": null
     },
     "1534328-1": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1534328-1: \"Authorization failed\"",
-      "nombre": "Comercializadora Industrial W & L Limitada"
+      "nombre": null
     },
-    "1596662-9": {
+    "1534330-3": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1596662-9: \"Authorization failed\"",
-      "nombre": "SR RESIDENTE"
+      "nombre": null
+    },
+    "1534331-1": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1534333-8": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1534334-6": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
     },
     "1534335-4": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1534335-4: \"Authorization failed\""
-    },
-    "1596663-7": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "error": "Khipu 401 para 1596663-7: \"Authorization failed\"",
-      "nombre": "Tezman Chile SpA"
-    },
-    "1596664-5": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "error": "Khipu 401 para 1596664-5: \"Authorization failed\"",
-      "nombre": "NCH Chile S.A."
+      "nombre": null
     },
     "1534336-2": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1534336-2: \"Authorization failed\""
+      "nombre": null
+    },
+    "1596662-9": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1596663-7": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1596664-5": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1596665-3": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
+    },
+    "1596666-1": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
     },
     "1637811-9": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1637811-9: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
-    },
-    "1637814-3": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "error": "Khipu 401 para 1637814-3: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
-    },
-    "1596666-1": {
-      "deuda": "$46.420",
-      "vencimiento": null,
-      "error": "Khipu 401 para 1596666-1: \"Authorization failed\"",
-      "nombre": "Granja Marina (Patagonía Austral SpA)"
+      "nombre": null
     },
     "1637812-7": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1637812-7: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
+      "nombre": null
     },
-    "1596665-3": {
-      "deuda": "$225.400",
-      "vencimiento": null,
-      "error": "Khipu 401 para 1596665-3: \"Authorization failed\"",
-      "nombre": "ALIMENTOS BOBBO LTDA"
-    },
-    "1664824-8": {
+    "1637814-3": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1664824-8: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
+      "nombre": null
     },
     "1664822-1": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1664822-1: \"Authorization failed\"",
-      "nombre": "Weidmuller SpA"
+      "nombre": null
     },
-    "1717633-1": {
+    "1664824-8": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1717633-1: \"Authorization failed\"",
-      "nombre": "ELECTRAFK S.A"
+      "nombre": null
     },
     "1717631-5": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1717631-5: \"Authorization failed\"",
-      "nombre": "John Crane Chile S.A."
+      "nombre": null
     },
     "1717632-3": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1717632-3: \"Authorization failed\"",
-      "nombre": "Megamin S.A."
+      "nombre": null
     },
-    "1973010-7": {
-      "deuda": "$39.050",
+    "1717633-1": {
+      "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1973010-7: \"Authorization failed\"",
-      "nombre": "Sociedad de Alimentos Leefood SpA"
-    },
-    "1534329-K": {
-      "deuda": null,
-      "nombre": "Comercial Ingersoll Rand (Chile) Limitada",
-      "error": "Khipu 401 para 1534329-K: \"Authorization failed\""
+      "nombre": null
     },
     "1752045-8": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1752045-8: \"Authorization failed\"",
-      "nombre": "Sánchez Hermanos SpA"
-    },
-    "1973011-5": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "error": "Khipu 401 para 1973011-5: \"Authorization failed\"",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
+      "nombre": null
     },
     "1782609-3": {
       "deuda": "$0",
       "vencimiento": null,
-      "error": "Khipu 401 para 1782609-3: \"Authorization failed\"",
-      "nombre": "ELECTRAFK S.A"
+      "nombre": null
     },
-    "1717634-K": {
-      "deuda": null,
-      "nombre": "Soc Com Jose Marin Antonin y Compania Limitada",
-      "error": "Khipu 401 para 1717634-K: \"Authorization failed\""
+    "1973010-7": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
     },
-    "1127143-K": {
-      "deuda": null,
-      "nombre": "PATAGONICA INMOBILIARIA SPA",
-      "error": "Khipu 401 para 1127143-K: \"Authorization failed\""
-    },
-    "1664823-K": {
-      "deuda": null,
-      "nombre": "SR. RESIDENTE",
-      "error": "Khipu 401 para 1664823-K: \"Authorization failed\""
-    },
-    "1127210-K": {
-      "deuda": null,
-      "nombre": "PATAGONICA INMOBILIARIA SPA",
-      "error": "Khipu 401 para 1127210-K: \"Authorization failed\""
+    "1973011-5": {
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
     }
   }
 }
