@@ -1,14 +1,20 @@
 {
   "manifest_version": 3,
   "name": "AA Session Exporter — Patagónica",
-  "version": "1.0",
-  "description": "Envía tu sesión de aguasandinas.cl al scraper local de Patagónica Inmobiliaria (solo uso personal).",
+  "version": "1.1",
+  "description": "Envía tu sesión de aguasandinas.cl al scraper de Patagónica Inmobiliaria (solo uso personal).",
   "permissions": ["cookies"],
   "host_permissions": [
     "https://www.aguasandinas.cl/*",
     "https://aguasandinas.cl/*",
     "https://wurfel.app.n8n.cloud/*"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "externally_connectable": {
+    "matches": ["https://facturacion-patagonica.vercel.app/*"]
+  },
   "action": {
     "default_popup": "popup.html",
     "default_title": "Enviar sesión AA"

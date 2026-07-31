@@ -2982,14 +2982,22 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
   const [enelUpdatedAt,setEnelUpdatedAt]=useState(null);
   const [sortCol,setSortCol]=useState(null);
   const [aaRefreshing,setAaRefreshing]=useState(false);
+  const AA_EXTENSION_ID="bpneagagdmfgbidenbgdmpinnpflcaif";
   const actualizarAA=useCallback(async()=>{
     if(aaRefreshing)return;
     setAaRefreshing(true);
     try{
-      const r=await fetch("/api/aa-refresh",{method:"POST",headers:{"Authorization":"Bearer mipass123"}});
-      const j=await r.json().catch(()=>({}));
-      if(!r.ok)throw new Error(j.error||"Error "+r.status);
-      notify?.("⟳ Actualización iniciada — los datos se actualizarán en ~5 minutos","info");
+      if(!window.chrome||!chrome.runtime||!chrome.runtime.sendMessage){
+        throw new Error("Instala la extensión de Chrome AA Session Exporter y ten la sesión de aguasandinas.cl iniciada");
+      }
+      const resp=await new Promise((resolve,reject)=>{
+        chrome.runtime.sendMessage(AA_EXTENSION_ID,{action:"exportarSesionAA"},(r)=>{
+          if(chrome.runtime.lastError)reject(new Error(chrome.runtime.lastError.message));
+          else resolve(r);
+        });
+      });
+      if(!resp||!resp.ok)throw new Error((resp&&resp.error)||"Error desconocido");
+      notify?.("⟳ Sesión enviada — el scraping corre en la nube (~5-9 min)","info");
     }catch(e){notify?.("Error al actualizar AA: "+e.message,"err");}
     setAaRefreshing(false);
   },[aaRefreshing,notify]);
@@ -3133,7 +3141,7 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
         aaLoading&&h("span",{style:{fontSize:9,color:AA_BLUE},className:"spin"},"\u29B3"),
         !aaLoading&&aaError&&h("span",{style:{fontSize:10,color:"var(--err)",cursor:"default"},title:aaError},"\u26A0\uFE0F"),
         !aaLoading&&conDeuda>0&&h("span",{title:"Cuentas con deuda vigente en Aguas Andinas",style:{fontSize:10,color:"var(--red)",background:"var(--rbg)",border:"1px solid var(--rdim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",fontWeight:700,cursor:"default"}},"\uD83D\uDD34 "+conDeuda+" con deuda"),
-        h("button",{onClick:actualizarAA,disabled:aaRefreshing,title:"Disparar actualizaci\u00F3n de datos AA v\u00EDa GitHub Actions",style:{fontSize:10,padding:"2px 8px",borderRadius:6,border:"1px solid "+AA_BLUE,background:"transparent",color:AA_BLUE,cursor:aaRefreshing?"wait":"pointer",opacity:aaRefreshing?0.6:1,display:"flex",alignItems:"center",gap:4}},aaRefreshing?h("span",{className:"spin"},"\u27F3"):"\u27F3","Actualizar"),
+        h("button",{onClick:actualizarAA,disabled:aaRefreshing,title:"La sesi\u00F3n de AA debe estar iniciada",style:{fontSize:10,padding:"2px 8px",borderRadius:6,border:"1px solid "+AA_BLUE,background:"transparent",color:AA_BLUE,cursor:aaRefreshing?"wait":"pointer",opacity:aaRefreshing?0.6:1,display:"flex",alignItems:"center",gap:4}},aaRefreshing?h("span",{className:"spin"},"\u27F3"):"\u27F3","Actualizar"),
         h("span",{style:{width:1,height:16,background:"var(--bdr)",display:"inline-block",margin:"0 4px"}}),
         /* \u2500\u2500 Enel \u2500\u2500 */
         h("span",{style:{fontSize:10,fontWeight:700,color:ENEL_GRN,marginRight:2}},"\u26A1 Enel"),
@@ -3147,7 +3155,7 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
       h("div",{style:{display:"flex",alignItems:"center",gap:8}},
         h("div",{style:{display:"flex",flexDirection:"column",gap:2,alignItems:"flex-end",marginRight:4}},
           h("span",{style:{fontSize:9,color:AA_BLUE,whiteSpace:"nowrap",fontWeight:500},title:"Deuda AA: actualizada automáticamente cada día a las 6:00 AM"},
-            "💧 AA — "+(aaUpdatedAt?"act. "+new Date(aaUpdatedAt).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"})+" (cada día 6 am)":"sin datos")
+            "💧 AA — "+(aaUpdatedAt?"act. "+new Date(aaUpdatedAt).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"}):"sin datos")
           ),
           h("span",{style:{fontSize:9,color:ENEL_GRN,whiteSpace:"nowrap",fontWeight:500},title:"Deuda Enel: actualizada automáticamente cada día a las 6:00 AM"},
             "⚡ Enel — "+(enelUpdatedAt?"act. "+new Date(enelUpdatedAt).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"})+" (cada día 6 am)":"sin datos")
