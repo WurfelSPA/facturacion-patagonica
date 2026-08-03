@@ -51,18 +51,68 @@ const BROWSER_CODE = `
 export default async function main({ page, context }) {
   const { rut, clave, year, month, diagOnly } = context;
   if (diagOnly) {
-    let navError = null;
+    const pasos = [];
+    async function snap(nombre, errMsg) {
+      let title = null, url = null, snippet = '';
+      try {
+        title = await page.title();
+        url = page.url();
+        snippet = await page.evaluate(() => (document.body ? document.body.innerText : 'NO_BODY').slice(0, 200));
+      } catch (e) { snippet = 'eval-error: ' + e.message; }
+      pasos.push({ nombre, errMsg: errMsg || null, title, url, snippet });
+    }
+
     try {
       await page.goto('https://web.nubox.com/Login/Account/Login?ReturnUrl=%2FSistemaLogin', { waitUntil: 'domcontentloaded', timeout: 25000 });
-    } catch (e) { navError = e.message; }
-    let title = null, url = null, htmlLen = 0, snippet = '';
+    } catch (e) { await snap('goto-login', e.message); return { data: { diagOnly: true, pasos }, type: 'application/json' }; }
+    await snap('goto-login', null);
+
+    const allInputs = await page.$$('input:not([type="hidden"]):not([type="submit"]):not([type="button"])');
+    let rutInput = null, passInput = null;
+    for (const inp of allInputs) {
+      const t = await inp.evaluate(el => el.type);
+      if (t === 'password' && !passInput) { passInput = inp; }
+      else if (t !== 'password' && t !== 'checkbox' && !rutInput) { rutInput = inp; }
+    }
+    if (!rutInput || !passInput) {
+      await snap('campos-no-encontrados', 'sin rutInput/passInput');
+      return { data: { diagOnly: true, pasos }, type: 'application/json' };
+    }
+    await rutInput.click({ clickCount: 3 });
+    await rutInput.type(rut, { delay: 40 });
+    await passInput.type(clave, { delay: 40 });
+
     try {
-      title = await page.title();
-      url = page.url();
-      htmlLen = await page.evaluate(() => document.documentElement.outerHTML.length);
-      snippet = await page.evaluate(() => (document.body ? document.body.innerText : 'NO_BODY').slice(0, 300));
-    } catch (e) { snippet = 'eval-error: ' + e.message; }
-    return { data: { diagOnly: true, navError, title, url, htmlLen, snippet }, type: 'application/json' };
+      await Promise.all([
+        page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 25000 }),
+        passInput.press('Enter')
+      ]);
+    } catch (e) { await snap('post-submit-login', e.message); return { data: { diagOnly: true, pasos }, type: 'application/json' }; }
+    await snap('post-submit-login', null);
+
+    try {
+      await page.waitForFunction(
+        () => typeof $ !== 'undefined' && document.getElementById('treeGrid') && document.getElementById('row1treeGrid'),
+        { timeout: 20000, polling: 500 }
+      );
+    } catch (e) { await snap('esperar-treeGrid', e.message); return { data: { diagOnly: true, pasos }, type: 'application/json' }; }
+    await snap('esperar-treeGrid', null);
+
+    try {
+      await Promise.all([
+        page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 25000 }),
+        page.evaluate(() => {
+          try { $('#treeGrid').jqxTreeGrid('selectRow', '2'); }
+          catch (_) {
+            const row = document.getElementById('row1treeGrid');
+            if (row) row.click();
+          }
+        })
+      ]);
+    } catch (e) { await snap('click-treeGrid-row', e.message); return { data: { diagOnly: true, pasos }, type: 'application/json' }; }
+    await snap('click-treeGrid-row', null);
+
+    return { data: { diagOnly: true, pasos }, type: 'application/json' };
   }
 
   const lastDay    = new Date(parseInt(year), parseInt(month), 0).getDate();
