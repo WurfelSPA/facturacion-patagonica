@@ -271,8 +271,19 @@ export default async function main({ page, context }) {
   // ── 4. Listar documentos del período y descargar PDF (AJAX dentro del browser)
   const result = await page.evaluate(async ({ fechaDesde, fechaHasta, DTE_BASE }) => {
     let pageToken = null, pageFuncId = null;
-    try { if (typeof token !== 'undefined' && token) pageToken = token; } catch(_) {}
-    try { if (typeof funcionarioId !== 'undefined') pageFuncId = String(funcionarioId); } catch(_) {}
+    // 'token' puede resolver a un elemento del DOM (id="token" auto-expuesto como
+    // global) en vez de al string real; en ese caso hay que leer su .value.
+    try {
+      if (typeof token !== 'undefined' && token) {
+        pageToken = (typeof token === 'string') ? token : (token.value || null);
+      }
+    } catch(_) {}
+    try {
+      if (typeof funcionarioId !== 'undefined' && funcionarioId) {
+        pageFuncId = (typeof funcionarioId === 'string' || typeof funcionarioId === 'number')
+          ? String(funcionarioId) : (funcionarioId.value ? String(funcionarioId.value) : null);
+      }
+    } catch(_) {}
 
     if (!pageToken) {
       const allScripts = [...document.querySelectorAll('script')].map(s => s.textContent || '').join('\\n');
@@ -282,8 +293,15 @@ export default async function main({ page, context }) {
       const fm = allScripts.match(/funcionarioId\\s*[=:]\\s*["']?(\\d{4,})["']?/);
       if (fm) pageFuncId = fm[1];
     }
+    // Última red de seguridad: input hidden id/name="token" en el DOM.
+    if (!pageToken) {
+      const el = document.getElementById('token') || document.querySelector('input[name="token"]');
+      if (el && el.value) pageToken = el.value;
+    }
 
-    if (!pageToken) return { error: 'Token no encontrado en la página DTE. URL: ' + location.href };
+    if (!pageToken || typeof pageToken !== 'string') {
+      return { error: 'Token no encontrado o no es string en la página DTE. typeofToken=' + typeof pageToken + ' URL: ' + location.href };
+    }
 
     try {
       const filtroRes = await fetch(DTE_BASE + '/ObtenerPorFiltro', {
