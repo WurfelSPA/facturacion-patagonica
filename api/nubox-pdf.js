@@ -71,7 +71,7 @@ export default async function main({ page, context }) {
       try {
         title = await page.title();
         url = page.url();
-        snippet = await page.evaluate(() => (document.body ? document.body.innerText : 'NO_BODY').slice(0, 200));
+        snippet = await page.evaluate(() => (document.body ? document.body.innerText : 'NO_BODY').slice(0, 600));
       } catch (e) { snippet = 'eval-error: ' + e.message; }
       pasos.push({ nombre, errMsg: errMsg || null, title, url, snippet });
     }
@@ -96,13 +96,36 @@ export default async function main({ page, context }) {
     await rutInput.type(rut, { delay: 40 });
     await passInput.type(clave, { delay: 40 });
 
+    // Verificar qué quedó realmente escrito en los campos antes de enviar.
+    const valoresCampos = await page.evaluate((rutSel) => {
+      const inputs = [...document.querySelectorAll('input:not([type="hidden"])')];
+      return inputs.map(i => ({ type: i.type, name: i.name || i.id || null, value: i.type === 'password' ? '*'.repeat((i.value||'').length) : i.value }));
+    }).catch(e => ({ evalError: e.message }));
+    pasos.push({ nombre: 'valores-campos-antes-submit', errMsg: null, title: null, url: null, snippet: JSON.stringify(valoresCampos).slice(0, 500) });
+
     const submitBtn = await findSubmitButton(page);
+    const btnInfo = submitBtn ? await submitBtn.evaluate(el => ({ tag: el.tagName, type: el.type, text: (el.textContent||'').trim(), disabled: !!el.disabled, outerHTML: el.outerHTML.slice(0,200) })).catch(e => ({ evalError: e.message })) : null;
+    pasos.push({ nombre: 'boton-encontrado', errMsg: null, title: null, url: null, snippet: JSON.stringify(btnInfo).slice(0, 500) });
+
     try {
       await Promise.all([
-        page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 25000 }),
+        page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }),
         submitBtn ? submitBtn.click() : passInput.press('Enter')
       ]);
-    } catch (e) { await snap('post-submit-login (submitBtn=' + !!submitBtn + ')', e.message); return { data: { diagOnly: true, pasos }, type: 'application/json' }; }
+    } catch (e) {
+      // Aunque no haya navegación, revisar si apareció un mensaje de error/validación visible.
+      const errores = await page.evaluate(() => {
+        const sels = ['.alert', '.validation-summary-errors', '[class*="error" i]', '[class*="invalid" i]', 'span.field-validation-error'];
+        const found = [];
+        for (const s of sels) {
+          document.querySelectorAll(s).forEach(el => { const t = (el.textContent||'').trim(); if (t) found.push(s + ': ' + t); });
+        }
+        return found;
+      }).catch(err => ['eval-error: ' + err.message]);
+      pasos.push({ nombre: 'errores-visibles-tras-click', errMsg: null, title: null, url: null, snippet: JSON.stringify(errores).slice(0, 500) });
+      await snap('post-submit-login (submitBtn=' + !!submitBtn + ')', e.message);
+      return { data: { diagOnly: true, pasos }, type: 'application/json' };
+    }
     await snap('post-submit-login (submitBtn=' + !!submitBtn + ')', null);
 
     try {
