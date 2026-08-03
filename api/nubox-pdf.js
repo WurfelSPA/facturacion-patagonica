@@ -85,90 +85,39 @@ export default async function main({ page, context }) {
   }
 
   if (diagOnly) {
-    const pasos = [];
-    async function snap(nombre, errMsg) {
-      let title = null, url = null, snippet = '';
-      try {
-        title = await page.title();
-        url = page.url();
-        snippet = await page.evaluate(() => (document.body ? document.body.innerText : 'NO_BODY').slice(0, 600));
-      } catch (e) { snippet = 'eval-error: ' + e.message; }
-      pasos.push({ nombre, errMsg: errMsg || null, title, url, snippet });
-    }
-
-    try {
+    async function loguear() {
       await page.goto('https://web.nubox.com/Login/Account/Login?ReturnUrl=%2FSistemaLogin', { waitUntil: 'domcontentloaded', timeout: 25000 });
-    } catch (e) { await snap('goto-login', e.message); return { data: { diagOnly: true, pasos }, type: 'application/json' }; }
-    await snap('goto-login', null);
-
-    const allInputs = await page.$$('input:not([type="hidden"]):not([type="submit"]):not([type="button"])');
-    let rutInput = null, passInput = null;
-    for (const inp of allInputs) {
-      const t = await inp.evaluate(el => el.type);
-      if (t === 'checkbox') continue;
-      if (!(await esVisible(inp))) continue; // salta campos señuelo (honeypot) ocultos
-      if (t === 'password' && !passInput) { passInput = inp; }
-      else if (t !== 'password' && !rutInput) { rutInput = inp; }
-    }
-    if (!rutInput || !passInput) {
-      await snap('campos-no-encontrados', 'sin rutInput/passInput');
-      return { data: { diagOnly: true, pasos }, type: 'application/json' };
-    }
-    const seleccion = await Promise.all([
-      rutInput.evaluate(el => ({ name: el.name || el.id, valueAntes: el.value })),
-      passInput.evaluate(el => ({ name: el.name || el.id, valueAntes: el.value }))
-    ]).catch(e => [{ evalError: e.message }]);
-    pasos.push({ nombre: 'campos-seleccionados', errMsg: null, title: null, url: null, snippet: JSON.stringify(seleccion).slice(0, 500) });
-
-    await rutInput.click({ clickCount: 3 });
-    await rutInput.type(rut, { delay: 40 });
-    const valorRutJustoDespues = await rutInput.evaluate(el => el.value).catch(e => 'eval-error: ' + e.message);
-    await passInput.click({ clickCount: 3 });
-    await passInput.type(clave, { delay: 40 });
-    const valorPassJustoDespues = await passInput.evaluate(el => el.value.length).catch(e => 'eval-error: ' + e.message);
-    pasos.push({ nombre: 'valores-justo-despues-de-tipear', errMsg: null, title: null, url: null, snippet: JSON.stringify({ rut: valorRutJustoDespues, passLen: valorPassJustoDespues }).slice(0, 500) });
-
-    // Verificar qué quedó realmente escrito en los campos antes de enviar.
-    const valoresCampos = await page.evaluate((rutSel) => {
-      const inputs = [...document.querySelectorAll('input:not([type="hidden"])')];
-      return inputs.map(i => ({ type: i.type, name: i.name || i.id || null, value: i.type === 'password' ? '*'.repeat((i.value||'').length) : i.value }));
-    }).catch(e => ({ evalError: e.message }));
-    pasos.push({ nombre: 'valores-campos-antes-submit', errMsg: null, title: null, url: null, snippet: JSON.stringify(valoresCampos).slice(0, 500) });
-
-    const submitBtn = await findSubmitButton(page);
-    const btnInfo = submitBtn ? await submitBtn.evaluate(el => ({ tag: el.tagName, type: el.type, text: (el.textContent||'').trim(), disabled: !!el.disabled, outerHTML: el.outerHTML.slice(0,200) })).catch(e => ({ evalError: e.message })) : null;
-    pasos.push({ nombre: 'boton-encontrado', errMsg: null, title: null, url: null, snippet: JSON.stringify(btnInfo).slice(0, 500) });
-
-    try {
+      const allInputs = await page.$$('input:not([type="hidden"]):not([type="submit"]):not([type="button"])');
+      let rutInput = null, passInput = null;
+      for (const inp of allInputs) {
+        const t = await inp.evaluate(el => el.type);
+        if (t === 'checkbox') continue;
+        if (!(await esVisible(inp))) continue;
+        if (t === 'password' && !passInput) { passInput = inp; }
+        else if (t !== 'password' && !rutInput) { rutInput = inp; }
+      }
+      if (!rutInput || !passInput) throw new Error('campos no encontrados');
+      await rutInput.click({ clickCount: 3 });
+      await rutInput.type(rut, { delay: 40 });
+      await passInput.click({ clickCount: 3 });
+      await passInput.type(clave, { delay: 40 });
+      const submitBtn = await findSubmitButton(page);
+      if (submitBtn) {
+        await submitBtn.evaluate(el => new Promise(resolve => {
+          if (!el.disabled) return resolve();
+          const obs = new MutationObserver(() => { if (!el.disabled) { obs.disconnect(); resolve(); } });
+          obs.observe(el, { attributes: true, attributeFilter: ['disabled'] });
+          setTimeout(() => { obs.disconnect(); resolve(); }, 5000);
+        })).catch(() => {});
+      }
       await Promise.all([
-        page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }),
+        page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 25000 }),
         submitBtn ? submitBtn.click() : passInput.press('Enter')
       ]);
-    } catch (e) {
-      // Aunque no haya navegación, revisar si apareció un mensaje de error/validación visible.
-      const errores = await page.evaluate(() => {
-        const sels = ['.alert', '.validation-summary-errors', '[class*="error" i]', '[class*="invalid" i]', 'span.field-validation-error'];
-        const found = [];
-        for (const s of sels) {
-          document.querySelectorAll(s).forEach(el => { const t = (el.textContent||'').trim(); if (t) found.push(s + ': ' + t); });
-        }
-        return found;
-      }).catch(err => ['eval-error: ' + err.message]);
-      pasos.push({ nombre: 'errores-visibles-tras-click', errMsg: null, title: null, url: null, snippet: JSON.stringify(errores).slice(0, 500) });
-      await snap('post-submit-login (submitBtn=' + !!submitBtn + ')', e.message);
-      return { data: { diagOnly: true, pasos }, type: 'application/json' };
-    }
-    await snap('post-submit-login (submitBtn=' + !!submitBtn + ')', null);
-
-    try {
       await page.waitForFunction(
         () => typeof $ !== 'undefined' && document.getElementById('treeGrid') && document.getElementById('row1treeGrid'),
         { timeout: 20000, polling: 500 }
       );
-    } catch (e) { await snap('esperar-treeGrid', e.message); return { data: { diagOnly: true, pasos }, type: 'application/json' }; }
-    await snap('esperar-treeGrid', null);
-
-    try {
       await Promise.all([
         page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 25000 }),
         page.evaluate(() => {
@@ -179,36 +128,29 @@ export default async function main({ page, context }) {
           }
         })
       ]);
-    } catch (e) { await snap('click-treeGrid-row', e.message); return { data: { diagOnly: true, pasos }, type: 'application/json' }; }
-    await snap('click-treeGrid-row', null);
+    }
 
-    // Navegar a la página de documentos tributarios y extraer, desde los
-    // propios scripts de la página, cómo arma la llamada a ObtenerPorFiltro
-    // (nombre real de parámetros/estructura, en vez de adivinar).
+    try {
+      await loguear();
+    } catch (e) {
+      return { data: { diagOnly: true, error: 'login-fallo: ' + e.message, url: page.url() }, type: 'application/json' };
+    }
+
     const navUrl = page.url();
     const utnMatch = navUrl.match(/[?&]utn=([^&]+)/);
     const utn = utnMatch ? utnMatch[1] : null;
-    if (utn) {
-      try {
-        await page.goto('https://app.nubox.com/ServiFactura/paginas/dteDocumentosTributarios.aspx?utn=' + encodeURIComponent(utn), { waitUntil: 'domcontentloaded', timeout: 25000 });
-        await new Promise(r => setTimeout(r, 2000));
-        const scriptInfo = await page.evaluate(() => {
-          const scripts = [...document.querySelectorAll('script')].map(s => s.textContent || '').join('\n---SCRIPT---\n');
-          const idx = scripts.indexOf('ObtenerPorFiltro');
-          const excerpt = idx >= 0 ? scripts.slice(Math.max(0, idx - 800), idx + 800) : 'NO_ENCONTRADO';
-          let pageToken = null;
-          try { if (typeof token !== 'undefined') pageToken = String(token).slice(0, 10) + '...(len ' + String(token).length + ')'; } catch (_) {}
-          return { title: document.title, url: location.href, tokenPreview: pageToken, excerpt };
-        }).catch(e => ({ evalError: e.message }));
-        pasos.push({ nombre: 'script-ObtenerPorFiltro', errMsg: null, title: scriptInfo.title, url: scriptInfo.url, snippet: JSON.stringify(scriptInfo).slice(0, 1800) });
-      } catch (e) {
-        pasos.push({ nombre: 'goto-dte-fallo', errMsg: e.message, title: null, url: null, snippet: '' });
-      }
-    } else {
-      pasos.push({ nombre: 'utn-no-encontrado', errMsg: null, title: null, url: navUrl, snippet: '' });
-    }
+    if (!utn) return { data: { diagOnly: true, error: 'utn no encontrado', url: navUrl }, type: 'application/json' };
 
-    return { data: { diagOnly: true, pasos }, type: 'application/json' };
+    await page.goto('https://app.nubox.com/ServiFactura/paginas/dteDocumentosTributarios.aspx?utn=' + encodeURIComponent(utn), { waitUntil: 'domcontentloaded', timeout: 25000 });
+    await new Promise(r => setTimeout(r, 2000));
+    const scriptInfo = await page.evaluate(() => {
+      const scripts = [...document.querySelectorAll('script')].map(s => s.textContent || '').join(String.fromCharCode(10));
+      const idx = scripts.indexOf('ObtenerPorFiltro');
+      const excerpt = idx >= 0 ? scripts.slice(Math.max(0, idx - 600), idx + 600) : 'NO_ENCONTRADO';
+      return { title: document.title, url: location.href, excerpt };
+    }).catch(e => ({ evalError: e.message }));
+
+    return { data: { diagOnly: true, scriptInfo }, type: 'application/json' };
   }
 
   const lastDay    = new Date(parseInt(year), parseInt(month), 0).getDate();
