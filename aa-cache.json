@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updatedAt": "2026-08-03T12:50:36.228Z",
+  "updatedAt": "2026-08-03T12:51:07.738Z",
   "source": "n8n",
   "accounts": {
     "672977-0": {
@@ -137,12 +137,12 @@
       "nombre": null
     },
     "1127204-5": {
-      "deuda": "$0",
+      "deuda": "$164.240",
       "vencimiento": null,
       "nombre": null
     },
     "1127206-1": {
-      "deuda": "$0",
+      "deuda": "$74.920",
       "vencimiento": null,
       "nombre": null
     },
