@@ -182,6 +182,32 @@ export default async function main({ page, context }) {
     } catch (e) { await snap('click-treeGrid-row', e.message); return { data: { diagOnly: true, pasos }, type: 'application/json' }; }
     await snap('click-treeGrid-row', null);
 
+    // Navegar a la página de documentos tributarios y extraer, desde los
+    // propios scripts de la página, cómo arma la llamada a ObtenerPorFiltro
+    // (nombre real de parámetros/estructura, en vez de adivinar).
+    const navUrl = page.url();
+    const utnMatch = navUrl.match(/[?&]utn=([^&]+)/);
+    const utn = utnMatch ? utnMatch[1] : null;
+    if (utn) {
+      try {
+        await page.goto('https://app.nubox.com/ServiFactura/paginas/dteDocumentosTributarios.aspx?utn=' + encodeURIComponent(utn), { waitUntil: 'domcontentloaded', timeout: 25000 });
+        await new Promise(r => setTimeout(r, 2000));
+        const scriptInfo = await page.evaluate(() => {
+          const scripts = [...document.querySelectorAll('script')].map(s => s.textContent || '').join('\n---SCRIPT---\n');
+          const idx = scripts.indexOf('ObtenerPorFiltro');
+          const excerpt = idx >= 0 ? scripts.slice(Math.max(0, idx - 800), idx + 800) : 'NO_ENCONTRADO';
+          let pageToken = null;
+          try { if (typeof token !== 'undefined') pageToken = String(token).slice(0, 10) + '...(len ' + String(token).length + ')'; } catch (_) {}
+          return { title: document.title, url: location.href, tokenPreview: pageToken, excerpt };
+        }).catch(e => ({ evalError: e.message }));
+        pasos.push({ nombre: 'script-ObtenerPorFiltro', errMsg: null, title: scriptInfo.title, url: scriptInfo.url, snippet: JSON.stringify(scriptInfo).slice(0, 1800) });
+      } catch (e) {
+        pasos.push({ nombre: 'goto-dte-fallo', errMsg: e.message, title: null, url: null, snippet: '' });
+      }
+    } else {
+      pasos.push({ nombre: 'utn-no-encontrado', errMsg: null, title: null, url: navUrl, snippet: '' });
+    }
+
     return { data: { diagOnly: true, pasos }, type: 'application/json' };
   }
 
