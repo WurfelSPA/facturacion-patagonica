@@ -51,17 +51,37 @@ const BROWSER_CODE = `
 export default async function main({ page, context }) {
   const { rut, clave, year, month, diagOnly } = context;
 
-  // Busca el botón de submit del login: primero por type="submit", luego
-  // cualquier <button> cuyo texto sugiera que es el de ingresar/entrar.
+  // Un elemento está realmente visible si ocupa espacio y no está oculto por
+  // CSS. Los campos/botones señuelo (honeypot) anti-bot suelen estar en el
+  // DOM pero con display:none, visibility:hidden o tamaño 0.
+  async function esVisible(handle) {
+    return handle.evaluate(el => {
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none';
+    }).catch(() => false);
+  }
+
+  // Busca el botón/input de submit del login: por texto o value que sugiera
+  // ingresar/entrar, revisando tanto <button> como <input type=button|submit>.
+  // Se excluyen candidatos no visibles (señuelos) y el ícono de mostrar clave.
   async function findSubmitButton(page) {
-    const typed = await page.$('button[type="submit"], input[type="submit"]');
-    if (typed) return typed;
-    const buttons = await page.$$('button');
-    for (const b of buttons) {
-      const txt = await b.evaluate(el => (el.textContent || '').trim().toLowerCase());
-      if (/ingres|entrar|iniciar|login|acceder/.test(txt)) return b;
+    const candidatos = [
+      ...(await page.$$('button')),
+      ...(await page.$$('input[type="button"], input[type="submit"]'))
+    ];
+    for (const b of candidatos) {
+      const info = await b.evaluate(el => ({
+        text: (el.textContent || '').trim().toLowerCase(),
+        value: (el.value || '').trim().toLowerCase(),
+        cls: (el.className || '').toLowerCase()
+      })).catch(() => null);
+      if (!info) continue;
+      if (info.cls.includes('eye-password')) continue;
+      const etiqueta = info.text || info.value;
+      if (/ingres|entrar|iniciar|login|acceder/.test(etiqueta) && await esVisible(b)) return b;
     }
-    return buttons[0] || null;
+    return null;
   }
 
   if (diagOnly) {
@@ -85,8 +105,10 @@ export default async function main({ page, context }) {
     let rutInput = null, passInput = null;
     for (const inp of allInputs) {
       const t = await inp.evaluate(el => el.type);
+      if (t === 'checkbox') continue;
+      if (!(await esVisible(inp))) continue; // salta campos señuelo (honeypot) ocultos
       if (t === 'password' && !passInput) { passInput = inp; }
-      else if (t !== 'password' && t !== 'checkbox' && !rutInput) { rutInput = inp; }
+      else if (t !== 'password' && !rutInput) { rutInput = inp; }
     }
     if (!rutInput || !passInput) {
       await snap('campos-no-encontrados', 'sin rutInput/passInput');
@@ -187,8 +209,10 @@ export default async function main({ page, context }) {
     let rutInput = null, passInput = null;
     for (const inp of allInputs) {
       const t = await inp.evaluate(el => el.type);
+      if (t === 'checkbox') continue;
+      if (!(await esVisible(inp))) continue; // salta campos señuelo (honeypot) ocultos
       if (t === 'password' && !passInput) { passInput = inp; }
-      else if (t !== 'password' && t !== 'checkbox' && !rutInput) { rutInput = inp; }
+      else if (t !== 'password' && !rutInput) { rutInput = inp; }
     }
     if (!rutInput || !passInput) throw new Error('Campos de login no encontrados en: ' + page.url());
     await rutInput.click({ clickCount: 3 });
