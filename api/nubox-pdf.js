@@ -400,7 +400,7 @@ export default async function handler(req, res) {
     console.log(`[nubox-pdf] Descargando facturas ${mes} via Browserless...`);
 
     const blRes = await fetch(
-      `https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}&timeout=120000`,
+      `https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}&timeout=120000&proxy=residential&proxyCountry=cl&proxySticky=true`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
