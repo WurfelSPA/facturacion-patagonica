@@ -57,14 +57,27 @@ export default async function main({ page, context }) {
 
   // ── 1. Login Nubox ────────────────────────────────────────────────────────
   const LOGIN_URL = 'https://web.nubox.com/Login/Account/Login?ReturnUrl=%2FSistemaLogin';
-  // 'load' nunca dispara: la SPA de Nubox tiene polling de red continuo que
-  // mantiene la navegación "en curso" indefinidamente. 'domcontentloaded' +
-  // esperar un selector concreto es la señal de listo confiable acá.
-  await page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  let navError = null;
+  try {
+    await page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 25000 });
+  } catch (e) {
+    navError = e.message;
+  }
+  await new Promise(r => setTimeout(r, 2000));
   await Promise.race([
-    page.waitForSelector('#treeGrid', { timeout: 20000 }),
-    page.waitForSelector('input[type="password"]', { timeout: 20000 }),
+    page.waitForSelector('#treeGrid', { timeout: 8000 }),
+    page.waitForSelector('input[type="password"]', { timeout: 8000 }),
   ]).catch(() => {});
+
+  if (navError) {
+    const debugInfo = await page.evaluate(() => ({
+      title: document.title,
+      url: location.href,
+      htmlLen: document.documentElement.outerHTML.length,
+      snippet: (document.body ? document.body.innerText : 'NO_BODY').slice(0, 400)
+    })).catch(e => ({ evalError: e.message }));
+    throw new Error('Nav goto fallo: ' + navError + ' | debug=' + JSON.stringify(debugInfo));
+  }
 
   const alreadyLogged = await page.$('#treeGrid');
   if (!alreadyLogged) {
