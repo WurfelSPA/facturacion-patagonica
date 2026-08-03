@@ -292,8 +292,8 @@ export default async function main({ page, context }) {
         body: JSON.stringify({
           token: pageToken, EstadoId: 3, estadoEnvio: 0,
           fechaDesde, fechaHasta,
-          filtro: '<Terminos></Terminos>',
-          folioDesde: 0, folioHasta: 0,
+          filtro: '',
+          folioDesde: null, folioHasta: null,
           usaFormatoImpresionEspecial: false
         })
       });
