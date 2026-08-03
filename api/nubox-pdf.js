@@ -57,8 +57,14 @@ export default async function main({ page, context }) {
 
   // ── 1. Login Nubox ────────────────────────────────────────────────────────
   const LOGIN_URL = 'https://web.nubox.com/Login/Account/Login?ReturnUrl=%2FSistemaLogin';
-  // Usar 'load' en vez de 'networkidle2' — Nubox SPA tiene polling continuo
-  await page.goto(LOGIN_URL, { waitUntil: 'load', timeout: 60000 });
+  // 'load' nunca dispara: la SPA de Nubox tiene polling de red continuo que
+  // mantiene la navegación "en curso" indefinidamente. 'domcontentloaded' +
+  // esperar un selector concreto es la señal de listo confiable acá.
+  await page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await Promise.race([
+    page.waitForSelector('#treeGrid', { timeout: 20000 }),
+    page.waitForSelector('input[type="password"]', { timeout: 20000 }),
+  ]).catch(() => {});
 
   const alreadyLogged = await page.$('#treeGrid');
   if (!alreadyLogged) {
@@ -73,9 +79,8 @@ export default async function main({ page, context }) {
     await rutInput.click({ clickCount: 3 });
     await rutInput.type(rut, { delay: 40 });
     await passInput.type(clave, { delay: 40 });
-    // Usar 'load' para waitForNavigation — menos restrictivo que networkidle2
     await Promise.all([
-      page.waitForNavigation({ waitUntil: 'load', timeout: 60000 }),
+      page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }),
       passInput.press('Enter')
     ]);
     const afterUrl = page.url();
@@ -92,7 +97,7 @@ export default async function main({ page, context }) {
     { timeout: 30000, polling: 500 }
   );
   await Promise.all([
-    page.waitForNavigation({ waitUntil: 'load', timeout: 60000 }),
+    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }),
     page.evaluate(() => {
       try { $('#treeGrid').jqxTreeGrid('selectRow', '2'); }
       catch (_) {
@@ -109,7 +114,7 @@ export default async function main({ page, context }) {
   // ── 3. Navegar a Ventas Electrónicas (dteDocumentosTributarios) ────────────
   const DTE_BASE = 'https://app.nubox.com/ServiFactura/paginas/dteDocumentosTributarios.aspx';
   await page.goto(DTE_BASE + '?utn=' + encodeURIComponent(utn), {
-    waitUntil: 'load', timeout: 60000
+    waitUntil: 'domcontentloaded', timeout: 30000
   });
 
   // Esperar que cargue el token en la página
