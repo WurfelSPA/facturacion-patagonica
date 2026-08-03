@@ -49,7 +49,7 @@ async function getSAToken() {
 // timeout en el SPA de Nubox (que tiene polling de red continuo).
 const BROWSER_CODE = `
 export default async function main({ page, context }) {
-  const { rut, clave, year, month, diagOnly } = context;
+  const { rut, clave, year, month, diagOnly, diagSearch } = context;
 
   // Un elemento está realmente visible si ocupa espacio y no está oculto por
   // CSS. Los campos/botones señuelo (honeypot) anti-bot suelen estar en el
@@ -143,26 +143,26 @@ export default async function main({ page, context }) {
 
     await page.goto('https://app.nubox.com/ServiFactura/paginas/dteDocumentosTributarios.aspx?utn=' + encodeURIComponent(utn), { waitUntil: 'domcontentloaded', timeout: 25000 });
     await new Promise(r => setTimeout(r, 2000));
-    const scriptInfo = await page.evaluate(async () => {
+    const scriptInfo = await page.evaluate(async (term) => {
       const scripts = [...document.querySelectorAll('script')];
-      const inline = scripts.filter(s => !s.src).map(s => s.textContent || '').join(String.fromCharCode(10));
       const srcs = scripts.filter(s => s.src).map(s => s.src);
-      const idx = inline.indexOf('ObtenerPorFiltro');
+      const inline = scripts.filter(s => !s.src).map(s => s.textContent || '').join(String.fromCharCode(10));
+      const idx = inline.indexOf(term);
       if (idx >= 0) {
-        return { title: document.title, url: location.href, foundIn: 'inline', excerpt: inline.slice(Math.max(0, idx - 600), idx + 600) };
+        return { title: document.title, url: location.href, foundIn: 'inline', excerpt: inline.slice(Math.max(0, idx - 600), idx + 600), allSrcs: srcs };
       }
       for (const src of srcs) {
         try {
           const r = await fetch(src, { credentials: 'include' });
           const txt = await r.text();
-          const i = txt.indexOf('ObtenerPorFiltro');
+          const i = txt.indexOf(term);
           if (i >= 0) {
-            return { title: document.title, url: location.href, foundIn: src, excerpt: txt.slice(Math.max(0, i - 600), i + 600) };
+            return { title: document.title, url: location.href, foundIn: src, excerpt: txt.slice(Math.max(0, i - 600), i + 600), allSrcs: srcs };
           }
         } catch (e) { /* ignora, sigue con el siguiente */ }
       }
-      return { title: document.title, url: location.href, foundIn: null, excerpt: 'NO_ENCONTRADO', scriptSrcs: srcs };
-    }).catch(e => ({ evalError: e.message }));
+      return { title: document.title, url: location.href, foundIn: null, excerpt: 'NO_ENCONTRADO', allSrcs: srcs };
+    }, diagSearch || 'ObtenerPorFiltro').catch(e => ({ evalError: e.message }));
 
     return { data: { diagOnly: true, scriptInfo }, type: 'application/json' };
   }
@@ -361,7 +361,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
-  const { mes, destFolderId, diagOnly } = req.body || {};
+  const { mes, destFolderId, diagOnly, diagSearch } = req.body || {};
   if (!diagOnly) {
     if (!mes || !/^\d{4}-\d{2}$/.test(mes))
       return res.status(400).json({ error: 'Se requiere mes en formato YYYY-MM' });
@@ -386,7 +386,7 @@ export default async function handler(req, res) {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: BROWSER_CODE, context: { rut: RUT, clave: CLAVE, year, month, diagOnly: !!diagOnly } })
+        body: JSON.stringify({ code: BROWSER_CODE, context: { rut: RUT, clave: CLAVE, year, month, diagOnly: !!diagOnly, diagSearch } })
       }
     );
 
