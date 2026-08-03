@@ -315,7 +315,10 @@ export default async function main({ page, context }) {
           usaFormatoImpresionEspecial: false
         })
       });
-      if (!filtroRes.ok) return { error: 'ObtenerPorFiltro HTTP ' + filtroRes.status };
+      if (!filtroRes.ok) {
+        const bodyText = await filtroRes.text().catch(() => '');
+        return { error: 'ObtenerPorFiltro HTTP ' + filtroRes.status + ' | tokenLen=' + (pageToken ? pageToken.length : 0) + ' | fechaDesde=' + fechaDesde + ' fechaHasta=' + fechaHasta + ' | body=' + bodyText.slice(0, 400) };
+      }
 
       const filtroRaw = await filtroRes.json();
       let filtroData;
