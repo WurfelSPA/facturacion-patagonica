@@ -49,7 +49,21 @@ async function getSAToken() {
 // timeout en el SPA de Nubox (que tiene polling de red continuo).
 const BROWSER_CODE = `
 export default async function main({ page, context }) {
-  const { rut, clave, year, month } = context;
+  const { rut, clave, year, month, diagOnly } = context;
+  if (diagOnly) {
+    let navError = null;
+    try {
+      await page.goto('https://web.nubox.com/Login/Account/Login?ReturnUrl=%2FSistemaLogin', { waitUntil: 'domcontentloaded', timeout: 25000 });
+    } catch (e) { navError = e.message; }
+    let title = null, url = null, htmlLen = 0, snippet = '';
+    try {
+      title = await page.title();
+      url = page.url();
+      htmlLen = await page.evaluate(() => document.documentElement.outerHTML.length);
+      snippet = await page.evaluate(() => (document.body ? document.body.innerText : 'NO_BODY').slice(0, 300));
+    } catch (e) { snippet = 'eval-error: ' + e.message; }
+    return { data: { diagOnly: true, navError, title, url, htmlLen, snippet }, type: 'application/json' };
+  }
 
   const lastDay    = new Date(parseInt(year), parseInt(month), 0).getDate();
   const fechaDesde = '01/' + month + '/' + year;
@@ -230,11 +244,13 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
-  const { mes, destFolderId } = req.body || {};
-  if (!mes || !/^\d{4}-\d{2}$/.test(mes))
-    return res.status(400).json({ error: 'Se requiere mes en formato YYYY-MM' });
-  if (!destFolderId)
-    return res.status(400).json({ error: 'Se requiere destFolderId' });
+  const { mes, destFolderId, diagOnly } = req.body || {};
+  if (!diagOnly) {
+    if (!mes || !/^\d{4}-\d{2}$/.test(mes))
+      return res.status(400).json({ error: 'Se requiere mes en formato YYYY-MM' });
+    if (!destFolderId)
+      return res.status(400).json({ error: 'Se requiere destFolderId' });
+  }
 
   const RUT               = process.env.NUBOX_API_USER;
   const CLAVE             = process.env.NUBOX_API_PASS;
@@ -243,7 +259,7 @@ export default async function handler(req, res) {
   if (!RUT || !CLAVE)     return res.status(500).json({ error: 'Faltan NUBOX_API_USER / NUBOX_API_PASS' });
   if (!BROWSERLESS_TOKEN) return res.status(500).json({ error: 'Falta BROWSERLESS_TOKEN' });
 
-  const [year, month] = mes.split('-');
+  const [year, month] = diagOnly ? [null, null] : mes.split('-');
 
   try {
     console.log(`[nubox-pdf] Descargando facturas ${mes} via Browserless...`);
@@ -253,7 +269,7 @@ export default async function handler(req, res) {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: BROWSER_CODE, context: { rut: RUT, clave: CLAVE, year, month } })
+        body: JSON.stringify({ code: BROWSER_CODE, context: { rut: RUT, clave: CLAVE, year, month, diagOnly: !!diagOnly } })
       }
     );
 
@@ -263,6 +279,9 @@ export default async function handler(req, res) {
     }
 
     const blData = await blRes.json();
+    if (diagOnly) {
+      return res.status(200).json({ ok: true, diag: blData });
+    }
     if (!blData.pdfBase64) {
       throw new Error('No se recibio PDF: ' + JSON.stringify(blData).slice(0, 500));
     }
