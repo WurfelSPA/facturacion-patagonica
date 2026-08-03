@@ -82,13 +82,14 @@ export default async function main({ page, context }) {
     await rutInput.type(rut, { delay: 40 });
     await passInput.type(clave, { delay: 40 });
 
+    const submitBtn = await page.$('button[type="submit"], input[type="submit"]');
     try {
       await Promise.all([
         page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 25000 }),
-        passInput.press('Enter')
+        submitBtn ? submitBtn.click() : passInput.press('Enter')
       ]);
-    } catch (e) { await snap('post-submit-login', e.message); return { data: { diagOnly: true, pasos }, type: 'application/json' }; }
-    await snap('post-submit-login', null);
+    } catch (e) { await snap('post-submit-login (submitBtn=' + !!submitBtn + ')', e.message); return { data: { diagOnly: true, pasos }, type: 'application/json' }; }
+    await snap('post-submit-login (submitBtn=' + !!submitBtn + ')', null);
 
     try {
       await page.waitForFunction(
@@ -156,9 +157,10 @@ export default async function main({ page, context }) {
     await rutInput.click({ clickCount: 3 });
     await rutInput.type(rut, { delay: 40 });
     await passInput.type(clave, { delay: 40 });
+    const submitBtn = await page.$('button[type="submit"], input[type="submit"]');
     await Promise.all([
       page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }),
-      passInput.press('Enter')
+      submitBtn ? submitBtn.click() : passInput.press('Enter')
     ]);
     const afterUrl = page.url();
     if (afterUrl.toLowerCase().includes('/login/') || afterUrl.toLowerCase().includes('/account/')) {
