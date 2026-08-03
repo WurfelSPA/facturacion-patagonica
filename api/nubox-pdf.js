@@ -227,8 +227,17 @@ export default async function main({ page, context }) {
     if (!rutInput || !passInput) throw new Error('Campos de login no encontrados en: ' + page.url());
     await rutInput.click({ clickCount: 3 });
     await rutInput.type(rut, { delay: 40 });
+    await passInput.click({ clickCount: 3 });
     await passInput.type(clave, { delay: 40 });
     const submitBtn = await findSubmitButton(page);
+    if (submitBtn) {
+      await submitBtn.evaluate(el => new Promise(resolve => {
+        if (!el.disabled) return resolve();
+        const obs = new MutationObserver(() => { if (!el.disabled) { obs.disconnect(); resolve(); } });
+        obs.observe(el, { attributes: true, attributeFilter: ['disabled'] });
+        setTimeout(() => { obs.disconnect(); resolve(); }, 5000);
+      })).catch(() => {});
+    }
     await Promise.all([
       page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }),
       submitBtn ? submitBtn.click() : passInput.press('Enter')
