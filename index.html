@@ -1954,6 +1954,94 @@ async function generarBorradorNuevaDenominacion(c, pdfTexto){
   setTimeout(()=>URL.revokeObjectURL(url),5000);
 }
 
+async function generarAnexo(c, promptUsuario){
+  function xe(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+  function pd(v){if(!v||v==="—"||v==="-"||v==="")return null;if(typeof v==="string"&&v.includes("/")){const[d,mm,y]=v.split("/").map(Number);if(!d||!mm||!y)return null;return new Date(y,mm-1,d);}return null;}
+  const MES_ES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  function fmtL(d){return`${String(d.getDate()).padStart(2,"0")} de ${MES_ES[d.getMonth()]} de ${d.getFullYear()}`;}
+  function fmtC(d){return`${String(d.getDate()).padStart(2,"0")}-${String(d.getMonth()+1).padStart(2,"0")}-${d.getFullYear()}`;}
+  const hoy=new Date();
+  const termInicio=pd(c.termContrato);
+  const termFin=pd(c.termTermino);
+
+  const contexto=[
+    `Arrendataria: ${c.nombre||"[NOMBRE]"}`,
+    `RUT Arrendataria: ${c.rut||"[RUT]"}`,
+    `Local/Sitio: ${c.sitio||"[LOCAL]"}`,
+    `Edificio/Ubicación: ${c.edificio||"[EDIFICIO]"}`,
+    `Superficie: ${c.m2?c.m2+" m2":"[SUPERFICIE]"}`,
+    `Renta de arrendamiento actual: ${c.ufArr>0?c.ufArr.toFixed(2)+" UF":"[RENTA]"}`,
+    `Servicios de administración actuales: ${c.ufSrv>0?c.ufSrv.toFixed(2)+" UF":"[SERV. ADMIN]"}`,
+    `Inicio del contrato original: ${termInicio?fmtL(termInicio):"[FECHA INICIO]"}`,
+    `Término del contrato original: ${termFin?fmtL(termFin):"[FECHA TÉRMINO]"}`,
+    `Reajuste pactado: ${c.pctReaj&&c.pctReaj!=="-"?c.pctReaj+"% cada "+(c.cadaAnios||1)+" año(s)":"[REAJUSTE]"}`,
+    `Arrendadora: PATAGONICA INMOBILIARIA SpA, RUT 96.673.250-4`,
+  ].join("\n");
+
+  const prompt=`Eres un abogado chileno redactando un ANEXO a un contrato de arrendamiento comercial vigente, para uso interno (borrador a revisar antes de enviar al cliente).
+
+DATOS DEL CONTRATO ORIGINAL VIGENTE:
+${contexto}
+
+INSTRUCCIÓN DEL USUARIO SOBRE LO QUE DEBE CONTENER ESTE ANEXO:
+"""
+${promptUsuario}
+"""
+
+Redacta el texto completo del Anexo en español, con lenguaje legal chileno formal, en Santiago de Chile a la fecha de hoy (${fmtL(hoy)}). El anexo debe:
+- Identificar a las partes (Arrendadora y Arrendataria) y referenciar que modifica/complementa el contrato de arrendamiento original vigente entre ellas.
+- Desarrollar en cláusulas numeradas (PRIMERO, SEGUNDO, etc.) los cambios/adiciones solicitados por el usuario, usando los datos del contrato original como base cuando corresponda.
+- Dejar constancia de que, en todo lo no modificado por este anexo, el contrato original mantiene su plena vigencia.
+- Terminar con un párrafo de cierre y líneas para firma de ambas partes.
+- Usar cifras en UF cuando corresponda a montos, dejando placeholders entre corchetes [ASI] solo si un dato específico no fue proporcionado ni se puede inferir.
+
+FORMATO DE SALIDA (obligatorio, no agregues explicaciones fuera de este formato):
+- Devuelve solo el texto del anexo, sin comentarios ni markdown de bloques de código.
+- La primera línea debe iniciar con "# " seguido del título del anexo en mayúsculas (ej: "# ANEXO N.1 AL CONTRATO DE ARRENDAMIENTO").
+- Cada encabezado de cláusula debe ir en su propia línea iniciando con "## " (ej: "## PRIMERO: ANTECEDENTES").
+- El resto de los párrafos van como líneas de texto normal, sin ningún prefijo.
+- Separa cada línea/párrafo con un salto de línea simple.`;
+
+  const textoIA=await callClaude(prompt);
+
+  function wp(text,opts){
+    opts=opts||{};
+    const sz=opts.sz||22;const bold=opts.bold||false;const center=opts.center||false;
+    const sb=opts.sb||0;const sa=opts.sa!==undefined?opts.sa:120;
+    const jc=center?'<w:jc w:val="center"/>':"";
+    const b=bold?"<w:b/>":"";
+    return`<w:p><w:pPr>${jc}<w:spacing w:before="${sb}" w:after="${sa}"/><w:rPr>${b}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr></w:pPr><w:r><w:rPr>${b}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr><w:t xml:space="preserve">${xe(text)}</w:t></w:r></w:p>`;
+  }
+
+  const lineas=textoIA.split("\n").map(l=>l.trim()).filter(l=>l.length>0);
+  const cuerpo=lineas.map(linea=>{
+    if(linea.startsWith("# "))return wp(linea.slice(2).trim(),{bold:true,center:true,sz:26,sb:0,sa:160});
+    if(linea.startsWith("## "))return wp(linea.slice(3).trim(),{bold:true,sb:160,sa:80});
+    return wp(linea,{sa:120});
+  }).join("");
+
+  const body=[
+    wp("BORRADOR — ANEXO DE CONTRATO — DOCUMENTO DE USO INTERNO",{center:true,sz:18,sa:200}),
+    cuerpo,
+  ].join("");
+  const docXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="709" w:footer="709" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const ct=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/></Types>`;
+  const rels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+  const drels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/></Relationships>`;
+  const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:rPrDefault></w:docDefaults></w:styles>`;
+  const sets=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:defaultTabStop w:val="708"/></w:settings>`;
+  const zip=new JSZip();
+  zip.file("[Content_Types].xml",ct);zip.file("_rels/.rels",rels);
+  zip.file("word/document.xml",docXml);zip.file("word/_rels/document.xml.rels",drels);
+  zip.file("word/styles.xml",styles);zip.file("word/settings.xml",sets);
+  const blob=await zip.generateAsync({type:"blob",mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=url;
+  a.download=`Anexo_${(c.nombre||"cliente").replace(/[^a-zA-Z0-9]/g,"_")}_${fmtC(hoy)}.docx`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+}
+
 
 /* ═══════════════════════════════════
    VISTA FACTURAS x COBRAR
@@ -2415,6 +2503,10 @@ function ContratosView({dashData,driveLoading}){
   const [ajusteModal,setAjusteModal]=useState(null); /* {rut,sitio,nombre} */
   const [ajusteDraft,setAjusteDraft]=useState(null);
   const [ajusteSaving,setAjusteSaving]=useState(false);
+  const [anexoModalOpen,setAnexoModalOpen]=useState(false);
+  const [anexoPrompt,setAnexoPrompt]=useState("");
+  const [anexoGenerando,setAnexoGenerando]=useState(false);
+  const [anexoError,setAnexoError]=useState("");
   const [sortCol,setSortCol]=useState(null);
   const [sortDir,setSortDir]=useState("asc");
   const [filaSel,setFilaSel]=useState(null);
@@ -2663,12 +2755,14 @@ function ContratosView({dashData,driveLoading}){
       },
         h("option",{value:"contrato"},"Contrato de Arrendamiento"),
         h("option",{value:"denominacion"},"Cambio de Denominación Legal"),
-        h("option",{value:"nueva-denominacion"},"Contrato de Arrendamiento Nueva Denominación")
+        h("option",{value:"nueva-denominacion"},"Contrato de Arrendamiento Nueva Denominación"),
+        h("option",{value:"anexo"},"Anexo")
       ),
       h("button",{
         disabled:!clienteSeleccionado||(borradorTipo==="nueva-denominacion"&&!certPdf)||!!borradorLoading["panel"],
         onClick:async()=>{
           if(!clienteSeleccionado)return;
+          if(borradorTipo==="anexo"){setAnexoError("");setAnexoModalOpen(true);return;}
           setBorradorLoading(p=>({...p,panel:true}));
           try{
             if(borradorTipo==="contrato") await generarBorrador(clienteSeleccionado);
@@ -2686,7 +2780,7 @@ function ContratosView({dashData,driveLoading}){
           background:borradorLoading["panel"]||!clienteSeleccionado||(borradorTipo==="nueva-denominacion"&&!certPdf)?"var(--surf3)":"linear-gradient(135deg,var(--acc),var(--acc2))",
           color:borradorLoading["panel"]||!clienteSeleccionado||(borradorTipo==="nueva-denominacion"&&!certPdf)?"var(--txm)":"#fff",
           display:"inline-flex",alignItems:"center",gap:6,whiteSpace:"nowrap"}
-      },borradorLoading["panel"]?h("span",{className:"spin"},"⟳"):"⬇","  Descargar Borrador")
+      },borradorLoading["panel"]?h("span",{className:"spin"},"⟳"):(borradorTipo==="anexo"?"✨":"⬇"),"  "+(borradorTipo==="anexo"?"Generar Anexo":"Descargar Borrador"))
     ),
     /* ── Panel subida certificado (solo para nueva-denominacion) ── */
     borradorTipo==="nueva-denominacion"&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--adim)",borderRadius:10,padding:"12px 18px",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}},
@@ -2879,6 +2973,31 @@ function ContratosView({dashData,driveLoading}){
         h("div",{style:{display:"flex",gap:10,justifyContent:"flex-end"}},
           h("button",{onClick:()=>{setAjusteModal(null);setAjusteDraft(null);},style:{padding:"7px 16px",borderRadius:8,border:"1px solid var(--bdr)",background:"none",color:"var(--txm)",fontSize:12,fontWeight:600,cursor:"pointer"}},"Cancelar"),
           h("button",{disabled:ajusteSaving,onClick:guardarAjuste,style:{padding:"7px 18px",borderRadius:8,border:"none",fontWeight:700,fontSize:12,cursor:ajusteSaving?"not-allowed":"pointer",background:ajusteSaving?"var(--surf3)":"linear-gradient(135deg,var(--acc),var(--acc2))",color:ajusteSaving?"var(--txm)":"#fff",display:"inline-flex",alignItems:"center",gap:6}},ajusteSaving?h("span",{className:"spin"},"⟳"):"💾","  Guardar")
+        )
+      )
+    ),
+    /* ── Modal Generar Anexo con IA ── */
+    anexoModalOpen&&h("div",{onClick:function(e){if(e.target===e.currentTarget&&!anexoGenerando)setAnexoModalOpen(false);},
+      style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}},
+      h("div",{style:{background:"var(--surf)",borderRadius:16,boxShadow:"0 8px 40px rgba(0,0,0,0.25)",maxWidth:560,width:"100%",maxHeight:"85vh",overflow:"auto",padding:"24px 28px",position:"relative"}},
+        h("button",{disabled:anexoGenerando,onClick:()=>setAnexoModalOpen(false),style:{position:"absolute",top:14,right:16,background:"none",border:"none",fontSize:20,cursor:anexoGenerando?"not-allowed":"pointer",color:"var(--txm)",lineHeight:1}},"×"),
+        h("div",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".1em",textTransform:"uppercase",marginBottom:4}},"Generar Anexo con IA"),
+        h("div",{style:{fontSize:16,fontWeight:800,color:"var(--tx)",marginBottom:2}},clienteSeleccionado?clienteSeleccionado.nombre:""),
+        h("div",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",marginBottom:16}},clienteSeleccionado?(clienteSeleccionado.rut+" · "+clienteSeleccionado.sitio):""),
+        h("div",{style:{fontSize:11,color:"var(--txm)",marginBottom:10,lineHeight:1.5}},"Describe brevemente qué debe agregar, modificar o especificar este anexo respecto del contrato original. Ej: \"Agregar una nueva bodega al contrato y especificar las UF a cobrar por ella\"."),
+        h("textarea",{placeholder:"Describe el anexo a generar...",value:anexoPrompt,onChange:e=>setAnexoPrompt(e.target.value),disabled:anexoGenerando,style:{width:"100%",minHeight:100,fontSize:12,padding:"8px 10px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)",fontFamily:"'DM Sans',sans-serif",marginBottom:10,resize:"vertical"}}),
+        anexoError&&h("div",{style:{fontSize:11,color:"var(--red)",marginBottom:10}},anexoError),
+        h("div",{style:{display:"flex",gap:10,justifyContent:"flex-end"}},
+          h("button",{disabled:anexoGenerando,onClick:()=>{setAnexoModalOpen(false);setAnexoPrompt("");setAnexoError("");},style:{padding:"7px 16px",borderRadius:8,border:"1px solid var(--bdr)",background:"none",color:"var(--txm)",fontSize:12,fontWeight:600,cursor:anexoGenerando?"not-allowed":"pointer"}},"Cancelar"),
+          h("button",{disabled:anexoGenerando||!anexoPrompt.trim(),onClick:async()=>{
+            if(!clienteSeleccionado)return;
+            setAnexoGenerando(true);setAnexoError("");
+            try{
+              await generarAnexo(clienteSeleccionado,anexoPrompt.trim());
+              setAnexoModalOpen(false);setAnexoPrompt("");
+            }catch(e){console.error(e);setAnexoError(e.message||"Error generando el anexo");}
+            setAnexoGenerando(false);
+          },style:{padding:"7px 18px",borderRadius:8,border:"none",fontWeight:700,fontSize:12,cursor:(anexoGenerando||!anexoPrompt.trim())?"not-allowed":"pointer",background:(anexoGenerando||!anexoPrompt.trim())?"var(--surf3)":"linear-gradient(135deg,var(--acc),var(--acc2))",color:(anexoGenerando||!anexoPrompt.trim())?"var(--txm)":"#fff",display:"inline-flex",alignItems:"center",gap:6}},anexoGenerando?h("span",{className:"spin"},"⟳"):"✨","  Generar")
         )
       )
     )
