@@ -5066,7 +5066,7 @@ function App(){
         const nbRes=await fetch("/api/nubox-pdf",{
           method:"POST",
           headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({mes:mesCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID}),
+          body:JSON.stringify({mes:mesCode,destFolderId:DRIVE_FACTURACION_FOLDER_ID,userToken:await getToken().catch(()=>null)}),
         });
         const nbData=await nbRes.json().catch(()=>({}));
         if(!nbRes.ok)throw new Error("Nubox: "+(nbData.error||"Error desconocido"));

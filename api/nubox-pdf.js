@@ -379,7 +379,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
-  const { mes, destFolderId, diagOnly, diagSearch } = req.body || {};
+  const { mes, destFolderId, diagOnly, diagSearch, userToken } = req.body || {};
   if (!diagOnly) {
     if (!mes || !/^\d{4}-\d{2}$/.test(mes))
       return res.status(400).json({ error: 'Se requiere mes en formato YYYY-MM' });
@@ -426,7 +426,11 @@ export default async function handler(req, res) {
     // ── Subir a Google Drive ─────────────────────────────────────────────────
     const pdfBuffer = Buffer.from(blData.pdfBase64, 'base64');
     const fileName  = `Facturas_PISA_${mes}.pdf`;
-    const saToken   = await getSAToken();
+    // La Service Account no tiene cuota de almacenamiento propia para crear
+    // archivos en carpetas de Mi Unidad (solo en Unidades Compartidas), así que
+    // la subida usa el token del usuario cuando está disponible (mismo patrón
+    // que split-pdf.js).
+    const uploadToken = userToken || await getSAToken();
     const boundary  = 'nubox_pdf_boundary';
     const metadata  = JSON.stringify({ name: fileName, mimeType: 'application/pdf', parents: [destFolderId] });
     const multipart = Buffer.concat([
@@ -440,7 +444,7 @@ export default async function handler(req, res) {
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${saToken}`,
+          'Authorization': `Bearer ${uploadToken}`,
           'Content-Type': `multipart/related; boundary=${boundary}`
         },
         body: multipart
