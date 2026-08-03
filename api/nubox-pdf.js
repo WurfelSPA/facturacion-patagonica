@@ -50,6 +50,20 @@ async function getSAToken() {
 const BROWSER_CODE = `
 export default async function main({ page, context }) {
   const { rut, clave, year, month, diagOnly } = context;
+
+  // Busca el botón de submit del login: primero por type="submit", luego
+  // cualquier <button> cuyo texto sugiera que es el de ingresar/entrar.
+  async function findSubmitButton(page) {
+    const typed = await page.$('button[type="submit"], input[type="submit"]');
+    if (typed) return typed;
+    const buttons = await page.$$('button');
+    for (const b of buttons) {
+      const txt = await b.evaluate(el => (el.textContent || '').trim().toLowerCase());
+      if (/ingres|entrar|iniciar|login|acceder/.test(txt)) return b;
+    }
+    return buttons[0] || null;
+  }
+
   if (diagOnly) {
     const pasos = [];
     async function snap(nombre, errMsg) {
@@ -82,7 +96,7 @@ export default async function main({ page, context }) {
     await rutInput.type(rut, { delay: 40 });
     await passInput.type(clave, { delay: 40 });
 
-    const submitBtn = await page.$('button[type="submit"], input[type="submit"]');
+    const submitBtn = await findSubmitButton(page);
     try {
       await Promise.all([
         page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 25000 }),
@@ -157,7 +171,7 @@ export default async function main({ page, context }) {
     await rutInput.click({ clickCount: 3 });
     await rutInput.type(rut, { delay: 40 });
     await passInput.type(clave, { delay: 40 });
-    const submitBtn = await page.$('button[type="submit"], input[type="submit"]');
+    const submitBtn = await findSubmitButton(page);
     await Promise.all([
       page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }),
       submitBtn ? submitBtn.click() : passInput.press('Enter')
