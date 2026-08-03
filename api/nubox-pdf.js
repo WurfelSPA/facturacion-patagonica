@@ -114,9 +114,19 @@ export default async function main({ page, context }) {
       await snap('campos-no-encontrados', 'sin rutInput/passInput');
       return { data: { diagOnly: true, pasos }, type: 'application/json' };
     }
+    const seleccion = await Promise.all([
+      rutInput.evaluate(el => ({ name: el.name || el.id, valueAntes: el.value })),
+      passInput.evaluate(el => ({ name: el.name || el.id, valueAntes: el.value }))
+    ]).catch(e => [{ evalError: e.message }]);
+    pasos.push({ nombre: 'campos-seleccionados', errMsg: null, title: null, url: null, snippet: JSON.stringify(seleccion).slice(0, 500) });
+
     await rutInput.click({ clickCount: 3 });
     await rutInput.type(rut, { delay: 40 });
+    const valorRutJustoDespues = await rutInput.evaluate(el => el.value).catch(e => 'eval-error: ' + e.message);
+    await passInput.click({ clickCount: 3 });
     await passInput.type(clave, { delay: 40 });
+    const valorPassJustoDespues = await passInput.evaluate(el => el.value.length).catch(e => 'eval-error: ' + e.message);
+    pasos.push({ nombre: 'valores-justo-despues-de-tipear', errMsg: null, title: null, url: null, snippet: JSON.stringify({ rut: valorRutJustoDespues, passLen: valorPassJustoDespues }).slice(0, 500) });
 
     // Verificar qué quedó realmente escrito en los campos antes de enviar.
     const valoresCampos = await page.evaluate((rutSel) => {
