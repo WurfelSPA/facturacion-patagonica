@@ -1,15 +1,14 @@
 {
   "ok": true,
-  "updatedAt": "2026-07-31T17:30:03.203Z",
+  "updatedAt": "2026-08-03T12:59:26.740Z",
   "source": "n8n",
   "accounts": {
     "672977-0": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "nombre": null
+      "deuda": null,
+      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: db40002a-f859-45f2-8671-ece6f7001081)"
     },
     "1009146-2": {
-      "deuda": "$0",
+      "deuda": "$1.550",
       "vencimiento": null,
       "nombre": null
     },
@@ -24,7 +23,7 @@
       "nombre": null
     },
     "1127131-6": {
-      "deuda": "$0",
+      "deuda": "$90.270",
       "vencimiento": null,
       "nombre": null
     },
@@ -49,49 +48,52 @@
       "nombre": null
     },
     "1127136-7": {
-      "deuda": null,
-      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: 0f0090f6-bcae-4595-b042-57435e2934dd)"
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
     },
     "1127137-5": {
-      "deuda": "$0",
+      "deuda": "$12.017",
       "vencimiento": null,
       "nombre": null
     },
     "1127138-3": {
-      "deuda": "$0",
+      "deuda": "$164.310",
       "vencimiento": null,
       "nombre": null
     },
     "1127139-1": {
-      "deuda": null,
-      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: c790c774-7daf-4ed0-9f0b-faae2d85d723)"
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
     },
     "1127140-5": {
-      "deuda": "$0",
+      "deuda": "$12.070",
       "vencimiento": null,
       "nombre": null
     },
     "1127141-3": {
-      "deuda": null,
-      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: c790c774-7daf-4ed0-9f0b-faae2d85d723)"
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
     },
     "1127142-1": {
-      "deuda": "$0",
+      "deuda": "$7.864",
       "vencimiento": null,
       "nombre": null
     },
     "1127144-8": {
-      "deuda": "$0",
+      "deuda": "$23.092",
       "vencimiento": null,
       "nombre": null
     },
     "1127145-6": {
-      "deuda": "$0",
+      "deuda": "$2.340",
       "vencimiento": null,
       "nombre": null
     },
     "1127146-4": {
-      "deuda": "$0",
+      "deuda": "$950",
       "vencimiento": null,
       "nombre": null
     },
@@ -121,9 +123,8 @@
       "nombre": null
     },
     "1127152-9": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "nombre": null
+      "deuda": null,
+      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: 68deb00c-a6ac-45a6-a81f-a22ed87047ad)"
     },
     "1127153-7": {
       "deuda": "$0",
@@ -136,12 +137,12 @@
       "nombre": null
     },
     "1127204-5": {
-      "deuda": "$0",
+      "deuda": "$164.240",
       "vencimiento": null,
       "nombre": null
     },
     "1127206-1": {
-      "deuda": "$0",
+      "deuda": "$74.920",
       "vencimiento": null,
       "nombre": null
     },
@@ -151,17 +152,17 @@
       "nombre": null
     },
     "1127209-6": {
-      "deuda": "$0",
+      "deuda": "$14.780",
       "vencimiento": null,
       "nombre": null
     },
     "1127211-8": {
-      "deuda": "$0",
+      "deuda": "$79.100",
       "vencimiento": null,
       "nombre": null
     },
     "1127212-6": {
-      "deuda": "$0",
+      "deuda": "$58.170",
       "vencimiento": null,
       "nombre": null
     },
@@ -176,7 +177,7 @@
       "nombre": null
     },
     "1534318-4": {
-      "deuda": "$0",
+      "deuda": "$203.290",
       "vencimiento": null,
       "nombre": null
     },
@@ -186,37 +187,35 @@
       "nombre": null
     },
     "1534320-6": {
-      "deuda": "$0",
+      "deuda": "$42.760",
       "vencimiento": null,
       "nombre": null
     },
     "1534321-4": {
-      "deuda": "$0",
+      "deuda": "$61.850",
       "vencimiento": null,
       "nombre": null
     },
     "1534322-2": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "nombre": null
+      "deuda": null,
+      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: cb77a934-3731-4730-a26e-661e9631fc48)"
     },
     "1534323-0": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "nombre": null
+      "deuda": null,
+      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: cb77a934-3731-4730-a26e-661e9631fc48)"
     },
     "1534324-9": {
-      "deuda": "$0",
+      "deuda": "$18.940",
       "vencimiento": null,
       "nombre": null
     },
     "1534325-7": {
-      "deuda": "$0",
+      "deuda": "$6.480",
       "vencimiento": null,
       "nombre": null
     },
     "1534326-5": {
-      "deuda": "$0",
+      "deuda": "$18.940",
       "vencimiento": null,
       "nombre": null
     },
@@ -231,7 +230,7 @@
       "nombre": null
     },
     "1534330-3": {
-      "deuda": "$0",
+      "deuda": "$158.765",
       "vencimiento": null,
       "nombre": null
     },
@@ -261,12 +260,12 @@
       "nombre": null
     },
     "1596662-9": {
-      "deuda": "$0",
+      "deuda": "$240.446",
       "vencimiento": null,
       "nombre": null
     },
     "1596663-7": {
-      "deuda": "$0",
+      "deuda": "$10.630",
       "vencimiento": null,
       "nombre": null
     },
@@ -286,27 +285,27 @@
       "nombre": null
     },
     "1637811-9": {
-      "deuda": "$0",
+      "deuda": "$16.300",
       "vencimiento": null,
       "nombre": null
     },
     "1637812-7": {
-      "deuda": "$0",
+      "deuda": "$47.000",
       "vencimiento": null,
       "nombre": null
     },
     "1637814-3": {
-      "deuda": "$0",
+      "deuda": "$16.300",
       "vencimiento": null,
       "nombre": null
     },
     "1664822-1": {
-      "deuda": "$0",
+      "deuda": "$23.092",
       "vencimiento": null,
       "nombre": null
     },
     "1664824-8": {
-      "deuda": "$0",
+      "deuda": "$28.020",
       "vencimiento": null,
       "nombre": null
     },
@@ -316,9 +315,8 @@
       "nombre": null
     },
     "1717632-3": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "nombre": null
+      "deuda": null,
+      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: 039ee8f2-218e-4803-ab07-fd6473e3445d)"
     },
     "1717633-1": {
       "deuda": "$0",
