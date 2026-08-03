@@ -143,11 +143,25 @@ export default async function main({ page, context }) {
 
     await page.goto('https://app.nubox.com/ServiFactura/paginas/dteDocumentosTributarios.aspx?utn=' + encodeURIComponent(utn), { waitUntil: 'domcontentloaded', timeout: 25000 });
     await new Promise(r => setTimeout(r, 2000));
-    const scriptInfo = await page.evaluate(() => {
-      const scripts = [...document.querySelectorAll('script')].map(s => s.textContent || '').join(String.fromCharCode(10));
-      const idx = scripts.indexOf('ObtenerPorFiltro');
-      const excerpt = idx >= 0 ? scripts.slice(Math.max(0, idx - 600), idx + 600) : 'NO_ENCONTRADO';
-      return { title: document.title, url: location.href, excerpt };
+    const scriptInfo = await page.evaluate(async () => {
+      const scripts = [...document.querySelectorAll('script')];
+      const inline = scripts.filter(s => !s.src).map(s => s.textContent || '').join(String.fromCharCode(10));
+      const srcs = scripts.filter(s => s.src).map(s => s.src);
+      const idx = inline.indexOf('ObtenerPorFiltro');
+      if (idx >= 0) {
+        return { title: document.title, url: location.href, foundIn: 'inline', excerpt: inline.slice(Math.max(0, idx - 600), idx + 600) };
+      }
+      for (const src of srcs) {
+        try {
+          const r = await fetch(src, { credentials: 'include' });
+          const txt = await r.text();
+          const i = txt.indexOf('ObtenerPorFiltro');
+          if (i >= 0) {
+            return { title: document.title, url: location.href, foundIn: src, excerpt: txt.slice(Math.max(0, i - 600), i + 600) };
+          }
+        } catch (e) { /* ignora, sigue con el siguiente */ }
+      }
+      return { title: document.title, url: location.href, foundIn: null, excerpt: 'NO_ENCONTRADO', scriptSrcs: srcs };
     }).catch(e => ({ evalError: e.message }));
 
     return { data: { diagOnly: true, scriptInfo }, type: 'application/json' };
