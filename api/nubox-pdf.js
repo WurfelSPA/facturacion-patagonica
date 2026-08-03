@@ -311,7 +311,7 @@ export default async function main({ page, context }) {
           token: pageToken, EstadoId: 3, estadoEnvio: 0,
           fechaDesde, fechaHasta,
           filtro: '',
-          folioDesde: null, folioHasta: null,
+          folioDesde: 0, folioHasta: 0,
           usaFormatoImpresionEspecial: false
         })
       });
