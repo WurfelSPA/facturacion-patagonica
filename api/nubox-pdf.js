@@ -49,7 +49,7 @@ async function getSAToken() {
 // timeout en el SPA de Nubox (que tiene polling de red continuo).
 const BROWSER_CODE = `
 export default async function main({ page, context }) {
-  const { rut, clave, year, month, diagOnly, diagSearch } = context;
+  const { rut, clave, year, month } = context;
 
   // Un elemento está realmente visible si ocupa espacio y no está oculto por
   // CSS. Los campos/botones señuelo (honeypot) anti-bot suelen estar en el
@@ -82,89 +82,6 @@ export default async function main({ page, context }) {
       if (/ingres|entrar|iniciar|login|acceder/.test(etiqueta) && await esVisible(b)) return b;
     }
     return null;
-  }
-
-  if (diagOnly) {
-    async function loguear() {
-      await page.goto('https://web.nubox.com/Login/Account/Login?ReturnUrl=%2FSistemaLogin', { waitUntil: 'domcontentloaded', timeout: 25000 });
-      const allInputs = await page.$$('input:not([type="hidden"]):not([type="submit"]):not([type="button"])');
-      let rutInput = null, passInput = null;
-      for (const inp of allInputs) {
-        const t = await inp.evaluate(el => el.type);
-        if (t === 'checkbox') continue;
-        if (!(await esVisible(inp))) continue;
-        if (t === 'password' && !passInput) { passInput = inp; }
-        else if (t !== 'password' && !rutInput) { rutInput = inp; }
-      }
-      if (!rutInput || !passInput) throw new Error('campos no encontrados');
-      await rutInput.click({ clickCount: 3 });
-      await rutInput.type(rut, { delay: 40 });
-      await passInput.click({ clickCount: 3 });
-      await passInput.type(clave, { delay: 40 });
-      const submitBtn = await findSubmitButton(page);
-      if (submitBtn) {
-        await submitBtn.evaluate(el => new Promise(resolve => {
-          if (!el.disabled) return resolve();
-          const obs = new MutationObserver(() => { if (!el.disabled) { obs.disconnect(); resolve(); } });
-          obs.observe(el, { attributes: true, attributeFilter: ['disabled'] });
-          setTimeout(() => { obs.disconnect(); resolve(); }, 5000);
-        })).catch(() => {});
-      }
-      await Promise.all([
-        page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 25000 }),
-        submitBtn ? submitBtn.click() : passInput.press('Enter')
-      ]);
-      await page.waitForFunction(
-        () => typeof $ !== 'undefined' && document.getElementById('treeGrid') && document.getElementById('row1treeGrid'),
-        { timeout: 20000, polling: 500 }
-      );
-      await Promise.all([
-        page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 25000 }),
-        page.evaluate(() => {
-          try { $('#treeGrid').jqxTreeGrid('selectRow', '2'); }
-          catch (_) {
-            const row = document.getElementById('row1treeGrid');
-            if (row) row.click();
-          }
-        })
-      ]);
-    }
-
-    try {
-      await loguear();
-    } catch (e) {
-      return { data: { diagOnly: true, error: 'login-fallo: ' + e.message, url: page.url() }, type: 'application/json' };
-    }
-
-    const navUrl = page.url();
-    const utnMatch = navUrl.match(/[?&]utn=([^&]+)/);
-    const utn = utnMatch ? utnMatch[1] : null;
-    if (!utn) return { data: { diagOnly: true, error: 'utn no encontrado', url: navUrl }, type: 'application/json' };
-
-    await page.goto('https://app.nubox.com/ServiFactura/paginas/dteDocumentosTributarios.aspx?utn=' + encodeURIComponent(utn), { waitUntil: 'domcontentloaded', timeout: 25000 });
-    await new Promise(r => setTimeout(r, 2000));
-    const scriptInfo = await page.evaluate(async (term) => {
-      const scripts = [...document.querySelectorAll('script')];
-      const srcs = scripts.filter(s => s.src).map(s => s.src);
-      const inline = scripts.filter(s => !s.src).map(s => s.textContent || '').join(String.fromCharCode(10));
-      const idx = inline.indexOf(term);
-      if (idx >= 0) {
-        return { title: document.title, url: location.href, foundIn: 'inline', excerpt: inline.slice(Math.max(0, idx - 600), idx + 600), allSrcs: srcs };
-      }
-      for (const src of srcs) {
-        try {
-          const r = await fetch(src, { credentials: 'include' });
-          const txt = await r.text();
-          const i = txt.indexOf(term);
-          if (i >= 0) {
-            return { title: document.title, url: location.href, foundIn: src, excerpt: txt.slice(Math.max(0, i - 600), i + 600), allSrcs: srcs };
-          }
-        } catch (e) { /* ignora, sigue con el siguiente */ }
-      }
-      return { title: document.title, url: location.href, foundIn: null, excerpt: 'NO_ENCONTRADO', allSrcs: srcs };
-    }, diagSearch || 'ObtenerPorFiltro').catch(e => ({ evalError: e.message }));
-
-    return { data: { diagOnly: true, scriptInfo }, type: 'application/json' };
   }
 
   const lastDay    = new Date(parseInt(year), parseInt(month), 0).getDate();
@@ -379,13 +296,11 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
-  const { mes, destFolderId, diagOnly, diagSearch, userToken } = req.body || {};
-  if (!diagOnly) {
-    if (!mes || !/^\d{4}-\d{2}$/.test(mes))
-      return res.status(400).json({ error: 'Se requiere mes en formato YYYY-MM' });
-    if (!destFolderId)
-      return res.status(400).json({ error: 'Se requiere destFolderId' });
-  }
+  const { mes, destFolderId, userToken } = req.body || {};
+  if (!mes || !/^\d{4}-\d{2}$/.test(mes))
+    return res.status(400).json({ error: 'Se requiere mes en formato YYYY-MM' });
+  if (!destFolderId)
+    return res.status(400).json({ error: 'Se requiere destFolderId' });
 
   const RUT               = process.env.NUBOX_API_USER;
   const CLAVE             = process.env.NUBOX_API_PASS;
@@ -394,7 +309,7 @@ export default async function handler(req, res) {
   if (!RUT || !CLAVE)     return res.status(500).json({ error: 'Faltan NUBOX_API_USER / NUBOX_API_PASS' });
   if (!BROWSERLESS_TOKEN) return res.status(500).json({ error: 'Falta BROWSERLESS_TOKEN' });
 
-  const [year, month] = diagOnly ? [null, null] : mes.split('-');
+  const [year, month] = mes.split('-');
 
   try {
     console.log(`[nubox-pdf] Descargando facturas ${mes} via Browserless...`);
@@ -404,7 +319,7 @@ export default async function handler(req, res) {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: BROWSER_CODE, context: { rut: RUT, clave: CLAVE, year, month, diagOnly: !!diagOnly, diagSearch } })
+        body: JSON.stringify({ code: BROWSER_CODE, context: { rut: RUT, clave: CLAVE, year, month } })
       }
     );
 
@@ -414,9 +329,6 @@ export default async function handler(req, res) {
     }
 
     const blData = await blRes.json();
-    if (diagOnly) {
-      return res.status(200).json({ ok: true, diag: blData });
-    }
     if (!blData.pdfBase64) {
       throw new Error('No se recibio PDF: ' + JSON.stringify(blData).slice(0, 500));
     }
