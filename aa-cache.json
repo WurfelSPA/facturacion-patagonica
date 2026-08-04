@@ -317,7 +317,8 @@
     },
     "1717632-3": {
       "deuda": null,
-      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: 039ee8f2-218e-4803-ab07-fd6473e3445d)"
+      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: 039ee8f2-218e-4803-ab07-fd6473e3445d)",
+      "nombre": "Megamin S.A."
     },
     "1717633-1": {
       "deuda": "$0",
