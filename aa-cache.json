@@ -204,7 +204,8 @@
     },
     "1534323-0": {
       "deuda": null,
-      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: cb77a934-3731-4730-a26e-661e9631fc48)"
+      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: cb77a934-3731-4730-a26e-661e9631fc48)",
+      "nombre": "Performex Chile SpA"
     },
     "1534324-9": {
       "deuda": "$18.940",
