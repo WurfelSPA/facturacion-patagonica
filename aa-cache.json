@@ -342,6 +342,10 @@
       "deuda": "$0",
       "vencimiento": null,
       "nombre": "PATAGONICA INMOBILIARIA SPA"
+    },
+    "1127143-K": {
+      "deuda": null,
+      "nombre": "PATAGONICA INMOBILIARIA SPA"
     }
   }
 }
