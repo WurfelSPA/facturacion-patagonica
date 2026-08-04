@@ -341,8 +341,13 @@ export default async function handler(req, res) {
   try {
     console.log(`[nubox-pdf] Descargando facturas ${mes} via Browserless...`);
 
+    // stealth:true patchea fingerprints de automatización (navigator.webdriver, etc.)
+    // — el login intermitente que redirige a Login/?Pais=CL parece el mismo tipo de
+    // bloqueo que Incapsula aplicaba a AA/Enel antes de este fix.
+    const launchB64 = Buffer.from(JSON.stringify({ stealth: true })).toString('base64');
+
     const blRes = await fetch(
-      `https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}&timeout=120000&proxy=residential&proxyCountry=cl&proxySticky=true`,
+      `https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}&timeout=120000&proxy=residential&proxyCountry=cl&proxySticky=true&launch=${launchB64}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
