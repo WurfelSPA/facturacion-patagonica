@@ -5071,6 +5071,8 @@ function App(){
         const nbData=await nbRes.json().catch(()=>({}));
         if(!nbRes.ok)throw new Error("Nubox: "+(nbData.error||"Error desconocido"));
         pdfFileId=nbData.fileId;
+        if(nbData.xmlFileId)notify(`✓ XML del período también guardado en Drive (${nbData.xmlFileName})`,"ok");
+        else if(nbData.xmlError)notify(`⚠ No se pudo descargar el XML: ${nbData.xmlError}`,"warn");
         setSplitStatus(`✓ ${nbData.total} facturas descargadas. Separando por cliente...`);
       }else{
         setSplitStatus("✓ PDF encontrado en Drive. Separando por cliente...");

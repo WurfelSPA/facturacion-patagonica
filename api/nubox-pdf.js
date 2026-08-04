@@ -1,16 +1,16 @@
 /**
  * POST /api/nubox-pdf
- * Descarga el PDF consolidado de facturas PISA para un mes desde Nubox
- * usando Browserless (igual que nubox-refresh.js) y lo sube a Google Drive.
+ * Descarga el PDF consolidado y el ZIP de XML de facturas PISA para un mes
+ * desde Nubox usando Browserless, y los sube a Google Drive.
  *
  * Env vars:
  *   NUBOX_API_USER          — RUT de acceso a Nubox (ej: 96673250-4)
  *   NUBOX_API_PASS          — Clave de Nubox
  *   BROWSERLESS_TOKEN       — Token de production-sfo.browserless.io
- *   GOOGLE_SERVICE_ACCOUNT  — JSON de Service Account con acceso Drive
+ *   GOOGLE_SERVICE_ACCOUNT  — JSON de Service Account con acceso Drive (fallback si no hay userToken)
  *
- * POST body: { mes: "YYYY-MM", destFolderId: "<Drive folder id>" }
- * Returns:   { ok, fileId, fileName, total, mes }
+ * POST body: { mes: "YYYY-MM", destFolderId: "<Drive folder id>", userToken?: "<OAuth token>" }
+ * Returns:   { ok, fileId, fileName, xmlFileId, xmlFileName, xmlError, total, mes }
  */
 
 export const config = { api: { bodyParser: { sizeLimit: '5mb' } } };
@@ -247,6 +247,15 @@ export default async function main({ page, context }) {
       const ids = docs.map(d => d.Id || d.id).filter(Boolean).join(',');
       const total = docs.length;
 
+      function toBase64(buf) {
+        const u8 = new Uint8Array(buf);
+        let bin = '';
+        for (let i = 0; i < u8.length; i += 8192) {
+          bin += String.fromCharCode.apply(null, u8.subarray(i, Math.min(i + 8192, u8.length)));
+        }
+        return { b64: btoa(bin), size: u8.length };
+      }
+
       const pdfRes = await fetch(DTE_BASE + '/VerPDF', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json; charset=utf-8', 'X-Requested-With': 'XMLHttpRequest' },
@@ -270,13 +279,31 @@ export default async function main({ page, context }) {
         return { error: 'Respuesta no es PDF (' + ct + '): ' + preview.slice(0, 300) };
       }
 
-      const buf = await dlRes.arrayBuffer();
-      const u8  = new Uint8Array(buf);
-      let   bin = '';
-      for (let i = 0; i < u8.length; i += 8192) {
-        bin += String.fromCharCode.apply(null, u8.subarray(i, Math.min(i + 8192, u8.length)));
+      const pdf = toBase64(await dlRes.arrayBuffer());
+
+      // ── XML (botón "Descargar XML" de Ventas Electrónicas) ────────────────
+      let xmlBase64 = null, xmlSize = null, xmlError = null;
+      try {
+        const arrayId = docs.map(d => ({ idDocs: parseInt(d.Id || d.id, 10), formato: 'SII' }));
+        const xmlListRes = await fetch(DTE_BASE + '/DescargarXML', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json; charset=utf-8', 'X-Requested-With': 'XMLHttpRequest' },
+          body: JSON.stringify({ token: pageToken, funcionarioId: pageFuncId || '339708', arrayId: JSON.stringify(arrayId) })
+        });
+        if (!xmlListRes.ok) throw new Error('DescargarXML HTTP ' + xmlListRes.status);
+        const xmlRaw = await xmlListRes.json();
+        const xmlPath = xmlRaw.d || xmlRaw.url || xmlRaw;
+        if (!xmlPath || typeof xmlPath !== 'string') throw new Error('DescargarXML no retornó ruta: ' + JSON.stringify(xmlRaw).slice(0, 200));
+        const xmlUrl = xmlPath.startsWith('http') ? xmlPath : ('https://app.nubox.com' + xmlPath);
+        const xmlDlRes = await fetch(xmlUrl, { credentials: 'include' });
+        if (!xmlDlRes.ok) throw new Error('Descarga XML HTTP ' + xmlDlRes.status + ' url: ' + xmlUrl);
+        const xmlB64 = toBase64(await xmlDlRes.arrayBuffer());
+        xmlBase64 = xmlB64.b64; xmlSize = xmlB64.size;
+      } catch (e) {
+        xmlError = e.message;
       }
-      return { pdfBase64: btoa(bin), total, pdfSize: u8.length };
+
+      return { pdfBase64: pdf.b64, pdfSize: pdf.size, xmlBase64, xmlSize, xmlError, total };
 
     } catch(e) {
       return { error: e.message };
@@ -335,44 +362,59 @@ export default async function handler(req, res) {
 
     console.log(`[nubox-pdf] PDF recibido — ${blData.total} docs, ${Math.round((blData.pdfSize||0)/1024)} KB`);
 
-    // ── Subir a Google Drive ─────────────────────────────────────────────────
-    const pdfBuffer = Buffer.from(blData.pdfBase64, 'base64');
-    const fileName  = `Facturas_PISA_${mes}.pdf`;
     // La Service Account no tiene cuota de almacenamiento propia para crear
     // archivos en carpetas de Mi Unidad (solo en Unidades Compartidas), así que
     // la subida usa el token del usuario cuando está disponible (mismo patrón
     // que split-pdf.js).
     const uploadToken = userToken || await getSAToken();
-    const boundary  = 'nubox_pdf_boundary';
-    const metadata  = JSON.stringify({ name: fileName, mimeType: 'application/pdf', parents: [destFolderId] });
-    const multipart = Buffer.concat([
-      Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`),
-      pdfBuffer,
-      Buffer.from(`\r\n--${boundary}--`)
-    ]);
 
-    const uploadRes = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${uploadToken}`,
-          'Content-Type': `multipart/related; boundary=${boundary}`
-        },
-        body: multipart
+    async function subirADrive(buffer, fileName, mimeType) {
+      const boundary  = 'nubox_pdf_boundary';
+      const metadata  = JSON.stringify({ name: fileName, mimeType, parents: [destFolderId] });
+      const multipart = Buffer.concat([
+        Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`),
+        buffer,
+        Buffer.from(`\r\n--${boundary}--`)
+      ]);
+      const uploadRes = await fetch(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true',
+        {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${uploadToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+          body: multipart
+        }
+      );
+      if (!uploadRes.ok) {
+        const errText = await uploadRes.text();
+        throw new Error(`Drive upload ${uploadRes.status}: ${errText.slice(0, 300)}`);
       }
-    );
-
-    if (!uploadRes.ok) {
-      const errText = await uploadRes.text();
-      throw new Error(`Drive upload ${uploadRes.status}: ${errText.slice(0, 300)}`);
+      return uploadRes.json();
     }
 
-    const uploadData = await uploadRes.json();
+    // ── PDF ───────────────────────────────────────────────────────────────────
+    const fileName   = `Facturas_PISA_${mes}.pdf`;
+    const uploadData = await subirADrive(Buffer.from(blData.pdfBase64, 'base64'), fileName, 'application/pdf');
     console.log(`[nubox-pdf] Guardado en Drive: ${fileName} (id: ${uploadData.id})`);
 
+    // ── XML (best-effort: si falla, el PDF igual se entrega) ────────────────
+    let xmlFileId = null, xmlFileName = null;
+    if (blData.xmlBase64) {
+      xmlFileName = `Facturas XML_PISA_${mes}.zip`;
+      try {
+        const xmlUploadData = await subirADrive(Buffer.from(blData.xmlBase64, 'base64'), xmlFileName, 'application/zip');
+        xmlFileId = xmlUploadData.id;
+        console.log(`[nubox-pdf] Guardado en Drive: ${xmlFileName} (id: ${xmlFileId})`);
+      } catch (e) {
+        console.error('[nubox-pdf] Error subiendo XML:', e.message);
+        blData.xmlError = blData.xmlError || e.message;
+      }
+    } else if (blData.xmlError) {
+      console.error('[nubox-pdf] DescargarXML falló:', blData.xmlError);
+    }
+
     return res.status(200).json({
-      ok: true, fileId: uploadData.id, fileName, total: blData.total, mes
+      ok: true, fileId: uploadData.id, fileName, total: blData.total, mes,
+      xmlFileId, xmlFileName, xmlError: blData.xmlBase64 ? null : blData.xmlError
     });
 
   } catch (err) {
