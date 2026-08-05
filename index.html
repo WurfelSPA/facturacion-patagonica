@@ -5121,10 +5121,22 @@ function App(){
         const dest=MODO_PRUEBA?TEST_DEST:row.correo;
         const subject=row.cliente+" "+row.factura+" — "+row.concepto+" "+periodo+" — Patagónica Inmobiliaria SpA";
         const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura,ufSII);
-        const pdf=pdfMap[row.factura];let pdfB64=null;
-        if(pdf?.zipPath&&files.zip){try{pdfB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}}
-      else if(pdf?.driveFileId){try{pdfB64=await getPdfBase64FromDrive(pdf.driveFileId);}catch(e){console.warn("Drive PDF:",e.message);}}
-        try{await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,pdfB64,pdf?.nombre);const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(row.i,key);if(row.sheetRow&&!MODO_PRUEBA){marcarEnviadoSheet(row.sheetRow,row.sentColLetter).catch(e=>console.warn("mark-sent:",e.message));}enviados++;await new Promise(r=>setTimeout(r,400));}
+        let attB64=null,attNombre=null,attMime=undefined;
+        if(esClienteXML(row.cliente)){
+          /* Cliente requiere el XML del DTE — buscarlo en los ZIPs Facturas XML_PISA de Drive */
+          try{
+            const xr=await fetch(`/api/historial?folioXml=${encodeURIComponent(row.factura)}`);
+            const xd=await xr.json();
+            if(xd.found){attB64=xd.xmlBase64;attNombre=(row.factura||"factura").replace(/[^\w-]/g,"")+".xml";attMime="application/xml";}
+            else notify("⚠ XML no encontrado para "+row.factura+" — se enviará sin adjunto","warn");
+          }catch(e){console.warn("XML fetch:",e.message);}
+        }else{
+          const pdf=pdfMap[row.factura];
+          if(pdf?.zipPath&&files.zip){try{attB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}}
+          else if(pdf?.driveFileId){try{attB64=await getPdfBase64FromDrive(pdf.driveFileId);}catch(e){console.warn("Drive PDF:",e.message);}}
+          attNombre=pdf?.nombre;
+        }
+        try{await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,attB64,attNombre,attMime);const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(row.i,key);if(row.sheetRow&&!MODO_PRUEBA){marcarEnviadoSheet(row.sheetRow,row.sentColLetter).catch(e=>console.warn("mark-sent:",e.message));}enviados++;await new Promise(r=>setTimeout(r,400));}
         catch(e){notify("Error en "+row.cliente+": "+e.message,"err");}
       }
       if(enviados>0){try{const resumenRows=pend.slice(0,enviados);const resumenHtml=buildResumenHtml(resumenRows,periodo);const resSubject="Resumen Facturación "+periodo+" — "+enviados+" correos enviados";await sendGmail(token,"","",REMITENTE,resSubject,resumenHtml,null,null,null,"facturacion@patagonica.cl");}catch(e){console.warn("Error enviando resumen:",e.message);}}
