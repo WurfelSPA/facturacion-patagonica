@@ -86,6 +86,10 @@
       "dest": "/ajustes-contratos.json"
     },
     {
+      "src": "/clientes-seguimiento.json",
+      "dest": "/clientes-seguimiento.json"
+    },
+    {
       "src": "/(.+\\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2))",
       "dest": "/$1"
     },
