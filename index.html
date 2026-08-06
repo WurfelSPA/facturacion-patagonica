@@ -668,7 +668,7 @@ async function procesarPlanillaFacturacion(file,periodo){
   const dataRaw=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
   const mesNum=MES_NUM[periodo.split(" ")[0]];
   const anio=parseInt(periodo.split(" ")[1]);
-  let colGS=-1,colGT=-1,colEnviado=-1,colPagado=-1;
+  let colGS=-1,colGT=-1,colEnviado=-1,colPagado=-1,colPagadoArr=-1,colPagadoGC=-1;
 
   function esTargetMes(val){
     if(val===null||val===undefined)return false;
@@ -688,10 +688,15 @@ async function procesarPlanillaFacturacion(file,periodo){
       /* Buscar 'GC' (Serv.Adm.) dinámicamente: en planillas antiguas está en i+1, en nuevas puede estar en i+2+ por columnas extra */
       for(let j=i+1;j<=Math.min(i+6,fila3.length-1);j++){const h=fila3[j];if(typeof h==="string"&&h.trim()==="GC"){colGT=j;break;}}
       if(colGT===-1)colGT=i+1;
+      /* Buscar 'Pago Arriendo' dinámicamente (columna dedicada, agregada desde Mayo 2026 junto a Nro Fact Arriendo) */
+      for(let j=i+1;j<=Math.min(i+6,fila3.length-1);j++){const h=fila3[j];if(typeof h==="string"&&h.trim().toLowerCase()==="pago arriendo"){colPagadoArr=j;break;}}
+      /* Buscar 'Pago GC' dinámicamente (columna dedicada, agregada desde Mayo 2026 junto a Nro Fact GC) */
+      for(let j=colGT+1;j<=Math.min(colGT+6,fila3.length-1);j++){const h=fila3[j];if(typeof h==="string"&&h.trim().toLowerCase()==="pago gc"){colPagadoGC=j;break;}}
       /* Buscar 'Correo Enviado' dinámicamente */
       for(let j=i+1;j<=Math.min(i+10,fila3.length-1);j++){const h=fila3[j];if(typeof h==="string"&&h.trim().toLowerCase().includes("correo enviado")){colEnviado=j;break;}}
       if(colEnviado===-1)colEnviado=i+3;
-      /* Buscar 'Pagado' dinámicamente */
+      /* Buscar 'Pagado' dinámicamente — columna compartida, respaldo para períodos anteriores
+         a Mayo 2026 que no tienen 'Pago Arriendo'/'Pago GC' separados */
       for(let j=i+1;j<=Math.min(i+10,fila3.length-1);j++){const h=fila3[j];if(typeof h==="string"&&h.trim().toLowerCase()==="pagado"){colPagado=j;break;}}
       if(colPagado===-1)colPagado=i+4;
       break;
@@ -714,18 +719,24 @@ async function procesarPlanillaFacturacion(file,periodo){
     const emailBilling=row[12]?String(row[12]).trim():"";
     const rutBilling=row[9]?String(row[9]).replace(/\./g,"").trim().toLowerCase():""; /* Col J: RUT normalizado */
     const yaEnviado=colEnviado>0&&row[colEnviado]&&String(row[colEnviado]).trim().toLowerCase()==="enviado";
-    const yaPagado=colPagado>0&&row[colPagado]&&String(row[colPagado]).trim()!=="";
+    const yaPagado=colPagado>0&&row[colPagado]&&String(row[colPagado]).trim()!==""; /* compartida — respaldo meses previos a Pago Arriendo/Pago GC */
     const sheetRow=i+1; /* fila 1-indexed en el Sheets (dataRaw[i] = fila i+1) */
     const sentColLetter=colIndexToLetter(colEnviado); /* columna dinámica: HC para Junio, HG para Julio, etc. */
     const pagadoColLetter=colPagado>0?colIndexToLetter(colPagado):"";
+    /* Pago Arriendo / Pago GC por separado (desde Mayo 2026) — si el período no tiene
+       la columna dedicada, cada concepto cae de vuelta a la columna "Pagado" compartida */
+    const yaPagadoArr=colPagadoArr>0?!!(row[colPagadoArr]&&String(row[colPagadoArr]).trim()!==""):yaPagado;
+    const yaPagadoGC=colPagadoGC>0?!!(row[colPagadoGC]&&String(row[colPagadoGC]).trim()!==""):yaPagado;
+    const pagadoArrColLetter=colPagadoArr>0?colIndexToLetter(colPagadoArr):pagadoColLetter;
+    const pagadoGCColLetter=colPagadoGC>0?colIndexToLetter(colPagadoGC):pagadoColLetter;
     const nroFactArrColLetter=colIndexToLetter(colGS+1); /* Nro Fact Arriendo = columna inmediata después del UF Arriendo */
     const nroFactGCColLetter=colGT>0?colIndexToLetter(colGT+1):"";   /* Nro Fact GC = columna inmediata después del UF GC */
     /* Leer nros de factura ya escritos en planilla (si existen) — evitan re-procesar ZIP */
     const _nfArr=row[colGS+1];const nroFactArr=(typeof _nfArr==="number"&&_nfArr>0)?String(Math.round(_nfArr)):(typeof _nfArr==="string"&&_nfArr.trim())?_nfArr.trim():null;
     const _nfGC=colGT>0?row[colGT+1]:null;const nroFactGC=(typeof _nfGC==="number"&&_nfGC>0)?String(Math.round(_nfGC)):(typeof _nfGC==="string"&&_nfGC.trim())?_nfGC.trim():null;
     const m2Billing=row[42]!=null&&row[42]!==""?Number(row[42]):null; /* Col AQ: m² */
-    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado,sheetRow,sentColLetter,pagadoColLetter,nroFactArrColLetter,nroFactGCColLetter,nroFactArr,nroFactGC,m2:m2Billing});
-    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado,sheetRow,sentColLetter,pagadoColLetter,nroFactArrColLetter,nroFactGCColLetter,nroFactArr,nroFactGC,m2:m2Billing});
+    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado:yaPagadoArr,sheetRow,sentColLetter,pagadoColLetter:pagadoArrColLetter,nroFactArrColLetter,nroFactGCColLetter,nroFactArr,nroFactGC,m2:m2Billing});
+    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado:yaPagadoGC,sheetRow,sentColLetter,pagadoColLetter:pagadoGCColLetter,nroFactArrColLetter,nroFactGCColLetter,nroFactArr,nroFactGC,m2:m2Billing});
   }
   return clientes;
 }

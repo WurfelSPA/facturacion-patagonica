@@ -40,10 +40,6 @@
   },
   "crons": [
     {
-      "path": "/api/planilla?addMonth=1",
-      "schedule": "0 12 25 * *"
-    },
-    {
       "path": "/api/aa-refresh",
       "schedule": "0 10 * * *"
     },
