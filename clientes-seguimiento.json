@@ -1,0 +1,28 @@
+{
+  "updatedAt": "2026-08-05T00:00:00.000Z",
+  "items": {
+    "77.478.992-8": {
+      "nombre": "LOINCO CAPITAL SPA",
+      "sitio": "Estacionamientos",
+      "tipo": "orden_compra",
+      "notas": "Estacionamientos — ya no tiene contrato vigente; se factura caso a caso por orden de compra.",
+      "facturas": [
+        { "folio": "FAC-EL-19018", "fecha": "2026-07-21", "monto": 242962 }
+      ]
+    },
+    "99.576.080-0": {
+      "nombre": "OLYMPUS CORPORATION CHILE SPA",
+      "sitio": "Bodega 4-A",
+      "tipo": "orden_compra",
+      "notas": "Bodega 4-A — sin contrato, se factura por orden de compra (mantiene contrato vigente aparte en 5-A, ver ajustes-contratos.json).",
+      "facturas": []
+    },
+    "79.913.320-2": {
+      "nombre": "GALLYAS TELECOM S.A.",
+      "sitio": "Edif. 32, sitio 5-A",
+      "tipo": "orden_compra",
+      "notas": "Edif. 32, sitio 5-A — aunque sigue apareciendo en la Planilla, su contrato ya venció y ahora se factura por orden de compra.",
+      "facturas": []
+    }
+  }
+}

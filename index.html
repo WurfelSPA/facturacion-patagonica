@@ -3491,6 +3491,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
   const refreshFlag=React.useRef(false);
   const [resumenData,setResumenData]=useState(null);   /* [{nombre, meses:{}, total}] desde /api/historial?resumen=1 */
   const [rutMapDTE,setRutMapDTE]=useState({});          /* {RazonSocial→RUT} desde /api/historial?rutMap=1 */
+  const [seguimiento,setSeguimiento]=useState({});      /* {rut: {nombre,tipo,notas,facturas[]}} desde /clientes-seguimiento.json — clientes sin fila en Planilla (ej. facturación por orden de compra) */
   const [sortCol,setSortCol]=useState("total");         /* columna activa: "rut"|"nombre"|"total" */
   const [sortDir,setSortDir]=useState("desc");          /* "asc"|"desc" */
 
@@ -3528,11 +3529,18 @@ function HistorialFactView({dashData,driveLoading,notify}){
       .then(r=>r.json())
       .then(d=>{if(!cancelled)setRutMapDTE(d.ruts||{});})
       .catch(()=>{});
+    // Clientes en seguimiento manual (sin fila en Planilla, ej. facturación por orden de compra)
+    fetch("/clientes-seguimiento.json")
+      .then(r=>r.ok?r.json():null)
+      .then(d=>{if(!cancelled&&d&&d.items)setSeguimiento(d.items);})
+      .catch(()=>{});
     return ()=>{cancelled=true;};
   },[]);
 
   /* Clave única por fila de planilla: sitio + edificio (ej: 'A-2|T. Of. 44') */
   const siteKey=sc=>`${sc.sitio}${sc.edificio?'|'+sc.edificio:''}`;
+  const MES_NOMBRE_ARR=Object.keys(MES_NUM);
+  const rutNorm2=r=>(r||"").replace(/\./g,"").replace(/-/g,"").toLowerCase();
 
   /* Al seleccionar cliente: descubrir períodos y cargar en paralelo por sitio */
   useEffect(()=>{
@@ -3545,7 +3553,36 @@ function HistorialFactView({dashData,driveLoading,notify}){
       .then(r=>r.json())
       .then(({periodos=[]})=>{
         if(cancelled) return;
-        setPeriodsAvail(periodos);
+
+        /* Facturas registradas a mano en clientes-seguimiento.json (clientes sin
+           contrato/ZIP aún sincronizado, ej. facturación por orden de compra) —
+           se agregan como período/columna extra, sin pisar un período que ya
+           venga real desde el ZIP de Drive. */
+        const manualInv={};   // {siteKey: {periodo: {arriendo:{nro,total,uf}}}}
+        const manualPeriodos=[];
+        selGroup.forEach(sc=>{
+          const entry=Object.entries(seguimiento).find(([rut])=>rutNorm2(rut)===rutNorm2(sc.rut));
+          if(!entry)return;
+          (entry[1].facturas||[]).forEach(f=>{
+            const d=f.fecha?new Date(f.fecha+"T00:00:00"):null;
+            if(!d||isNaN(d))return;
+            const mesLabel=`${MES_NOMBRE_ARR[d.getMonth()]} ${d.getFullYear()}`;
+            if(periodos.includes(mesLabel))return; // ya viene real del ZIP, no pisar
+            if(!manualPeriodos.includes(mesLabel))manualPeriodos.push(mesLabel);
+            const numPart=(f.folio||"").replace(/^FAC-EL-?/i,"").replace(/^F(?:EE)?-/i,"");
+            const key=siteKey(sc);
+            manualInv[key]=manualInv[key]||{};
+            manualInv[key][mesLabel]={arriendo:{nro:numPart?`F-${numPart}`:null,total:Number(f.monto)||0,uf:null}};
+          });
+        });
+        setPeriodsAvail([...manualPeriodos,...periodos]);
+        if(Object.keys(manualInv).length>0){
+          setInvoicesMap(prev=>{
+            const next={...prev};
+            Object.entries(manualInv).forEach(([key,byPeriodo])=>{next[key]={...(next[key]||{}),...byPeriodo};});
+            return next;
+          });
+        }
         /* loadingSet: "sitio|periodo" para rastrear cada fetch independiente */
         const ls=new Set();
         selGroup.forEach(sc=>periodos.slice(0,10).forEach(p=>ls.add(siteKey(sc)+'|'+p)));
@@ -3626,7 +3663,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
       })
       .catch(()=>{if(!cancelled){setPeriodsAvail([]);setLoadingSet(new Set());}});
     return ()=>{cancelled=true;};
-  },[selClient,refreshTrigger]);
+  },[selClient,refreshTrigger,seguimiento]);
 
   const clients=dashData
     ?(()=>{const seen=new Set();return [...dashData.clients].sort((a,b)=>(a.ri||0)-(b.ri||0)).filter(c=>{const k=c.nombre+"|"+c.sitio;if(seen.has(k))return false;seen.add(k);return true;});})()
@@ -3662,19 +3699,58 @@ function HistorialFactView({dashData,driveLoading,notify}){
   /* Función strip para matching de nombres */
   const stripNombre=s=>(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
 
+  /* Fusiona clientes-seguimiento.json con la tabla resumen (que viene de Nubox y no
+     "sabe" de clientes que ya no tienen fila en la Planilla). Si el cliente ya aparece
+     en resumenData (match por RUT) solo se rellenan los meses que Nubox aún no tiene
+     (ej. una factura recién emitida, antes del próximo refresh del caché); si no
+     aparece, se agrega como fila sintética para no perder visibilidad. */
+  const resumenConSeguimiento=React.useMemo(()=>{
+    const base=(resumenData||[]).map(c=>({...c}));
+    const rutIdx={};
+    base.forEach((c,i)=>{const rut=rutMap[stripNombre(c.nombre)];if(rut)rutIdx[rut.replace(/\./g,"")]=i;});
+    Object.entries(seguimiento).forEach(([rut,info])=>{
+      const rutNorm=rut.replace(/\./g,"");
+      const manualMeses={};
+      (info.facturas||[]).forEach(f=>{
+        const d=f.fecha?new Date(f.fecha+"T00:00:00"):null;
+        if(!d||isNaN(d))return;
+        const mesLabel=`${MES_NOMBRE_ARR[d.getMonth()]} ${d.getFullYear()}`;
+        manualMeses[mesLabel]=(manualMeses[mesLabel]||0)+(Number(f.monto)||0);
+      });
+      const idx=rutIdx[rutNorm];
+      if(idx!=null){
+        const existing=base[idx];
+        const meses={...existing.meses};
+        let total=existing.total;
+        Object.entries(manualMeses).forEach(([mes,val])=>{
+          if(!meses[mes]){meses[mes]=val;total+=val;}
+        });
+        base[idx]={...existing,meses,total,_seguimiento:info};
+      }else{
+        const total=Object.values(manualMeses).reduce((s,v)=>s+v,0);
+        base.push({nombre:info.nombre||rut,meses:manualMeses,total,_seguimiento:info,_rutManual:rut});
+      }
+    });
+    return base;
+  },[resumenData,seguimiento,rutMap]);
+
+  /* RUT de una fila de la tabla resumen: prioriza el RUT manual (clientes-seguimiento.json,
+     sin match en Nubox) sobre el cruce por nombre vía rutMap */
+  const rutOf=c=>c._rutManual||rutMap[stripNombre(c.nombre)]||"";
+
   /* Filtrado y ordenamiento tabla resumen */
   const filteredResumen=React.useMemo(()=>{
-    const arr=(resumenData||[]).filter(c=>{
+    const arr=(resumenConSeguimiento||[]).filter(c=>{
       if(!search)return true;
       const q=search.toLowerCase();
-      const rut=(rutMap[stripNombre(c.nombre)]||"").replace(/\./g,"").toLowerCase();
+      const rut=rutOf(c).replace(/\./g,"").toLowerCase();
       return c.nombre.toLowerCase().includes(q)||rut.includes(q.replace(/\./g,""));
     });
     arr.sort((a,b)=>{
       let va,vb;
       if(sortCol==="rut"){
-        va=(rutMap[stripNombre(a.nombre)]||"zzz").replace(/\./g,"");
-        vb=(rutMap[stripNombre(b.nombre)]||"zzz").replace(/\./g,"");
+        va=(rutOf(a)||"zzz").replace(/\./g,"");
+        vb=(rutOf(b)||"zzz").replace(/\./g,"");
         // Ordenar numéricamente por la parte antes del guión
         const na=parseInt((va.split("-")[0]||"0").replace(/\D/g,""))||0;
         const nb=parseInt((vb.split("-")[0]||"0").replace(/\D/g,""))||0;
@@ -3689,7 +3765,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
       return 0;
     });
     return arr;
-  },[resumenData,search,rutMap,sortCol,sortDir]);
+  },[resumenConSeguimiento,search,rutMap,sortCol,sortDir]);
 
   const toggleSort=col=>{
     if(sortCol===col)setSortDir(d=>d==="asc"?"desc":"asc");
@@ -3805,9 +3881,9 @@ function HistorialFactView({dashData,driveLoading,notify}){
         ?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados")
         :h("div",{style:{maxHeight:"calc(100vh - 260px)",overflowY:"auto"}},
           filteredResumen.map(c=>{
-            const rut=rutMap[stripNombre(c.nombre)]||"—";
+            const rut=rutOf(c)||"—";
             const canClick=true;
-            return h("div",{key:c.nombre,
+            return h("div",{key:rut+"|"+c.nombre,
               onClick:()=>{
                 const cStrip=stripNombre(c.nombre);
                 const seen=new Set();
@@ -3825,8 +3901,13 @@ function HistorialFactView({dashData,driveLoading,notify}){
                 cursor:canClick?"pointer":"default",transition:"background .1s"}
             },
               h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txd)",alignSelf:"center",whiteSpace:"nowrap"}},rut),
-              h("div",{style:{alignSelf:"center"}},
-                h("div",{style:{fontWeight:600,fontSize:12,lineHeight:1.4}},c.nombre)
+              h("div",{style:{alignSelf:"center",display:"flex",alignItems:"center",gap:6}},
+                h("div",{style:{fontWeight:600,fontSize:12,lineHeight:1.4}},c.nombre),
+                c._seguimiento&&h("span",{
+                  title:c._seguimiento.notas||"",
+                  style:{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:6,whiteSpace:"nowrap",
+                    background:"#fdf0d5",color:"#8a6100",border:"1px solid #e8c468"}
+                },c._seguimiento.tipo==="orden_compra"?"OC · SIN CONTRATO":"SEGUIMIENTO")
               ),
               ...MESES_RESUMEN.map(p=>{
                 const v=c.meses[p]||0;
@@ -4483,6 +4564,7 @@ function App(){
   const [planillaError,setPlanillaError]=useState(null);
   const [data,setData]=useState([]);
   const [soloPlanilla,setSoloPlanilla]=useState(false); /* true cuando data viene solo de la planilla (sin ZIP) */
+  const [autoLoading,setAutoLoading]=useState(false); /* true mientras cargarDesdePlanilla trae los datos automáticos, para no mostrar el mirror de la Planilla justo antes de que la vista cambie sola a "table" */
   const [pdfMap,setPdfMap]=useState({});
   const [filter,setFilter]=useState("all");
   const [concFilter,setConcFilter]=useState("all");
@@ -5199,6 +5281,7 @@ function App(){
    * ────────────────────────────────────────────────────────────────────────── */
   const cargarDesdePlanilla=useCallback(async()=>{
     if(!files.planilla||!periodo)return;
+    setAutoLoading(true);
     try{
       const clientes=await procesarPlanillaFacturacion(files.planilla,periodo);
       const filas=[];
@@ -5227,6 +5310,7 @@ function App(){
         if(zipStatus!=="ready"&&zipStatus!=="loading")buscarZip(periodo);
       }
     }catch(e){console.warn("cargarDesdePlanilla:",e.message);}
+    finally{setAutoLoading(false);}
   },[files.planilla,periodo,zipStatus,buscarZip]);
 
   const togglePagado=useCallback((rowI,sheetRow,pagadoColLetter,currentPaid)=>{
@@ -6228,7 +6312,12 @@ function App(){
           style:{fontSize:11,padding:"4px 12px",borderRadius:7,border:"1px solid var(--rdim)",background:"transparent",color:"var(--red)",cursor:"pointer"}
         },"\u21ba Reintentar"),
         ),
-      files.planilla
+      files.planilla&&(planillaStatus==="checking"||autoLoading)
+        ?h("div",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,color:"var(--txm)",fontSize:13}},
+            h("span",{className:"spin",style:{fontSize:22}},"⟳"),
+            "Cargando "+periodo+"..."
+          )
+        :files.planilla
         ?h(LlenarPlanillaView,{periodo,planillaFile:files.planilla,embedded:true})
         :h("div",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--txd)",fontSize:13}},
             "Carga la planilla en el Dashboard para visualizar los datos del período"
