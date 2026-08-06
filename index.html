@@ -3488,7 +3488,7 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
 /* ══════════════════════════════════════════════════════════
    HISTORIAL FACTURACIÓN
 ══════════════════════════════════════════════════════════ */
-function HistorialFactView({dashData,driveLoading,notify}){
+function HistorialFactView({dashData,driveLoading,notify,planillaFile,marcarPagadoSheet}){
   const [selGroup,setSelGroup]=useState([]);           /* array de sitios del cliente seleccionado */
   const selClient=selGroup[0]||null;                   /* primer sitio → usado para fetch (comparten rut+nombre) */
   const [periodsAvail,setPeriodsAvail]=useState([]); /* períodos con ZIP en Drive */
@@ -3552,6 +3552,62 @@ function HistorialFactView({dashData,driveLoading,notify}){
   const siteKey=sc=>`${sc.sitio}${sc.edificio?'|'+sc.edificio:''}`;
   const MES_NOMBRE_ARR=Object.keys(MES_NUM);
   const rutNorm2=r=>(r||"").replace(/\./g,"").replace(/-/g,"").toLowerCase();
+
+  /* ── Marcar Pagado directo desde Histórico (sin recorrer mes a mes en Facturación) ──
+     pagoMap: {periodo: {siteKey: {arriendo:{sheetRow,colLetter,yaPagado}, servAdm:{...}}}}
+     planillaPeriodoCache: evita re-parsear la misma hoja/período si ya se consultó antes. */
+  const [pagoMap,setPagoMap]=useState({});
+  const planillaPeriodoCache=React.useRef({});
+  async function cargarPagoPeriodo(periodo){
+    if(planillaPeriodoCache.current[periodo])return planillaPeriodoCache.current[periodo];
+    if(!planillaFile)return null;
+    try{
+      const clientes=await procesarPlanillaFacturacion(planillaFile,periodo);
+      planillaPeriodoCache.current[periodo]=clientes;
+      return clientes;
+    }catch(e){return null;}
+  }
+  /* Al seleccionar cliente (o cuando llegan más períodos): traer sheetRow + columna
+     "Pago Arriendo"/"Pago GC" de la Planilla real para cada período mostrado */
+  useEffect(()=>{
+    if(!selClient||!planillaFile||periodsAvail.length===0)return;
+    let cancelled=false;
+    const periodosAConsultar=periodsAvail.slice(0,10);
+    Promise.all(periodosAConsultar.map(p=>cargarPagoPeriodo(p).then(clientes=>[p,clientes])))
+      .then(results=>{
+        if(cancelled)return;
+        setPagoMap(prev=>{
+          const next={...prev};
+          results.forEach(([p,clientes])=>{
+            if(!clientes)return;
+            const byPeriod={...(next[p]||{})};
+            selGroup.forEach(sc=>{
+              const match=tipo=>clientes.find(c=>c.tipo===tipo&&rutNorm2(c.rut)===rutNorm2(sc.rut)&&(c.sitio||"")===(sc.sitio||"")&&(c.edificio||"")===(sc.edificio||""));
+              const arr=match("arriendo"),srv=match("serv_adm");
+              byPeriod[siteKey(sc)]={
+                arriendo:arr?{sheetRow:arr.sheetRow,colLetter:arr.pagadoColLetter,yaPagado:arr.yaPagado}:null,
+                servAdm:srv?{sheetRow:srv.sheetRow,colLetter:srv.pagadoColLetter,yaPagado:srv.yaPagado}:null,
+              };
+            });
+            next[p]=byPeriod;
+          });
+          return next;
+        });
+      });
+    return ()=>{cancelled=true;};
+  },[selClient,periodsAvail,planillaFile]);
+
+  const togglePagoHistorico=async(periodo,skey,conc,info)=>{
+    if(!info||!info.sheetRow||!info.colLetter||!marcarPagadoSheet)return;
+    const nuevo=!info.yaPagado;
+    setPagoMap(prev=>({...prev,[periodo]:{...prev[periodo],[skey]:{...prev[periodo]?.[skey],[conc]:{...info,yaPagado:nuevo}}}}));
+    try{
+      await marcarPagadoSheet(info.sheetRow,info.colLetter,nuevo);
+    }catch(e){
+      notify("Error al marcar pagado: "+e.message,"err");
+      setPagoMap(prev=>({...prev,[periodo]:{...prev[periodo],[skey]:{...prev[periodo]?.[skey],[conc]:info}}}));
+    }
+  };
 
   /* Al seleccionar cliente: descubrir períodos y cargar en paralelo por sitio */
   useEffect(()=>{
@@ -3978,9 +4034,9 @@ function HistorialFactView({dashData,driveLoading,notify}){
               h("tr",{style:{background:"var(--surf2)"}},
                 h("th",{rowSpan:2,style:{padding:"9px 16px",textAlign:"left",fontWeight:700,color:"var(--txm)",
                   letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",fontSize:10,whiteSpace:"nowrap",minWidth:100,verticalAlign:"middle"}},"CONCEPTO"),
-                ...periodos.map(p=>h("th",{key:p,colSpan:3,style:{padding:"7px 10px",textAlign:"center",fontWeight:600,
+                ...periodos.map(p=>h("th",{key:p,colSpan:4,style:{padding:"7px 10px",textAlign:"center",fontWeight:600,
                   color:"var(--tx)",borderBottom:"1px solid #e0e8f0",borderLeft:"1px solid var(--bdr)",
-                  whiteSpace:"nowrap",minWidth:260,position:"relative"}},
+                  whiteSpace:"nowrap",minWidth:320,position:"relative"}},
                   p,
                   siteLd.has(sc.sitio+'|'+p)&&h("span",{style:{display:"inline-block",fontSize:9,color:"var(--txm)",fontWeight:400,marginLeft:6}},
                     h("span",{className:"spin",style:{fontSize:9}},"⟳"))
@@ -3994,6 +4050,8 @@ function HistorialFactView({dashData,driveLoading,notify}){
                     color:"var(--txm)",borderBottom:"1px solid var(--bdr)",minWidth:70}},"UF"),
                   h("th",{key:p+"-t",style:{padding:"4px 10px",textAlign:"center",fontSize:9,fontWeight:600,
                     color:"var(--txm)",borderBottom:"1px solid var(--bdr)",minWidth:100}},"Total CLP"),
+                  h("th",{key:p+"-pg",style:{padding:"4px 8px",textAlign:"center",fontSize:9,fontWeight:600,
+                    color:"var(--txm)",borderBottom:"1px solid var(--bdr)",minWidth:60}},"Pagado"),
                 ])
               )
             ),
@@ -4043,6 +4101,17 @@ function HistorialFactView({dashData,driveLoading,notify}){
                       :total?h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},
                           "$"+total.toLocaleString("es-CL"))
                       :dash),
+                    (()=>{
+                      const pagoInfo=(conc==='arriendo'||conc==='servAdm')?pagoMap[p]?.[siteKey(sc)]?.[conc]:null;
+                      const puedeMarcar=pagoInfo&&pagoInfo.sheetRow&&pagoInfo.colLetter;
+                      return h("td",{key:p+"-pg",...tdC},
+                        puedeMarcar?h("input",{type:"checkbox",checked:!!pagoInfo.yaPagado,
+                          title:pagoInfo.yaPagado?"Pagado — clic para desmarcar":"Marcar como pagado",
+                          onChange:()=>togglePagoHistorico(p,siteKey(sc),conc,pagoInfo),
+                          style:{width:15,height:15,cursor:"pointer",accentColor:"var(--green)"}
+                        }):h("span",{style:{color:"var(--txd)",fontSize:11}},"—")
+                      );
+                    })(),
                   ];
                 })
               )),
@@ -4062,6 +4131,7 @@ function HistorialFactView({dashData,driveLoading,notify}){
                               "$"+sumTotal.toLocaleString("es-CL"))
                           :h("span",{style:{color:"var(--txd)",fontSize:11}},"—")
                     ),
+                    h("td",{key:p+"-tot-pg"}),
                   ];
                 })
               )
@@ -6593,7 +6663,7 @@ function App(){
     ,view==="contratos"&&h(ContratosView,{dashData,driveLoading})
     ,view==="cuentas"&&h(CuentasServiciosView,{dashData,driveLoading,notify})
     ,view==="cortijo"&&h(ElCortijoView,null)
-    ,view==="historial-fact"&&h(HistorialFactView,{dashData,driveLoading,notify})
+    ,view==="historial-fact"&&h(HistorialFactView,{dashData,driveLoading,notify,planillaFile:files.planilla,marcarPagadoSheet})
   ));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(h(App));
