@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updatedAt": "2026-08-07T16:35:55.283Z",
+  "updatedAt": "2026-08-07T16:36:30.591Z",
   "source": "n8n",
   "accounts": {
     "672977-0": {
@@ -335,17 +335,17 @@
     "1782609-3": {
       "deuda": "$0",
       "vencimiento": null,
-      "nombre": "Electrafk S.A."
+      "nombre": null
     },
     "1973010-7": {
-      "deuda": "$0",
+      "deuda": "$38.750",
       "vencimiento": null,
-      "nombre": "Sociedad de Alimentos Leefood SpA"
+      "nombre": null
     },
     "1973011-5": {
       "deuda": "$0",
       "vencimiento": null,
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
+      "nombre": null
     },
     "1127143-K": {
       "deuda": null,
