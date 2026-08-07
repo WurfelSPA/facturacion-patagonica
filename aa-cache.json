@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updatedAt": "2026-08-07T16:29:05.628Z",
+  "updatedAt": "2026-08-07T16:29:34.033Z",
   "source": "n8n",
   "accounts": {
     "672977-0": {
@@ -192,19 +192,19 @@
       "nombre": null
     },
     "1534321-4": {
-      "deuda": "$61.850",
+      "deuda": "$14.780",
       "vencimiento": null,
-      "nombre": "A3D Chile S. A."
+      "nombre": null
     },
     "1534322-2": {
-      "deuda": null,
-      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: cb77a934-3731-4730-a26e-661e9631fc48)",
-      "nombre": "Mediland SpA"
+      "deuda": "$79.100",
+      "vencimiento": null,
+      "nombre": null
     },
     "1534323-0": {
-      "deuda": null,
-      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: cb77a934-3731-4730-a26e-661e9631fc48)",
-      "nombre": "Performex Chile SpA"
+      "deuda": "$58.170",
+      "vencimiento": null,
+      "nombre": null
     },
     "1534324-9": {
       "deuda": "$18.940",
