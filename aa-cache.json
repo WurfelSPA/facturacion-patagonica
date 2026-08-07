@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updatedAt": "2026-08-07T16:35:15.908Z",
+  "updatedAt": "2026-08-07T16:35:55.283Z",
   "source": "n8n",
   "accounts": {
     "672977-0": {
@@ -318,19 +318,19 @@
       "nombre": null
     },
     "1717632-3": {
-      "deuda": null,
-      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: 039ee8f2-218e-4803-ab07-fd6473e3445d)",
-      "nombre": "Megamin S.A."
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
     },
     "1717633-1": {
       "deuda": "$0",
       "vencimiento": null,
-      "nombre": "Electrafk S.A."
+      "nombre": null
     },
     "1752045-8": {
       "deuda": "$0",
       "vencimiento": null,
-      "nombre": "Sánchez Hermanos SpA"
+      "nombre": null
     },
     "1782609-3": {
       "deuda": "$0",
