@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updatedAt": "2026-08-07T16:34:40.470Z",
+  "updatedAt": "2026-08-07T16:35:15.908Z",
   "source": "n8n",
   "accounts": {
     "672977-0": {
@@ -303,19 +303,19 @@
       "nombre": null
     },
     "1664822-1": {
-      "deuda": "$23.092",
+      "deuda": "$0",
       "vencimiento": null,
-      "nombre": "Weidmuller SpA"
+      "nombre": null
     },
     "1664824-8": {
       "deuda": "$28.020",
       "vencimiento": null,
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
+      "nombre": null
     },
     "1717631-5": {
       "deuda": "$0",
       "vencimiento": null,
-      "nombre": "John Crane Chile S.A."
+      "nombre": null
     },
     "1717632-3": {
       "deuda": null,
