@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updatedAt": "2026-08-07T16:31:18.907Z",
+  "updatedAt": "2026-08-07T16:31:52.559Z",
   "source": "n8n",
   "accounts": {
     "672977-0": {
@@ -215,17 +215,17 @@
     "1534325-7": {
       "deuda": "$6.480",
       "vencimiento": null,
-      "nombre": "Fedex Express Chile SpA"
+      "nombre": null
     },
     "1534326-5": {
-      "deuda": "$18.940",
+      "deuda": "$0",
       "vencimiento": null,
-      "nombre": "Industria YKK Chile LTDA"
+      "nombre": null
     },
     "1534327-3": {
       "deuda": "$0",
       "vencimiento": null,
-      "nombre": "Señor Residente"
+      "nombre": null
     },
     "1534328-1": {
       "deuda": "$0",
