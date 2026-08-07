@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updatedAt": "2026-08-07T16:31:52.559Z",
+  "updatedAt": "2026-08-07T16:32:25.698Z",
   "source": "n8n",
   "accounts": {
     "672977-0": {
@@ -230,17 +230,17 @@
     "1534328-1": {
       "deuda": "$0",
       "vencimiento": null,
-      "nombre": "Comercializadora Industrial W & L Limitada"
+      "nombre": null
     },
     "1534330-3": {
-      "deuda": "$158.765",
+      "deuda": "$0",
       "vencimiento": null,
-      "nombre": "Drager Chile Limitada"
+      "nombre": null
     },
     "1534331-1": {
       "deuda": "$0",
       "vencimiento": null,
-      "nombre": "Trane de Chile S.A."
+      "nombre": null
     },
     "1534333-8": {
       "deuda": "$0",
