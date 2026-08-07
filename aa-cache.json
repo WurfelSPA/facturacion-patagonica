@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updatedAt": "2026-08-07T16:33:35.194Z",
+  "updatedAt": "2026-08-07T16:34:06.127Z",
   "source": "n8n",
   "accounts": {
     "672977-0": {
@@ -273,19 +273,19 @@
       "nombre": null
     },
     "1596664-5": {
-      "deuda": "$0",
+      "deuda": "$9.630",
       "vencimiento": null,
-      "nombre": "NCH Chile S.A."
+      "nombre": null
     },
     "1596665-3": {
-      "deuda": "$0",
+      "deuda": "$374.690",
       "vencimiento": null,
-      "nombre": "Alimentos Bobbo Ltda"
+      "nombre": null
     },
     "1596666-1": {
       "deuda": "$0",
       "vencimiento": null,
-      "nombre": "Granja Marina (Patagonía Austral SpA)"
+      "nombre": null
     },
     "1637811-9": {
       "deuda": "$16.300",
