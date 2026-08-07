@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updatedAt": "2026-08-07T16:26:40.315Z",
+  "updatedAt": "2026-08-07T16:26:59.013Z",
   "source": "n8n",
   "accounts": {
     "672977-0": {
@@ -136,19 +136,19 @@
       "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: 9561072e-1254-4a4e-82d1-15caa3c8a2c4)"
     },
     "1127204-5": {
-      "deuda": "$164.240",
+      "deuda": "$0",
       "vencimiento": null,
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
+      "nombre": null
     },
     "1127206-1": {
-      "deuda": "$74.920",
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
     "1127208-8": {
       "deuda": "$0",
       "vencimiento": null,
-      "nombre": "Sánchez Hermanos SpA"
+      "nombre": null
     },
     "1127209-6": {
       "deuda": "$14.780",
