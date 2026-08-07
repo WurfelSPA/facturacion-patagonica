@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updatedAt": "2026-08-07T16:23:36.108Z",
+  "updatedAt": "2026-08-07T16:24:05.566Z",
   "source": "n8n",
   "accounts": {
     "672977-0": {
@@ -77,19 +77,19 @@
       "nombre": null
     },
     "1127142-1": {
-      "deuda": "$7.864",
+      "deuda": "$0",
       "vencimiento": null,
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
+      "nombre": null
     },
     "1127144-8": {
-      "deuda": "$23.092",
+      "deuda": "$0",
       "vencimiento": null,
-      "nombre": "Segafredo Zanetti Chile S.A."
+      "nombre": null
     },
     "1127145-6": {
       "deuda": "$2.340",
       "vencimiento": null,
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
+      "nombre": null
     },
     "1127146-4": {
       "deuda": "$950",
