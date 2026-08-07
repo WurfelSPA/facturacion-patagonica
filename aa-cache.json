@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updatedAt": "2026-08-07T16:26:06.439Z",
+  "updatedAt": "2026-08-07T16:26:13.920Z",
   "source": "n8n",
   "accounts": {
     "672977-0": {
@@ -124,8 +124,7 @@
     },
     "1127152-9": {
       "deuda": null,
-      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: 68deb00c-a6ac-45a6-a81f-a22ed87047ad)",
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
+      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: 9561072e-1254-4a4e-82d1-15caa3c8a2c4)"
     },
     "1127153-7": {
       "deuda": "$0",
@@ -133,9 +132,8 @@
       "nombre": null
     },
     "1127203-7": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "nombre": null
+      "deuda": null,
+      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: 9561072e-1254-4a4e-82d1-15caa3c8a2c4)"
     },
     "1127204-5": {
       "deuda": "$164.240",
