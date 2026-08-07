@@ -372,8 +372,29 @@ export default async function handler(req, res) {
     // la subida usa el token del usuario cuando está disponible (mismo patrón
     // que split-pdf.js).
     const uploadToken = userToken || await getSAToken();
+    const saToken = await getSAToken();
+
+    // Elimina cualquier archivo previo con ese nombre exacto en la carpeta antes de
+    // subir el nuevo — evita quedar con copias viejas/duplicadas cuando se vuelve a
+    // descargar el mismo mes (ej. botón "Forzar descarga desde Nubox").
+    async function eliminarSiExiste(fileName) {
+      try {
+        const q = `name='${fileName.replace(/'/g, "\\'")}' and '${destFolderId}' in parents and trashed=false`;
+        const searchRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)&pageSize=10&supportsAllDrives=true&includeItemsFromAllDrives=true`,
+          { headers: { Authorization: `Bearer ${saToken}` } }
+        );
+        const searchJson = searchRes.ok ? await searchRes.json() : { files: [] };
+        for (const f of (searchJson.files || [])) {
+          await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}?supportsAllDrives=true`,
+            { method: 'DELETE', headers: { Authorization: `Bearer ${uploadToken}` } }).catch(() => {});
+        }
+        if (searchJson.files?.length) console.log(`[nubox-pdf] Eliminado(s) ${searchJson.files.length} archivo(s) previo(s): ${fileName}`);
+      } catch (e) { console.error(`[nubox-pdf] Error eliminando duplicados de ${fileName}:`, e.message); }
+    }
 
     async function subirADrive(buffer, fileName, mimeType) {
+      await eliminarSiExiste(fileName);
       const boundary  = 'nubox_pdf_boundary';
       const metadata  = JSON.stringify({ name: fileName, mimeType, parents: [destFolderId] });
       const multipart = Buffer.concat([

@@ -5212,7 +5212,7 @@ function App(){
   };
 
   const MES_STR={"Enero":"01","Febrero":"02","Marzo":"03","Abril":"04","Mayo":"05","Junio":"06","Julio":"07","Agosto":"08","Septiembre":"09","Octubre":"10","Noviembre":"11","Diciembre":"12"};
-  const splitPDF=async()=>{
+  const splitPDF=async(force)=>{
     setSplitLoading(true);setSplitResult(null);setSplitStatus("");
     const [mesNombre,anio]=periodo.split(" ");
     const mesNum=MES_STR[mesNombre];
@@ -5220,14 +5220,19 @@ function App(){
     const periodoCode=mesCode;
     const pdfNombre=`Facturas_PISA_${mesCode}.pdf`;
     try{
-      // 1. Buscar PDF en Drive (via servidor con Service Account)
-      setSplitStatus("🔍 Buscando PDF en Drive...");
-      const qRes=await fetch(`/api/storage?buscarPdf=${encodeURIComponent(pdfNombre)}&folderId=${DRIVE_FACTURACION_FOLDER_ID}`);
-      const qData=await qRes.json();
-      let pdfFileId=qData.pdfFileId||null;
-      // 2. Si no existe, descargar de Nubox (2-3 min — el timer muestra el progreso)
+      // 1. Buscar PDF en Drive (via servidor con Service Account) — salvo que se
+      //    esté forzando la descarga, en cuyo caso se ignora el PDF ya guardado
+      //    y se le vuelve a pedir a Nubox (nubox-pdf.js elimina el viejo antes de subir el nuevo)
+      let pdfFileId=null;
+      if(!force){
+        setSplitStatus("🔍 Buscando PDF en Drive...");
+        const qRes=await fetch(`/api/storage?buscarPdf=${encodeURIComponent(pdfNombre)}&folderId=${DRIVE_FACTURACION_FOLDER_ID}`);
+        const qData=await qRes.json();
+        pdfFileId=qData.pdfFileId||null;
+      }
+      // 2. Si no existe (o se forzó), descargar de Nubox (2-3 min — el timer muestra el progreso)
       if(!pdfFileId){
-        setSplitStatus("🔐 Conectando con Nubox... (puede tardar 2-3 min)");
+        setSplitStatus(force?"🔄 Forzando nueva descarga desde Nubox... (puede tardar 2-3 min)":"🔐 Conectando con Nubox... (puede tardar 2-3 min)");
         const nbRes=await fetch("/api/nubox-pdf",{
           method:"POST",
           headers:{"Content-Type":"application/json"},
@@ -6350,6 +6355,19 @@ function App(){
             :"▶ Procesar "+periodo
         ),
         h("button",{
+          disabled:zipStatus==="loading"||zipStatus==="splitting"||splitLoading,
+          title:`Ignora el PDF y el ZIP de XML ya guardados en Drive para ${periodo} y vuelve a descargar todo desde Nubox`,
+          onClick:()=>{
+            if(!window.confirm(`¿Forzar una nueva descarga desde Nubox para ${periodo}?\n\nEsto reemplaza en Drive el PDF maestro (Facturas_PISA_${periodo}) y el ZIP de XML ya guardados.`))return;
+            periodoActivado.current=true;autoProcesado.current=false;autoNuboxRef.current=false;
+            setData([]);setCanGenerate(true);
+            splitPDF(true);
+          },
+          style:{fontSize:11,fontWeight:600,padding:"6px 12px",borderRadius:8,border:"1px solid var(--bdr)",
+            background:"var(--surf)",color:"var(--txm)",cursor:"pointer",whiteSpace:"nowrap",
+            opacity:(zipStatus==="loading"||zipStatus==="splitting"||splitLoading)?0.6:1}
+        },"🔄 Forzar descarga desde Nubox"),
+        h("button",{
           disabled:!files.planilla,
           style:{fontSize:12,fontWeight:600,padding:"7px 18px",borderRadius:20,border:"1px solid var(--bdr)",
             background:files.planilla?"var(--surf)":"var(--surf)",
@@ -6425,6 +6443,19 @@ function App(){
           disabled:zipStatus==="loading"||zipStatus==="splitting"||splitLoading,
           onClick:()=>{periodoActivado.current=true;autoProcesado.current=false;autoNuboxRef.current=false;setSoloPlanilla(false);setData([]);setCanGenerate(true);setZipStatus("idle");setPdfMap({});splitPDF();}
         },zipStatus==="loading"||zipStatus==="splitting"||splitLoading?h("span",{style:{display:"flex",alignItems:"center",gap:6}},h("span",{className:"spin"},"⟳")," Procesando..."):"▶ Procesar "+periodo),
+        h("button",{
+          disabled:zipStatus==="loading"||zipStatus==="splitting"||splitLoading,
+          title:`Ignora el PDF y el ZIP de XML ya guardados en Drive para ${periodo} y vuelve a descargar todo desde Nubox`,
+          onClick:()=>{
+            if(!window.confirm(`¿Forzar una nueva descarga desde Nubox para ${periodo}?\n\nEsto reemplaza en Drive el PDF maestro (Facturas_PISA_${periodo}) y el ZIP de XML ya guardados.`))return;
+            periodoActivado.current=true;autoProcesado.current=false;autoNuboxRef.current=false;
+            setSoloPlanilla(false);setData([]);setCanGenerate(true);setZipStatus("idle");setPdfMap({});
+            splitPDF(true);
+          },
+          style:{fontSize:11,fontWeight:600,padding:"4px 10px",borderRadius:8,border:"1px solid var(--bdr)",
+            background:"var(--surf)",color:"var(--txm)",cursor:"pointer",whiteSpace:"nowrap",
+            opacity:(zipStatus==="loading"||zipStatus==="splitting"||splitLoading)?0.6:1}
+        },"🔄 Forzar descarga desde Nubox"),
         soloPlanilla&&(zipStatus==="loading"||(zipStatus==="ready"&&Object.keys(pdfMap).length===0))&&
           h("span",{style:{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,color:"#92400e",fontFamily:"'DM Sans',sans-serif",padding:"3px 10px",background:"#fef3c7",border:"1px solid #f59e0b",borderRadius:20,whiteSpace:"nowrap",fontWeight:600}},
             h("span",{className:"spin",style:{fontSize:12}},"⟳"),
