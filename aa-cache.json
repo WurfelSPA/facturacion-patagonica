@@ -1,16 +1,17 @@
 {
   "ok": true,
-  "updatedAt": "2026-08-03T12:59:26.740Z",
+  "updatedAt": "2026-08-07T16:21:26.028Z",
   "source": "n8n",
   "accounts": {
     "672977-0": {
-      "deuda": null,
-      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: db40002a-f859-45f2-8671-ece6f7001081)"
+      "deuda": "$0",
+      "vencimiento": null,
+      "nombre": null
     },
     "1009146-2": {
       "deuda": "$1.550",
       "vencimiento": null,
-      "nombre": "Sánchez Hermanos SpA"
+      "nombre": null
     },
     "1009152-7": {
       "deuda": "$0",
