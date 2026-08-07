@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updatedAt": "2026-08-07T16:23:27.169Z",
+  "updatedAt": "2026-08-07T16:23:36.108Z",
   "source": "n8n",
   "accounts": {
     "672977-0": {
@@ -62,7 +62,7 @@
       "nombre": null
     },
     "1127139-1": {
-      "deuda": "$0",
+      "deuda": "$58.170",
       "vencimiento": null,
       "nombre": null
     },
@@ -72,9 +72,9 @@
       "nombre": null
     },
     "1127141-3": {
-      "deuda": "$0",
+      "deuda": "$27.460",
       "vencimiento": null,
-      "nombre": "PATAGONICA INMOBILIARIA SPA"
+      "nombre": null
     },
     "1127142-1": {
       "deuda": "$7.864",
