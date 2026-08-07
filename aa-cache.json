@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updatedAt": "2026-08-07T16:32:57.978Z",
+  "updatedAt": "2026-08-07T16:33:35.194Z",
   "source": "n8n",
   "accounts": {
     "672977-0": {
@@ -263,14 +263,14 @@
       "nombre": null
     },
     "1596662-9": {
-      "deuda": "$240.446",
+      "deuda": "$0",
       "vencimiento": null,
       "nombre": null
     },
     "1596663-7": {
-      "deuda": "$10.630",
+      "deuda": "$0",
       "vencimiento": null,
-      "nombre": "Tezman Chile SpA"
+      "nombre": null
     },
     "1596664-5": {
       "deuda": "$0",
