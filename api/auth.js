@@ -137,7 +137,7 @@ async function readDriveCredentials(token) {
   const r = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`,{
     headers:{Authorization:`Bearer ${token}`}
   });
-  if (!r.ok) throw new Error('Drive read error: '+r.status);
+  if (!r.ok) throw new Error('Drive read error: '+r.status+' '+(await r.text()).slice(0,300)+' (fileId='+id+')');
   return r.json();
 }
 
@@ -527,7 +527,9 @@ a{display:inline-block;padding:10px 20px;background:#4f46e5;color:#fff;border-ra
         const tok = await saToken();
         creds = await readDriveCredentials(tok);
       } catch(e) {
-        return res.status(500).json({error:'No se pudo leer credenciales de Drive: '+e.message});
+        let saEmail = null;
+        try { saEmail = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT).client_email; } catch(_) {}
+        return res.status(500).json({error:'No se pudo leer credenciales de Drive: '+e.message, hint:'Comparte el archivo (DRIVE_CREDENTIALS_ID) como Editor con: '+saEmail});
       }
 
       const salt = generateSalt();
