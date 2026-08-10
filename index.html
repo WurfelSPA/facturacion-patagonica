@@ -4651,6 +4651,8 @@ function App(){
   const [concFilter,setConcFilter]=useState("all");
   const [search,setSearch]=useState("");
   const [searchFactura,setSearchFactura]=useState("");
+  const [sortCol,setSortCol]=useState(null);
+  const [sortDir,setSortDir]=useState("asc");
   const [sentSet,setSentSet]=useState(new Set());
   const [sentKeys,setSentKeys]=useState(()=>{try{return new Set(JSON.parse(localStorage.getItem("pat_sent")||"[]"));}catch{return new Set();}});
   const marcarEnviado=useCallback((idx,key)=>{setSentSet(p=>new Set([...p,idx]));setSentKeys(p=>{const s=new Set([...p,key]);localStorage.setItem("pat_sent",JSON.stringify([...s]));return s;});},[]);
@@ -5437,6 +5439,44 @@ function App(){
     const ms=!q||normQ(r.cliente).includes(q)||(r.sitio&&normQ(r.sitio)===q)||(r.rut&&r.rut.replace(/[.\-]/g,"").includes(q.replace(/[.\-]/g,"")));
     const mfact=!searchFactura||( r.factura&&r.factura.toLowerCase().includes(searchFactura.toLowerCase()));
     return mf&&mc&&ms&&mfact;
+  });
+
+  /* Monto Total (Neto+IVA) de una fila — misma lógica usada en la columna "Monto+IVA" */
+  function montoIvaOf(row){
+    if(row.montoTotal!=null&&row.montoTotal>0) return row.montoTotal;
+    const uf=row.ufPdf??null;
+    const ufVal=ufSII??row.ufValor??null;
+    if(uf!=null&&ufVal&&uf<10000){
+      const neto=Math.round(uf*ufVal);
+      const iva=Math.round(neto*0.19);
+      return neto+iva;
+    }
+    const base=(uf!=null&&uf>500)?Math.round(uf):(row.ufPlan>500)?Math.round(row.ufPlan):null;
+    if(!base) return null;
+    return Math.round(base*1.19);
+  }
+
+  function toggleSort(col){if(sortCol===col)setSortDir(d=>d==="asc"?"desc":"asc");else{setSortCol(col);setSortDir("asc");}}
+  function sortArrow(col){if(sortCol!==col)return" ↕";return sortDir==="asc"?" ↑":" ↓";}
+  function getSortVal(row,col){
+    switch(col){
+      case"sitio":return(row.sitio||"");
+      case"cliente":return(row.cliente||"");
+      case"correo":return(row.correo||"");
+      case"concepto":return(row.concepto||"");
+      case"factura":return(row.factura||"");
+      case"ufPlan":return row.ufPlan??-Infinity;
+      case"ufPdf":return row.ufPdf??-Infinity;
+      case"monto":return montoIvaOf(row)??-Infinity;
+      case"estado":return(row.estado||"");
+      case"pagado":return row.yaPagado?1:0;
+      default:return"";
+    }
+  }
+  const sorted=!sortCol?filtered:[...filtered].sort((a,b)=>{
+    const va=getSortVal(a,sortCol),vb=getSortVal(b,sortCol);
+    const cmp=typeof va==="number"&&typeof vb==="number"?va-vb:String(va).localeCompare(String(vb),"es");
+    return sortDir==="asc"?cmp:-cmp;
   });
 
   /* ══════════════════════════════════════════════════════════
@@ -6554,13 +6594,13 @@ function App(){
         h("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:940}},
           h("colgroup",null,h("col",{style:{width:58}}),h("col",{style:{width:"15%"}}),h("col",{style:{width:"17%"}}),h("col",{style:{width:88}}),h("col",{style:{width:88}}),h("col",{style:{width:72}}),h("col",{style:{width:72}}),h("col",{style:{width:96}}),h("col",{style:{width:110}}),h("col",{style:{width:60}})),
           h("thead",null,h("tr",{style:{background:"#ddeaf8",position:"sticky",top:0,zIndex:3}},
-            ["Sitio","Cliente","Correo","Concepto","Factura","UF planilla","UF PDF","Monto+IVA","Estado/Acción","Pagado"].map((hd,hi)=>
-              h("th",{key:hd,style:{padding:"8px 11px",textAlign:hi===9?"center":"left",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:"0.07em",borderBottom:"1px solid var(--bdr)"}},hd.toUpperCase())
+            [["Sitio","sitio"],["Cliente","cliente"],["Correo","correo"],["Concepto","concepto"],["Factura","factura"],["UF planilla","ufPlan"],["UF PDF","ufPdf"],["Monto+IVA","monto"],["Estado/Acción","estado"],["Pagado","pagado"]].map(([hd,col],hi)=>
+              h("th",{key:hd,onClick:()=>toggleSort(col),style:{padding:"8px 11px",textAlign:hi===9?"center":"left",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:"0.07em",borderBottom:"1px solid var(--bdr)",cursor:"pointer",userSelect:"none",whiteSpace:"nowrap"}},hd.toUpperCase(),h("span",{style:{opacity:.5,fontSize:9}},sortArrow(col)))
             )
           )),
-          h("tbody",null,filtered.length===0?
+          h("tbody",null,sorted.length===0?
             h("tr",null,h("td",{colSpan:10,style:{padding:"48px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados")):
-            filtered.map(row=>{
+            sorted.map(row=>{
               const i=row.i,sent=sentSet.has(i)||!!row.yaEnviado,sending=sendingIdx===i,noEmail=!row.correo;
               const diffPdf=row.ufPdf!==null&&row.ufPdf!==undefined&&(row.ufPdf>5000?Math.abs(row.ufPdf-row.ufPlan)>500:Math.abs(row.ufPdf-row.ufPlan)>0.5);
               const diffSII=row.ufSII!=null&&row.ufPlan<=500&&Math.abs(row.ufPlan-row.ufSII)>0.5;
@@ -6626,24 +6666,7 @@ function App(){
     :"—"
 )),
                 h("td",{style:{padding:"8px 11px",background:bg}},h("span",{style:{fontSize:12,fontFamily:"'DM Mono',monospace",fontWeight:600,color:"var(--tx)"}},
-                  (()=>{
-                    /* Preferir el Monto Total real extraído del PDF (contempla montos
-                       exentos de IVA, que la fórmula UF×1.19 no puede calcular). */
-                    if(row.montoTotal!=null&&row.montoTotal>0) return "$"+Math.round(row.montoTotal).toLocaleString("es-CL");
-                    /* Fallback (PDF aún no procesado): fórmula exacta factura chilena
-                       — Neto=round(UF×UF_día), IVA=round(Neto×0.19). No contempla exentos. */
-                    const uf=row.ufPdf??null;
-                    const ufVal=ufSII??row.ufValor??null; /* fallback: UF del propio PDF si el indicador falla */
-                    if(uf!=null&&ufVal&&uf<10000){
-                      const neto=Math.round(uf*ufVal);
-                      const iva=Math.round(neto*0.19);
-                      return "$"+(neto+iva).toLocaleString("es-CL");
-                    }
-                    /* Monto CLP fijo (ufPdf o ufPlan > 500 → precio en pesos directo) */
-                    const base=(uf!=null&&uf>500)?Math.round(uf):(row.ufPlan>500)?Math.round(row.ufPlan):null;
-                    if(!base) return "—";
-                    return "$"+Math.round(base*1.19).toLocaleString("es-CL");
-                  })()
+                  (()=>{const m=montoIvaOf(row);return m==null?"—":"$"+Math.round(m).toLocaleString("es-CL");})()
                 )),
                 h("td",{style:{padding:"8px 11px",background:bg}},
                   row.estado==="sanchez"?h("span",{title:"Arriendo facturado por Sanchez Hermanos SpA",style:{fontSize:10,fontWeight:700,padding:"3px 10px",borderRadius:20,background:"#ede9fe",color:"#5b21b6",border:"1px solid #c4b5fd",letterSpacing:"0.04em",cursor:"default"}},"SANCHEZ"):
