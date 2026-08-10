@@ -225,7 +225,7 @@ export default async function main({ page, context }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json; charset=utf-8', 'X-Requested-With': 'XMLHttpRequest' },
         body: JSON.stringify({
-          token: pageToken, EstadoId: 3, estadoEnvio: 0,
+          token: pageToken, EstadoId: 0, estadoEnvio: 0,
           fechaDesde, fechaHasta,
           filtro: '',
           folioDesde: 0, folioHasta: 0,
