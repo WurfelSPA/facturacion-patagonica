@@ -4976,6 +4976,10 @@ function App(){
   const [sentSet,setSentSet]=useState(new Set());
   const [sentKeys,setSentKeys]=useState(()=>{try{return new Set(JSON.parse(localStorage.getItem("pat_sent")||"[]"));}catch{return new Set();}});
   const marcarEnviado=useCallback((idx,key)=>{setSentSet(p=>new Set([...p,idx]));setSentKeys(p=>{const s=new Set([...p,key]);localStorage.setItem("pat_sent",JSON.stringify([...s]));return s;});},[]);
+  const desmarcarEnviado=useCallback((idx,key)=>{
+    setSentSet(p=>{const s=new Set(p);s.delete(idx);return s;});
+    setSentKeys(p=>{const s=new Set(p);s.delete(key);localStorage.setItem("pat_sent",JSON.stringify([...s]));return s;});
+  },[]);
   const [sendingIdx,setSendingIdx]=useState(null);
   const [showProc,setShowProc]=useState(false);
   const [procLogs,setProcLogs]=useState([]);
@@ -5450,7 +5454,7 @@ function App(){
       setTimeout(()=>{setShowProc(false);setView("table");},1800);
       setData(filas);
       const prevSent=new Set();
-      filas.forEach((f,i)=>{const key=`${periodo}|${f.cliente}|${f.concepto}`;if(sentKeys.has(key))prevSent.add(i);});
+      filas.forEach((f,i)=>{const key=`${periodo}|${f.cliente}|${f.concepto}|${f.factura||""}`;if(sentKeys.has(key))prevSent.add(i);});
       setSentSet(prevSent);
       if(prevSent.size>0)addLog(`✓ ${prevSent.size} correos ya enviados en sesiones anteriores`,"ok");
       /* ── Email de notificación con stats reales ── */
@@ -5529,7 +5533,7 @@ function App(){
         attNombre=pdf?.nombre;
       }
       await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,attB64,attNombre,attMime);
-      const key=`${periodo}|${row.cliente}|${row.concepto}`;
+      const key=`${periodo}|${row.cliente}|${row.concepto}|${row.factura||""}`;
       marcarEnviado(idx,key);
       /* Marcar en planilla Google Sheets — llamada directa desde frontend */
       if(row.sheetRow&&!MODO_PRUEBA){marcarEnviadoSheet(row.sheetRow,row.sentColLetter).catch(e=>console.warn("mark-sent:",e.message));}
@@ -5642,7 +5646,7 @@ function App(){
           else if(pdf?.driveFileId){try{attB64=await getPdfBase64FromDrive(pdf.driveFileId);}catch(e){console.warn("Drive PDF:",e.message);}}
           attNombre=pdf?.nombre;
         }
-        try{await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,attB64,attNombre,attMime);const key=`${periodo}|${row.cliente}|${row.concepto}`;marcarEnviado(row.i,key);if(row.sheetRow&&!MODO_PRUEBA){marcarEnviadoSheet(row.sheetRow,row.sentColLetter).catch(e=>console.warn("mark-sent:",e.message));}enviados++;await new Promise(r=>setTimeout(r,400));}
+        try{await sendGmail(token,dest,CCO,REMITENTE,subject,htmlBody,attB64,attNombre,attMime);const key=`${periodo}|${row.cliente}|${row.concepto}|${row.factura||""}`;marcarEnviado(row.i,key);if(row.sheetRow&&!MODO_PRUEBA){marcarEnviadoSheet(row.sheetRow,row.sentColLetter).catch(e=>console.warn("mark-sent:",e.message));}enviados++;await new Promise(r=>setTimeout(r,400));}
         catch(e){notify("Error en "+row.cliente+": "+e.message,"err");}
       }
       if(enviados>0){try{const resumenRows=pend.slice(0,enviados);const resumenHtml=buildResumenHtml(resumenRows,periodo);const resSubject="Resumen Facturación "+periodo+" — "+enviados+" correos enviados";await sendGmail(token,"","",REMITENTE,resSubject,resumenHtml,null,null,null,"facturacion@patagonica.cl");}catch(e){console.warn("Error enviando resumen:",e.message);}}
@@ -5652,15 +5656,29 @@ function App(){
 
   /* ── Sincronizar planilla: escribe "Enviado" en HC para todos los ya enviados ── */
   /* Escribe "Enviado" en columna dinámica — servidor descarga XLSX, modifica y re-sube */
-  const marcarEnviadoSheet=useCallback(async(sheetRowOrRows,sentCol)=>{
+  const marcarEnviadoSheet=useCallback(async(sheetRowOrRows,sentCol,value)=>{
     sentCol=sentCol||"HC";
     const isArray=Array.isArray(sheetRowOrRows);
     const body=isArray?{sheetRows:sheetRowOrRows,sentCol}:{sheetRow:sheetRowOrRows,sentCol};
+    if(typeof value==="string")body.value=value;
     const r=await fetch("/api/planilla",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     const rj=await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(rj.error||`HTTP ${r.status}`);
     return rj;
   },[]);
+
+  /* ── Revertir "Enviado" a pendiente: limpia caché local (sentSet/sentKeys) y,
+     si la fila tiene fila real en la planilla, borra también la marca ahí ── */
+  const revertirEnviado=useCallback(async(row)=>{
+    const key=`${periodo}|${row.cliente}|${row.concepto}|${row.factura||""}`;
+    desmarcarEnviado(row.i,key);
+    setData(prev=>prev.map((r,i)=>i===row.i?{...r,yaEnviado:false}:r));
+    if(row.sheetRow&&row.sentColLetter){
+      try{await marcarEnviadoSheet(row.sheetRow,row.sentColLetter,"");}
+      catch(e){notify("⚠ No se pudo actualizar la planilla: "+e.message,"warn");}
+    }
+    notify("↩ "+row.cliente+" vuelve a pendiente por enviar","ok");
+  },[periodo,desmarcarEnviado,marcarEnviadoSheet,notify]);
 
   const marcarPagadoSheet=useCallback(async(sheetRow,pagadoCol,paid)=>{
     const body={sheetRow,sentCol:pagadoCol,value:paid?"Pagado":""};
@@ -7011,7 +7029,7 @@ function App(){
                 h("td",{style:{padding:"8px 11px",background:bg}},
                   row.estado==="sanchez"?h("span",{title:"Arriendo facturado por Sanchez Hermanos SpA",style:{fontSize:10,fontWeight:700,padding:"3px 10px",borderRadius:20,background:"#ede9fe",color:"#5b21b6",border:"1px solid #c4b5fd",letterSpacing:"0.04em",cursor:"default"}},"SANCHEZ"):
                   row.estado==="missing"?h(Badge,{e:"missing",row}):
-                  sent?h(Badge,{e:"sent_sheet",row}):
+                  sent?h("span",{onClick:()=>{if(window.confirm(row.cliente+" — "+row.factura+"\n\n¿Volver a marcar como pendiente por enviar?"))revertirEnviado(row);},title:"Clic para volver a pendiente por enviar",style:{cursor:"pointer"}},h(Badge,{e:"sent_sheet",row})):
                   sending?h("span",{style:{color:"var(--blue)",fontSize:11,display:"inline-flex",alignItems:"center",gap:4}},h("span",{className:"spin"},"⟳")," Enviando..."):
                   row.estado==="ok"&&!noEmail?h("button",{
                     className:"btn-send",
