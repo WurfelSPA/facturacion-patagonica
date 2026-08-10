@@ -5574,7 +5574,18 @@ function App(){
       }
       notify("✓ "+data.zipName+" descargado ("+data.totalFacturas+" facturas)","ok");
       autoProcesado.current=false; /* permitir que procesar() corra con el ZIP nuevo */
-      buscarZip(periodo);
+      if(data.zipBase64){
+        /* Usar el ZIP recién generado directamente (sin esperar a que Drive lo
+           indexe para buscarZip) — dispara el auto-proceso de inmediato */
+        const zipBytesLocal=Uint8Array.from(atob(data.zipBase64),c=>c.charCodeAt(0));
+        const zipFileLocal=new File([zipBytesLocal],data.zipName,{type:"application/zip"});
+        zipPeriodoRef.current=periodo;
+        setPdfMaestroId(null);setCanGenerate(false);setZipError(null);
+        setFiles(prev=>({...prev,zip:zipFileLocal}));
+        setZipStatus("ready");
+      }else{
+        buscarZip(periodo);
+      }
     }catch(e){
       setSplitResult({error:e.message});
       notify("Error: "+e.message,"err");
