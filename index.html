@@ -714,6 +714,7 @@ async function procesarPlanillaFacturacion(file,periodo){
     const ufGT=row[colGT];
     if(!cliente||excl.includes(String(cliente).trim()))continue;
     const sName=String(cliente).trim();
+    const sociedad=row[5]?String(row[5]).trim():""; /* Col F: Sociedad Arrendadora (PISA, SÁNCHEZ, ...) */
     const sito=sitio?String(sitio).trim():"";
     const edif=row[8]?String(row[8]).trim():""; /* Col I: nro local / bodega / edif */
     const emailBilling=row[12]?String(row[12]).trim():"";
@@ -735,10 +736,53 @@ async function procesarPlanillaFacturacion(file,periodo){
     const _nfArr=row[colGS+1];const nroFactArr=(typeof _nfArr==="number"&&_nfArr>0)?String(Math.round(_nfArr)):(typeof _nfArr==="string"&&_nfArr.trim())?_nfArr.trim():null;
     const _nfGC=colGT>0?row[colGT+1]:null;const nroFactGC=(typeof _nfGC==="number"&&_nfGC>0)?String(Math.round(_nfGC)):(typeof _nfGC==="string"&&_nfGC.trim())?_nfGC.trim():null;
     const m2Billing=row[42]!=null&&row[42]!==""?Number(row[42]):null; /* Col AQ: m² */
-    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado:yaPagadoArr,sheetRow,sentColLetter,pagadoColLetter:pagadoArrColLetter,nroFactArrColLetter,nroFactGCColLetter,nroFactArr,nroFactGC,m2:m2Billing});
-    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,edificio:edif,cliente:sName,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado:yaPagadoGC,sheetRow,sentColLetter,pagadoColLetter:pagadoGCColLetter,nroFactArrColLetter,nroFactGCColLetter,nroFactArr,nroFactGC,m2:m2Billing});
+    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,edificio:edif,cliente:sName,sociedad,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado:yaPagadoArr,sheetRow,sentColLetter,pagadoColLetter:pagadoArrColLetter,nroFactArrColLetter,nroFactGCColLetter,nroFactArr,nroFactGC,m2:m2Billing});
+    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,edificio:edif,cliente:sName,sociedad,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado:yaPagadoGC,sheetRow,sentColLetter,pagadoColLetter:pagadoGCColLetter,nroFactArrColLetter,nroFactGCColLetter,nroFactArr,nroFactGC,m2:m2Billing});
   }
   return clientes;
+}
+/* ── Días de mora por cliente desde "Facturas x Cobrar PISA" (mismo criterio que FactxCobrarView) ── */
+function _rutNormMora(r){return(r||"").replace(/\./g,"").replace(/-/g,"").toLowerCase();}
+function parseFacturasPorCobrarBase(values){
+  if(!values||values.length<2)throw new Error("Sin datos en hoja Base");
+  const hdr=values[0].map(h=>String(h||"").toLowerCase().replace(/[\r\n\s_]/g,""));
+  function fi(tests){for(let i=0;i<hdr.length;i++)for(const t of tests)if(hdr[i].includes(t))return i;return -1;}
+  const iCod=fi(["cod"])>=0?fi(["cod"]):3;
+  const iCliente=fi(["cliente"])>=0?fi(["cliente"]):4;
+  const iDiasDoc=fi(["diasdoc","ddoc","diaspag"])>=0?fi(["diasdoc","ddoc","diaspag"]):11;
+  const iMonto=fi(["monto","c/d(ml)","c/d(m"])>=0?fi(["monto","c/d(ml)","c/d(m"]):13;
+  const iSdo=fi(["sdo","vencido"])>=0?fi(["sdo","vencido"]):14;
+  function n(v){return parseFloat(String(v||"0").replace(/[^0-9.\-]/g,""))||0;}
+  return values.slice(1)
+    .filter(r=>r.length>4&&String(r[iCliente]||"").trim()!==""&&String(r[iCliente]||"").trim()!=="Cliente")
+    .map(r=>({rut:String(r[iCod]||"").trim(),cliente:String(r[iCliente]||"").trim(),diasDoc:n(r[iDiasDoc]),monto:n(r[iMonto]),sdoVencido:n(r[iSdo])}))
+    .filter(r=>r.monto>0||r.sdoVencido>0);
+}
+/* Descubre y carga el último "F x Cobrar Pisa *.xlsx" en Drive, agregado por RUT → {maxDias,totalDeuda,nombre} */
+async function fetchFacturasPorCobrarMora(){
+  const ls1=await fetch("/api/historial?ls="+DRIVE_FACTURACION_FOLDER_ID).then(r=>r.json());
+  const sub=(ls1.files||[]).find(f=>f.name.toLowerCase().includes("cobrar")&&(f.mimeType||"").includes("folder"));
+  if(!sub)return null;
+  const ls2=await fetch("/api/historial?ls="+sub.id).then(r=>r.json());
+  function dateKey(name){const m=name.match(/(\d{2})-(\d{2})-(\d{4})/);return m?m[3]+m[2]+m[1]:name;}
+  const xl=(ls2.files||[]).filter(f=>f.name.toLowerCase().endsWith(".xlsx")).sort((a,b)=>dateKey(a.name).localeCompare(dateKey(b.name)));
+  if(!xl.length)return null;
+  const last=xl[xl.length-1];
+  const buf=await fetch("/api/historial?fileId="+last.id).then(r=>r.arrayBuffer());
+  const wb=XLSX.read(new Uint8Array(buf),{type:"array",cellDates:true});
+  const ws=wb.Sheets["Base"]||wb.Sheets["base"]||wb.Sheets["BASE"]||wb.Sheets[wb.SheetNames[0]];
+  if(!ws)return null;
+  const raw=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:""});
+  const rows=parseFacturasPorCobrarBase(raw);
+  const porRut={};
+  rows.forEach(r=>{
+    const key=_rutNormMora(r.rut);
+    if(!key)return;
+    if(!porRut[key])porRut[key]={maxDias:0,totalDeuda:0,nombre:r.cliente};
+    porRut[key].totalDeuda+=r.monto;
+    if(r.diasDoc>porRut[key].maxDias)porRut[key].maxDias=r.diasDoc;
+  });
+  return{porRut,fecha:dateKey(last.name)};
 }
 /* ── Lee la planilla para TODOS los meses del año dado ─────────────────────── */
 async function leerHistorialAnio(xlsxFile, anio){
@@ -2497,6 +2541,242 @@ function FactxCobrarView({notify}){
   );
 }
 
+/* ═══════════════════════════════════
+   ESTADO DE PAGOS — dashboard mensual (solo PISA)
+   Cruza la Planilla (pagado/no pagado por período) con la mora en vivo
+   de "Facturas x Cobrar PISA" (días de atraso por cliente).
+═══════════════════════════════════ */
+function BarraEstado({segments}){
+  const total=segments.reduce((s,x)=>s+x.count,0)||1;
+  return h("div",{style:{display:"flex",height:22,borderRadius:11,overflow:"hidden",background:"var(--surf2)",border:"1px solid var(--bdr)"}},
+    segments.map((s,i)=>s.count>0&&h("div",{key:s.label,title:`${s.label}: ${s.count} (${Math.round(s.count/total*100)}%)`,
+      style:{width:(s.count/total*100)+"%",background:s.color,display:"flex",alignItems:"center",justifyContent:"center",
+        borderRight:i<segments.length-1?"2px solid var(--surf)":"none",minWidth:s.count>0?22:0}},
+      (s.count/total)>0.12&&h("span",{style:{fontSize:10,fontWeight:700,color:"#fff",whiteSpace:"nowrap"}},s.count)
+    ))
+  );
+}
+function LeyendaEstado(){
+  return h("div",{style:{display:"flex",gap:14,alignItems:"center",fontSize:10,color:"var(--txm)"}},
+    h("span",{style:{display:"flex",alignItems:"center",gap:5}},h("span",{style:{width:9,height:9,borderRadius:"50%",background:"var(--green)",display:"inline-block"}}),"Pagado"),
+    h("span",{style:{display:"flex",alignItems:"center",gap:5}},h("span",{style:{width:9,height:9,borderRadius:"50%",background:"var(--amber)",display:"inline-block"}}),"Pendiente")
+  );
+}
+function BarraAntiguedad({buckets}){
+  const labels={"<=30":"Al día (≤30)","31-60":"31-60 días","61-90":"61-90 días","91-365":"91-365 días","+365":"+365 días"};
+  const colors={"<=30":"#10b981","31-60":"#f59e0b","61-90":"#f97316","91-365":"#ef4444","+365":"#7c3aed"};
+  const max=Math.max(1,...buckets.map(b=>b.count));
+  return h("div",{style:{display:"flex",flexDirection:"column",gap:8}},
+    buckets.map(b=>h("div",{key:b.key,style:{display:"flex",alignItems:"center",gap:8}},
+      h("div",{style:{width:104,fontSize:10,color:"var(--txm)",fontWeight:600,flexShrink:0}},labels[b.key]),
+      h("div",{style:{flex:1,height:14,background:"var(--surf2)",borderRadius:7,overflow:"hidden"}},
+        h("div",{title:`${labels[b.key]}: ${b.count} clientes`,
+          style:{height:"100%",width:(b.count/max*100)+"%",background:colors[b.key],borderRadius:7,minWidth:b.count>0?6:0}})
+      ),
+      h("div",{style:{width:26,textAlign:"right",fontSize:11,fontWeight:700,fontFamily:"'DM Mono',monospace"}},b.count)
+    ))
+  );
+}
+function EstadoPagosView({notify}){
+  const PERIODOS_DASH=React.useMemo(()=>{const i=PERIODOS.indexOf("Mayo 2026");return i>=0?PERIODOS.slice(i):PERIODOS;},[]);
+  const [periodo,setPeriodo]=useState(()=>{
+    const now=new Date();
+    const cur=`${MESES_NOMBRES[now.getMonth()]} ${now.getFullYear()}`;
+    const i=PERIODOS.indexOf("Mayo 2026");
+    const list=i>=0?PERIODOS.slice(i):PERIODOS;
+    return list.includes(cur)?cur:list[0];
+  });
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState(null);
+  const [rows,setRows]=useState([]);
+  const [mora,setMora]=useState(null);
+  const [ufDia5,setUfDia5]=useState(null);
+  const [concFilter,setConcFilter]=useState("all");
+  const [estFilter,setEstFilter]=useState("all");
+  const [search,setSearch]=useState("");
+  const [sortCol,setSortCol]=useState(null);
+  const [sortDir,setSortDir]=useState("asc");
+  const planillaFileRef=React.useRef(null);
+  const moraRef=React.useRef(null);
+
+  React.useEffect(()=>{
+    let cancelled=false;
+    setLoading(true);setError(null);
+    const pFile=planillaFileRef.current
+      ?Promise.resolve(planillaFileRef.current)
+      :fetch("/api/planilla").then(r=>{if(!r.ok)throw new Error("No se pudo cargar la planilla");return r.blob();})
+        .then(b=>{const f=new File([b],"Planilla.xlsx");planillaFileRef.current=f;return f;});
+    const pMora=moraRef.current
+      ?Promise.resolve(moraRef.current)
+      :fetchFacturasPorCobrarMora().then(m=>{moraRef.current=m;return m;}).catch(()=>null);
+    Promise.all([pFile,pMora])
+      .then(([file,moraData])=>{if(!cancelled)setMora(moraData);return procesarPlanillaFacturacion(file,periodo);})
+      .then(clientes=>{if(!cancelled)setRows(clientes.filter(c=>(c.sociedad||"").toUpperCase()==="PISA"));})
+      .catch(e=>{if(!cancelled){setError(e.message);if(notify)notify("Error: "+e.message,"err");}})
+      .finally(()=>{if(!cancelled)setLoading(false);});
+    return ()=>{cancelled=true;};
+  },[periodo]);
+
+  React.useEffect(()=>{
+    const[mesNombre,anioStr]=periodo.split(" ");
+    const mesNum=MES_NUM[mesNombre];
+    let cancelled=false;
+    getUFDia5(parseInt(anioStr),mesNum).then(v=>{if(!cancelled)setUfDia5(v);});
+    return ()=>{cancelled=true;};
+  },[periodo]);
+
+  const enriched=React.useMemo(()=>{
+    const porRut=mora?.porRut||{};
+    return rows.map(r=>{
+      const dias=porRut[_rutNormMora(r.rut)]?.maxDias||0;
+      return{...r,dias,moroso:dias>30,montoClp:ufDia5?Math.round(r.uf*ufDia5*1.19):null};
+    });
+  },[rows,mora,ufDia5]);
+
+  const clientesUnicos=React.useMemo(()=>{
+    const map={};
+    enriched.forEach(r=>{const k=_rutNormMora(r.rut);if(!map[k])map[k]={rut:r.rut,nombre:r.cliente,dias:r.dias,moroso:r.moroso};});
+    return Object.values(map);
+  },[enriched]);
+
+  const stats=React.useMemo(()=>{
+    const pagados=enriched.filter(r=>r.yaPagado);
+    const totalFacturado=enriched.reduce((s,r)=>s+(r.montoClp||0),0);
+    const pct=enriched.length?Math.round(pagados.length/enriched.length*100):0;
+    const porConcepto=tipo=>{const rs=enriched.filter(r=>r.tipo===tipo);const pag=rs.filter(r=>r.yaPagado).length;return{total:rs.length,pag,pend:rs.length-pag};};
+    const bucketOf=d=>d<=30?"<=30":d<=60?"31-60":d<=90?"61-90":d<=365?"91-365":"+365";
+    const buckets=["<=30","31-60","61-90","91-365","+365"].map(k=>({key:k,count:clientesUnicos.filter(c=>bucketOf(c.dias)===k).length}));
+    return{
+      totalFacturado,pct,nPagados:pagados.length,nPend:enriched.length-pagados.length,
+      nAlDia:clientesUnicos.filter(c=>!c.moroso).length,
+      nMoroso:clientesUnicos.filter(c=>c.moroso).length,
+      nMoroso90:clientesUnicos.filter(c=>c.dias>90).length,
+      arriendo:porConcepto("arriendo"),servAdm:porConcepto("serv_adm"),buckets
+    };
+  },[enriched,clientesUnicos]);
+
+  function toggleSort(col){if(sortCol===col)setSortDir(d=>d==="asc"?"desc":"asc");else{setSortCol(col);setSortDir("asc");}}
+  function sortArrow(col){if(sortCol!==col)return" ↕";return sortDir==="asc"?" ↑":" ↓";}
+  function getSortVal(r,col){
+    switch(col){
+      case"cliente":return r.cliente||"";
+      case"rut":return r.rut||"";
+      case"tipo":return r.tipo==="arriendo"?"Arriendo":"Serv. Adm.";
+      case"monto":return r.montoClp??-Infinity;
+      case"estado":return r.yaPagado?1:0;
+      case"dias":return r.dias||0;
+      default:return"";
+    }
+  }
+  const normQ=s=>(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+  const q=normQ(search);
+  const filteredRows=enriched.filter(r=>{
+    const mc=concFilter==="all"||r.tipo===concFilter;
+    const me=estFilter==="all"||(estFilter==="pagado"&&r.yaPagado)||(estFilter==="pendiente"&&!r.yaPagado)||(estFilter==="moroso"&&r.moroso)||(estFilter==="aldia"&&!r.moroso);
+    const ms=!q||normQ(r.cliente).includes(q)||normQ(r.rut).includes(q);
+    return mc&&me&&ms;
+  });
+  const sortedRows=!sortCol?filteredRows:[...filteredRows].sort((a,b)=>{
+    const va=getSortVal(a,sortCol),vb=getSortVal(b,sortCol);
+    const cmp=typeof va==="number"&&typeof vb==="number"?va-vb:String(va).localeCompare(String(vb),"es");
+    return sortDir==="asc"?cmp:-cmp;
+  });
+
+  return h("main",{style:{flex:1,minHeight:0,overflowY:"auto",padding:"18px 22px",display:"flex",flexDirection:"column",gap:16},className:"fade-up"},
+    h("div",{style:{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}},
+      h("select",{value:periodo,onChange:e=>setPeriodo(e.target.value),
+        style:{fontSize:12,fontWeight:700,padding:"6px 12px",background:"linear-gradient(135deg,var(--acc),var(--acc2))",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}},
+        PERIODOS_DASH.map(p=>h("option",{key:p,value:p,style:{background:"#fff",color:"#1a1a1a"}},p))
+      ),
+      mora&&mora.fecha&&h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},"Mora consultada al "+mora.fecha),
+      !mora&&!loading&&h("span",{style:{fontSize:10,color:"var(--amber)"}},"⚠ No se pudo leer Facturas x Cobrar — mostrando solo pagado/pendiente"),
+      loading&&h("span",{className:"spin",style:{marginLeft:2}},"⟳")
+    ),
+    error&&h("div",{style:{padding:12,background:"var(--rbg)",color:"var(--red)",borderRadius:8,fontSize:12}},error),
+
+    !loading&&!error&&h("div",{style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}},
+      h("div",{className:"dash-card"},
+        h("div",{className:"dash-card-lbl"},"Total Facturado"),
+        h("div",{className:"dash-card-val",style:{color:"var(--blue)",fontSize:22}},ufDia5?"$"+Math.round(stats.totalFacturado).toLocaleString("es-CL"):"—"),
+        h("div",{className:"dash-card-sub"},enriched.length+" facturas · "+periodo)
+      ),
+      h("div",{className:"dash-card",style:{borderLeft:"3px solid var(--green)"}},
+        h("div",{className:"dash-card-lbl"},"% Pagado"),
+        h("div",{className:"dash-card-val",style:{color:"var(--green)"}},stats.pct+"%"),
+        h("div",{className:"dash-card-sub"},`${stats.nPagados} de ${enriched.length} facturas`)
+      ),
+      h("div",{className:"dash-card",style:{borderLeft:"3px solid var(--green)"}},
+        h("div",{className:"dash-card-lbl"},"Clientes al día"),
+        h("div",{className:"dash-card-val",style:{color:"var(--green)"}},stats.nAlDia),
+        h("div",{className:"dash-card-sub"},"0-30 días de mora")
+      ),
+      h("div",{className:"dash-card",style:{borderLeft:"3px solid var(--red)"}},
+        h("div",{className:"dash-card-lbl"},"Clientes en mora"),
+        h("div",{className:"dash-card-val",style:{color:"var(--red)"}},stats.nMoroso),
+        h("div",{className:"dash-card-sub"},stats.nMoroso90+" de ellos con +90 días")
+      )
+    ),
+
+    !loading&&!error&&h("div",{style:{display:"grid",gridTemplateColumns:"1.1fr 1fr",gap:14}},
+      h("div",{className:"dash-card",style:{display:"flex",flexDirection:"column",gap:12}},
+        h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
+          h("div",{style:{fontSize:12,fontWeight:700,color:"var(--tx)"}},"Pagado vs. Pendiente"),
+          h(LeyendaEstado,null)
+        ),
+        h(BarraEstado,{segments:[{label:"Pagado",count:stats.nPagados,color:"var(--green)"},{label:"Pendiente",count:stats.nPend,color:"var(--amber)"}]}),
+        h("div",{style:{display:"flex",flexDirection:"column",gap:10,marginTop:4}},
+          h("div",null,
+            h("div",{style:{fontSize:10,color:"var(--txm)",fontWeight:600,marginBottom:4}},"Arriendo · "+stats.arriendo.total+" facturas"),
+            h(BarraEstado,{segments:[{label:"Pagado",count:stats.arriendo.pag,color:"var(--green)"},{label:"Pendiente",count:stats.arriendo.pend,color:"var(--amber)"}]})
+          ),
+          h("div",null,
+            h("div",{style:{fontSize:10,color:"var(--txm)",fontWeight:600,marginBottom:4}},"Serv. Adm. · "+stats.servAdm.total+" facturas"),
+            h(BarraEstado,{segments:[{label:"Pagado",count:stats.servAdm.pag,color:"var(--green)"},{label:"Pendiente",count:stats.servAdm.pend,color:"var(--amber)"}]})
+          )
+        )
+      ),
+      h("div",{className:"dash-card"},
+        h("div",{style:{fontSize:12,fontWeight:700,color:"var(--tx)",marginBottom:12}},"Estado de cobranza (antigüedad)"),
+        h(BarraAntiguedad,{buckets:stats.buckets})
+      )
+    ),
+
+    !loading&&!error&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
+      h("div",{style:{display:"flex",gap:8,alignItems:"center",padding:"10px 14px",borderBottom:"1px solid var(--bdr)",flexWrap:"wrap"}},
+        [{k:"all",l:"Todos"},{k:"pagado",l:"Pagado"},{k:"pendiente",l:"Pendiente"},{k:"aldia",l:"Al día"},{k:"moroso",l:"Moroso"}]
+          .map(f=>h("button",{key:f.k,className:`pill${estFilter===f.k?" active":""}`,onClick:()=>setEstFilter(f.k)},f.l)),
+        h("span",{style:{color:"var(--txd)",fontSize:11}},"·"),
+        [{k:"all",l:"Todos"},{k:"arriendo",l:"Arriendo"},{k:"serv_adm",l:"Serv. Adm."}]
+          .map(f=>h("button",{key:f.k,className:`pill${concFilter===f.k?" active":""}`,onClick:()=>setConcFilter(f.k),style:{fontSize:10}},f.l)),
+        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{marginLeft:"auto",width:190}})
+      ),
+      h("div",{style:{overflowX:"auto"}},
+        h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:12}},
+          h("thead",null,h("tr",{style:{background:"var(--surf2)"}},
+            [["Cliente","cliente"],["RUT","rut"],["Concepto","tipo"],["Monto","monto"],["Estado","estado"],["Días mora","dias"]].map(([lbl,col])=>
+              h("th",{key:col,onClick:()=>toggleSort(col),style:{padding:"8px 11px",textAlign:(col==="monto"||col==="dias")?"right":"left",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",cursor:"pointer",userSelect:"none",whiteSpace:"nowrap"}},
+                lbl.toUpperCase(),h("span",{style:{opacity:.5,fontSize:9}},sortArrow(col)))
+            )
+          )),
+          h("tbody",null,
+            loading?h("tr",null,h("td",{colSpan:6,style:{padding:32,textAlign:"center",color:"var(--txd)"}},"Cargando...")):
+            sortedRows.length===0?h("tr",null,h("td",{colSpan:6,style:{padding:32,textAlign:"center",color:"var(--txd)"}},"Sin resultados")):
+            sortedRows.map((r,i)=>h("tr",{key:r.rut+"|"+r.tipo+"|"+i,style:{borderBottom:"1px solid var(--bdr)"}},
+              h("td",{style:{padding:"7px 11px",fontWeight:600}},r.cliente),
+              h("td",{style:{padding:"7px 11px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txd)"}},formatRUT(r.rut)),
+              h("td",{style:{padding:"7px 11px"}},h("span",{className:r.tipo==="arriendo"?"tag-arr":"tag-srv"},r.tipo==="arriendo"?"Arriendo":"Serv. Adm.")),
+              h("td",{style:{padding:"7px 11px",textAlign:"right",fontFamily:"'DM Mono',monospace"}},r.montoClp!=null?"$"+r.montoClp.toLocaleString("es-CL"):"—"),
+              h("td",{style:{padding:"7px 11px"}},r.yaPagado
+                ?h("span",{style:{fontSize:10,fontWeight:700,padding:"3px 9px",borderRadius:20,background:"var(--gbg)",color:"var(--green)",border:"1px solid var(--gdim)"}},"✓ Pagado")
+                :h("span",{style:{fontSize:10,fontWeight:700,padding:"3px 9px",borderRadius:20,background:"var(--abg)",color:"var(--amber)",border:"1px solid var(--adim)"}},"○ Pendiente")),
+              h("td",{style:{padding:"7px 11px",textAlign:"right",fontFamily:"'DM Mono',monospace",color:r.moroso?"var(--red)":"var(--txd)",fontWeight:r.moroso?700:400}},r.dias>0?r.dias+" d.":"—")
+            ))
+          )
+        )
+      )
+    )
+  );
+}
 
 /* ═══════════════════════════════════
    VISTA CONTRATOS
@@ -4524,6 +4804,7 @@ function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlo
     {id:"dashboard", icon:"📊", label:"Dashboard"},
     {id:"ventas",    icon:"📈", label:"Detalles Ventas"},
     {id:"factura",   icon:"📋", label:"Facturación"},
+    {id:"pagos",     icon:"✅", label:"Estado de Pagos"},
     {id:"historial-fact", icon:"📂", label:"Histórico Facturación"},
     {id:"fact-cobrar", icon:"💰", label:"Facturas x Cobrar"},
     {id:"contratos", icon:"📄", label:"Contratos"},
@@ -6343,7 +6624,7 @@ function App(){
     h("header",{style:{background:view==="table"?"#1e3a5f":"var(--surf)",borderBottom:view==="table"?"1px solid #152d4a":"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:49,gap:10}},
       h("div",{style:{display:"flex",alignItems:"center",gap:10}},
         h("div",{style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px",color:view==="table"?"#fff":"var(--tx)"}},
-          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="cuentas"?"🔌 Cuentas Servicios":view==="fact-cobrar"?"💰 Facturas x Cobrar":view==="cortijo"?"🏡 El Cortijo":"📋 Facturación"
+          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="cuentas"?"🔌 Cuentas Servicios":view==="fact-cobrar"?"💰 Facturas x Cobrar":view==="pagos"?"✅ Estado de Pagos":view==="cortijo"?"🏡 El Cortijo":"📋 Facturación"
         ),
         view==="table"&&h("span",{style:{fontSize:14,fontWeight:600,color:"#93b5d4",marginLeft:6}},periodo)
       ),
@@ -6714,6 +6995,7 @@ function App(){
     )
     ,view==="ventas"&&h(VentasView,{periodo})
     ,view==="fact-cobrar"&&h(FactxCobrarView,{notify})
+    ,view==="pagos"&&h(EstadoPagosView,{notify})
     ,view==="contratos"&&h(ContratosView,{dashData,driveLoading})
     ,view==="cuentas"&&h(CuentasServiciosView,{dashData,driveLoading,notify})
     ,view==="cortijo"&&h(ElCortijoView,null)
