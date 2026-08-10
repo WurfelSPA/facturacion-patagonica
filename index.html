@@ -2645,7 +2645,7 @@ function EstadoPagosView({notify}){
     const pagados=enriched.filter(r=>r.yaPagado);
     const totalFacturado=enriched.reduce((s,r)=>s+(r.montoClp||0),0);
     const pct=enriched.length?Math.round(pagados.length/enriched.length*100):0;
-    const porConcepto=tipo=>{const rs=enriched.filter(r=>r.tipo===tipo);const pag=rs.filter(r=>r.yaPagado).length;return{total:rs.length,pag,pend:rs.length-pag};};
+    const porConcepto=tipo=>{const rs=enriched.filter(r=>r.tipo===tipo);const pag=rs.filter(r=>r.yaPagado).length;const monto=rs.reduce((s,r)=>s+(r.montoClp||0),0);return{total:rs.length,pag,pend:rs.length-pag,monto};};
     const bucketOf=d=>d<=30?"<=30":d<=60?"31-60":d<=90?"61-90":d<=365?"91-365":"+365";
     const buckets=["<=30","31-60","61-90","91-365","+365"].map(k=>({key:k,count:clientesUnicos.filter(c=>bucketOf(c.dias)===k).length}));
     return{
@@ -2696,11 +2696,21 @@ function EstadoPagosView({notify}){
     ),
     error&&h("div",{style:{padding:12,background:"var(--rbg)",color:"var(--red)",borderRadius:8,fontSize:12}},error),
 
-    !loading&&!error&&h("div",{style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}},
+    !loading&&!error&&h("div",{style:{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:12}},
       h("div",{className:"dash-card"},
         h("div",{className:"dash-card-lbl"},"Total Facturado"),
-        h("div",{className:"dash-card-val",style:{color:"var(--blue)",fontSize:22}},enriched.length>0?"$"+Math.round(stats.totalFacturado).toLocaleString("es-CL"):"—"),
+        h("div",{className:"dash-card-val",style:{color:"var(--blue)",fontSize:20}},enriched.length>0?"$"+Math.round(stats.totalFacturado).toLocaleString("es-CL"):"—"),
         h("div",{className:"dash-card-sub"},enriched.length+" facturas · "+periodo)
+      ),
+      h("div",{className:"dash-card"},
+        h("div",{className:"dash-card-lbl"},"Total Arriendo"),
+        h("div",{className:"dash-card-val",style:{color:"var(--blue)",fontSize:20}},enriched.length>0?"$"+Math.round(stats.arriendo.monto).toLocaleString("es-CL"):"—"),
+        h("div",{className:"dash-card-sub"},stats.arriendo.total+" facturas")
+      ),
+      h("div",{className:"dash-card"},
+        h("div",{className:"dash-card-lbl"},"Total Serv. Adm."),
+        h("div",{className:"dash-card-val",style:{color:"var(--blue)",fontSize:20}},enriched.length>0?"$"+Math.round(stats.servAdm.monto).toLocaleString("es-CL"):"—"),
+        h("div",{className:"dash-card-sub"},stats.servAdm.total+" facturas")
       ),
       h("div",{className:"dash-card",style:{borderLeft:"3px solid var(--green)"}},
         h("div",{className:"dash-card-lbl"},"% Pagado"),
