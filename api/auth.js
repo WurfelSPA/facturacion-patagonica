@@ -152,6 +152,22 @@ async function writeDriveCredentials(token, data) {
   if (!r.ok) throw new Error('Drive write error: '+r.status+' '+(await r.text()));
 }
 
+async function createDriveCredentialsFile(token, parentFolderId) {
+  const boundary = 'auth_creds_boundary_'+Date.now();
+  const metadata = { name: 'auth-credentials.json', parents: parentFolderId ? [parentFolderId] : undefined };
+  const body =
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+    `--${boundary}\r\nContent-Type: application/json\r\n\r\n{}\r\n` +
+    `--${boundary}--`;
+  const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body
+  });
+  if (!r.ok) throw new Error('Drive create error: '+r.status+' '+(await r.text()));
+  return r.json();
+}
+
 // ── Resend ───────────────────────────────────────────────────────────────────
 async function sendResetEmail(to, name, resetUrl) {
   const apiKey = process.env.RESEND_API_KEY;
@@ -504,6 +520,24 @@ a{display:inline-block;padding:10px 20px;background:#4f46e5;color:#fff;border-ra
       }
 
       return res.status(200).json({ok:true});
+    }
+
+    // ── ADMIN-INIT-STORE ──────────────────────────────────────────────────────
+    // Crea el archivo Drive de credenciales (uso único, si DRIVE_CREDENTIALS_ID
+    // está mal configurado o el archivo no existe). Protegido por ADMIN_SEED_SECRET.
+    if (action==='admin-init-store') {
+      const secret = req.headers['x-seed-secret'] || (req.body||{}).secret || '';
+      const expected = process.env.ADMIN_SEED_SECRET || '';
+      if (!expected || secret !== expected)
+        return res.status(403).json({error:'No autorizado'});
+      try {
+        const tok = await saToken();
+        const parent = (req.body||{}).parentFolderId || null;
+        const file = await createDriveCredentialsFile(tok, parent);
+        return res.status(200).json({ok:true, fileId:file.id, name:file.name});
+      } catch(e) {
+        return res.status(500).json({error:'No se pudo crear el archivo: '+e.message});
+      }
     }
 
     // ── ADMIN-ADD-USER ────────────────────────────────────────────────────────
