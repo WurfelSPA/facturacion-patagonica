@@ -393,8 +393,22 @@ async function generarExcelResumen(xlsxFile,periodo){
   }
   if(monthCol===-1)throw new Error(`Columna del mes ${periodo} no encontrada en planilla`);
   // Columnas fijas (índice 0-based): H=7 I=8 J=9 K=10 L=11 AQ=42
-  // Columnas dinámicas: monthCol=Arriendo  monthCol+2=GC  monthCol+4=Comentarios
-  const COLS=[7,8,9,10,11,42,monthCol,monthCol+2,monthCol+4];
+  // Columnas dinámicas: buscar "GC" y "Comentarios" por encabezado en vez de un
+  // offset fijo — el ancho del bloque mensual cambió al agregar "Pago Arriendo"/
+  // "Pago GC" desde Mayo 2026 (monthCol+2/+4 ya no caen siempre en GC/Comentarios).
+  let colGT=-1;
+  for(let j=monthCol+1;j<=Math.min(monthCol+6,headerRow.length-1);j++){
+    const h=headerRow[j];
+    if(typeof h==="string"&&h.trim()==="GC"){colGT=j;break;}
+  }
+  if(colGT===-1)colGT=monthCol+2;
+  let colComentarios=-1;
+  for(let j=monthCol+1;j<=Math.min(monthCol+10,headerRow.length-1);j++){
+    const h=headerRow[j];
+    if(typeof h==="string"&&h.trim().toLowerCase()==="comentarios"){colComentarios=j;break;}
+  }
+  if(colComentarios===-1)colComentarios=monthCol+4;
+  const COLS=[7,8,9,10,11,42,monthCol,colGT,colComentarios];
   const HEADERS=["Sitio","Edificio","RUT","Direcci\u00f3n","Cliente","Total m\u00b2",`Arriendo ${periodo}`,"GC","Comentarios"];
   const outRows=[HEADERS];
   for(let r=4;r<rows.length;r++){
