@@ -2701,17 +2701,17 @@ function EstadoPagosView({notify}){
 
     !loading&&!error&&h("div",{style:{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:12}},
       h("div",{className:"dash-card"},
-        h("div",{className:"dash-card-lbl"},"Total Facturado"),
+        h("div",{className:"dash-card-lbl"},"Total Facturado PISA"),
         h("div",{className:"dash-card-val",style:{color:"var(--blue)",fontSize:20}},enriched.length>0?"$"+Math.round(stats.totalFacturado).toLocaleString("es-CL"):"—"),
         h("div",{className:"dash-card-sub"},enriched.length+" facturas · "+periodo)
       ),
       h("div",{className:"dash-card"},
-        h("div",{className:"dash-card-lbl"},"Total Arriendo"),
+        h("div",{className:"dash-card-lbl"},"Total Arriendo PISA"),
         h("div",{className:"dash-card-val",style:{color:"var(--blue)",fontSize:20}},enriched.length>0?"$"+Math.round(stats.arriendo.monto).toLocaleString("es-CL"):"—"),
         h("div",{className:"dash-card-sub"},stats.arriendo.total+" facturas")
       ),
       h("div",{className:"dash-card"},
-        h("div",{className:"dash-card-lbl"},"Total Serv. Adm."),
+        h("div",{className:"dash-card-lbl"},"Total Serv. Adm. PISA"),
         h("div",{className:"dash-card-val",style:{color:"var(--blue)",fontSize:20}},enriched.length>0?"$"+Math.round(stats.servAdm.monto).toLocaleString("es-CL"):"—"),
         h("div",{className:"dash-card-sub"},stats.servAdm.total+" facturas")
       ),
@@ -2730,6 +2730,9 @@ function EstadoPagosView({notify}){
         h("div",{className:"dash-card-val",style:{color:"var(--red)"}},stats.nMoroso),
         h("div",{className:"dash-card-sub"},stats.nMoroso90+" de ellos con +90 días")
       )
+    ),
+    !loading&&!error&&h("div",{style:{fontSize:10,color:"var(--txd)",marginTop:-6}},
+      "* Montos aproximados (UF planilla × valor UF del día, sin leer el PDF real de la factura) y solo clientes PISA — pueden diferir del total en Facturación, que prioriza el monto real facturado e incluye todas las sociedades."
     ),
 
     !loading&&!error&&h("div",{style:{display:"grid",gridTemplateColumns:"1.1fr 1fr",gap:14}},
