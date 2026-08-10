@@ -5761,6 +5761,9 @@ function App(){
     const cmp=typeof va==="number"&&typeof vb==="number"?va-vb:String(va).localeCompare(String(vb),"es");
     return sortDir==="asc"?cmp:-cmp;
   });
+  /* Totales de facturación del período — mismo cálculo que la columna Monto+IVA */
+  const totalArriendoClp=enriched.filter(r=>r.concepto==="Arriendo").reduce((s,r)=>s+(montoIvaOf(r)||0),0);
+  const totalServAdmClp=enriched.filter(r=>r.concepto==="Serv. Adm.").reduce((s,r)=>s+(montoIvaOf(r)||0),0);
 
   /* ══════════════════════════════════════════════════════════
      RENDER DASHBOARD
@@ -6746,11 +6749,11 @@ function App(){
           )
     ),
     view==="table"&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflowX:"hidden",background:"#eef4fd"},className:"fade-up"},
-      h("div",{style:{display:"grid",gridTemplateColumns:"repeat(5,1fr)",borderBottom:"1px solid #b8d0ee",background:"#ddeaf8"}},
-        [{label:"Total",val:stats.total,col:"var(--tx)",sub:""},{label:"Con PDF",val:stats.conPdf,col:"var(--green)",sub:"facturas cruzadas"},{label:"Sin PDF",val:stats.sinPdf,col:"var(--red)",sub:"revisar"},{label:"Coinciden",val:stats.ok,col:"var(--accl)",sub:"listos para enviar"},{label:"Enviados",val:stats.sent,col:"var(--amber)",sub:MODO_PRUEBA?"→ "+TEST_DEST:"esta sesión"}]
-        .map((m,i)=>h("div",{key:i,style:{background:"var(--surf)",padding:"13px 16px",borderRight:i<4?"1px solid var(--bdr)":"none"}},
+      h("div",{style:{display:"grid",gridTemplateColumns:"repeat(7,1fr)",borderBottom:"1px solid #b8d0ee",background:"#ddeaf8"}},
+        [{label:"Total",val:stats.total,col:"var(--tx)",sub:""},{label:"Con PDF",val:stats.conPdf,col:"var(--green)",sub:"facturas cruzadas"},{label:"Sin PDF",val:stats.sinPdf,col:"var(--red)",sub:"revisar"},{label:"Coinciden",val:stats.ok,col:"var(--accl)",sub:"listos para enviar"},{label:"Enviados",val:stats.sent,col:"var(--amber)",sub:MODO_PRUEBA?"→ "+TEST_DEST:"esta sesión"},{label:"Total Arriendo",val:"$"+Math.round(totalArriendoClp).toLocaleString("es-CL"),col:"var(--blue)",sub:"Neto+IVA del período",small:true},{label:"Total Serv. Adm.",val:"$"+Math.round(totalServAdmClp).toLocaleString("es-CL"),col:"var(--blue)",sub:"Neto+IVA del período",small:true}]
+        .map((m,i)=>h("div",{key:i,style:{background:"var(--surf)",padding:"13px 16px",borderRight:i<6?"1px solid var(--bdr)":"none"}},
           h("div",{style:{fontSize:10,fontWeight:600,color:"var(--txm)",marginBottom:4,letterSpacing:"0.06em"}},m.label.toUpperCase()),
-          h("div",{style:{fontSize:24,fontWeight:700,color:m.col,lineHeight:1,fontFamily:"'DM Mono',monospace"}},m.val),
+          h("div",{style:{fontSize:m.small?18:24,fontWeight:700,color:m.col,lineHeight:1,fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap"}},m.val),
           m.sub&&h("div",{style:{fontSize:10,color:"var(--txd)",marginTop:3}},m.sub)
         ))
       ),
