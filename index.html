@@ -2559,7 +2559,7 @@ function BarraEstado({segments}){
 function LeyendaEstado(){
   return h("div",{style:{display:"flex",gap:14,alignItems:"center",fontSize:10,color:"var(--txm)"}},
     h("span",{style:{display:"flex",alignItems:"center",gap:5}},h("span",{style:{width:9,height:9,borderRadius:"50%",background:"var(--green)",display:"inline-block"}}),"Pagado"),
-    h("span",{style:{display:"flex",alignItems:"center",gap:5}},h("span",{style:{width:9,height:9,borderRadius:"50%",background:"var(--amber)",display:"inline-block"}}),"Pendiente")
+    h("span",{style:{display:"flex",alignItems:"center",gap:5}},h("span",{style:{width:9,height:9,borderRadius:"50%",background:"var(--red)",display:"inline-block"}}),"Pendiente")
   );
 }
 function BarraAntiguedad({buckets}){
@@ -2723,15 +2723,15 @@ function EstadoPagosView({notify}){
           h("div",{style:{fontSize:12,fontWeight:700,color:"var(--tx)"}},"Pagado vs. Pendiente"),
           h(LeyendaEstado,null)
         ),
-        h(BarraEstado,{segments:[{label:"Pagado",count:stats.nPagados,color:"var(--green)"},{label:"Pendiente",count:stats.nPend,color:"var(--amber)"}]}),
+        h(BarraEstado,{segments:[{label:"Pagado",count:stats.nPagados,color:"var(--green)"},{label:"Pendiente",count:stats.nPend,color:"var(--red)"}]}),
         h("div",{style:{display:"flex",flexDirection:"column",gap:10,marginTop:4}},
           h("div",null,
             h("div",{style:{fontSize:10,color:"var(--txm)",fontWeight:600,marginBottom:4}},"Arriendo · "+stats.arriendo.total+" facturas"),
-            h(BarraEstado,{segments:[{label:"Pagado",count:stats.arriendo.pag,color:"var(--green)"},{label:"Pendiente",count:stats.arriendo.pend,color:"var(--amber)"}]})
+            h(BarraEstado,{segments:[{label:"Pagado",count:stats.arriendo.pag,color:"var(--green)"},{label:"Pendiente",count:stats.arriendo.pend,color:"var(--red)"}]})
           ),
           h("div",null,
             h("div",{style:{fontSize:10,color:"var(--txm)",fontWeight:600,marginBottom:4}},"Serv. Adm. · "+stats.servAdm.total+" facturas"),
-            h(BarraEstado,{segments:[{label:"Pagado",count:stats.servAdm.pag,color:"var(--green)"},{label:"Pendiente",count:stats.servAdm.pend,color:"var(--amber)"}]})
+            h(BarraEstado,{segments:[{label:"Pagado",count:stats.servAdm.pag,color:"var(--green)"},{label:"Pendiente",count:stats.servAdm.pend,color:"var(--red)"}]})
           )
         )
       ),
@@ -2750,11 +2750,11 @@ function EstadoPagosView({notify}){
           .map(f=>h("button",{key:f.k,className:`pill${concFilter===f.k?" active":""}`,onClick:()=>setConcFilter(f.k),style:{fontSize:10}},f.l)),
         h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{marginLeft:"auto",width:190}})
       ),
-      h("div",{style:{overflowX:"auto"}},
+      h("div",{style:{maxHeight:"calc(100vh - 420px)",minHeight:220,overflowY:"auto",overflowX:"auto"}},
         h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:12}},
-          h("thead",null,h("tr",{style:{background:"var(--surf2)"}},
+          h("thead",null,h("tr",{style:{background:"var(--surf2)",position:"sticky",top:0,zIndex:2}},
             [["Cliente","cliente"],["RUT","rut"],["Concepto","tipo"],["Monto","monto"],["Estado","estado"],["Días mora","dias"]].map(([lbl,col])=>
-              h("th",{key:col,onClick:()=>toggleSort(col),style:{padding:"8px 11px",textAlign:(col==="monto"||col==="dias")?"right":"left",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",cursor:"pointer",userSelect:"none",whiteSpace:"nowrap"}},
+              h("th",{key:col,onClick:()=>toggleSort(col),style:{padding:"8px 11px",textAlign:(col==="monto"||col==="dias")?"right":"left",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",cursor:"pointer",userSelect:"none",whiteSpace:"nowrap",background:"var(--surf2)"}},
                 lbl.toUpperCase(),h("span",{style:{opacity:.5,fontSize:9}},sortArrow(col)))
             )
           )),
@@ -2768,7 +2768,7 @@ function EstadoPagosView({notify}){
               h("td",{style:{padding:"7px 11px",textAlign:"right",fontFamily:"'DM Mono',monospace"}},r.montoClp!=null?"$"+r.montoClp.toLocaleString("es-CL"):"—"),
               h("td",{style:{padding:"7px 11px"}},r.yaPagado
                 ?h("span",{style:{fontSize:10,fontWeight:700,padding:"3px 9px",borderRadius:20,background:"var(--gbg)",color:"var(--green)",border:"1px solid var(--gdim)"}},"✓ Pagado")
-                :h("span",{style:{fontSize:10,fontWeight:700,padding:"3px 9px",borderRadius:20,background:"var(--abg)",color:"var(--amber)",border:"1px solid var(--adim)"}},"○ Pendiente")),
+                :h("span",{style:{fontSize:10,fontWeight:700,padding:"3px 9px",borderRadius:20,background:"var(--rbg)",color:"var(--red)",border:"1px solid var(--rdim)"}},"○ Pendiente")),
               h("td",{style:{padding:"7px 11px",textAlign:"right",fontFamily:"'DM Mono',monospace",color:r.moroso?"var(--red)":"var(--txd)",fontWeight:r.moroso?700:400}},r.dias>0?r.dias+" d.":"—")
             ))
           )
