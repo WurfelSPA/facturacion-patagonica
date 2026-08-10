@@ -2629,7 +2629,9 @@ function EstadoPagosView({notify}){
     const porRut=mora?.porRut||{};
     return rows.map(r=>{
       const dias=porRut[_rutNormMora(r.rut)]?.maxDias||0;
-      return{...r,dias,moroso:dias>30,montoClp:ufDia5?Math.round(r.uf*ufDia5*1.19):null};
+      /* Igual criterio que en Facturación: valores >500 ya están en CLP fijo (no UF) — no multiplicar por UF del día */
+      const montoClp=r.uf>500?Math.round(r.uf*1.19):(ufDia5?Math.round(r.uf*ufDia5*1.19):null);
+      return{...r,dias,moroso:dias>30,montoClp};
     });
   },[rows,mora,ufDia5]);
 
@@ -2697,7 +2699,7 @@ function EstadoPagosView({notify}){
     !loading&&!error&&h("div",{style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}},
       h("div",{className:"dash-card"},
         h("div",{className:"dash-card-lbl"},"Total Facturado"),
-        h("div",{className:"dash-card-val",style:{color:"var(--blue)",fontSize:22}},ufDia5?"$"+Math.round(stats.totalFacturado).toLocaleString("es-CL"):"—"),
+        h("div",{className:"dash-card-val",style:{color:"var(--blue)",fontSize:22}},enriched.length>0?"$"+Math.round(stats.totalFacturado).toLocaleString("es-CL"):"—"),
         h("div",{className:"dash-card-sub"},enriched.length+" facturas · "+periodo)
       ),
       h("div",{className:"dash-card",style:{borderLeft:"3px solid var(--green)"}},
