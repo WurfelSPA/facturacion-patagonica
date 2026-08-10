@@ -159,7 +159,7 @@ async function createDriveCredentialsFile(token, parentFolderId) {
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
     `--${boundary}\r\nContent-Type: application/json\r\n\r\n{}\r\n` +
     `--${boundary}--`;
-  const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+  const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
     body
