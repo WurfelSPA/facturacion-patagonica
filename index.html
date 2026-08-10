@@ -5433,7 +5433,7 @@ function App(){
   const stats={total:enriched.length,ok:enriched.filter(r=>r.estado==="ok").length,diff:enriched.filter(r=>r.estado!=="ok"&&r.estado!=="sanchez").length,sent:enriched.filter(r=>sentSet.has(r.i)||r.yaEnviado).length,conPdf:enriched.filter(r=>r.factura&&r.ufPdf!==null&&r.estado!=="sanchez").length,sinPdf:enriched.filter(r=>(!r.factura||r.ufPdf===null)&&r.estado!=="sanchez").length,sanchez:enriched.filter(r=>r.estado==="sanchez").length};
   const filtered=enriched.filter(r=>{
     const mf=filter==="all"||(filter==="ok"&&r.estado==="ok"&&!sentSet.has(r.i)&&!r.yaEnviado)||(filter==="diff"&&r.estado!=="ok"&&r.estado!=="sanchez")||(filter==="sent"&&(sentSet.has(r.i)||r.yaEnviado))||(filter==="difiere"&&r.estado==="diff"&&r.matchScore!==1)||(filter==="sinpdf"&&!r.factura&&r.estado!=="sanchez");
-    const mc=concFilter==="all"||(concFilter==="arr"&&r.concepto==="Arriendo")||(concFilter==="srv"&&r.concepto==="Serv. Adm.")||(concFilter==="hab"&&r.concepto==="Habilitación")||(concFilter==="ppr"&&!r.yaPagado);
+    const mc=concFilter==="all"||(concFilter==="arr"&&r.concepto==="Arriendo")||(concFilter==="srv"&&r.concepto==="Serv. Adm.")||(concFilter==="hab"&&r.concepto==="Habilitación")||(concFilter==="pag"&&!!r.yaPagado)||(concFilter==="ppr"&&!r.yaPagado);
     const normQ=s=>(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," ").trim();
     const q=normQ(search);
     const ms=!q||normQ(r.cliente).includes(q)||(r.sitio&&normQ(r.sitio)===q)||(r.rut&&r.rut.replace(/[.\-]/g,"").includes(q.replace(/[.\-]/g,"")));
@@ -6507,8 +6507,8 @@ function App(){
          {k:"sinpdf",l:`Sin PDF (${stats.sinPdf})`}]
         .map(f=>h("button",{key:f.k,className:`pill${filter===f.k?" active":""}`,onClick:()=>setFilter(f.k)},f.l)),
         h("span",{style:{color:"var(--txd)",fontSize:11,marginLeft:3}},"·"),
-        [{k:"all",l:`Todos (${enriched.length})`},{k:"arr",l:`Arriendo (${enriched.filter(r=>r.concepto==="Arriendo").length})`},{k:"srv",l:`Serv.Adm. (${enriched.filter(r=>r.concepto==="Serv. Adm.").length})`},{k:"hab",l:`Habilitación (${enriched.filter(r=>r.concepto==="Habilitación").length})`},{k:"ppr",l:`Por Pagar (${enriched.filter(r=>!r.yaPagado).length})`}]
-        .map(f=>h("button",{key:f.k,className:`pill${concFilter===f.k?" active":""}`,onClick:()=>setConcFilter(f.k),style:{fontSize:10,...(f.k==="ppr"?{color:concFilter==="ppr"?"":"var(--red,#e03)"}:{})}},f.l)),
+        [{k:"all",l:`Todos (${enriched.length})`},{k:"arr",l:`Arriendo (${enriched.filter(r=>r.concepto==="Arriendo").length})`},{k:"srv",l:`Serv.Adm. (${enriched.filter(r=>r.concepto==="Serv. Adm.").length})`},{k:"hab",l:`Habilitación (${enriched.filter(r=>r.concepto==="Habilitación").length})`},{k:"pag",l:`Pagado (${enriched.filter(r=>r.yaPagado).length})`},{k:"ppr",l:`Por Pagar (${enriched.filter(r=>!r.yaPagado).length})`}]
+        .map(f=>h("button",{key:f.k,className:`pill${concFilter===f.k?" active":""}`,onClick:()=>setConcFilter(f.k),style:{fontSize:10,...(f.k==="ppr"?{color:concFilter==="ppr"?"":"var(--red,#e03)"}:{}),...(f.k==="pag"?{color:concFilter==="pag"?"":"var(--green,#0a7)"}:{})}},f.l)),
         h("div",{style:{marginLeft:"auto",display:"flex",alignItems:"center",gap:8}},
           ufSII&&h("span",{style:{fontSize:11,fontFamily:"'DM Mono',monospace",fontWeight:600,
             background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:6,padding:"4px 10px",
