@@ -79,6 +79,26 @@ async function hashPassword(password, salt) {
   return hexEncode(bits);
 }
 
+// ── Expiración de sesión: siempre a la medianoche (hora Chile) ──────────────
+function tzOffsetMinutes(date, tz) {
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
+  const p = dtf.formatToParts(date).reduce((a, x) => { if (x.type !== 'literal') a[x.type] = x.value; return a; }, {});
+  const asUTC = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour), Number(p.minute), Number(p.second));
+  return (asUTC - date.getTime()) / 60000;
+}
+function nextMidnightEpochSeconds(tz = 'America/Santiago') {
+  const now = new Date();
+  const dtf = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
+  const p = dtf.formatToParts(now).reduce((a, x) => { if (x.type !== 'literal') a[x.type] = x.value; return a; }, {});
+  const tomorrowUTCGuess = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day) + 1, 0, 0, 0);
+  const offsetMin = tzOffsetMinutes(new Date(tomorrowUTCGuess), tz);
+  return Math.floor((tomorrowUTCGuess - offsetMin * 60000) / 1000);
+}
+
 // ── Credenciales desde env var ───────────────────────────────────────────────
 function readEnvCredentials() {
   const raw = process.env.AUTH_CREDS;
@@ -234,13 +254,14 @@ export default async function handler(req, res) {
         } catch(e) { /* si Drive falla, respetar el env var */ }
       }
 
+      const sessionExp = nextMidnightEpochSeconds();
       const payload = {
         email: emailKey, name: user.name,
         mustChangePassword: !!user.mustChangePassword,
-        exp: Math.floor(Date.now()/1000) + 28800
+        exp: sessionExp
       };
       const jwt = await signToken(payload, JWT_SECRET);
-      res.setHeader('Set-Cookie', makeCookie(jwt));
+      res.setHeader('Set-Cookie', makeCookie(jwt, sessionExp - Math.floor(Date.now()/1000)));
       return res.status(200).json({ok:true, name:user.name, mustChangePassword:!!user.mustChangePassword});
     }
 
@@ -312,12 +333,13 @@ export default async function handler(req, res) {
         return res.status(500).json({error:'No se pudo guardar la nueva contraseña: '+e.message});
       }
 
+      const sessionExp2 = nextMidnightEpochSeconds();
       const newPayload = {
         email:payload.email, name:payload.name, mustChangePassword:false,
-        exp: Math.floor(Date.now()/1000) + 28800
+        exp: sessionExp2
       };
       const jwt = await signToken(newPayload, JWT_SECRET);
-      res.setHeader('Set-Cookie', makeCookie(jwt));
+      res.setHeader('Set-Cookie', makeCookie(jwt, sessionExp2 - Math.floor(Date.now()/1000)));
       return res.status(200).json({ok:true});
     }
 
@@ -484,7 +506,43 @@ a{display:inline-block;padding:10px 20px;background:#4f46e5;color:#fff;border-ra
       return res.status(200).json({ok:true});
     }
 
+    // ── ADMIN-ADD-USER ────────────────────────────────────────────────────────
+    // Crea o actualiza un usuario directamente en Drive (no toca AUTH_CREDS).
+    // Protegido por ADMIN_SEED_SECRET — solo para agregar cuentas autorizadas.
+    if (action==='admin-add-user') {
+      const secret = req.headers['x-seed-secret'] || (req.body||{}).secret || '';
+      const expected = process.env.ADMIN_SEED_SECRET || '';
+      if (!expected || secret !== expected)
+        return res.status(403).json({error:'No autorizado'});
 
+      const { email='', password='', name='' } = req.body || {};
+      const emailKey = email.toLowerCase().trim();
+      if (!emailKey.endsWith('@patagonica.cl'))
+        return res.status(400).json({error:'El correo debe ser del dominio @patagonica.cl'});
+      if (!password || password.length < 6)
+        return res.status(400).json({error:'Contraseña requerida (mínimo 6 caracteres)'});
+
+      let creds;
+      try {
+        const tok = await saToken();
+        creds = await readDriveCredentials(tok);
+      } catch(e) {
+        return res.status(500).json({error:'No se pudo leer credenciales de Drive: '+e.message});
+      }
+
+      const salt = generateSalt();
+      const hash = await hashPassword(password, salt);
+      creds[emailKey] = { name: name||emailKey, hash, salt, mustChangePassword:false };
+
+      try {
+        const tok = await saToken();
+        await writeDriveCredentials(tok, creds);
+      } catch(e) {
+        return res.status(500).json({error:'No se pudo guardar en Drive: '+e.message});
+      }
+
+      return res.status(200).json({ok:true, email:emailKey});
+    }
 
     return res.status(400).json({error:'Action desconocida: '+action});
 

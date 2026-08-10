@@ -4977,9 +4977,14 @@ function App(){
   const [authMustChange,setAuthMustChange]=React.useState(false);
   const [pwdInput,setPwdInput]=useState("");
   React.useEffect(function(){
-    /* AUTH DESHABILITADO TEMPORALMENTE — restaurar fetch cuando se resuelva el login */
-    setCurrentUser({email:'amelendez@patagonica.cl',name:'Patagonica'});
-    setAuthLoading(false);
+    fetch('/api/auth?action=me')
+      .then(function(r){ if(!r.ok) throw new Error('sin sesión'); return r.json(); })
+      .then(function(d){
+        setCurrentUser({email:d.email,name:d.name});
+        setAuthMustChange(!!d.mustChangePassword);
+      })
+      .catch(function(){ setCurrentUser(null); })
+      .finally(function(){ setAuthLoading(false); });
   },[]);
   const [pwdError,setPwdError]=useState(false);
   const [notif,setNotif]=useState(null);
