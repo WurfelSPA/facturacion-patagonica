@@ -715,6 +715,7 @@ async function procesarPlanillaFacturacion(file,periodo){
     if(!cliente||excl.includes(String(cliente).trim()))continue;
     const sName=String(cliente).trim();
     const sociedad=row[5]?String(row[5]).trim():""; /* Col F: Sociedad Arrendadora (PISA, SÁNCHEZ, ...) */
+    const afecto=row[48]?String(row[48]).trim():""; /* Col AW: Afecto / Exento IVA */
     const sito=sitio?String(sitio).trim():"";
     const edif=row[8]?String(row[8]).trim():""; /* Col I: nro local / bodega / edif */
     const emailBilling=row[12]?String(row[12]).trim():"";
@@ -736,8 +737,8 @@ async function procesarPlanillaFacturacion(file,periodo){
     const _nfArr=row[colGS+1];const nroFactArr=(typeof _nfArr==="number"&&_nfArr>0)?String(Math.round(_nfArr)):(typeof _nfArr==="string"&&_nfArr.trim())?_nfArr.trim():null;
     const _nfGC=colGT>0?row[colGT+1]:null;const nroFactGC=(typeof _nfGC==="number"&&_nfGC>0)?String(Math.round(_nfGC)):(typeof _nfGC==="string"&&_nfGC.trim())?_nfGC.trim():null;
     const m2Billing=row[42]!=null&&row[42]!==""?Number(row[42]):null; /* Col AQ: m² */
-    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,edificio:edif,cliente:sName,sociedad,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado:yaPagadoArr,sheetRow,sentColLetter,pagadoColLetter:pagadoArrColLetter,nroFactArrColLetter,nroFactGCColLetter,nroFactArr,nroFactGC,m2:m2Billing});
-    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,edificio:edif,cliente:sName,sociedad,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado:yaPagadoGC,sheetRow,sentColLetter,pagadoColLetter:pagadoGCColLetter,nroFactArrColLetter,nroFactGCColLetter,nroFactArr,nroFactGC,m2:m2Billing});
+    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,edificio:edif,cliente:sName,sociedad,afecto,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado:yaPagadoArr,sheetRow,sentColLetter,pagadoColLetter:pagadoArrColLetter,nroFactArrColLetter,nroFactGCColLetter,nroFactArr,nroFactGC,m2:m2Billing});
+    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,edificio:edif,cliente:sName,sociedad,afecto,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado:yaPagadoGC,sheetRow,sentColLetter,pagadoColLetter:pagadoGCColLetter,nroFactArrColLetter,nroFactGCColLetter,nroFactArr,nroFactGC,m2:m2Billing});
   }
   return clientes;
 }
@@ -2629,8 +2630,10 @@ function EstadoPagosView({notify}){
     const porRut=mora?.porRut||{};
     return rows.map(r=>{
       const dias=porRut[_rutNormMora(r.rut)]?.maxDias||0;
-      /* Igual criterio que en Facturación: valores >500 ya están en CLP fijo (no UF) — no multiplicar por UF del día */
-      const montoClp=r.uf>500?Math.round(r.uf*1.19):(ufDia5?Math.round(r.uf*ufDia5*1.19):null);
+      /* Igual criterio que en Facturación: valores >500 ya están en CLP fijo (no UF) — no multiplicar por UF del día.
+         Clientes Exentos no llevan el 19% de IVA. */
+      const iva=r.afecto==="Exento"?1:1.19;
+      const montoClp=r.uf>500?Math.round(r.uf*iva):(ufDia5?Math.round(r.uf*ufDia5*iva):null);
       return{...r,dias,moroso:dias>30,montoClp};
     });
   },[rows,mora,ufDia5]);
@@ -5370,7 +5373,7 @@ function App(){
           }
         }
         const _nfCol=c.tipo==="arriendo"?c.nroFactArrColLetter:c.nroFactGCColLetter;
-        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,montoTotal,ivaAmount,ufValor,enviado:false,yaEnviado:c.yaEnviado||false,yaPagado:c.yaPagado||false,sheetRow:c.sheetRow||null,sentColLetter:c.sentColLetter||"HC",pagadoColLetter:c.pagadoColLetter||"",nroFactCol:_nfCol||"",facturaEnPlanilla:matchScore===888});
+        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo,concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf,montoTotal,ivaAmount,ufValor,afecto:c.afecto,enviado:false,yaEnviado:c.yaEnviado||false,yaPagado:c.yaPagado||false,sheetRow:c.sheetRow||null,sentColLetter:c.sentColLetter||"HC",pagadoColLetter:c.pagadoColLetter||"",nroFactCol:_nfCol||"",facturaEnPlanilla:matchScore===888});
       }
 
       /* ── Si no hay datos de planilla, mostrar igual los PDFs detectados ── */
@@ -5679,7 +5682,7 @@ function App(){
         }
         /* Siempre usar ufPdf=c.uf para mostrar monto estimado en Monto+IVA */
         /* Mostrar la fila aunque no tenga factura (mes no procesado aún) */
-        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo:c.email||"",concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf:c.uf,montoTotal:null,ivaAmount:null,ufValor:null,enviado:false,yaEnviado:c.yaEnviado||false,yaPagado:c.yaPagado||false,sheetRow:c.sheetRow||null,sentColLetter:c.sentColLetter||"HC",pagadoColLetter:c.pagadoColLetter||"",nroFactCol:nfCol||"",facturaEnPlanilla:matchScore===888});
+        filas.push({sitio:c.sitio,edificio:c.edificio||"",cliente:c.cliente,rut:c.rut,correo:c.email||"",concepto,colRef,factura,matchScore,ufSII:null,ufPlan:c.uf,ufPdf:c.uf,montoTotal:null,ivaAmount:null,ufValor:null,afecto:c.afecto,enviado:false,yaEnviado:c.yaEnviado||false,yaPagado:c.yaPagado||false,sheetRow:c.sheetRow||null,sentColLetter:c.sentColLetter||"HC",pagadoColLetter:c.pagadoColLetter||"",nroFactCol:nfCol||"",facturaEnPlanilla:matchScore===888});
       }
       if(filas.length>0){
         /* Traer montos reales del XML del DTE antes de mostrar — evita que se vea
@@ -5737,16 +5740,17 @@ function App(){
   /* Monto Total (Neto+IVA) de una fila — misma lógica usada en la columna "Monto+IVA" */
   function montoIvaOf(row){
     if(row.montoTotal!=null&&row.montoTotal>0) return row.montoTotal;
+    const exento=row.afecto==="Exento";
     const uf=row.ufPdf??null;
     const ufVal=ufSII??row.ufValor??null;
     if(uf!=null&&ufVal&&uf<10000){
       const neto=Math.round(uf*ufVal);
-      const iva=Math.round(neto*0.19);
+      const iva=exento?0:Math.round(neto*0.19);
       return neto+iva;
     }
     const base=(uf!=null&&uf>500)?Math.round(uf):(row.ufPlan>500)?Math.round(row.ufPlan):null;
     if(!base) return null;
-    return Math.round(base*1.19);
+    return exento?base:Math.round(base*1.19);
   }
 
   function toggleSort(col){if(sortCol===col)setSortDir(d=>d==="asc"?"desc":"asc");else{setSortCol(col);setSortDir("asc");}}
