@@ -7012,7 +7012,10 @@ function App(){
             )
           )),
           h("tbody",null,sorted.length===0?
-            h("tr",null,h("td",{colSpan:10,style:{padding:"48px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados")):
+            (autoLoading||driveLoading||planillaStatus==="checking"||zipStatus==="loading"||splitLoading
+              ?h("tr",null,h("td",{colSpan:10,style:{padding:"48px",textAlign:"center",color:"var(--txm)",fontSize:13}},h("span",{className:"spin",style:{marginRight:8}},"⟳"),"Cargando "+periodo+"..."))
+              :h("tr",null,h("td",{colSpan:10,style:{padding:"48px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados"))
+            ):
             sorted.map(row=>{
               const i=row.i,sent=sentSet.has(i)||!!row.yaEnviado,sending=sendingIdx===i,noEmail=!row.correo;
               const diffPdf=row.ufPdf!==null&&row.ufPdf!==undefined&&(row.ufPdf>5000?Math.abs(row.ufPdf-row.ufPlan)>500:Math.abs(row.ufPdf-row.ufPlan)>0.5);
