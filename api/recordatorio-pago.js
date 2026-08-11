@@ -11,11 +11,9 @@
  * deuda pendiente en "Facturas x Cobrar PISA", usando el correo registrado
  * en la Planilla de facturación.
  *
- * ⚠️ MODO PRUEBA ACTIVO (ver constantes TEST_MODE/TEST_DEST/TEST_LIMIT más
- * abajo): mientras TEST_MODE=true, solo se procesa TEST_LIMIT cliente(s) y
- * el correo se entrega a TEST_DEST en vez del correo real del cliente
- * (queda igual en Enviados de facturacion@ para revisar el contenido real).
- * Para producción, cambiar TEST_MODE a false.
+ * ✅ EN PRODUCCIÓN (TEST_MODE=false): se entrega de verdad al correo
+ * registrado de cada cliente con deuda pendiente. Para volver a modo
+ * prueba (solo 1 envío, a TEST_DEST), cambiar TEST_MODE a true.
  *
  * Env vars requeridas (todas ya existentes en el proyecto):
  *   GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_FROM
@@ -26,12 +24,8 @@
 
 import XLSX from 'xlsx';
 
-// ═════════════════ MODO PRUEBA — cambiar TEST_MODE a false cuando esté listo ═════════════════
-// El token de Gmail actual solo tiene permiso de envío real (gmail.send), no
-// de inserción sin entrega (gmail.insert) — por eso en modo prueba el envío
-// SÍ se entrega, pero a TEST_DEST (no al cliente real), y de paso queda
-// registrado en Enviados de facturacion@ para revisar el contenido.
-const TEST_MODE  = true;
+// ═════════════════ Cambiar TEST_MODE a true para volver a modo prueba ═════════════════
+const TEST_MODE  = false;
 const TEST_DEST  = 'amelendez@patagonica.cl';
 const TEST_LIMIT = 1;
 // ══════════════════════════════════════════════════════════════════════════════════════════════
