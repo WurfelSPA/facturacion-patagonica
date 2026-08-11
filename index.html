@@ -687,13 +687,24 @@ async function parsePlanillaParaDashboard(file){
 /* ═══════════════════════════════════
    PROCESAMIENTO DE BILLING
 ═══════════════════════════════════ */
-/* Acepta números reales y texto con formato chileno ("7,56", "1.234,56")
-   — Excel a veces guarda una celda como texto en vez de número.
+/* Acepta números reales y texto numérico guardado por error como texto
+   (Excel a veces deja una celda en texto en vez de número). El punto es
+   siempre el separador decimal (ej. "7.56" → 7,56); si además aparece una
+   coma, se asume separador de miles ("1,234.56" → 1234.56) — y viceversa
+   si la coma queda más a la derecha que el punto ("1.234,56" → 1234.56).
    Devuelve null si no es interpretable como número. */
 function parseNumCelda(v){
   if(typeof v==="number")return v;
   if(typeof v==="string"){
-    const n=parseFloat(v.trim().replace(/\./g,"").replace(",","."));
+    let s=v.trim();
+    const iComa=s.lastIndexOf(","),iPunto=s.lastIndexOf(".");
+    if(iComa>=0&&iPunto>=0){
+      s=iComa>iPunto?s.replace(/\./g,"").replace(",","."):s.replace(/,/g,"");
+    }else if(iComa>=0){
+      s=s.replace(",",".");
+    }
+    /* si solo tiene punto, se deja tal cual — el punto ya es decimal */
+    const n=parseFloat(s);
     if(!isNaN(n))return n;
   }
   return null;
