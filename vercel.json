@@ -36,6 +36,9 @@
     },
     "api/planilla-email.js": {
       "maxDuration": 120
+    },
+    "api/recordatorio-pago.js": {
+      "maxDuration": 120
     }
   },
   "crons": [
@@ -58,6 +61,14 @@
     {
       "path": "/api/planilla-email?recipients=contabilidad",
       "schedule": "0 12 26 * *"
+    },
+    {
+      "path": "/api/recordatorio-pago?trigger=dia20",
+      "schedule": "0 13 20 * *"
+    },
+    {
+      "path": "/api/recordatorio-pago?trigger=fin-mes",
+      "schedule": "0 13 28-31 * *"
     }
   ],
   "routes": [
