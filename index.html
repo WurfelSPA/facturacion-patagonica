@@ -796,7 +796,10 @@ async function procesarPlanillaFacturacion(file,periodo){
   return clientes;
 }
 /* ── Días de mora por cliente desde "Facturas x Cobrar PISA" (mismo criterio que FactxCobrarView) ── */
-function _rutNormMora(r){return(r||"").replace(/\./g,"").replace(/-/g,"").toLowerCase();}
+/* Ignora el dígito verificador — el archivo "Facturas x Cobrar" a veces lo
+   trae corrupto (ej. "77478992-C" en vez de "77478992-8"), así que se
+   compara solo el cuerpo numérico del RUT contra la Planilla. */
+function _rutNormMora(r){const s=(r||"").replace(/\./g,"").replace(/-/g,"").toLowerCase();return s.slice(0,-1);}
 function parseFacturasPorCobrarBase(values){
   if(!values||values.length<2)throw new Error("Sin datos en hoja Base");
   const hdr=values[0].map(h=>String(h||"").toLowerCase().replace(/[\r\n\s_]/g,""));

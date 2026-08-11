@@ -96,7 +96,13 @@ async function driveDownload(token, fileId) {
   return Buffer.from(await r.arrayBuffer());
 }
 
-function rutNorm(r) { return String(r || '').replace(/\./g, '').replace(/-/g, '').trim().toLowerCase(); }
+/* Ignora el dígito verificador — el archivo "Facturas x Cobrar" a veces lo
+   trae corrupto (ej. "77478992-C" en vez de "77478992-8"), así que se
+   compara solo el cuerpo numérico del RUT contra la Planilla. */
+function rutNorm(r) {
+  const s = String(r || '').replace(/\./g, '').replace(/-/g, '').trim().toLowerCase();
+  return s.slice(0, -1);
+}
 
 // ── Deuda por cliente desde "Facturas x Cobrar PISA" (misma lógica que la vista de la app) ──
 function parseFacturasPorCobrarBase(values) {
