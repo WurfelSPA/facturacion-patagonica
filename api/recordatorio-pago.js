@@ -11,13 +11,11 @@
  * deuda pendiente en "Facturas x Cobrar PISA", usando el correo registrado
  * en la Planilla de facturación.
  *
- * ⚠️ MODO PRUEBA ACTIVO (ver constantes TEST_MODE/TEST_LIMIT más abajo):
- * mientras TEST_MODE=true, solo se procesan TEST_LIMIT cliente(s) y el
- * correo NO se entrega a nadie — se inserta directo con la etiqueta
- * "Enviados" en la cuenta remitente (como IMAP APPEND), así que queda
- * disponible para revisar el contenido real sin generar ninguna entrega
- * ni copia en ninguna bandeja de entrada. Para producción, cambiar
- * TEST_MODE a false (ahí sí se entrega de verdad al cliente).
+ * ⚠️ MODO PRUEBA ACTIVO (ver constantes TEST_MODE/TEST_DEST/TEST_LIMIT más
+ * abajo): mientras TEST_MODE=true, solo se procesa TEST_LIMIT cliente(s) y
+ * el correo se entrega a TEST_DEST en vez del correo real del cliente
+ * (queda igual en Enviados de facturacion@ para revisar el contenido real).
+ * Para producción, cambiar TEST_MODE a false.
  *
  * Env vars requeridas (todas ya existentes en el proyecto):
  *   GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_FROM
@@ -29,8 +27,13 @@
 import XLSX from 'xlsx';
 
 // ═════════════════ MODO PRUEBA — cambiar TEST_MODE a false cuando esté listo ═════════════════
-const TEST_MODE  = true;  // true: inserta como "Enviado" sin entregar a nadie (ver insertarComoEnviadoGmail)
-const TEST_LIMIT = 1;     // clientes a procesar mientras TEST_MODE esté activo
+// El token de Gmail actual solo tiene permiso de envío real (gmail.send), no
+// de inserción sin entrega (gmail.insert) — por eso en modo prueba el envío
+// SÍ se entrega, pero a TEST_DEST (no al cliente real), y de paso queda
+// registrado en Enviados de facturacion@ para revisar el contenido.
+const TEST_MODE  = true;
+const TEST_DEST  = 'amelendez@patagonica.cl';
+const TEST_LIMIT = 1;
 // ══════════════════════════════════════════════════════════════════════════════════════════════
 
 const DRIVE_FACTURACION_FOLDER_ID = "1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u";
@@ -204,19 +207,6 @@ async function sendGmailSimple(token, to, from, subject, htmlBody) {
   return res.json();
 }
 
-// ── Modo prueba: inserta el mensaje directo en Enviados, SIN entregarlo a nadie
-//    (equivalente a IMAP APPEND — no dispara ninguna entrega real, así que no
-//    llega copia a la bandeja de entrada de nadie, incluida facturacion@). ──────
-async function insertarComoEnviadoGmail(token, to, from, subject, htmlBody) {
-  const raw = buildRawEmail(to, from, subject, htmlBody);
-  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages', {
-    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ raw, labelIds: ['SENT'] })
-  });
-  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(`Gmail insert ${res.status}: ${err.error?.message || JSON.stringify(err).slice(0, 200)}`); }
-  return res.json();
-}
-
 function esUltimoDiaDelMes(d) {
   const t = new Date(d); t.setDate(t.getDate() + 1);
   return t.getDate() === 1;
@@ -265,15 +255,10 @@ export default async function handler(req, res) {
 
       const subject = 'Recordatorio de pago pendiente — Patagónica Inmobiliaria';
       const htmlBody = buildRecordatorioHtml(nombre);
+      const destinatario = TEST_MODE ? TEST_DEST : correoReal;
       try {
-        if (TEST_MODE) {
-          // No se entrega a nadie — solo queda en Enviados de facturacion@ para revisar
-          await insertarComoEnviadoGmail(gmailToken, correoReal, FROM, subject, htmlBody);
-          detalle.push({ rut, nombre, insertadoComoEnviado: correoReal, deudaTotal: Math.round(deuda.total) });
-        } else {
-          await sendGmailSimple(gmailToken, correoReal, FROM, subject, htmlBody);
-          detalle.push({ rut, nombre, enviadoA: correoReal, deudaTotal: Math.round(deuda.total) });
-        }
+        await sendGmailSimple(gmailToken, destinatario, FROM, subject, htmlBody);
+        detalle.push({ rut, nombre, enviadoA: destinatario, deudaTotal: Math.round(deuda.total) });
         enviados++;
       } catch (e) {
         detalle.push({ rut, nombre, error: e.message });
