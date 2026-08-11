@@ -5256,13 +5256,29 @@ function App(){
     if(!files.zip)return;
     setShowProc(true);setProcDone(false);setProcLogs([]);setProcProgress(5);
     try{
+      /* ── PASO 0: Refrescar la planilla desde Drive — evita procesar con una
+         copia vieja cargada en memoria si alguien editó la Planilla mientras
+         tanto (ej. cambió valores de Arriendo/GC de un cliente) ── */
+      let planillaFresca=files.planilla;
+      try{
+        addLog("▶ Descargando última versión de la planilla desde Drive...","info");
+        const pr=await fetch("/api/planilla");
+        if(pr.ok){
+          const blob=await pr.blob();
+          planillaFresca=new File([blob],"Planilla Facturación.xlsx",{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+          setFiles(f=>({...f,planilla:planillaFresca}));
+        }else{
+          addLog("⚠ No se pudo refrescar la planilla — usando la última copia cargada","warn");
+        }
+      }catch(e){addLog("⚠ No se pudo refrescar la planilla — usando la última copia cargada","warn");}
+
       /* ── PASO 1: PLANILLA (opcional — puede no tener datos del mes) ── */
       let clientes=[];
       let planillaOk=false;
-      if(files.planilla){
+      if(planillaFresca){
         addLog("▶ Leyendo planilla de facturación...","info");
         try{
-          clientes=await procesarPlanillaFacturacion(files.planilla,periodo);
+          clientes=await procesarPlanillaFacturacion(planillaFresca,periodo);
           addLog(`✓ ${clientes.length} filas detectadas para ${periodo}`,"ok");
           planillaOk=true;
         }catch(e){
