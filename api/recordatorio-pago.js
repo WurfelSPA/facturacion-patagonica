@@ -11,10 +11,13 @@
  * deuda pendiente en "Facturas x Cobrar PISA", usando el correo registrado
  * en la Planilla de facturación.
  *
- * ⚠️ MODO PRUEBA ACTIVO (ver constantes TEST_MODE/TEST_DEST/TEST_LIMIT más
- * abajo): mientras TEST_MODE=true, solo se envía a TEST_LIMIT cliente(s) y
- * el destinatario real se reemplaza por TEST_DEST. Para producción, cambiar
- * TEST_MODE a false.
+ * ⚠️ MODO PRUEBA ACTIVO (ver constantes TEST_MODE/TEST_LIMIT más abajo):
+ * mientras TEST_MODE=true, solo se procesan TEST_LIMIT cliente(s) y el
+ * correo NO se entrega a nadie — se inserta directo con la etiqueta
+ * "Enviados" en la cuenta remitente (como IMAP APPEND), así que queda
+ * disponible para revisar el contenido real sin generar ninguna entrega
+ * ni copia en ninguna bandeja de entrada. Para producción, cambiar
+ * TEST_MODE a false (ahí sí se entrega de verdad al cliente).
  *
  * Env vars requeridas (todas ya existentes en el proyecto):
  *   GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_FROM
@@ -26,9 +29,8 @@
 import XLSX from 'xlsx';
 
 // ═════════════════ MODO PRUEBA — cambiar TEST_MODE a false cuando esté listo ═════════════════
-const TEST_MODE  = true;
-const TEST_DEST  = 'facturacion@patagonica.cl';
-const TEST_LIMIT = 1;
+const TEST_MODE  = true;  // true: inserta como "Enviado" sin entregar a nadie (ver insertarComoEnviadoGmail)
+const TEST_LIMIT = 1;     // clientes a procesar mientras TEST_MODE esté activo
 // ══════════════════════════════════════════════════════════════════════════════════════════════
 
 const DRIVE_FACTURACION_FOLDER_ID = "1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u";
@@ -175,8 +177,8 @@ function buildRecordatorioHtml(nombreCliente) {
   </td></tr><tr><td style="background:#f8f8f8;border-top:1px solid #e8e8e8;padding:18px 32px"><p style="font-size:13px;font-weight:600;color:#111;margin:0 0 2px">Área de Administración</p><p style="font-size:12px;color:#666;margin:0">Patagónica Inmobiliaria SpA · RUT 96.673.250-4</p><p style="font-size:11px;color:#999;margin:6px 0 0">Correo generado automáticamente.</p></td></tr></table></td></tr></table></body></html>`;
 }
 
-// ── Enviar (sin CC/BCC) ────────────────────────────────────────────────────────
-async function sendGmailSimple(token, to, from, subject, htmlBody) {
+// ── Construir el MIME crudo (sin CC/BCC) ──────────────────────────────────────
+function buildRawEmail(to, from, subject, htmlBody) {
   const fromEncoded = `=?UTF-8?B?${Buffer.from('Patagónica Inmobiliaria').toString('base64')}?= <${from}>`;
   const lines = [
     `From: ${fromEncoded}`,
@@ -188,12 +190,30 @@ async function sendGmailSimple(token, to, from, subject, htmlBody) {
     '',
     Buffer.from(htmlBody).toString('base64'),
   ];
-  const raw = Buffer.from(lines.join('\r\n')).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return Buffer.from(lines.join('\r\n')).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// ── Enviar de verdad (producción) ─────────────────────────────────────────────
+async function sendGmailSimple(token, to, from, subject, htmlBody) {
+  const raw = buildRawEmail(to, from, subject, htmlBody);
   const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
     method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ raw })
   });
   if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(`Gmail ${res.status}: ${err.error?.message || JSON.stringify(err).slice(0, 200)}`); }
+  return res.json();
+}
+
+// ── Modo prueba: inserta el mensaje directo en Enviados, SIN entregarlo a nadie
+//    (equivalente a IMAP APPEND — no dispara ninguna entrega real, así que no
+//    llega copia a la bandeja de entrada de nadie, incluida facturacion@). ──────
+async function insertarComoEnviadoGmail(token, to, from, subject, htmlBody) {
+  const raw = buildRawEmail(to, from, subject, htmlBody);
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages', {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ raw, labelIds: ['SENT'] })
+  });
+  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(`Gmail insert ${res.status}: ${err.error?.message || JSON.stringify(err).slice(0, 200)}`); }
   return res.json();
 }
 
@@ -243,10 +263,17 @@ export default async function handler(req, res) {
       if (!correoReal) { detalle.push({ rut, nombre, skip: 'sin correo en planilla' }); continue; }
       if (TEST_MODE && enviados >= TEST_LIMIT) { detalle.push({ rut, nombre, skip: 'omitido — modo prueba' }); continue; }
 
-      const destinatario = TEST_MODE ? TEST_DEST : correoReal;
+      const subject = 'Recordatorio de pago pendiente — Patagónica Inmobiliaria';
+      const htmlBody = buildRecordatorioHtml(nombre);
       try {
-        await sendGmailSimple(gmailToken, destinatario, FROM, 'Recordatorio de pago pendiente — Patagónica Inmobiliaria', buildRecordatorioHtml(nombre));
-        detalle.push({ rut, nombre, enviadoA: destinatario, deudaTotal: Math.round(deuda.total) });
+        if (TEST_MODE) {
+          // No se entrega a nadie — solo queda en Enviados de facturacion@ para revisar
+          await insertarComoEnviadoGmail(gmailToken, correoReal, FROM, subject, htmlBody);
+          detalle.push({ rut, nombre, insertadoComoEnviado: correoReal, deudaTotal: Math.round(deuda.total) });
+        } else {
+          await sendGmailSimple(gmailToken, correoReal, FROM, subject, htmlBody);
+          detalle.push({ rut, nombre, enviadoA: correoReal, deudaTotal: Math.round(deuda.total) });
+        }
         enviados++;
       } catch (e) {
         detalle.push({ rut, nombre, error: e.message });
