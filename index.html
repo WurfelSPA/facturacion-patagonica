@@ -5183,6 +5183,7 @@ function App(){
 
   /* Refs de control de flujo automático */
   const autoProcesado=React.useRef(false);
+  const procesandoRef=React.useRef(false); /* evita que dos llamadas a procesar() corran en paralelo y se pisen el resultado */
   const autoNuboxRef=React.useRef(false);
   const periodoActivado=React.useRef(false);  /* true solo cuando el usuario elige período */
   useEffect(()=>{
@@ -5290,6 +5291,8 @@ function App(){
   /* ── PROCESAR ── */
   const procesar=useCallback(async()=>{
     if(!files.zip)return;
+    if(procesandoRef.current){addLog("⚠ Ya hay un procesamiento en curso — espera a que termine antes de volver a presionar Procesar","warn");return;}
+    procesandoRef.current=true;
     setShowProc(true);setProcDone(false);setProcLogs([]);setProcProgress(5);
     try{
       /* ── PASO 0: Refrescar la planilla desde Drive — evita procesar con una
@@ -5529,7 +5532,7 @@ function App(){
       /* Guardar mapping factura→cliente para Historial de Facturas */
       guardarHistorialPeriodo(new Date().getFullYear(),periodo,filas);
     }catch(e){addLog("✗ Error: "+e.message,"err");setProcDone(true);notify("Error: "+e.message,"err");}
-    finally{setSoloPlanilla(false);}
+    finally{setSoloPlanilla(false);procesandoRef.current=false;}
   },[files,periodo]);
 
   const finishProc=()=>{setShowProc(false);setView("table");notify(`${data.length} filas procesadas — ${periodo}`);};
