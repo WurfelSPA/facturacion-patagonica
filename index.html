@@ -347,7 +347,15 @@ async function extraerComentariosMes(xlsxFile, periodo){
     if(match){monthCol=c;break;}
   }
   if(monthCol===-1)throw new Error(`Columna del mes ${periodo} no encontrada en la planilla`);
-  const comentariosCol=monthCol+4; // fecha → N°Fact → GC → N°FactGC → Comentarios
+  // Buscar "Comentarios" por encabezado — el ancho del bloque mensual cambió
+  // al agregar "Pago Arriendo"/"Pago GC" desde Mayo 2026, así que monthCol+4
+  // ya no cae siempre en Comentarios (a veces cae en Nro Fact GC).
+  let comentariosCol=-1;
+  for(let j=monthCol+1;j<=Math.min(monthCol+10,headerRow.length-1);j++){
+    const h=headerRow[j];
+    if(typeof h==="string"&&h.trim().toLowerCase()==="comentarios"){comentariosCol=j;break;}
+  }
+  if(comentariosCol===-1)comentariosCol=monthCol+4;
   const SITIO_ORDER=["5-A","4-A","A-1","A-2","B","D-2","D-3"];
   const grupos={};
   for(let r=4;r<rows.length;r++){
