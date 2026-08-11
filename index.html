@@ -414,6 +414,12 @@ async function generarExcelResumen(xlsxFile,periodo){
   for(let r=4;r<rows.length;r++){
     const row=rows[r];if(!row)continue;
     const clienteVal=row[11]!=null?String(row[11]).trim():"";if(!clienteVal||clienteVal.toUpperCase()==="VACANTE")continue;
+    /* Si tanto Arriendo como GC están en 0 (o vacío), no se emitirá factura
+       este mes — no tiene sentido dejar la fila en el resumen */
+    const arriendoVal=row[monthCol],gcVal=row[colGT];
+    const arriendoZero=!arriendoVal||arriendoVal===0;
+    const gcZero=!gcVal||gcVal===0;
+    if(arriendoZero&&gcZero)continue;
     outRows.push(COLS.map(c=>row[c]!=null?row[c]:""));
   }
   // ── Construir XLSX con estilos usando JSZip + XML puro ──────────────────

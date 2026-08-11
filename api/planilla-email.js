@@ -91,6 +91,18 @@ function findMonthCol(headerRow, targetYear, targetMonth) {
   return -1;
 }
 
+// ── Helper: encontrar columna del bloque mensual por texto de encabezado
+//    (el ancho del bloque cambió al agregar "Pago Arriendo"/"Pago GC" desde
+//    Mayo 2026 — un offset fijo ya no cae siempre en la misma columna) ──────
+function findColByHeader(headerRow, fromCol, text, maxOffset) {
+  const target = text.trim().toLowerCase();
+  for (let j = fromCol; j <= Math.min(fromCol + maxOffset, headerRow.length - 1); j++) {
+    const h = headerRow[j];
+    if (typeof h === 'string' && h.trim().toLowerCase() === target) return j;
+  }
+  return -1;
+}
+
 // ── 4. Extraer comentarios del mes ───────────────────────────────────────────
 function extraerComentarios(buf, periodo) {
   const [mesNombre, anio] = periodo.split(' ');
@@ -106,7 +118,8 @@ function extraerComentarios(buf, periodo) {
   const monthCol = findMonthCol(headerRow, targetYear, targetMonth);
   if (monthCol === -1) throw new Error(`Columna del mes ${periodo} no encontrada`);
 
-  const comentariosCol = monthCol + 4;
+  let comentariosCol = findColByHeader(headerRow, monthCol + 1, 'comentarios', 10);
+  if (comentariosCol === -1) comentariosCol = monthCol + 4;
   const SITIO_ORDER = ['5-A','4-A','A-1','A-2','B','D-2','D-3'];
   const grupos = {};
 
@@ -147,7 +160,12 @@ async function generarExcelResumen(buf, periodo) {
   const monthCol = findMonthCol(headerRow, targetYear, targetMonth);
   if (monthCol === -1) throw new Error(`Columna del mes ${periodo} no encontrada`);
 
-  const COLS    = [7, 8, 9, 10, 11, 42, monthCol, monthCol + 2, monthCol + 4];
+  let colGC = findColByHeader(headerRow, monthCol + 1, 'GC', 6);
+  if (colGC === -1) colGC = monthCol + 2;
+  let colComentarios = findColByHeader(headerRow, monthCol + 1, 'comentarios', 10);
+  if (colComentarios === -1) colComentarios = monthCol + 4;
+
+  const COLS    = [7, 8, 9, 10, 11, 42, monthCol, colGC, colComentarios];
   const HEADERS = ['Sitio','Edificio','RUT','Dirección','Cliente','Total m²',`Arriendo ${periodo}`,'GC','Comentarios'];
   const outRows = [HEADERS];
 
@@ -156,6 +174,13 @@ async function generarExcelResumen(buf, periodo) {
     if (!row) continue;
     const cv = row[11] != null ? String(row[11]).trim() : '';
     if (!cv || cv.toUpperCase() === 'VACANTE') continue;
+    /* Si tanto Arriendo como GC están en 0 (o vacío), no se emitirá factura
+       este mes — no tiene sentido dejar la fila en el resumen */
+    const arriendoVal = row[monthCol];
+    const gcVal = row[colGC];
+    const arriendoZero = !arriendoVal || arriendoVal === 0;
+    const gcZero = !gcVal || gcVal === 0;
+    if (arriendoZero && gcZero) continue;
     outRows.push(COLS.map(c => (row[c] != null ? row[c] : '')));
   }
 
