@@ -687,6 +687,17 @@ async function parsePlanillaParaDashboard(file){
 /* ═══════════════════════════════════
    PROCESAMIENTO DE BILLING
 ═══════════════════════════════════ */
+/* Acepta números reales y texto con formato chileno ("7,56", "1.234,56")
+   — Excel a veces guarda una celda como texto en vez de número.
+   Devuelve null si no es interpretable como número. */
+function parseNumCelda(v){
+  if(typeof v==="number")return v;
+  if(typeof v==="string"){
+    const n=parseFloat(v.trim().replace(/\./g,"").replace(",","."));
+    if(!isNaN(n))return n;
+  }
+  return null;
+}
 async function procesarPlanillaFacturacion(file,periodo){
   const buf=await readFileAsBuffer(file);
   const wb=XLSX.read(buf,{type:"array"});
@@ -738,8 +749,11 @@ async function procesarPlanillaFacturacion(file,periodo){
     const row=dataRaw[i];if(!row)continue;
     const sitio=row[7];
     const cliente=row[11];
-    const ufGS=row[colGS];
-    const ufGT=row[colGT];
+    /* Tolerar celdas guardadas como texto con coma decimal (ej. "7,56"),
+       que a veces quedan así por formato de celda en vez de número real —
+       antes se descartaban silenciosamente por no ser typeof "number". */
+    const ufGS=parseNumCelda(row[colGS]);
+    const ufGT=parseNumCelda(row[colGT]);
     if(!cliente||excl.includes(String(cliente).trim()))continue;
     const sName=String(cliente).trim();
     const sociedad=row[5]?String(row[5]).trim():""; /* Col F: Sociedad Arrendadora (PISA, SÁNCHEZ, ...) */
@@ -765,8 +779,8 @@ async function procesarPlanillaFacturacion(file,periodo){
     const _nfArr=row[colGS+1];const nroFactArr=(typeof _nfArr==="number"&&_nfArr>0)?String(Math.round(_nfArr)):(typeof _nfArr==="string"&&_nfArr.trim())?_nfArr.trim():null;
     const _nfGC=colGT>0?row[colGT+1]:null;const nroFactGC=(typeof _nfGC==="number"&&_nfGC>0)?String(Math.round(_nfGC)):(typeof _nfGC==="string"&&_nfGC.trim())?_nfGC.trim():null;
     const m2Billing=row[42]!=null&&row[42]!==""?Number(row[42]):null; /* Col AQ: m² */
-    if(typeof ufGS==="number"&&ufGS>0)clientes.push({sitio:sito,edificio:edif,cliente:sName,sociedad,afecto,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado:yaPagadoArr,sheetRow,sentColLetter,pagadoColLetter:pagadoArrColLetter,nroFactArrColLetter,nroFactGCColLetter,nroFactArr,nroFactGC,m2:m2Billing});
-    if(typeof ufGT==="number"&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,edificio:edif,cliente:sName,sociedad,afecto,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado:yaPagadoGC,sheetRow,sentColLetter,pagadoColLetter:pagadoGCColLetter,nroFactArrColLetter,nroFactGCColLetter,nroFactArr,nroFactGC,m2:m2Billing});
+    if(ufGS!=null&&ufGS>0)clientes.push({sitio:sito,edificio:edif,cliente:sName,sociedad,afecto,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado:yaPagadoArr,sheetRow,sentColLetter,pagadoColLetter:pagadoArrColLetter,nroFactArrColLetter,nroFactGCColLetter,nroFactArr,nroFactGC,m2:m2Billing});
+    if(ufGT!=null&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,edificio:edif,cliente:sName,sociedad,afecto,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado:yaPagadoGC,sheetRow,sentColLetter,pagadoColLetter:pagadoGCColLetter,nroFactArrColLetter,nroFactGCColLetter,nroFactArr,nroFactGC,m2:m2Billing});
   }
   return clientes;
 }
