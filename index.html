@@ -243,14 +243,18 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 .epv2-marquee-val{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700}
 @media (prefers-reduced-motion:reduce){.epv2-marquee-track{animation:none}}
 /* Banners por servicio (Aguas Andinas / Enel) — Cuentas de Servicios */
-.epv2-util-banner{position:relative;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 14px 9px 17px;border-radius:10px;background:var(--surf2);border:1px solid var(--bdr);overflow:hidden}
-.epv2-util-banner::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--ucolor)}
+.epv2-util-banner{position:relative;display:flex;align-items:center;gap:12px;padding:9px 14px 9px 17px;border-radius:10px;background:var(--surf2);border:1px solid var(--bdr);overflow:hidden;isolation:isolate;min-height:38px}
+.epv2-util-banner::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--ucolor);z-index:1}
 .epv2-util-banner-title{display:flex;align-items:center;gap:7px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;color:var(--ucolor);letter-spacing:.02em;flex-shrink:0}
-.epv2-util-chip{display:flex;align-items:center;gap:5px;padding:4px 11px;border-radius:20px;background:var(--surf3);border:1px solid var(--bdr);font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--txm);white-space:nowrap}
+.epv2-util-marquee{flex:1;min-width:0;overflow:hidden;position:relative;align-self:stretch;display:flex;align-items:center}
+.epv2-util-marquee-track{display:flex;align-items:center;gap:8px;width:max-content;animation:epv2marquee 16s linear infinite;will-change:transform;backface-visibility:hidden}
+.epv2-util-banner:hover .epv2-util-marquee-track{animation-play-state:paused}
+.epv2-util-chip{display:flex;align-items:center;gap:5px;padding:4px 11px;border-radius:20px;background:var(--surf3);border:1px solid var(--bdr);font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--txm);white-space:nowrap;flex-shrink:0}
 .epv2-util-chip b{font-weight:700;font-size:12px}
 .epv2-util-btn{display:flex;align-items:center;gap:5px;font-size:10px;padding:4px 10px;border-radius:6px;border:1px solid var(--ucolor);background:transparent;color:var(--ucolor);cursor:pointer;font-weight:600;flex-shrink:0}
 .epv2-util-btn:hover{background:rgba(255,255,255,.07)}
 .epv2-util-btn:disabled{opacity:.6;cursor:wait}
+@media (prefers-reduced-motion:reduce){.epv2-util-marquee-track{animation:none}}
 </style>
 </head>
 <body>
@@ -3771,27 +3775,37 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
   const ENEL_GRN="#34D399";  /* Verde Enel, aclarado para fondo oscuro */
   const AA_COLS=["ID Aguas Andinas","N\u00b0 Medidor AA","Deuda AA","Nombre Factura AA"];
   const ENEL_COLS=["ID Enel","N\u00b0 Medidor Enel","Deuda Enel"];
-  const bannerAA=h("div",{className:"epv2-util-banner",style:{"--ucolor":AA_BLUE}},
-    h("div",{className:"epv2-util-banner-title"},h("span",{className:"fv2-pulse",style:{"--acc":AA_BLUE}}),"💧 Aguas Andinas"),
+  const chipsAA=[
     h("span",{className:"epv2-util-chip"},"Cuentas ",h("b",{style:{color:"var(--tx)"}},Object.keys(aaData).length)),
     h("span",{className:"epv2-util-chip"},"Con ID ",h("b",{style:{color:"var(--green)"}},conIdAA)),
     h("span",{className:"epv2-util-chip"},"Sin ID ",h("b",{style:{color:"var(--amber)"}},sinIdAA)),
     h("span",{className:"epv2-util-chip"},"Con deuda ",h("b",{style:{color:"var(--red)"}},conDeuda)),
-    aaLoading&&h("span",{className:"fv2-loader",style:{width:12,height:12,fontSize:12}}),
-    !aaLoading&&aaError&&h("span",{style:{fontSize:10,color:"var(--red)",cursor:"default"},title:aaError},"⚠️"),
-    h("span",{className:"epv2-util-chip",style:{marginLeft:"auto",color:"var(--txm)"}},aaUpdatedAt?"Act. "+new Date(aaUpdatedAt).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"}):"sin datos"),
-    h("button",{onClick:actualizarAA,disabled:aaRefreshing,title:"La sesión de AA debe estar iniciada",className:"epv2-util-btn",style:{"--ucolor":AA_BLUE},},aaRefreshing?h("span",{className:"fv2-loader",style:{width:11,height:11,fontSize:11}}):"⟳","Actualizar")
+    h("span",{className:"epv2-util-chip",style:{color:"var(--txm)"}},aaUpdatedAt?"Act. "+new Date(aaUpdatedAt).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"}):"sin datos")
+  ];
+  if(aaLoading)chipsAA.push(h("span",{className:"fv2-loader",style:{width:12,height:12,fontSize:12}}));
+  if(!aaLoading&&aaError)chipsAA.push(h("span",{style:{fontSize:10,color:"var(--red)",cursor:"default"},title:aaError},"⚠️"));
+  const bannerAA=h("div",{className:"epv2-util-banner",style:{"--ucolor":AA_BLUE}},
+    h("div",{className:"epv2-util-banner-title"},h("span",{className:"fv2-pulse",style:{"--acc":AA_BLUE}}),"💧 Aguas Andinas"),
+    h("div",{className:"epv2-util-marquee"},h("div",{className:"epv2-util-marquee-track"},
+      [...chipsAA,...chipsAA].map((el,idx)=>React.cloneElement(el,{key:idx}))
+    )),
+    h("button",{onClick:actualizarAA,disabled:aaRefreshing,title:"La sesión de AA debe estar iniciada",className:"epv2-util-btn",style:{"--ucolor":AA_BLUE}},aaRefreshing?h("span",{className:"fv2-loader",style:{width:11,height:11,fontSize:11}}):"⟳","Actualizar")
   );
-  const bannerEnel=h("div",{className:"epv2-util-banner",style:{"--ucolor":ENEL_GRN}},
-    h("div",{className:"epv2-util-banner-title"},h("span",{className:"fv2-pulse",style:{"--acc":ENEL_GRN}}),"⚡ Enel"),
+  const chipsEnel=[
     h("span",{className:"epv2-util-chip"},"Cuentas ",h("b",{style:{color:"var(--tx)"}},Object.keys(enelData).length)),
     h("span",{className:"epv2-util-chip"},"Con ID ",h("b",{style:{color:"var(--green)"}},conIdEnel)),
     h("span",{className:"epv2-util-chip"},"Sin ID ",h("b",{style:{color:"var(--amber)"}},sinIdEnel)),
     h("span",{className:"epv2-util-chip"},"Con deuda ",h("b",{style:{color:"var(--red)"}},conDeudaEnel)),
-    sinAsignarEnel>0&&h("span",{className:"epv2-util-chip",title:"Cuentas en el portal Enel sin cliente asignado en la planilla"},"Sin asignar ",h("b",{style:{color:"#C4B5FD"}},sinAsignarEnel)),
-    enelLoading&&h("span",{className:"fv2-loader",style:{width:12,height:12,fontSize:12}}),
-    !enelLoading&&enelError&&h("span",{style:{fontSize:10,color:"var(--red)",cursor:"default"},title:enelError},"⚠️"),
-    h("span",{className:"epv2-util-chip",style:{marginLeft:"auto",color:"var(--txm)"}},enelUpdatedAt?"Act. "+new Date(enelUpdatedAt).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"}):"sin datos"),
+    h("span",{className:"epv2-util-chip",style:{color:"var(--txm)"}},enelUpdatedAt?"Act. "+new Date(enelUpdatedAt).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"}):"sin datos")
+  ];
+  if(sinAsignarEnel>0)chipsEnel.push(h("span",{className:"epv2-util-chip",title:"Cuentas en el portal Enel sin cliente asignado en la planilla"},"Sin asignar ",h("b",{style:{color:"#C4B5FD"}},sinAsignarEnel)));
+  if(enelLoading)chipsEnel.push(h("span",{className:"fv2-loader",style:{width:12,height:12,fontSize:12}}));
+  if(!enelLoading&&enelError)chipsEnel.push(h("span",{style:{fontSize:10,color:"var(--red)",cursor:"default"},title:enelError},"⚠️"));
+  const bannerEnel=h("div",{className:"epv2-util-banner",style:{"--ucolor":ENEL_GRN}},
+    h("div",{className:"epv2-util-banner-title"},h("span",{className:"fv2-pulse",style:{"--acc":ENEL_GRN}}),"⚡ Enel"),
+    h("div",{className:"epv2-util-marquee"},h("div",{className:"epv2-util-marquee-track"},
+      [...chipsEnel,...chipsEnel].map((el,idx)=>React.cloneElement(el,{key:idx}))
+    )),
     h("button",{onClick:actualizarEnel,disabled:enelRefreshing,title:"La sesión de Enel debe estar iniciada",className:"epv2-util-btn",style:{"--ucolor":ENEL_GRN}},enelRefreshing?h("span",{className:"fv2-loader",style:{width:11,height:11,fontSize:11}}):"⟳","Actualizar")
   );
   return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up epv2"},
