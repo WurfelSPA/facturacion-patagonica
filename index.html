@@ -2277,8 +2277,8 @@ function FactxCobrarView({notify}){
     if(d<=90)return"61-90"; if(d<=365)return"91-365"; return"+365";
   }
   function bucketLabel(b){return{"<=30":"≤ 30 días","31-60":"31-60 días","61-90":"61-90 días","91-365":"91-365 días","+365":"+ 365 días"}[b]||b;}
-  function bucketColor(b){return{"<=30":"#10b981","31-60":"#f59e0b","61-90":"#f97316","91-365":"#ef4444","+365":"#7c3aed"}[b]||"var(--txm)";}
-  function bucketBg(b){return{"<=30":"rgba(16,185,129,0.12)","31-60":"rgba(245,158,11,0.12)","61-90":"rgba(249,115,22,0.12)","91-365":"rgba(239,68,68,0.12)","+365":"rgba(124,58,237,0.12)"}[b]||"var(--surf2)";}
+  function bucketColor(b){return{"<=30":"#34D399","31-60":"#FBBF24","61-90":"#f97316","91-365":"#FB7185","+365":"#8B5CF6"}[b]||"var(--txm)";}
+  function bucketBg(b){return{"<=30":"rgba(52,211,153,0.14)","31-60":"rgba(251,191,36,0.14)","61-90":"rgba(249,115,22,0.14)","91-365":"rgba(251,113,133,0.14)","+365":"rgba(139,92,246,0.14)"}[b]||"var(--surf2)";}
 
   function parseSheetValues(values){
     if(!values||values.length<2)throw new Error("Sin datos ("+( values?values.length:0)+" filas)");
@@ -2410,18 +2410,18 @@ function FactxCobrarView({notify}){
     return sort.dir==="asc"?(typeof av==="number"?av-bv:String(av).localeCompare(String(bv),"es")):(typeof bv==="number"?bv-av:String(bv).localeCompare(String(av),"es"));
   });}
 
-  if(loading){return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}},
+  if(loading){return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center"},className:"fade-up epv2"},
     h("div",{style:{textAlign:"center",color:"var(--txm)"}},
-      h("div",{style:{fontSize:28,marginBottom:12}},"⏳"),
+      h("div",{className:"fv2-loader",style:{width:32,height:32,fontSize:32,marginBottom:14}}),
       h("div",{style:{fontSize:13,fontWeight:600}},"Cargando Facturas x Cobrar..."),
       h("div",{style:{fontSize:11,color:"var(--txd)",marginTop:4}},"Leyendo desde Google Drive")
     ));}
 
-  if(error){return h("main",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16},className:"fade-up"},
+  if(error){return h("main",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16},className:"fade-up epv2"},
     h("div",{style:{textAlign:"center",maxWidth:460}},
       h("div",{style:{fontSize:34,marginBottom:10}},"⚠️"),
       h("div",{style:{fontSize:15,fontWeight:700,color:"var(--tx)",marginBottom:6}},"No se pudo cargar desde Drive"),
-      h("div",{style:{fontSize:11,color:"#ef4444",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:8,padding:"10px 14px",marginBottom:16,fontFamily:"'DM Mono',monospace",wordBreak:"break-all",textAlign:"left"}},error),
+      h("div",{style:{fontSize:11,color:"var(--red)",background:"var(--rbg)",border:"1px solid var(--rdim)",borderRadius:8,padding:"10px 14px",marginBottom:16,fontFamily:"'JetBrains Mono',monospace",wordBreak:"break-all",textAlign:"left"}},error),
       h("div",{style:{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}},
         h("button",{onClick:discoverFolder,style:{padding:"9px 20px",background:"var(--acc)",color:"#fff",border:"none",borderRadius:9,fontSize:12,fontWeight:700,cursor:"pointer"}},"🔄 Reintentar"),
         h("label",{style:{display:"inline-flex",alignItems:"center",gap:6,padding:"9px 20px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:9,fontSize:12,fontWeight:600,cursor:"pointer",color:"var(--txm)"}},
@@ -2438,7 +2438,7 @@ function FactxCobrarView({notify}){
     var cli=selClient;
     var bkt=getBucket(cli.maxDias);
     var docsSorted=cli.docs.slice().sort(function(a,b){return b.diasDoc-a.diasDoc;});
-    return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up"},
+    return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up epv2"},
       /* Header detalle */
       h("div",{style:{padding:"14px 24px",borderBottom:"1px solid var(--bdr)",background:"var(--surf)",display:"flex",alignItems:"center",gap:14,flexShrink:0}},
         h("button",{onClick:function(){setSelClient(null);},
@@ -2446,17 +2446,18 @@ function FactxCobrarView({notify}){
           "← Volver"),
         h("div",{style:{flex:1,minWidth:0}},
           h("div",{style:{fontSize:16,fontWeight:800,color:"var(--tx)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}},cli.nombre),
-          h("div",{style:{fontSize:11,color:"var(--txm)",fontFamily:"'DM Mono',monospace",marginTop:1}},cli.rut)
+          h("div",{style:{fontSize:11,color:"var(--txm)",fontFamily:"'JetBrains Mono',monospace",marginTop:1}},cli.rut)
         ),
         h("div",{style:{display:"flex",gap:8,alignItems:"center",flexShrink:0}},
           h("span",{style:{fontSize:10,fontWeight:700,padding:"3px 9px",borderRadius:20,background:bucketBg(bkt),color:bucketColor(bkt),border:"1px solid "+bucketColor(bkt)+"44"}},
             "Vence: "+bucketLabel(bkt)),
           h("div",{style:{textAlign:"right"}},
-            h("div",{style:{fontSize:18,fontWeight:900,color:"var(--tx)",fontFamily:"'DM Mono',monospace"}},fmtCLP(cli.total)),
-            h("div",{style:{fontSize:10,color:"var(--txd)",fontWeight:700,letterSpacing:".06em",textTransform:"uppercase"}},"Total por cobrar")
+            h("div",{style:{fontSize:18,fontWeight:900,color:"var(--tx)",fontFamily:"'JetBrains Mono',monospace"}},fmtCLP(cli.total)),
+            h("div",{style:{display:"flex",alignItems:"center",gap:6,justifyContent:"flex-end",fontSize:10,color:"var(--txd)",fontWeight:700,letterSpacing:".06em",textTransform:"uppercase"}},h("span",{className:"fv2-pulse"}),"Total por cobrar")
           )
         )
       ),
+      h("div",{className:"fv2-stream"}),
       /* Tabla documentos */
       h("div",{style:{flex:1,overflowY:"auto",overflowX:"auto",minHeight:0}},
         h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:12}},
@@ -2470,34 +2471,34 @@ function FactxCobrarView({notify}){
           h("tbody",null,docsSorted.map(function(r,i){
             var bk=getBucket(r.diasDoc);
             return h("tr",{key:i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"var(--surf2)"}},
-              h("td",{style:{padding:"10px 14px",color:"var(--txm)",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",fontSize:11}},r.fecha),
+              h("td",{style:{padding:"10px 14px",color:"var(--txm)",whiteSpace:"nowrap",fontFamily:"'JetBrains Mono',monospace",fontSize:11}},r.fecha),
               h("td",{style:{padding:"10px 14px"}},
                 h("span",{style:{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:8,
-                  background:r.tipo==="Fact_Bol"?"rgba(59,130,246,0.10)":"rgba(156,163,175,0.12)",
-                  color:r.tipo==="Fact_Bol"?"#3b82f6":"var(--txm)",
-                  border:r.tipo==="Fact_Bol"?"1px solid rgba(59,130,246,0.25)":"1px solid var(--bdr)"}},
+                  background:r.tipo==="Fact_Bol"?"var(--bbg)":"var(--surf2)",
+                  color:r.tipo==="Fact_Bol"?"var(--blue)":"var(--txm)",
+                  border:r.tipo==="Fact_Bol"?"1px solid rgba(56,189,248,.3)":"1px solid var(--bdr)"}},
                   r.tipo==="Fact_Bol"?"Fact/Bol":"Movto")
               ),
               h("td",{style:{padding:"10px 14px"}},
                 r.folio
                   ?h("button",{onClick:function(){verFactura(r.folio);},title:"Ver detalle DTE",
-                      style:{background:"none",border:"none",padding:0,cursor:"pointer",color:"var(--acc)",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,textDecoration:"underline",textUnderlineOffset:2}},
+                      style:{background:"none",border:"none",padding:0,cursor:"pointer",color:"var(--acc)",fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:700,textDecoration:"underline",textUnderlineOffset:2}},
                       r.folio)
                   :h("span",{style:{color:"var(--txd)",fontSize:11}},"—")
               ),
               h("td",{style:{padding:"10px 14px",color:"var(--txm)",maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontSize:11}},r.glosa||"—"),
-              h("td",{style:{padding:"10px 14px",color:"var(--txm)",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",fontSize:11}},r.vcto||"—"),
+              h("td",{style:{padding:"10px 14px",color:"var(--txm)",whiteSpace:"nowrap",fontFamily:"'JetBrains Mono',monospace",fontSize:11}},r.vcto||"—"),
               h("td",{style:{padding:"10px 14px"}},
                 h("span",{style:{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,background:bucketBg(bk),color:bucketColor(bk),border:"1px solid "+bucketColor(bk)+"44",whiteSpace:"nowrap"}},
                   r.diasDoc>0?r.diasDoc+" días":"—")
               ),
-              h("td",{style:{padding:"10px 14px",textAlign:"right",fontFamily:"'DM Mono',monospace",color:"var(--tx)",fontWeight:700,fontSize:12}},fmtCLP(r.monto))
+              h("td",{style:{padding:"10px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",color:"var(--tx)",fontWeight:700,fontSize:12}},fmtCLP(r.monto))
             );
           })),
           h("tfoot",null,
-            h("tr",{style:{background:"rgba(34,197,94,0.08)",borderTop:"2px solid rgba(34,197,94,0.3)"}},
-              h("td",{colSpan:6,style:{padding:"10px 14px",fontWeight:800,fontSize:12,color:"#15803d"}},"Total — "+cli.docs.length+" documento"+(cli.docs.length!==1?"s":"")),
-              h("td",{style:{padding:"10px 14px",textAlign:"right",fontFamily:"'DM Mono',monospace",fontWeight:900,fontSize:14,color:"#15803d"}},fmtCLP(cli.total))
+            h("tr",{style:{background:"var(--gbg)",borderTop:"2px solid var(--gdim)"}},
+              h("td",{colSpan:6,style:{padding:"10px 14px",fontWeight:800,fontSize:12,color:"var(--green)"}},"Total — "+cli.docs.length+" documento"+(cli.docs.length!==1?"s":"")),
+              h("td",{style:{padding:"10px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontWeight:900,fontSize:14,color:"var(--green)"}},fmtCLP(cli.total))
             )
           )
         )
@@ -2508,9 +2509,9 @@ function FactxCobrarView({notify}){
         h("div",{style:{background:"var(--surf)",borderRadius:16,boxShadow:"0 8px 40px rgba(0,0,0,0.25)",maxWidth:520,width:"100%",maxHeight:"85vh",overflow:"auto",padding:"24px 28px",position:"relative"}},
           h("button",{onClick:function(){setFxcModal(null);},style:{position:"absolute",top:14,right:16,background:"none",border:"none",fontSize:20,cursor:"pointer",color:"var(--txm)",lineHeight:1}},"×"),
           h("div",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".1em",textTransform:"uppercase",marginBottom:4}},"Detalle DTE"),
-          h("div",{style:{fontSize:22,fontWeight:800,color:"var(--tx)",fontFamily:"'DM Mono',monospace",marginBottom:16}},"Folio "+fxcModal.folio),
-          fxcModal.loading&&h("div",{style:{textAlign:"center",padding:"30px 0",color:"var(--txm)"}},h("div",{style:{fontSize:24,marginBottom:8}},"⏳"),h("div",{style:{fontSize:12}},"Buscando en Drive...")),
-          fxcModal.error&&h("div",{style:{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:10,padding:"14px 16px",color:"#ef4444",fontSize:12,fontFamily:"'DM Mono',monospace"}},"⚠️ "+fxcModal.error),
+          h("div",{style:{fontSize:22,fontWeight:800,color:"var(--tx)",fontFamily:"'JetBrains Mono',monospace",marginBottom:16}},"Folio "+fxcModal.folio),
+          fxcModal.loading&&h("div",{style:{textAlign:"center",padding:"30px 0",color:"var(--txm)"}},h("span",{className:"fv2-loader",style:{width:24,height:24,fontSize:24,marginBottom:8}}),h("div",{style:{fontSize:12,marginTop:8}},"Buscando en Drive...")),
+          fxcModal.error&&h("div",{style:{background:"var(--rbg)",border:"1px solid var(--rdim)",borderRadius:10,padding:"14px 16px",color:"var(--red)",fontSize:12,fontFamily:"'JetBrains Mono',monospace"}},"⚠️ "+fxcModal.error),
           fxcModal.data&&(function(){
             var d=fxcModal.data;
             var TIPOS={"33":"Factura Electrónica","61":"Nota de Crédito","39":"Boleta Electrónica","56":"Nota de Débito","52":"Guía de Despacho"};
@@ -2583,7 +2584,11 @@ function FactxCobrarView({notify}){
     XLSX.writeFile(wb,"Facturas_x_Cobrar_"+fecha+".xlsx");
   }
 
-  return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up"},
+  var bucketDeuda=BUCKETS.map(function(b){
+    var monto=clients.filter(function(c){return getBucket(c.maxDias)===b;}).reduce(function(s,c){return s+c.total;},0);
+    return{label:bucketLabel(b),count:monto,color:bucketColor(b)};
+  });
+  return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up epv2"},
     /* ── Cuadro comparativo de cortes ── */
     drvFiles.length>0&&h("div",{style:{padding:"8px 24px",background:"var(--surf)",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",flexShrink:0}},
       h("span",{style:{fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:".07em",textTransform:"uppercase",marginRight:8}},"Deuda por corte:"),
@@ -2635,11 +2640,18 @@ function FactxCobrarView({notify}){
           style:{padding:"5px 14px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:8,fontSize:12,cursor:"pointer",color:"var(--txm)",fontWeight:600}},"🔄")
       )
     ),
-    /* Resumen total */
-    h("div",{style:{padding:"8px 24px",borderBottom:"1px solid var(--bdr)",background:"var(--surf2)",display:"flex",alignItems:"center",gap:16,flexShrink:0}},
-      h("span",{style:{fontSize:11,color:"var(--txm)"}},"Total por cobrar:"),
-      h("span",{style:{fontSize:15,fontWeight:900,color:"var(--tx)",fontFamily:"'DM Mono',monospace"}},fmtCLP(totalGlobal)),
-      h("span",{style:{fontSize:11,color:"var(--txd)","marginLeft":"auto"}},(rows.length+" documentos"))
+    h("div",{className:"fv2-stream"}),
+    /* Resumen total + distribución de deuda por antigüedad */
+    h("div",{style:{padding:"10px 24px",borderBottom:"1px solid var(--bdr)",background:"var(--surf2)",display:"flex",flexDirection:"column",gap:8,flexShrink:0}},
+      h("div",{style:{display:"flex",alignItems:"center",gap:16}},
+        h("span",{style:{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--txm)"}},h("span",{className:"fv2-pulse"}),"Total por cobrar:"),
+        h("span",{style:{fontSize:15,fontWeight:900,color:"var(--tx)",fontFamily:"'JetBrains Mono',monospace"}},fmtCLP(totalGlobal)),
+        h("span",{style:{fontSize:11,color:"var(--txd)","marginLeft":"auto"}},(rows.length+" documentos"))
+      ),
+      totalGlobal>0&&h("div",null,
+        h("div",{style:{fontSize:9,color:"var(--txd)",fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",marginBottom:4}},"Distribución por antigüedad"),
+        h(BarraEstado,{segments:bucketDeuda,fmt:fmtCLP})
+      )
     ),
     /* Tabla clientes */
     h("div",{style:{flex:1,overflowY:"auto",overflowX:"auto",minHeight:0}},
@@ -2664,21 +2676,21 @@ function FactxCobrarView({notify}){
               onClick:function(){setSelClient(cli);},
               style:{borderBottom:"1px solid var(--bdr)",cursor:"pointer",transition:"background .1s",
                 background:i%2===0?"var(--surf)":"var(--surf2)"},
-              onMouseEnter:function(e){e.currentTarget.style.background="rgba(79,70,229,0.06)";},
+              onMouseEnter:function(e){e.currentTarget.style.background="var(--surf3)";},
               onMouseLeave:function(e){e.currentTarget.style.background=i%2===0?"var(--surf)":"var(--surf2)";}
             },
               h("td",{style:{padding:"12px 14px",fontWeight:700,color:"var(--tx)"}},
                 h("div",{style:{fontWeight:700,fontSize:13}},cli.nombre),
               ),
-              h("td",{style:{padding:"12px 14px",color:"var(--txm)",fontFamily:"'DM Mono',monospace",fontSize:11,whiteSpace:"nowrap"}},cli.rut),
+              h("td",{style:{padding:"12px 14px",color:"var(--txm)",fontFamily:"'JetBrains Mono',monospace",fontSize:11,whiteSpace:"nowrap"}},cli.rut),
               h("td",{style:{padding:"12px 14px",color:"var(--txm)",fontSize:12,textAlign:"center"}},
-                h("span",{style:{display:"inline-block",padding:"2px 8px",borderRadius:20,background:"rgba(79,70,229,0.08)",color:"var(--acc)",fontWeight:700,fontSize:11}},cli.docs.length)
+                h("span",{style:{display:"inline-block",padding:"2px 8px",borderRadius:20,background:"var(--bbg)",color:"var(--acc)",fontWeight:700,fontSize:11}},cli.docs.length)
               ),
               h("td",{style:{padding:"12px 14px"}},
                 h("span",{style:{fontSize:10,fontWeight:700,padding:"3px 9px",borderRadius:20,background:bucketBg(bk),color:bucketColor(bk),border:"1px solid "+bucketColor(bk)+"44",whiteSpace:"nowrap"}},
                   cli.maxDias>0?cli.maxDias+" días":"—")
               ),
-              h("td",{style:{padding:"12px 14px",textAlign:"right",fontFamily:"'DM Mono',monospace",fontWeight:800,fontSize:13,color:"var(--tx)"}},
+              h("td",{style:{padding:"12px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontWeight:800,fontSize:13,color:"var(--tx)"}},
                 fmtCLP(cli.total),
                 h("span",{style:{fontSize:9,color:"var(--txd)",marginLeft:6}})
               )
@@ -2694,7 +2706,7 @@ function FactxCobrarView({notify}){
    Cruza la Planilla (pagado/no pagado por período) con la mora en vivo
    de "Facturas x Cobrar PISA" (días de atraso por cliente).
 ═══════════════════════════════════ */
-function BarraEstado({segments}){
+function BarraEstado({segments,fmt}){
   const total=segments.reduce((s,x)=>s+x.count,0)||1;
   const sig=segments.map(s=>s.count).join(",");
   const [grown,setGrown]=useState(false);
@@ -2704,10 +2716,10 @@ function BarraEstado({segments}){
     return()=>cancelAnimationFrame(r1);
   },[sig]);
   return h("div",{className:"epv2-bar-track",style:{height:22}},
-    segments.map((s,i)=>s.count>0&&h("div",{key:s.label,className:"epv2-bar-fill",title:`${s.label}: ${s.count} (${Math.round(s.count/total*100)}%)`,
+    segments.map((s,i)=>s.count>0&&h("div",{key:s.label,className:"epv2-bar-fill",title:`${s.label}: ${fmt?fmt(s.count):s.count} (${Math.round(s.count/total*100)}%)`,
       style:{width:grown?(s.count/total*100)+"%":"0%","--glow":s.color,background:s.color,display:"flex",alignItems:"center",justifyContent:"center",
         borderRight:i<segments.length-1?"2px solid var(--surf)":"none",minWidth:grown&&s.count>0?22:0}},
-      grown&&(s.count/total)>0.12&&h("span",{style:{fontSize:10,fontWeight:700,color:"#fff",whiteSpace:"nowrap"}},s.count)
+      grown&&(s.count/total)>0.16&&h("span",{style:{fontSize:10,fontWeight:700,color:"#fff",whiteSpace:"nowrap",overflow:"hidden"}},fmt?fmt(s.count):s.count)
     ))
   );
 }
