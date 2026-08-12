@@ -233,9 +233,9 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
   .epv2-ticker-val{animation:none}
 }
 /* Banner tipo ticker bursátil — recorre KPIs clave sin parar (se pausa al pasar el mouse) */
-.epv2-marquee{position:relative;overflow:hidden;border-radius:10px;background:rgba(15,23,42,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--bdr)}
-.epv2-marquee::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--acc),var(--acc2),transparent);opacity:.8;z-index:2}
-.epv2-marquee-track{display:flex;align-items:center;gap:12px;width:max-content;padding:10px 12px;animation:epv2marquee 18s linear infinite}
+.epv2-marquee{position:relative;overflow:hidden;border-radius:10px;background:#0F172A;border:1px solid var(--bdr);isolation:isolate;min-height:44px;flex-shrink:0;transform:translateZ(0)}
+.epv2-marquee::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--acc),var(--acc2),transparent);opacity:.8;z-index:2;pointer-events:none}
+.epv2-marquee-track{display:flex;align-items:center;gap:12px;width:max-content;padding:10px 12px;animation:epv2marquee 18s linear infinite;will-change:transform;backface-visibility:hidden}
 .epv2-marquee:hover .epv2-marquee-track{animation-play-state:paused}
 @keyframes epv2marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 .epv2-marquee-item{display:flex;align-items:center;gap:9px;padding:8px 18px;white-space:nowrap;flex-shrink:0;background:var(--surf2);border:1px solid var(--bdr);border-radius:9px}
