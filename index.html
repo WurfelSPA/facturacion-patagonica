@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Facturación — Patagónica Inmobiliaria</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -190,6 +190,39 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 /* Línea de "flujo de datos" — barrido sutil, firma ambiental de la vista */
 @keyframes fv2stream{0%{background-position:-200% 0}100%{background-position:200% 0}}
 .fv2-stream{height:2px;background:linear-gradient(90deg,transparent,var(--acc) 45%,var(--acc2) 55%,transparent);background-size:200% 100%;animation:fv2stream 2.6s linear infinite;opacity:.55}
+
+/* ═══ Estado de Pagos — modo oscuro "centro de control" (inspirado en panel-ia) ═══ */
+.epv2{
+  --bg:#060B14;--surf:#0F172A;--surf2:#131C30;--surf3:#1B2540;
+  --bdr:rgba(148,163,184,.16);--bdr2:rgba(148,163,184,.32);
+  --tx:#E7ECF5;--txm:#93A0BD;--txd:#5C6884;
+  --green:#34D399;--gdim:rgba(52,211,153,.4);--gbg:rgba(52,211,153,.12);
+  --amber:#FBBF24;--adim:rgba(251,191,36,.4);--abg:rgba(251,191,36,.12);
+  --red:#FB7185;--rdim:rgba(251,113,133,.4);--rbg:rgba(251,113,133,.12);
+  --blue:#38BDF8;--bbg:rgba(56,189,248,.12);
+  --acc:#22D3EE;--acc2:#8B5CF6;--accl:#06B6D4;
+  background:
+    radial-gradient(circle at 12% -10%,rgba(34,211,238,.12),transparent 42%),
+    radial-gradient(circle at 88% 10%,rgba(139,92,246,.12),transparent 42%),
+    var(--bg);
+}
+.epv2, .epv2 input, .epv2 select{font-family:'DM Sans',sans-serif;color:var(--tx)}
+.epv2 .dash-card{background:rgba(15,23,42,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--bdr);border-radius:14px;position:relative;overflow:hidden;transition:border-color .2s,transform .2s}
+.epv2 .dash-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--acc),var(--acc2),transparent);opacity:.75}
+.epv2 .dash-card:hover{border-color:var(--bdr2);transform:translateY(-2px)}
+.epv2 .dash-card-val{font-family:'JetBrains Mono',monospace}
+.epv2 .tag-arr{background:rgba(56,189,248,.14);border:1px solid rgba(56,189,248,.38);color:#7dd3fc}
+.epv2 .tag-srv{background:rgba(251,191,36,.14);border:1px solid rgba(251,191,36,.38);color:#fcd34d}
+.epv2 select option{background:#0F172A;color:#E7ECF5}
+/* Barras con crecimiento animado + brillo + barrido — la "vida" que pidió el usuario */
+.epv2-bar-track{border-radius:11px;overflow:hidden;background:var(--surf2);border:1px solid var(--bdr);position:relative;display:flex}
+.epv2-bar-fill{transition:width 1.1s cubic-bezier(.22,.9,.24,1),min-width 1.1s cubic-bezier(.22,.9,.24,1);position:relative;box-shadow:0 0 12px -2px var(--glow,transparent),inset 0 0 12px -4px rgba(255,255,255,.25)}
+.epv2-bar-fill::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);transform:translateX(-120%);animation:epv2shimmer 2.8s ease-in-out infinite}
+@keyframes epv2shimmer{0%{transform:translateX(-120%)}55%{transform:translateX(120%)}100%{transform:translateX(120%)}}
+@media (prefers-reduced-motion:reduce){
+  .epv2-bar-fill{transition:none}
+  .epv2-bar-fill::after{animation:none;display:none}
+}
 </style>
 </head>
 <body>
@@ -2654,11 +2687,18 @@ function FactxCobrarView({notify}){
 ═══════════════════════════════════ */
 function BarraEstado({segments}){
   const total=segments.reduce((s,x)=>s+x.count,0)||1;
-  return h("div",{style:{display:"flex",height:22,borderRadius:11,overflow:"hidden",background:"var(--surf2)",border:"1px solid var(--bdr)"}},
-    segments.map((s,i)=>s.count>0&&h("div",{key:s.label,title:`${s.label}: ${s.count} (${Math.round(s.count/total*100)}%)`,
-      style:{width:(s.count/total*100)+"%",background:s.color,display:"flex",alignItems:"center",justifyContent:"center",
-        borderRight:i<segments.length-1?"2px solid var(--surf)":"none",minWidth:s.count>0?22:0}},
-      (s.count/total)>0.12&&h("span",{style:{fontSize:10,fontWeight:700,color:"#fff",whiteSpace:"nowrap"}},s.count)
+  const sig=segments.map(s=>s.count).join(",");
+  const [grown,setGrown]=useState(false);
+  useEffect(()=>{
+    setGrown(false);
+    const r1=requestAnimationFrame(()=>{const r2=requestAnimationFrame(()=>setGrown(true));return()=>cancelAnimationFrame(r2);});
+    return()=>cancelAnimationFrame(r1);
+  },[sig]);
+  return h("div",{className:"epv2-bar-track",style:{height:22}},
+    segments.map((s,i)=>s.count>0&&h("div",{key:s.label,className:"epv2-bar-fill",title:`${s.label}: ${s.count} (${Math.round(s.count/total*100)}%)`,
+      style:{width:grown?(s.count/total*100)+"%":"0%","--glow":s.color,background:s.color,display:"flex",alignItems:"center",justifyContent:"center",
+        borderRight:i<segments.length-1?"2px solid var(--surf)":"none",minWidth:grown&&s.count>0?22:0}},
+      grown&&(s.count/total)>0.12&&h("span",{style:{fontSize:10,fontWeight:700,color:"#fff",whiteSpace:"nowrap"}},s.count)
     ))
   );
 }
@@ -2670,16 +2710,23 @@ function LeyendaEstado(){
 }
 function BarraAntiguedad({buckets}){
   const labels={"<=30":"Al día (≤30)","31-60":"31-60 días","61-90":"61-90 días","91-365":"91-365 días","+365":"+365 días"};
-  const colors={"<=30":"#10b981","31-60":"#f59e0b","61-90":"#f97316","91-365":"#ef4444","+365":"#7c3aed"};
+  const colors={"<=30":"#34D399","31-60":"#FBBF24","61-90":"#f97316","91-365":"#FB7185","+365":"#8B5CF6"};
   const max=Math.max(1,...buckets.map(b=>b.count));
+  const sig=buckets.map(b=>b.count).join(",");
+  const [grown,setGrown]=useState(false);
+  useEffect(()=>{
+    setGrown(false);
+    const r1=requestAnimationFrame(()=>{const r2=requestAnimationFrame(()=>setGrown(true));return()=>cancelAnimationFrame(r2);});
+    return()=>cancelAnimationFrame(r1);
+  },[sig]);
   return h("div",{style:{display:"flex",flexDirection:"column",gap:8}},
     buckets.map(b=>h("div",{key:b.key,style:{display:"flex",alignItems:"center",gap:8}},
       h("div",{style:{width:104,fontSize:10,color:"var(--txm)",fontWeight:600,flexShrink:0}},labels[b.key]),
-      h("div",{style:{flex:1,height:14,background:"var(--surf2)",borderRadius:7,overflow:"hidden"}},
-        h("div",{title:`${labels[b.key]}: ${b.count} clientes`,
-          style:{height:"100%",width:(b.count/max*100)+"%",background:colors[b.key],borderRadius:7,minWidth:b.count>0?6:0}})
+      h("div",{className:"epv2-bar-track",style:{flex:1,height:14}},
+        h("div",{className:"epv2-bar-fill",title:`${labels[b.key]}: ${b.count} clientes`,
+          style:{height:"100%",width:grown?(b.count/max*100)+"%":"0%","--glow":colors[b.key],background:colors[b.key],minWidth:grown&&b.count>0?6:0}})
       ),
-      h("div",{style:{width:26,textAlign:"right",fontSize:11,fontWeight:700,fontFamily:"'DM Mono',monospace"}},b.count)
+      h("div",{style:{width:26,textAlign:"right",fontSize:11,fontWeight:700,fontFamily:"'JetBrains Mono',monospace"}},b.count)
     ))
   );
 }
@@ -2792,16 +2839,18 @@ function EstadoPagosView({notify}){
     return sortDir==="asc"?cmp:-cmp;
   });
 
-  return h("main",{style:{flex:1,minHeight:0,overflowY:"auto",padding:"18px 22px",display:"flex",flexDirection:"column",gap:16},className:"fade-up"},
+  return h("main",{style:{flex:1,minHeight:0,overflowY:"auto",padding:"18px 22px",display:"flex",flexDirection:"column",gap:16},className:"fade-up epv2"},
     h("div",{style:{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}},
       h("select",{value:periodo,onChange:e=>setPeriodo(e.target.value),
         style:{fontSize:12,fontWeight:700,padding:"6px 12px",background:"linear-gradient(135deg,var(--acc),var(--acc2))",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}},
         PERIODOS_DASH.map(p=>h("option",{key:p,value:p,style:{background:"#fff",color:"#1a1a1a"}},p))
       ),
-      mora&&mora.fecha&&h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},"Mora consultada al "+mora.fecha),
+      mora&&mora.fecha&&h("span",{style:{display:"flex",alignItems:"center",gap:7,fontSize:10,color:"var(--txd)",fontFamily:"'JetBrains Mono',monospace"}},
+        h("span",{className:"fv2-pulse"}),"Mora consultada al "+mora.fecha),
       !mora&&!loading&&h("span",{style:{fontSize:10,color:"var(--amber)"}},"⚠ No se pudo leer Facturas x Cobrar — mostrando solo pagado/pendiente"),
-      loading&&h("span",{className:"spin",style:{marginLeft:2}},"⟳")
+      loading&&h("span",{className:"fv2-loader",style:{width:14,height:14,fontSize:14,marginLeft:2}})
     ),
+    h("div",{className:"fv2-stream"}),
     error&&h("div",{style:{padding:12,background:"var(--rbg)",color:"var(--red)",borderRadius:8,fontSize:12}},error),
 
     !loading&&!error&&h("div",{style:{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:12}},
@@ -2882,7 +2931,7 @@ function EstadoPagosView({notify}){
             )
           )),
           h("tbody",null,
-            loading?h("tr",null,h("td",{colSpan:6,style:{padding:32,textAlign:"center",color:"var(--txd)"}},"Cargando...")):
+            loading?h("tr",null,h("td",{colSpan:6,style:{padding:32,textAlign:"center",color:"var(--txd)"}},h("div",{className:"fv2-loading-row"},h("span",{className:"fv2-loader"}),"Cargando..."))):
             sortedRows.length===0?h("tr",null,h("td",{colSpan:6,style:{padding:32,textAlign:"center",color:"var(--txd)"}},"Sin resultados")):
             sortedRows.map((r,i)=>h("tr",{key:r.rut+"|"+r.tipo+"|"+i,style:{borderBottom:"1px solid var(--bdr)"}},
               h("td",{style:{padding:"7px 11px",fontWeight:600}},r.cliente),
