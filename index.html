@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Facturación — Patagónica Inmobiliaria</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -141,6 +141,39 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
   main>div{overflow:visible!important;height:auto!important;max-height:none!important;flex:none!important;}
   .fade-up{animation:none!important;}
 }
+
+/* ══════════════════════════════════════════════════════════
+   PILOTO DE DISEÑO — Facturación (acotado, no toca otras vistas)
+   Variables scoped a .fv2: cualquier var(--xxx) usada dentro de un
+   elemento con esta clase (o descendiente de él) toma estos valores
+   en vez de los globales de :root, sin afectar Sidebar u otras vistas.
+═══════════════════════════════════════════════════════════ */
+.fv2{
+  --bg:#F7F9FC;--surf:#FFFFFF;--surf2:#F0F3F9;--surf3:#E9EDF5;
+  --bdr:#E3E8F0;--bdr2:#D3DAE6;
+  --tx:#0F1420;--txm:#5B6478;--txd:#94A0B8;
+  --green:#0E9F6E;--gdim:#a7ecd2;--gbg:#e7faf1;
+  --amber:#D97706;--adim:#fbdca0;--abg:#fef6e7;
+  --red:#E5484D;--rdim:#f6c6c8;--rbg:#fdecec;
+  --blue:#3B6EF5;--bbg:#eaf1ff;
+  --acc:#3B6EF5;--acc2:#7C6CFF;--accl:#2F5AD1;
+}
+.fv2, .fv2 input, .fv2 select{font-family:'DM Sans',sans-serif}
+.fv2-title{font-family:'Space Grotesk',sans-serif;font-weight:600;letter-spacing:-.01em}
+.fv2-lbl{font-family:'Space Grotesk',sans-serif;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+/* Punto "en vivo" — respira suavemente, para datos que vienen de Nubox/Drive en tiempo real */
+@keyframes fv2breathe{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(59,110,245,.35)}50%{opacity:.65;box-shadow:0 0 0 4px rgba(59,110,245,0)}}
+.fv2-pulse{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--acc);animation:fv2breathe 2s ease-in-out infinite;flex-shrink:0}
+.fv2-card{background:var(--surf);border:1px solid var(--bdr);border-radius:10px;transition:border-color .15s,box-shadow .15s}
+.fv2-card:hover{border-color:var(--bdr2);box-shadow:0 2px 12px rgba(15,20,32,.05)}
+.fv2 .pill{border-radius:8px;font-weight:600;transition:all .15s}
+.fv2 .pill.active{background:var(--acc);border-color:var(--acc);box-shadow:0 2px 10px rgba(59,110,245,.28)}
+.fv2 .pill:hover:not(.active){border-color:var(--bdr2);transform:translateY(-1px)}
+.fv2 .btn-primary{background:linear-gradient(135deg,var(--acc),var(--acc2));box-shadow:0 4px 18px rgba(59,110,245,.25);border-radius:8px}
+.fv2 .btn-primary:hover{box-shadow:0 6px 22px rgba(59,110,245,.35);transform:translateY(-1px)}
+.fv2 thead th{font-family:'Space Grotesk',sans-serif!important}
+.fv2 .row-tr{transition:background .12s}
+.fv2 .row-tr:hover td{background:var(--surf2)!important}
 </style>
 </head>
 <body>
@@ -6759,16 +6792,16 @@ function App(){
     MODO_PRUEBA&&h("div",{className:"test-banner"},"⚠",h("strong",null,"MODO PRUEBA"),"— correos van a",h("strong",{style:{marginLeft:4}},TEST_DEST),h("span",{style:{marginLeft:"auto",fontSize:10,color:"var(--txd)"}},'Producción: TEST_DEST="" en el código')),
 
     /* HEADER */
-    h("header",{style:{background:view==="table"?"#1e3a5f":"var(--surf)",borderBottom:view==="table"?"1px solid #152d4a":"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:49,gap:10}},
+    h("header",{className:view==="table"?"fv2":undefined,style:{background:view==="table"?"#0F1B33":"var(--surf)",borderBottom:view==="table"?"1px solid #1C2C4A":"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:49,gap:10}},
       h("div",{style:{display:"flex",alignItems:"center",gap:10}},
-        h("div",{style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px",color:view==="table"?"#fff":"var(--tx)"}},
+        h("div",{className:view==="table"?"fv2-title":undefined,style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px",color:view==="table"?"#fff":"var(--tx)"}},
           view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="cuentas"?"🔌 Cuentas Servicios":view==="fact-cobrar"?"💰 Facturas x Cobrar":view==="pagos"?"✅ Estado de Pagos":view==="cortijo"?"🏡 El Cortijo":"📋 Facturación"
         ),
-        view==="table"&&h("span",{style:{fontSize:14,fontWeight:600,color:"#93b5d4",marginLeft:6}},periodo)
+        view==="table"&&h("span",{style:{display:"inline-flex",alignItems:"center",gap:6,fontSize:14,fontWeight:600,color:"#8FB0FF",marginLeft:6}},h("span",{className:"fv2-pulse"}),periodo)
       ),
       h("div",{style:{display:"flex",gap:8,alignItems:"center"}},
-        view==="table"&&h("button",{onClick:unlocked?sendAll:()=>setShowPwdModal(true),style:{background:unlocked?"var(--gbg)":"rgba(255,255,255,0.1)",border:unlocked?"1px solid var(--gdim)":"1px solid rgba(255,255,255,0.2)",color:unlocked?"var(--green)":"#d0e4f7",borderRadius:9,padding:"6px 14px",fontSize:11,fontWeight:700,cursor:"pointer"}},"✉ Enviar todos"),
-        view==="table"&&h("button",{onClick:unlocked?()=>setUnlocked(false):()=>setShowPwdModal(true),style:{background:unlocked?"rgba(10,124,78,0.2)":"rgba(255,255,255,0.08)",border:unlocked?"1px solid rgba(10,124,78,0.4)":"1px solid rgba(255,255,255,0.15)",color:unlocked?"#4ade80":"#93b5d4",borderRadius:9,padding:"6px 10px",fontSize:14,cursor:"pointer",lineHeight:1}},unlocked?"🔓":"🔒"),
+        view==="table"&&h("button",{onClick:unlocked?sendAll:()=>setShowPwdModal(true),style:{background:unlocked?"var(--gbg)":"rgba(255,255,255,0.1)",border:unlocked?"1px solid var(--gdim)":"1px solid rgba(255,255,255,0.2)",color:unlocked?"var(--green)":"#8FB0FF",borderRadius:9,padding:"6px 14px",fontSize:11,fontWeight:700,cursor:"pointer"}},"✉ Enviar todos"),
+        view==="table"&&h("button",{onClick:unlocked?()=>setUnlocked(false):()=>setShowPwdModal(true),style:{background:unlocked?"rgba(14,159,110,0.2)":"rgba(255,255,255,0.08)",border:unlocked?"1px solid rgba(14,159,110,0.4)":"1px solid rgba(255,255,255,0.15)",color:unlocked?"#4ade80":"#8FB0FF",borderRadius:9,padding:"6px 10px",fontSize:14,cursor:"pointer",lineHeight:1}},unlocked?"🔓":"🔒"),
         view==="ventas"&&h("div",{style:{display:"flex",gap:6,alignItems:"center"}},
           h("select",{
             value:periodo.split(" ")[1]||"2026",
@@ -6881,16 +6914,16 @@ function App(){
             "Carga la planilla en el Dashboard para visualizar los datos del período"
           )
     ),
-    view==="table"&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflowX:"hidden",background:"#eef4fd"},className:"fade-up"},
-      h("div",{style:{display:"grid",gridTemplateColumns:"repeat(7,1fr)",borderBottom:"1px solid #b8d0ee",background:"#ddeaf8"}},
+    view==="table"&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflowX:"hidden",background:"var(--bg)"},className:"fade-up fv2"},
+      h("div",{style:{display:"grid",gridTemplateColumns:"repeat(7,1fr)",borderBottom:"1px solid #D6E4FF",background:"#EAF1FF"}},
         [{label:"Total",val:stats.total,col:"var(--tx)",sub:""},{label:"Con PDF",val:stats.conPdf,col:"var(--green)",sub:"facturas cruzadas"},{label:"Sin PDF",val:stats.sinPdf,col:"var(--red)",sub:"revisar"},{label:"Coinciden",val:stats.ok,col:"var(--accl)",sub:"listos para enviar"},{label:"Enviados",val:stats.sent,col:"var(--amber)",sub:MODO_PRUEBA?"→ "+TEST_DEST:"esta sesión"},{label:"Total Arriendo",val:"$"+Math.round(totalArriendoClp).toLocaleString("es-CL"),col:"var(--blue)",sub:"Neto+IVA del período",small:true},{label:"Total Serv. Adm.",val:"$"+Math.round(totalServAdmClp).toLocaleString("es-CL"),col:"var(--blue)",sub:"Neto+IVA del período",small:true}]
         .map((m,i)=>h("div",{key:i,style:{background:"var(--surf)",padding:"13px 16px",borderRight:i<6?"1px solid var(--bdr)":"none"}},
-          h("div",{style:{fontSize:10,fontWeight:600,color:"var(--txm)",marginBottom:4,letterSpacing:"0.06em"}},m.label.toUpperCase()),
+          h("div",{className:"fv2-lbl",style:{fontSize:10,color:"var(--txm)",marginBottom:4}},m.label.toUpperCase()),
           h("div",{style:{fontSize:m.small?18:24,fontWeight:700,color:m.col,lineHeight:1,fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap"}},m.val),
           m.sub&&h("div",{style:{fontSize:10,color:"var(--txd)",marginTop:3}},m.sub)
         ))
       ),
-      h("div",{style:{background:"#ddeaf8",borderBottom:"1px solid #b8d0ee",padding:"8px 18px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
+      h("div",{style:{background:"#EAF1FF",borderBottom:"1px solid #D6E4FF",padding:"8px 18px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
         h("select",{
           value:periodo,
           onChange:e=>{const p=e.target.value;if(p!==periodo){periodoActivado.current=false;autoProcesado.current=false;autoNuboxRef.current=false;setPeriodo(p);setZipStatus("idle");setData([]);setSoloPlanilla(false);setPdfMap({});setFiles(f=>({...f,planilla:null}));}},
@@ -7012,7 +7045,7 @@ function App(){
       h("div",{style:{flex:1,overflowX:"auto",overflowY:"auto"}},
         h("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:940}},
           h("colgroup",null,h("col",{style:{width:58}}),h("col",{style:{width:"15%"}}),h("col",{style:{width:"17%"}}),h("col",{style:{width:88}}),h("col",{style:{width:88}}),h("col",{style:{width:72}}),h("col",{style:{width:72}}),h("col",{style:{width:96}}),h("col",{style:{width:110}}),h("col",{style:{width:60}})),
-          h("thead",null,h("tr",{style:{background:"#ddeaf8",position:"sticky",top:0,zIndex:3}},
+          h("thead",null,h("tr",{style:{background:"#EAF1FF",position:"sticky",top:0,zIndex:3}},
             [["Sitio","sitio"],["Cliente","cliente"],["Correo","correo"],["Concepto","concepto"],["Factura","factura"],["UF planilla","ufPlan"],["UF PDF","ufPdf"],["Monto+IVA","monto"],["Estado/Acción","estado"],["Pagado","pagado"]].map(([hd,col],hi)=>
               h("th",{key:hd,onClick:()=>toggleSort(col),style:{padding:"8px 11px",textAlign:hi===9?"center":"left",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:"0.07em",borderBottom:"1px solid var(--bdr)",cursor:"pointer",userSelect:"none",whiteSpace:"nowrap"}},hd.toUpperCase(),h("span",{style:{opacity:.5,fontSize:9}},sortArrow(col)))
             )
@@ -7028,7 +7061,7 @@ function App(){
               const diffSII=row.ufSII!=null&&row.ufPlan<=500&&Math.abs(row.ufPlan-row.ufSII)>0.5;
               const diff=diffPdf||diffSII;
               const esArr=row.concepto==="Arriendo";
-              const bg=esArr?"#ffffff":"#fffdf5";
+              const bg=esArr?"#ffffff":"#F6F5FF";
               return h("tr",{key:i,className:"row-tr"},
                 h("td",{style:{padding:"8px 11px",background:bg}},
                   h("div",{style:{display:"flex",flexDirection:"column",gap:2}},
@@ -7118,7 +7151,7 @@ function App(){
           )
         )
       ),
-      h("footer",{style:{background:"#ddeaf8",borderTop:"1px solid #b8d0ee",padding:"9px 18px",display:"flex",alignItems:"center",justifyContent:"space-between"}},
+      h("footer",{style:{background:"#EAF1FF",borderTop:"1px solid #D6E4FF",padding:"9px 18px",display:"flex",alignItems:"center",justifyContent:"space-between"}},
         h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},`${filtered.length}/${stats.total} · ${stats.sent} enviados · ${periodo}`),
         h("div",{style:{display:"flex",gap:8,alignItems:"center"}},
           stats.sent>0&&h("button",{
