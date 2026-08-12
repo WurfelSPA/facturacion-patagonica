@@ -232,6 +232,16 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 @media (prefers-reduced-motion:reduce){
   .epv2-ticker-val{animation:none}
 }
+/* Banner tipo ticker bursátil — recorre KPIs clave sin parar (se pausa al pasar el mouse) */
+.epv2-marquee{position:relative;overflow:hidden;border-radius:10px;background:rgba(15,23,42,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--bdr)}
+.epv2-marquee::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--acc),var(--acc2),transparent);opacity:.8;z-index:2}
+.epv2-marquee-track{display:flex;width:max-content;animation:epv2marquee 30s linear infinite}
+.epv2-marquee:hover .epv2-marquee-track{animation-play-state:paused}
+@keyframes epv2marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.epv2-marquee-item{display:flex;align-items:center;gap:9px;padding:12px 28px;white-space:nowrap;flex-shrink:0;border-right:1px solid var(--bdr)}
+.epv2-marquee-lbl{font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--txm)}
+.epv2-marquee-val{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700}
+@media (prefers-reduced-motion:reduce){.epv2-marquee-track{animation:none}}
 </style>
 </head>
 <body>
@@ -6066,13 +6076,31 @@ function App(){
     }):[];
     const tblUfLabel=curMes==="current"?`UF hoy: ${tblUf.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`:`UF ${tblMesOpts.find(m=>m.k===dashMes)?.l||""}: ${tblUf.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 
-    return h("main",{style:{flex:1,overflowY:"auto",padding:"18px 22px",display:"flex",flexDirection:"column",gap:16},className:"fade-up"},
+    const tickerItems=[
+      {icon:"👥",lbl:"Total Clientes",val:dashData?String(dashData.clients.length):"—",color:"var(--acc2)"},
+      {icon:"🏢",lbl:"Arriendo Mensual",val:dashData?formatCLPCompact(totalClpArr):"—",color:"var(--blue)"},
+      {icon:"🧾",lbl:"Serv. Administrativos",val:dashData?formatCLPCompact(totalClpSrv):"—",color:"var(--amber)"},
+      {icon:"💰",lbl:"Total Mensual CLP",val:dashData?formatCLPCompact(totalClp):"—",color:"var(--green)"},
+      {icon:"📊",lbl:"Afecto IVA",val:dashData?String(afectoCount):"—",color:"var(--amber)"},
+      {icon:"◆",lbl:"UF Hoy",val:ufActual?ufActual.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2}):"—",color:"var(--acc)",loading:ufLoading}
+    ];
 
-      /* Barra de estado: UF + fuente planilla */
+    return h("main",{style:{flex:1,overflowY:"auto",padding:"18px 22px",display:"flex",flexDirection:"column",gap:16},className:"fade-up epv2"},
+
+      /* Banner ticker — recorre los KPIs clave sin parar */
+      h("div",{className:"epv2-marquee"},
+        h("div",{className:"epv2-marquee-track"},
+          [...tickerItems,...tickerItems].map((it,idx)=>h("div",{key:idx,className:"epv2-marquee-item"},
+            h("span",{style:{fontSize:14}},it.icon),
+            h("span",{className:"epv2-marquee-lbl"},it.lbl),
+            it.loading?h("span",{className:"fv2-loader",style:{width:13,height:13,fontSize:13}}):h("span",{className:"epv2-marquee-val",style:{color:it.color}},it.val)
+          ))
+        )
+      ),
+
+      /* Barra de estado: fuente planilla */
       h("div",{style:{display:"flex",alignItems:"center",gap:8,fontSize:11,color:"var(--txm)",flexWrap:"wrap"}},
-        ufActual&&h("span",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:6,padding:"3px 10px",fontFamily:"'DM Mono',monospace",fontSize:11}},"UF hoy: "+ufActual.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})),
-        ufLoading&&h("span",{className:"spin",style:{fontSize:14}},"⟳"),
-        driveLoading&&h("span",{style:{display:"flex",alignItems:"center",gap:5,color:"var(--blue)"}},h("span",{className:"spin",style:{fontSize:13}},"⟳"),"Cargando planilla desde Drive..."),
+        driveLoading&&h("span",{style:{display:"flex",alignItems:"center",gap:6,color:"var(--blue)"}},h("span",{className:"fv2-loader",style:{width:13,height:13,fontSize:13}}),"Cargando planilla desde Drive..."),
         files.planilla&&!driveLoading&&h("span",{style:{background:"var(--gbg)",border:"1px solid var(--gdim)",borderRadius:6,padding:"3px 10px",color:"var(--green)",fontWeight:600,fontSize:11}},"✓ Planilla Facturación · Drive"),
         h("span",{style:{color:"var(--txd)",marginLeft:2}},"Montos en CLP · mindicador.cl"),
         files.planilla&&h("button",{onClick:()=>{setFiles(p=>({...p,planilla:null}));setDashData(null);},style:{marginLeft:"auto",fontSize:10,padding:"2px 10px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--txm)",cursor:"pointer"}},"↻ Actualizar")
@@ -6179,10 +6207,10 @@ function App(){
               const clpSrv=c.ufSrv>0?Math.round(c.ufSrv*tblUf):null;
               const clpTotal=c.ufTotal>0?Math.round(c.ufTotal*tblUf):null;
               const isSelected=histClient&&histClient.rut===c.rut&&histClient.sitio===c.sitio;
-              return h("div",{key:c.rut+c.nombre+c.sitio+"_wrap",style:{borderBottom:"1px solid var(--bdr)",background:isSelected?"#f0f6ff":"transparent"}},
+              return h("div",{key:c.rut+c.nombre+c.sitio+"_wrap",style:{borderBottom:"1px solid var(--bdr)",background:isSelected?"var(--bbg)":"transparent"}},
               h("div",{
                 className:"dash-client-row",
-                style:{cursor:"pointer",borderBottom:"none",background:isSelected?"#e8f2ff":"transparent"},
+                style:{cursor:"pointer",borderBottom:"none",background:isSelected?"var(--bbg)":"transparent"},
                 onClick:()=>{setHistClient(isSelected?null:c);setHistAnio(2026);},
                 title:isSelected?"Cerrar historial":"Ver historial del cliente"
               },
@@ -6198,7 +6226,7 @@ function App(){
                 h("div",{style:{fontFamily:"'DM Mono',monospace",color:"var(--blue)",fontWeight:600,fontSize:10}},clpArr?formatCLP(clpArr):"—"),
                 h("div",{style:{fontFamily:"'DM Mono',monospace",color:"var(--amber)",fontSize:10}},clpSrv?formatCLP(clpSrv):"—"),
                 h("div",{style:{fontFamily:"'DM Mono',monospace",fontWeight:700,fontSize:10}},clpTotal?formatCLP(clpTotal):"—"),
-                h("div",null,c.afecto?h("span",{style:{padding:"2px 6px",borderRadius:6,fontSize:9,fontWeight:600,background:c.afecto==="Afecto"?"var(--abg)":"var(--bbg)",color:c.afecto==="Afecto"?"var(--amber)":"var(--blue)",border:`1px solid ${c.afecto==="Afecto"?"var(--adim)":"#b5d0f0"}`}},c.afecto):h("span",{style:{color:"var(--txd)"}},"—")),
+                h("div",null,c.afecto?h("span",{style:{padding:"2px 6px",borderRadius:6,fontSize:9,fontWeight:600,background:c.afecto==="Afecto"?"var(--abg)":"var(--bbg)",color:c.afecto==="Afecto"?"var(--amber)":"var(--blue)",border:`1px solid ${c.afecto==="Afecto"?"var(--adim)":"rgba(56,189,248,.35)"}`}},c.afecto):h("span",{style:{color:"var(--txd)"}},"—")),
                 h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:c.termContrato?"var(--tx)":"var(--txd)"}},c.termContrato||"—"),
                 h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.renovacion||"—"),
                 h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.aviso||"—"),
@@ -6220,7 +6248,7 @@ function App(){
       (!files.planilla)&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,padding:20}},
         driveLoading?
           h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},
-            h("span",{className:"spin",style:{fontSize:18}},"⟳"),
+            h("span",{className:"fv2-loader",style:{width:18,height:18,fontSize:18}}),
             "Cargando planilla desde Drive..."
           ):
           h("div",null,
@@ -6229,7 +6257,7 @@ function App(){
           )
       ),
       dashLoading&&h("div",{style:{textAlign:"center",padding:"20px 0",color:"var(--txm)",fontSize:13}},
-        h("span",{className:"spin",style:{fontSize:18,marginRight:8}},"⟳"),"Procesando planilla..."
+        h("span",{className:"fv2-loader",style:{width:18,height:18,fontSize:18,marginRight:8}}),"Procesando planilla..."
       ),
 
     );
