@@ -161,9 +161,12 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 .fv2, .fv2 input, .fv2 select{font-family:'DM Sans',sans-serif}
 .fv2-title{font-family:'Space Grotesk',sans-serif;font-weight:600;letter-spacing:-.01em}
 .fv2-lbl{font-family:'Space Grotesk',sans-serif;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
-/* Punto "en vivo" — respira suavemente, para datos que vienen de Nubox/Drive en tiempo real */
-@keyframes fv2breathe{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(59,110,245,.35)}50%{opacity:.65;box-shadow:0 0 0 4px rgba(59,110,245,0)}}
-.fv2-pulse{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--acc);animation:fv2breathe 2s ease-in-out infinite;flex-shrink:0}
+/* Punto "en vivo" — respira suavemente, para datos que vienen de Nubox/Drive en tiempo real.
+   Anillo exterior + halo para que se note incluso a tamaño chico. */
+@keyframes fv2breathe{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.35);opacity:.55}}
+@keyframes fv2halo{0%{box-shadow:0 0 0 0 rgba(59,110,245,.45)}70%{box-shadow:0 0 0 7px rgba(59,110,245,0)}100%{box-shadow:0 0 0 0 rgba(59,110,245,0)}}
+.fv2-pulse{position:relative;display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--acc);flex-shrink:0;animation:fv2halo 1.8s ease-out infinite}
+.fv2-pulse::after{content:'';position:absolute;inset:0;border-radius:50%;background:var(--acc);animation:fv2breathe 1.8s ease-in-out infinite}
 .fv2-card{background:var(--surf);border:1px solid var(--bdr);border-radius:10px;transition:border-color .15s,box-shadow .15s}
 .fv2-card:hover{border-color:var(--bdr2);box-shadow:0 2px 12px rgba(15,20,32,.05)}
 .fv2 .pill{border-radius:8px;font-weight:600;transition:all .15s}
@@ -174,6 +177,19 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 .fv2 thead th{font-family:'Space Grotesk',sans-serif!important}
 .fv2 .row-tr{transition:background .12s}
 .fv2 .row-tr:hover td{background:var(--surf2)!important}
+
+/* Loader "espacial" — anillo con degradé + satélite orbitando + núcleo con halo.
+   Reemplaza el ⟳ de texto en los momentos de carga largos dentro de Facturación. */
+@keyframes fv2spin{to{transform:rotate(360deg)}}
+@keyframes fv2spinRev{to{transform:rotate(-360deg)}}
+.fv2-loader{position:relative;width:1em;height:1em;display:inline-block;flex-shrink:0}
+.fv2-loader::before{content:'';position:absolute;inset:0;border-radius:50%;border:2px solid rgba(59,110,245,.15);border-top-color:var(--acc);border-right-color:var(--acc2);animation:fv2spin .85s linear infinite}
+.fv2-loader::after{content:'';position:absolute;top:-2px;left:50%;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--acc2);box-shadow:0 0 6px 1px rgba(124,108,255,.8);animation:fv2spinRev 1.7s linear infinite;transform-origin:50% calc(0.5em + 2px)}
+.fv2-loading-row{display:flex;align-items:center;justify-content:center;gap:10px}
+.fv2-loading-row .fv2-loader{width:22px;height:22px;font-size:22px}
+/* Línea de "flujo de datos" — barrido sutil, firma ambiental de la vista */
+@keyframes fv2stream{0%{background-position:-200% 0}100%{background-position:200% 0}}
+.fv2-stream{height:2px;background:linear-gradient(90deg,transparent,var(--acc) 45%,var(--acc2) 55%,transparent);background-size:200% 100%;animation:fv2stream 2.6s linear infinite;opacity:.55}
 </style>
 </head>
 <body>
@@ -6792,7 +6808,7 @@ function App(){
     MODO_PRUEBA&&h("div",{className:"test-banner"},"⚠",h("strong",null,"MODO PRUEBA"),"— correos van a",h("strong",{style:{marginLeft:4}},TEST_DEST),h("span",{style:{marginLeft:"auto",fontSize:10,color:"var(--txd)"}},'Producción: TEST_DEST="" en el código')),
 
     /* HEADER */
-    h("header",{className:view==="table"?"fv2":undefined,style:{background:view==="table"?"#0F1B33":"var(--surf)",borderBottom:view==="table"?"1px solid #1C2C4A":"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:49,gap:10}},
+    h("header",{className:(view==="table"||view==="upload")?"fv2":undefined,style:{background:view==="table"?"#0F1B33":"var(--surf)",borderBottom:view==="table"?"1px solid #1C2C4A":"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:49,gap:10}},
       h("div",{style:{display:"flex",alignItems:"center",gap:10}},
         h("div",{className:view==="table"?"fv2-title":undefined,style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px",color:view==="table"?"#fff":"var(--tx)"}},
           view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="cuentas"?"🔌 Cuentas Servicios":view==="fact-cobrar"?"💰 Facturas x Cobrar":view==="pagos"?"✅ Estado de Pagos":view==="cortijo"?"🏡 El Cortijo":"📋 Facturación"
@@ -6816,12 +6832,13 @@ function App(){
         )
       )
     ),
+    (view==="table"||view==="upload")&&h("div",{className:"fv2-stream"}),
 
     /* VIEWS */
     view==="dashboard"&&renderDashboard(dashSitio,dashMes,dashSearch),
 
 
-    view==="upload"&&h("main",{style:{flex:1,display:"flex",flexDirection:"column"},className:"fade-up"},
+    view==="upload"&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",background:"var(--bg)"},className:"fade-up fv2"},
       h("div",{style:{display:"flex",alignItems:"center",gap:12,padding:"14px 28px",borderBottom:"1px solid var(--bdr)",flexShrink:0,flexWrap:"wrap"}},
         h("select",{
           value:periodo,
@@ -6904,8 +6921,8 @@ function App(){
         },"\u21ba Reintentar"),
         ),
       files.planilla&&(planillaStatus==="checking"||autoLoading)
-        ?h("div",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,color:"var(--txm)",fontSize:13}},
-            h("span",{className:"spin",style:{fontSize:22}},"⟳"),
+        ?h("div",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,color:"var(--txm)",fontSize:13}},
+            h("span",{className:"fv2-loader",style:{width:36,height:36,fontSize:36}}),
             "Cargando "+periodo+"..."
           )
         :files.planilla
@@ -6949,8 +6966,8 @@ function App(){
             opacity:(zipStatus==="loading"||zipStatus==="splitting"||splitLoading)?0.6:1}
         },"🔄 Forzar descarga desde Nubox"),
         soloPlanilla&&(zipStatus==="loading"||(zipStatus==="ready"&&Object.keys(pdfMap).length===0))&&
-          h("span",{style:{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,color:"#92400e",fontFamily:"'DM Sans',sans-serif",padding:"3px 10px",background:"#fef3c7",border:"1px solid #f59e0b",borderRadius:20,whiteSpace:"nowrap",fontWeight:600}},
-            h("span",{className:"spin",style:{fontSize:12}},"⟳"),
+          h("span",{style:{display:"inline-flex",alignItems:"center",gap:6,fontSize:11,color:"#92400e",fontFamily:"'DM Sans',sans-serif",padding:"3px 10px",background:"#fef3c7",border:"1px solid #f59e0b",borderRadius:20,whiteSpace:"nowrap",fontWeight:600}},
+            h("span",{className:"fv2-loader",style:{width:12,height:12,fontSize:12}}),
             zipStatus==="loading"?"Descargando PDFs...":"Habilitando facturas..."
           ),
         h("span",{style:{color:"var(--txd)",fontSize:11,margin:"0 4px"}},"|"),
@@ -7052,7 +7069,7 @@ function App(){
           )),
           h("tbody",null,sorted.length===0?
             (autoLoading||driveLoading||planillaStatus==="checking"||zipStatus==="loading"||splitLoading
-              ?h("tr",null,h("td",{colSpan:10,style:{padding:"48px",textAlign:"center",color:"var(--txm)",fontSize:13}},h("span",{className:"spin",style:{marginRight:8}},"⟳"),"Cargando "+periodo+"..."))
+              ?h("tr",null,h("td",{colSpan:10,style:{padding:"48px",textAlign:"center",color:"var(--txm)",fontSize:13}},h("div",{className:"fv2-loading-row"},h("span",{className:"fv2-loader"}),"Cargando "+periodo+"...")))
               :h("tr",null,h("td",{colSpan:10,style:{padding:"48px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados"))
             ):
             sorted.map(row=>{
