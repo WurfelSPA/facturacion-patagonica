@@ -2750,12 +2750,13 @@ function RotatingKpi({items}){
     return()=>clearInterval(id);
   },[paused,items.length]);
   const cur=items[Math.min(i,items.length-1)];
-  return h("div",{className:"dash-card epv2-ticker",style:cur.accent?{borderLeft:"3px solid "+cur.accent}:undefined,
+  return h("div",{className:"dash-card epv2-ticker",
+      style:{display:"flex",flexDirection:"column",alignItems:"center",textAlign:"center",padding:"20px 20px 18px",...(cur.accent?{borderLeft:"3px solid "+cur.accent}:null)},
       onMouseEnter:()=>setPaused(true),onMouseLeave:()=>setPaused(false)},
-    h("div",{className:"dash-card-lbl"},cur.lbl),
-    h("div",{key:i,className:"dash-card-val epv2-ticker-val",style:{color:cur.color,fontSize:20}},cur.val),
-    h("div",{className:"dash-card-sub"},cur.sub),
-    h("div",{style:{display:"flex",gap:5,marginTop:9}},
+    h("div",{className:"dash-card-lbl",style:{fontSize:11}},cur.lbl),
+    h("div",{key:i,className:"dash-card-val epv2-ticker-val",style:{color:cur.color,fontSize:26,marginTop:4}},cur.val),
+    h("div",{className:"dash-card-sub",style:{fontSize:12,marginTop:6}},cur.sub),
+    h("div",{style:{display:"flex",gap:5,marginTop:10,justifyContent:"center"}},
       items.map((_,idx)=>h("span",{key:idx,className:"epv2-ticker-dot"+(idx===i?" active":""),onClick:()=>setI(idx)}))
     )
   );
@@ -2777,8 +2778,8 @@ function EstadoPagosView({notify}){
   const [concFilter,setConcFilter]=useState("all");
   const [estFilter,setEstFilter]=useState("all");
   const [search,setSearch]=useState("");
-  const [sortCol,setSortCol]=useState(null);
-  const [sortDir,setSortDir]=useState("asc");
+  const [sortCol,setSortCol]=useState("monto");
+  const [sortDir,setSortDir]=useState("desc");
   const planillaFileRef=React.useRef(null);
   const moraRef=React.useRef(null);
 
@@ -2895,7 +2896,7 @@ function EstadoPagosView({notify}){
         {lbl:"Clientes en mora",color:"var(--red)",accent:"var(--red)",val:stats.nMoroso,sub:stats.nMoroso90+" de ellos con +90 días"}
       ]})
     ),
-    !loading&&!error&&h("div",{style:{fontSize:10,color:"var(--txd)",marginTop:-6}},
+    !loading&&!error&&h("div",{style:{fontSize:11,color:"var(--txm)",marginTop:-6}},
       "* Montos aproximados (UF planilla × valor UF del día, sin leer el PDF real de la factura) y solo clientes PISA — pueden diferir del total en Facturación, que prioriza el monto real facturado e incluye todas las sociedades."
     ),
 
