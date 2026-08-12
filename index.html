@@ -242,6 +242,15 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 .epv2-marquee-lbl{font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--txm)}
 .epv2-marquee-val{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700}
 @media (prefers-reduced-motion:reduce){.epv2-marquee-track{animation:none}}
+/* Banners por servicio (Aguas Andinas / Enel) — Cuentas de Servicios */
+.epv2-util-banner{position:relative;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 14px 9px 17px;border-radius:10px;background:var(--surf2);border:1px solid var(--bdr);overflow:hidden}
+.epv2-util-banner::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--ucolor)}
+.epv2-util-banner-title{display:flex;align-items:center;gap:7px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;color:var(--ucolor);letter-spacing:.02em;flex-shrink:0}
+.epv2-util-chip{display:flex;align-items:center;gap:5px;padding:4px 11px;border-radius:20px;background:var(--surf3);border:1px solid var(--bdr);font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--txm);white-space:nowrap}
+.epv2-util-chip b{font-weight:700;font-size:12px}
+.epv2-util-btn{display:flex;align-items:center;gap:5px;font-size:10px;padding:4px 10px;border-radius:6px;border:1px solid var(--ucolor);background:transparent;color:var(--ucolor);cursor:pointer;font-weight:600;flex-shrink:0}
+.epv2-util-btn:hover{background:rgba(255,255,255,.07)}
+.epv2-util-btn:disabled{opacity:.6;cursor:wait}
 </style>
 </head>
 <body>
@@ -3725,9 +3734,9 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
     normQ(c.nombre).includes(q)||normQ(c.sitio).includes(q)||normQ(c.edificio).includes(q)||
     (c.rut&&c.rut.replace(/[.\-]/g,"").includes(q.replace(/[.\-]/g,"")))
   );
-  if(!dashData)return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,overflow:"hidden",minHeight:0}},
+  if(!dashData)return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,overflow:"hidden",minHeight:0},className:"fade-up epv2"},
     driveLoading
-      ?h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},h("span",{className:"spin",style:{fontSize:18}},"\u29B3"),"Cargando planilla desde Drive...")
+      ?h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},h("span",{className:"fv2-loader",style:{width:18,height:18,fontSize:18}}),"Cargando planilla desde Drive...")
       :h("div",{style:{fontSize:13,color:"var(--txd)"}},"Sin datos \u2014 carga la planilla de facturac\u00e9n")
   );
   const conIdAA=clientes.filter(c=>c.idAgua).length;
@@ -3758,11 +3767,35 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
   function toggleSort(col){if(sortCol===col)setSortDir(d=>d==='asc'?'desc':'asc');else{setSortCol(col);setSortDir('asc');}}
   const sorted=sortCol?[...filtered].sort((a,b)=>{const va=getSortVal(a,sortCol),vb=getSortVal(b,sortCol);const cmp=typeof va==='number'?va-vb:va.localeCompare(vb,'es');return sortDir==='asc'?cmp:-cmp;}):filtered;
   const COLS=["Sitio","Edificio","RUT","Cliente","Direcci\u00f3n","ID Aguas Andinas","N\u00b0 Medidor AA","Deuda AA","Nombre Factura AA","ID Enel","N\u00b0 Medidor Enel","Deuda Enel"];
-  const AA_BLUE="#0074BF";   /* Azul corporativo Aguas Andinas */
-  const ENEL_GRN="#00873D";  /* Verde corporativo Enel Chile  */
+  const AA_BLUE="#38BDF8";   /* Azul Aguas Andinas, aclarado para fondo oscuro */
+  const ENEL_GRN="#34D399";  /* Verde Enel, aclarado para fondo oscuro */
   const AA_COLS=["ID Aguas Andinas","N\u00b0 Medidor AA","Deuda AA","Nombre Factura AA"];
   const ENEL_COLS=["ID Enel","N\u00b0 Medidor Enel","Deuda Enel"];
-  return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up"},
+  const bannerAA=h("div",{className:"epv2-util-banner",style:{"--ucolor":AA_BLUE}},
+    h("div",{className:"epv2-util-banner-title"},h("span",{className:"fv2-pulse",style:{"--acc":AA_BLUE}}),"💧 Aguas Andinas"),
+    h("span",{className:"epv2-util-chip"},"Cuentas ",h("b",{style:{color:"var(--tx)"}},Object.keys(aaData).length)),
+    h("span",{className:"epv2-util-chip"},"Con ID ",h("b",{style:{color:"var(--green)"}},conIdAA)),
+    h("span",{className:"epv2-util-chip"},"Sin ID ",h("b",{style:{color:"var(--amber)"}},sinIdAA)),
+    h("span",{className:"epv2-util-chip"},"Con deuda ",h("b",{style:{color:"var(--red)"}},conDeuda)),
+    aaLoading&&h("span",{className:"fv2-loader",style:{width:12,height:12,fontSize:12}}),
+    !aaLoading&&aaError&&h("span",{style:{fontSize:10,color:"var(--red)",cursor:"default"},title:aaError},"⚠️"),
+    h("span",{className:"epv2-util-chip",style:{marginLeft:"auto",color:"var(--txm)"}},aaUpdatedAt?"Act. "+new Date(aaUpdatedAt).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"}):"sin datos"),
+    h("button",{onClick:actualizarAA,disabled:aaRefreshing,title:"La sesión de AA debe estar iniciada",className:"epv2-util-btn",style:{"--ucolor":AA_BLUE},},aaRefreshing?h("span",{className:"fv2-loader",style:{width:11,height:11,fontSize:11}}):"⟳","Actualizar")
+  );
+  const bannerEnel=h("div",{className:"epv2-util-banner",style:{"--ucolor":ENEL_GRN}},
+    h("div",{className:"epv2-util-banner-title"},h("span",{className:"fv2-pulse",style:{"--acc":ENEL_GRN}}),"⚡ Enel"),
+    h("span",{className:"epv2-util-chip"},"Cuentas ",h("b",{style:{color:"var(--tx)"}},Object.keys(enelData).length)),
+    h("span",{className:"epv2-util-chip"},"Con ID ",h("b",{style:{color:"var(--green)"}},conIdEnel)),
+    h("span",{className:"epv2-util-chip"},"Sin ID ",h("b",{style:{color:"var(--amber)"}},sinIdEnel)),
+    h("span",{className:"epv2-util-chip"},"Con deuda ",h("b",{style:{color:"var(--red)"}},conDeudaEnel)),
+    sinAsignarEnel>0&&h("span",{className:"epv2-util-chip",title:"Cuentas en el portal Enel sin cliente asignado en la planilla"},"Sin asignar ",h("b",{style:{color:"#C4B5FD"}},sinAsignarEnel)),
+    enelLoading&&h("span",{className:"fv2-loader",style:{width:12,height:12,fontSize:12}}),
+    !enelLoading&&enelError&&h("span",{style:{fontSize:10,color:"var(--red)",cursor:"default"},title:enelError},"⚠️"),
+    h("span",{className:"epv2-util-chip",style:{marginLeft:"auto",color:"var(--txm)"}},enelUpdatedAt?"Act. "+new Date(enelUpdatedAt).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"}):"sin datos"),
+    h("button",{onClick:actualizarEnel,disabled:enelRefreshing,title:"La sesión de Enel debe estar iniciada",className:"epv2-util-btn",style:{"--ucolor":ENEL_GRN}},enelRefreshing?h("span",{className:"fv2-loader",style:{width:11,height:11,fontSize:11}}):"⟳","Actualizar")
+  );
+  return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up epv2"},
+    h("div",{style:{padding:"14px 24px 4px",display:"flex",flexDirection:"column",gap:8,flexShrink:0}},bannerAA,bannerEnel),
     h("div",{style:{padding:"14px 24px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,flexShrink:0,borderBottom:"1px solid var(--bdr)"}},
       h("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
         h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"\uD83D\uDD0C CUENTAS DE SERVICIOS"),
@@ -3774,7 +3807,7 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
         h("span",{title:"Cuentas con ID Aguas Andinas",style:{fontSize:10,color:"var(--green)",background:"var(--gbg)",border:"1px solid var(--gdim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",cursor:"default"}},conIdAA+" con ID"),
         h("span",{title:"Cuentas sin ID Aguas Andinas",style:{fontSize:10,color:"var(--amber)",background:"var(--abg)",border:"1px solid var(--adim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",cursor:"default"}},sinIdAA+" sin ID"),
         aaLoading&&h("span",{style:{fontSize:9,color:AA_BLUE},className:"spin"},"\u29B3"),
-        !aaLoading&&aaError&&h("span",{style:{fontSize:10,color:"var(--err)",cursor:"default"},title:aaError},"\u26A0\uFE0F"),
+        !aaLoading&&aaError&&h("span",{style:{fontSize:10,color:"var(--red)",cursor:"default"},title:aaError},"\u26A0\uFE0F"),
         !aaLoading&&conDeuda>0&&h("span",{title:"Cuentas con deuda vigente en Aguas Andinas",style:{fontSize:10,color:"var(--red)",background:"var(--rbg)",border:"1px solid var(--rdim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",fontWeight:700,cursor:"default"}},"\uD83D\uDD34 "+conDeuda+" con deuda"),
         h("button",{onClick:actualizarAA,disabled:aaRefreshing,title:"La sesi\u00F3n de AA debe estar iniciada",style:{fontSize:10,padding:"2px 8px",borderRadius:6,border:"1px solid "+AA_BLUE,background:"transparent",color:AA_BLUE,cursor:aaRefreshing?"wait":"pointer",opacity:aaRefreshing?0.6:1,display:"flex",alignItems:"center",gap:4}},aaRefreshing?h("span",{className:"spin"},"\u27F3"):"\u27F3","Actualizar"),
         h("span",{style:{width:1,height:16,background:"var(--bdr)",display:"inline-block",margin:"0 4px"}}),
@@ -3784,9 +3817,9 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
         h("span",{title:"Cuentas con ID Enel",style:{fontSize:10,color:"var(--green)",background:"var(--gbg)",border:"1px solid var(--gdim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",cursor:"default"}},conIdEnel+" con ID"),
         h("span",{title:"Cuentas sin ID Enel",style:{fontSize:10,color:"var(--amber)",background:"var(--abg)",border:"1px solid var(--adim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",cursor:"default"}},sinIdEnel+" sin ID"),
         enelLoading&&h("span",{style:{fontSize:9,color:ENEL_GRN},className:"spin"},"\u29B3"),
-        !enelLoading&&enelError&&h("span",{style:{fontSize:10,color:"var(--err)",cursor:"default"},title:enelError},"\u26A0\uFE0F"),
-        !enelLoading&&sinAsignarEnel>0&&h("span",{title:"Cuentas en el portal Enel sin cliente asignado en la planilla (ver filas al final de la tabla)",style:{fontSize:10,color:"#7c3aed",background:"#f3f0ff",border:"1px solid #c4b5fd",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",fontWeight:700,cursor:"default"}},"\u26A1 "+sinAsignarEnel+" sin asignar"),
-        !enelLoading&&conDeudaEnel>0&&h("span",{title:"Cuentas con deuda vigente en Enel",style:{fontSize:10,color:"#dc2626",background:"var(--rbg)",border:"1px solid var(--rdim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",fontWeight:700,cursor:"default"}},"\u26A1 "+conDeudaEnel+" con deuda"),
+        !enelLoading&&enelError&&h("span",{style:{fontSize:10,color:"var(--red)",cursor:"default"},title:enelError},"\u26A0\uFE0F"),
+        !enelLoading&&sinAsignarEnel>0&&h("span",{title:"Cuentas en el portal Enel sin cliente asignado en la planilla (ver filas al final de la tabla)",style:{fontSize:10,color:"#C4B5FD",background:"rgba(139,92,246,.14)",border:"1px solid rgba(139,92,246,.4)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",fontWeight:700,cursor:"default"}},"\u26A1 "+sinAsignarEnel+" sin asignar"),
+        !enelLoading&&conDeudaEnel>0&&h("span",{title:"Cuentas con deuda vigente en Enel",style:{fontSize:10,color:"var(--red)",background:"var(--rbg)",border:"1px solid var(--rdim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",fontWeight:700,cursor:"default"}},"\u26A1 "+conDeudaEnel+" con deuda"),
         h("button",{onClick:actualizarEnel,disabled:enelRefreshing,title:"La sesi\u00F3n de Enel debe estar iniciada",style:{fontSize:10,padding:"2px 8px",borderRadius:6,border:"1px solid "+ENEL_GRN,background:"transparent",color:ENEL_GRN,cursor:enelRefreshing?"wait":"pointer",opacity:enelRefreshing?0.6:1,display:"flex",alignItems:"center",gap:4}},enelRefreshing?h("span",{className:"spin"},"\u27F3"):"\u27F3","Actualizar")
       ),
       h("div",{style:{display:"flex",alignItems:"center",gap:8}},
@@ -3832,7 +3865,7 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
           ?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:12}},"Sin resultados para \""+search+"\"")
           :h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
               h("thead",null,
-                h("tr",{style:{background:"#f0f4f8",position:"sticky",top:0,zIndex:2}},
+                h("tr",{style:{background:"var(--surf2)",position:"sticky",top:0,zIndex:2}},
                   COLS.map(col=>{
                     const isAA=AA_COLS.includes(col),isEnel=ENEL_COLS.includes(col),active=sortCol===col;
                     const svcColor=isAA?AA_BLUE:isEnel?ENEL_GRN:null;
@@ -3844,7 +3877,7 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
                       borderBottom:`2px solid ${svcColor||"var(--bdr)"}`,
                       borderLeft:(isFirstAA||isFirstEnel)?`2px solid ${svcColor}40`:"none",
                       whiteSpace:"nowrap",
-                      background:isAA?`${AA_BLUE}0d`:isEnel?`${ENEL_GRN}0d`:"#f0f4f8",
+                      background:isAA?`${AA_BLUE}0d`:isEnel?`${ENEL_GRN}0d`:"var(--surf2)",
                       cursor:"pointer",userSelect:"none"
                     }},col.toUpperCase()+(active?(sortDir==='asc'?' ▲':' ▼'):''));
                   })
@@ -3872,7 +3905,7 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
                       h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:ENEL_GRN,fontWeight:600,borderLeft:`2px solid ${ENEL_GRN}40`,background:`${ENEL_GRN}0d`}},id),
                       h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--bdr)",background:`${ENEL_GRN}06`}},"—"),
                       h("td",{style:{padding:"9px 12px",fontSize:10,fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap",background:`${ENEL_GRN}06`}},
-                        d?h("span",{style:{color:tieneDeuda?"#dc2626":ENEL_GRN,fontWeight:tieneDeuda?700:400}},d.deuda||"$0")
+                        d?h("span",{style:{color:tieneDeuda?"var(--red)":ENEL_GRN,fontWeight:tieneDeuda?700:400}},d.deuda||"$0")
                          :h("span",{style:{color:"var(--bdr)"}},"—")
                       )
                     );
@@ -3883,7 +3916,7 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
                   return h("tr",{key:c.rut+"|"+c.sitio+"|"+c.edificio+i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"var(--surf2)"}},
                     h("td",{style:{padding:"9px 12px"}},h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},c.sitio||"\u2014")),
                     h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)"}},c.edificio||"\u2014"),
-                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txd)"}},c.rut||"\u2014"),
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:"var(--txm)"}},c.rut||"\u2014"),
                     h("td",{style:{padding:"9px 12px",fontWeight:600,fontSize:11,maxWidth:200}},
                       c.isVacante
                         ?h("span",{style:{padding:"2px 8px",borderRadius:6,fontSize:10,fontWeight:700,background:"var(--abg)",color:"var(--amber)",border:"1px solid var(--adim)"}},"VACANTE")
@@ -3898,8 +3931,8 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
                         :(()=>{
                           const d=aaData[c.idAgua];
                           if(aaLoading) return h("span",{style:{color:"var(--bdr)",fontSize:9}},"\u00b7\u00b7\u00b7");
-                          if(!d&&aaError) return h("span",{style:{color:"var(--err)",fontSize:9}},"\u26a0");
-                          if(d) return h("span",{style:{color:d.deuda&&d.deuda!=="$0"?"#dc2626":AA_BLUE,fontWeight:d.deuda&&d.deuda!=="$0"?700:400}},d.deuda||"$0");
+                          if(!d&&aaError) return h("span",{style:{color:"var(--red)",fontSize:9}},"\u26a0");
+                          if(d) return h("span",{style:{color:d.deuda&&d.deuda!=="$0"?"var(--red)":AA_BLUE,fontWeight:d.deuda&&d.deuda!=="$0"?700:400}},d.deuda||"$0");
                           return h("span",{style:{color:"var(--bdr)"}},"\u2014");
                         })()
                     ),
@@ -3932,7 +3965,7 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
                             return h("span",{
                               title:(mismo?"Coincide con cliente planilla":"\u26a0 Difiere del cliente en planilla")+" \u2014 clic para editar",
                               onClick:()=>{setEditingAA(i);setEditVal(d.nombre||"");},
-                              style:{color:mismo?"var(--txm)":"#dc2626",fontWeight:mismo?400:700,cursor:"pointer"}
+                              style:{color:mismo?"var(--txm)":"var(--red)",fontWeight:mismo?400:700,cursor:"pointer"}
                             },d.nombre);
                           }
                           return h("span",{
@@ -3950,8 +3983,8 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
                         :(()=>{
                           const d=enelData[c.idEnel];
                           if(enelLoading) return h("span",{style:{color:"var(--bdr)",fontSize:9}},"\u00b7\u00b7\u00b7");
-                          if(!d&&enelError) return h("span",{style:{color:"var(--err)",fontSize:9}},"\u26a0");
-                          if(d) return h("span",{style:{color:d.deuda&&d.deuda!=="$0"?"#dc2626":ENEL_GRN,fontWeight:d.deuda&&d.deuda!=="$0"?700:400}},d.deuda||"$0");
+                          if(!d&&enelError) return h("span",{style:{color:"var(--red)",fontSize:9}},"\u26a0");
+                          if(d) return h("span",{style:{color:d.deuda&&d.deuda!=="$0"?"var(--red)":ENEL_GRN,fontWeight:d.deuda&&d.deuda!=="$0"?700:400}},d.deuda||"$0");
                           return h("span",{style:{color:"var(--bdr)"}},"\u2014");
                         })()
                     )
