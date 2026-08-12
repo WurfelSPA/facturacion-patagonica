@@ -223,6 +223,15 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
   .epv2-bar-fill{transition:none}
   .epv2-bar-fill::after{animation:none;display:none}
 }
+/* KPIs tipo ticker bursátil — un cuadro, 3 datos que se alternan solos */
+.epv2-ticker{cursor:default}
+@keyframes epv2tickerIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.epv2-ticker-val{animation:epv2tickerIn .45s ease}
+.epv2-ticker-dot{width:5px;height:5px;border-radius:50%;background:var(--bdr2);display:inline-block;cursor:pointer;transition:background .25s,transform .25s,box-shadow .25s}
+.epv2-ticker-dot.active{background:var(--acc);box-shadow:0 0 6px 1px var(--acc);transform:scale(1.35)}
+@media (prefers-reduced-motion:reduce){
+  .epv2-ticker-val{animation:none}
+}
 </style>
 </head>
 <body>
@@ -2730,6 +2739,27 @@ function BarraAntiguedad({buckets}){
     ))
   );
 }
+/* KPIs que alternan solos cada 3s dentro de un mismo cuadro, tipo ticker bursátil.
+   Se pausa mientras el mouse está encima para no molestar al leer. */
+function RotatingKpi({items}){
+  const [i,setI]=useState(0);
+  const [paused,setPaused]=useState(false);
+  useEffect(()=>{
+    if(paused||items.length<2)return;
+    const id=setInterval(()=>setI(v=>(v+1)%items.length),3000);
+    return()=>clearInterval(id);
+  },[paused,items.length]);
+  const cur=items[Math.min(i,items.length-1)];
+  return h("div",{className:"dash-card epv2-ticker",style:cur.accent?{borderLeft:"3px solid "+cur.accent}:undefined,
+      onMouseEnter:()=>setPaused(true),onMouseLeave:()=>setPaused(false)},
+    h("div",{className:"dash-card-lbl"},cur.lbl),
+    h("div",{key:i,className:"dash-card-val epv2-ticker-val",style:{color:cur.color,fontSize:20}},cur.val),
+    h("div",{className:"dash-card-sub"},cur.sub),
+    h("div",{style:{display:"flex",gap:5,marginTop:9}},
+      items.map((_,idx)=>h("span",{key:idx,className:"epv2-ticker-dot"+(idx===i?" active":""),onClick:()=>setI(idx)}))
+    )
+  );
+}
 function EstadoPagosView({notify}){
   const PERIODOS_DASH=React.useMemo(()=>{const i=PERIODOS.indexOf("Mayo 2026");return i>=0?PERIODOS.slice(i):PERIODOS;},[]);
   const [periodo,setPeriodo]=useState(()=>{
@@ -2853,37 +2883,17 @@ function EstadoPagosView({notify}){
     h("div",{className:"fv2-stream"}),
     error&&h("div",{style:{padding:12,background:"var(--rbg)",color:"var(--red)",borderRadius:8,fontSize:12}},error),
 
-    !loading&&!error&&h("div",{style:{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:12}},
-      h("div",{className:"dash-card"},
-        h("div",{className:"dash-card-lbl"},"Total Facturado PISA"),
-        h("div",{className:"dash-card-val",style:{color:"var(--blue)",fontSize:20}},enriched.length>0?"$"+Math.round(stats.totalFacturado).toLocaleString("es-CL"):"—"),
-        h("div",{className:"dash-card-sub"},enriched.length+" facturas · "+periodo)
-      ),
-      h("div",{className:"dash-card"},
-        h("div",{className:"dash-card-lbl"},"Total Arriendo PISA"),
-        h("div",{className:"dash-card-val",style:{color:"var(--blue)",fontSize:20}},enriched.length>0?"$"+Math.round(stats.arriendo.monto).toLocaleString("es-CL"):"—"),
-        h("div",{className:"dash-card-sub"},stats.arriendo.total+" facturas")
-      ),
-      h("div",{className:"dash-card"},
-        h("div",{className:"dash-card-lbl"},"Total Serv. Adm. PISA"),
-        h("div",{className:"dash-card-val",style:{color:"var(--blue)",fontSize:20}},enriched.length>0?"$"+Math.round(stats.servAdm.monto).toLocaleString("es-CL"):"—"),
-        h("div",{className:"dash-card-sub"},stats.servAdm.total+" facturas")
-      ),
-      h("div",{className:"dash-card",style:{borderLeft:"3px solid var(--green)"}},
-        h("div",{className:"dash-card-lbl"},"% Pagado"),
-        h("div",{className:"dash-card-val",style:{color:"var(--green)"}},stats.pct+"%"),
-        h("div",{className:"dash-card-sub"},`${stats.nPagados} de ${enriched.length} facturas`)
-      ),
-      h("div",{className:"dash-card",style:{borderLeft:"3px solid var(--green)"}},
-        h("div",{className:"dash-card-lbl"},"Clientes al día"),
-        h("div",{className:"dash-card-val",style:{color:"var(--green)"}},stats.nAlDia),
-        h("div",{className:"dash-card-sub"},"0-30 días de mora")
-      ),
-      h("div",{className:"dash-card",style:{borderLeft:"3px solid var(--red)"}},
-        h("div",{className:"dash-card-lbl"},"Clientes en mora"),
-        h("div",{className:"dash-card-val",style:{color:"var(--red)"}},stats.nMoroso),
-        h("div",{className:"dash-card-sub"},stats.nMoroso90+" de ellos con +90 días")
-      )
+    !loading&&!error&&h("div",{style:{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12}},
+      h(RotatingKpi,{items:[
+        {lbl:"Total Facturado PISA",color:"var(--blue)",val:enriched.length>0?"$"+Math.round(stats.totalFacturado).toLocaleString("es-CL"):"—",sub:enriched.length+" facturas · "+periodo},
+        {lbl:"Total Arriendo PISA",color:"var(--blue)",val:enriched.length>0?"$"+Math.round(stats.arriendo.monto).toLocaleString("es-CL"):"—",sub:stats.arriendo.total+" facturas"},
+        {lbl:"Total Serv. Adm. PISA",color:"var(--blue)",val:enriched.length>0?"$"+Math.round(stats.servAdm.monto).toLocaleString("es-CL"):"—",sub:stats.servAdm.total+" facturas"}
+      ]}),
+      h(RotatingKpi,{items:[
+        {lbl:"% Pagado",color:"var(--green)",accent:"var(--green)",val:stats.pct+"%",sub:`${stats.nPagados} de ${enriched.length} facturas`},
+        {lbl:"Clientes al día",color:"var(--green)",accent:"var(--green)",val:stats.nAlDia,sub:"0-30 días de mora"},
+        {lbl:"Clientes en mora",color:"var(--red)",accent:"var(--red)",val:stats.nMoroso,sub:stats.nMoroso90+" de ellos con +90 días"}
+      ]})
     ),
     !loading&&!error&&h("div",{style:{fontSize:10,color:"var(--txd)",marginTop:-6}},
       "* Montos aproximados (UF planilla × valor UF del día, sin leer el PDF real de la factura) y solo clientes PISA — pueden diferir del total en Facturación, que prioriza el monto real facturado e incluye todas las sociedades."
@@ -2935,7 +2945,7 @@ function EstadoPagosView({notify}){
             sortedRows.length===0?h("tr",null,h("td",{colSpan:6,style:{padding:32,textAlign:"center",color:"var(--txd)"}},"Sin resultados")):
             sortedRows.map((r,i)=>h("tr",{key:r.rut+"|"+r.tipo+"|"+i,style:{borderBottom:"1px solid var(--bdr)"}},
               h("td",{style:{padding:"7px 11px",fontWeight:600}},r.cliente),
-              h("td",{style:{padding:"7px 11px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txd)"}},formatRUT(r.rut)),
+              h("td",{style:{padding:"7px 11px",fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:"var(--txm)"}},formatRUT(r.rut)),
               h("td",{style:{padding:"7px 11px"}},h("span",{className:r.tipo==="arriendo"?"tag-arr":"tag-srv"},r.tipo==="arriendo"?"Arriendo":"Serv. Adm.")),
               h("td",{style:{padding:"7px 11px",textAlign:"right",fontFamily:"'DM Mono',monospace"}},r.montoClp!=null?"$"+r.montoClp.toLocaleString("es-CL"):"—"),
               h("td",{style:{padding:"7px 11px"}},r.yaPagado
