@@ -9,15 +9,17 @@
  *
  * Si esa fecha ya llegó (es decir, cae dentro de este mes o antes) y todavía
  * no se le avisó a ese cliente por ESTE mismo ciclo de renovación (se
- * trackea por rut+sitio+fechaTérmino en renovaciones-notificadas.json), le
- * envía un correo de aviso de renovación automática con copia al equipo.
+ * trackea por rut+sitio+edificio+fechaTérmino en renovaciones-notificadas.json),
+ * le envía un correo de aviso de renovación automática — sin copia a nadie.
+ * Al terminar, manda UN solo correo resumen a facturacion@patagonica.cl con el
+ * detalle de a quién se le avisó ese día (o "sin pendientes" si no hubo nadie).
  *
  * La primera vez que corre, "atrapa" cualquier aviso vencido que quedó sin
  * mandar antes de que este cron existiera — eso es intencional.
  *
  * ✅ EN PRODUCCIÓN (TEST_MODE=false): entrega de verdad al correo del
- * cliente registrado en la Planilla, con copia a alagies@ y mmunoz@.
- * Para volver a modo prueba, cambiar TEST_MODE a true.
+ * cliente registrado en la Planilla. Para volver a modo prueba, cambiar
+ * TEST_MODE a true.
  *
  * Env vars requeridas (todas ya existentes en el proyecto):
  *   GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_FROM
@@ -30,13 +32,13 @@
 import XLSX from 'xlsx';
 
 // ═════════════════ Cambiar TEST_MODE a true para volver a modo prueba ═════════════════
-const TEST_MODE  = true;
+const TEST_MODE  = false;
 const TEST_DEST  = 'amelendez@patagonica.cl';
 // ══════════════════════════════════════════════════════════════════════════════════════
 
 const DRIVE_PLANILLA_ID_DEFAULT = "1yIKK0ZgU5C1ARsD6NIryRlHnom2Qilml";
 const TRACKING_FILE = "renovaciones-notificadas.json";
-const CC_DEST = ['alagies@patagonica.cl', 'mmunoz@patagonica.cl'];
+const RESUMEN_DEST = 'facturacion@patagonica.cl';
 
 // ── Gmail OAuth (mismo patrón que recordatorio-pago.js) ──────────────────────
 async function getGmailToken() {
@@ -204,6 +206,22 @@ function buildRenovacionHtml({ nombre, sitio, edificio, terminoTxt, renovacion, 
   </td></tr><tr><td style="background:#f8f8f8;border-top:1px solid #e8e8e8;padding:18px 32px"><p style="font-size:13px;font-weight:600;color:#111;margin:0 0 2px">Administración de Contratos</p><p style="font-size:12px;color:#666;margin:0">Patagónica Inmobiliaria SpA · RUT 96.673.250-4</p><p style="font-size:11px;color:#999;margin:6px 0 0">Correo generado automáticamente.</p></td></tr></table></td></tr></table></body></html>`;
 }
 
+// ── Correo resumen para facturacion@patagonica.cl (uno solo por corrida) ─────
+function buildResumenHtml(enviadosOk, fallidos, hoyTxt) {
+  const filas = enviadosOk.length
+    ? enviadosOk.map(x => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee">${esc(x.nombre)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee">${esc(x.sitio)}${x.edificio ? ', ' + esc(x.edificio) : ''}</td><td style="padding:6px 10px;border-bottom:1px solid #eee">${esc(x.termino)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee">${esc(x.enviadoA)}</td></tr>`).join('')
+    : `<tr><td style="padding:10px" colspan="4">Sin pendientes por notificar en esta corrida.</td></tr>`;
+  const filasError = fallidos.length
+    ? `<p style="font-size:13px;color:#c0392b;margin:20px 0 6px;font-weight:600">Con error (revisar manualmente):</p><ul style="font-size:13px;color:#c0392b;margin:0 0 0 18px;padding:0">${fallidos.map(x => `<li>${esc(x.nombre)} (${esc(x.sitio)}${x.edificio ? ', ' + esc(x.edificio) : ''}) — ${esc(x.error)}</li>`).join('')}</ul>`
+    : '';
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#f4f4f4;font-family:Helvetica,Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:28px 0"><tr><td align="center"><table width="640" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;border:1px solid #e0e0e0;overflow:hidden"><tr><td style="background:#0f1117;padding:22px 32px"><div style="font-size:18px;font-weight:700;color:#fff">Patagónica Inmobiliaria SpA</div><div style="font-size:11px;color:#7b8299;margin-top:4px">Resumen automático — Avisos de renovación de contrato</div></td></tr><tr><td style="padding:28px 32px">
+    <p style="font-size:14px;color:#333;margin:0 0 16px">Corrida del ${esc(hoyTxt)}: se enviaron <strong>${enviadosOk.length}</strong> aviso(s) de renovación automática.</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#333;border-collapse:collapse"><thead><tr style="background:#f8f8f8"><th style="text-align:left;padding:6px 10px;border-bottom:2px solid #ddd">Cliente</th><th style="text-align:left;padding:6px 10px;border-bottom:2px solid #ddd">Sitio / Edificio</th><th style="text-align:left;padding:6px 10px;border-bottom:2px solid #ddd">Término</th><th style="text-align:left;padding:6px 10px;border-bottom:2px solid #ddd">Enviado a</th></tr></thead><tbody>${filas}</tbody></table>
+    ${filasError}
+    <p style="font-size:12px;color:#999;margin:20px 0 0">Próxima revisión automática: el 1° del mes siguiente.</p>
+  </td></tr></table></td></tr></table></body></html>`;
+}
+
 // ── MIME crudo CON Cc ─────────────────────────────────────────────────────────
 function buildRawEmail(to, cc, from, subject, htmlBody) {
   const fromEncoded = `=?UTF-8?B?${Buffer.from('Patagónica Inmobiliaria').toString('base64')}?= <${from}>`;
@@ -242,8 +260,7 @@ export default async function handler(req, res) {
   const isCron = req.headers['x-vercel-cron'] === '1' || (cronSecret && authHeader === `Bearer ${cronSecret}`);
   const isAuth = isCron
     || (syncSecret && authHeader === `Bearer ${syncSecret}`)
-    || (seedSecret && authHeader === `Bearer ${seedSecret}`)
-    || (TEST_MODE && req.query.preview === '1'); // se autodesactiva al pasar TEST_MODE a false
+    || (seedSecret && authHeader === `Bearer ${seedSecret}`);
   if (!isAuth) return res.status(401).json({ error: 'No autorizado' });
 
   const FROM = process.env.GMAIL_FROM || 'facturacion@patagonica.cl';
@@ -288,11 +305,10 @@ export default async function handler(req, res) {
         nuevoTerminoTxt: fmtDate(nuevoTermino)
       });
       const destinatario = TEST_MODE ? TEST_DEST : c.correo;
-      const cc = TEST_MODE ? [] : CC_DEST;
 
       try {
-        await sendGmail(gmailToken, destinatario, cc, FROM, subject, htmlBody);
-        detalle.push({ ...pick(c), fechaNotif: fmtDate(fechaNotif), enviadoA: destinatario, cc });
+        await sendGmail(gmailToken, destinatario, [], FROM, subject, htmlBody);
+        detalle.push({ ...pick(c), fechaNotif: fmtDate(fechaNotif), enviadoA: destinatario });
         enviados++;
         if (!TEST_MODE) {
           tracking.notificados[key] = { nombre: c.nombre, sitio: c.sitio, termino: fmtDate(c.termTermino), notificadoEn: new Date().toISOString() };
@@ -305,6 +321,18 @@ export default async function handler(req, res) {
 
     if (cambios) {
       await githubPutJson(TRACKING_FILE, tracking, sha, `chore: actualizar renovaciones notificadas ${hoy.toISOString().slice(0, 10)}`);
+    }
+
+    // ── Correo resumen único a facturacion@patagonica.cl ──────────────────────
+    const enviadosOk = detalle.filter(x => x.enviadoA && !x.error);
+    const fallidos = detalle.filter(x => x.error);
+    if (!TEST_MODE) {
+      try {
+        const hoyTxt = fmtDate(hoy);
+        await sendGmail(gmailToken, RESUMEN_DEST, [], FROM, `Resumen — Avisos de renovación de contrato (${hoyTxt})`, buildResumenHtml(enviadosOk, fallidos, hoyTxt));
+      } catch (e) {
+        console.error('[renovacion-contratos] Error enviando resumen:', e);
+      }
     }
 
     return res.status(200).json({ ok: true, testMode: TEST_MODE, enviados, revisados: clientes.length, detalle });
