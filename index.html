@@ -3386,9 +3386,9 @@ function ContratosView({dashData,driveLoading}){
           h("span",{style:{fontWeight:700,fontSize:12}},"Contratos con Término en "+currentYear),
           h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},vencimientos.length)
         ),
-        h("div",{style:{overflowX:"auto"}},
+        h("div",{style:{overflowX:"auto",overflowY:"auto",maxHeight:"calc(100vh - 320px)"}},
           h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
-            h("thead",null,h("tr",{style:{background:"#f0f4f8"}},["Sitio","Cliente / RUT","Edificio","Fecha Término","Días Restantes","Aviso previo","Aviso","Fecha Notificación","Serv. Admin.","Estado"].map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap"}},col.toUpperCase())))),
+            h("thead",null,h("tr",{style:{background:"#f0f4f8",position:"sticky",top:0,zIndex:2}},["Sitio","Cliente / RUT","Edificio","Fecha Término","Días Restantes","Aviso previo","Aviso","Fecha Notificación","Serv. Admin.","Estado"].map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap",background:"#f0f4f8"}},col.toUpperCase())))),
             h("tbody",null,vencimientos.map((c,i)=>{
               const dias=diasDesde(c.termTermino);
               const{bg,col,bdr}=urgBg(dias,false);
