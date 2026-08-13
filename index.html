@@ -260,8 +260,8 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 .hist-marquee::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--acc),var(--accl),transparent);opacity:.7;z-index:1}
 .hist-marquee-track{display:flex;align-items:center;gap:10px;width:max-content;padding:8px 14px;animation:epv2marquee 24s linear infinite;will-change:transform;backface-visibility:hidden}
 .hist-marquee:hover .hist-marquee-track{animation-play-state:paused}
-.hist-marquee-item{display:flex;align-items:center;gap:7px;padding:5px 13px;border-radius:20px;background:var(--surf2);border:1px solid var(--bdr);font-size:11px;color:var(--txm);white-space:nowrap;flex-shrink:0}
-.hist-marquee-item b{font-family:'DM Mono',monospace;font-weight:700;color:var(--accl)}
+.hist-marquee-item{display:flex;align-items:center;gap:8px;padding:6px 15px;border-radius:20px;background:var(--surf2);border:1px solid var(--bdr);font-size:13px;color:#1a3a5c;white-space:nowrap;flex-shrink:0}
+.hist-marquee-item b{font-family:'DM Mono',monospace;font-weight:700;font-size:14px;color:var(--accl)}
 .hist-marquee-item.total{background:#ddeaf8;border-color:#b8d0ee}
 .hist-marquee-item.total b{color:var(--green)}
 @media (prefers-reduced-motion:reduce){.hist-marquee-track{animation:none}}
@@ -4437,8 +4437,12 @@ function HistorialFactView({dashData,driveLoading,notify,planillaFile,marcarPaga
   const totalLoading=loadingSet.size;
   const totalPeriods=periodsAvail.length*selGroup.length;
 
+  const MES_AZULES=["#eaf3fc","#dceefa","#cde8f8","#bfe1f6","#a9d6f2","#93cbee","#7bbeea"];
+  const MES_AZULES_BDR=["#cfe3f7","#bfdaf3","#a9d0ef","#93c5ea","#7ab8e3","#63aade","#4f9cd6"];
   const histBannerItems=resumenData!==null?[
-    ...MESES_RESUMEN.map(mes=>h("span",{key:mes,className:"hist-marquee-item"},mes.split(" ")[0].slice(0,3),h("b",null,"$"+Math.round(totalesResumen.meses[mes]||0).toLocaleString("es-CL")))),
+    ...MESES_RESUMEN.map((mes,i)=>h("span",{key:mes,className:"hist-marquee-item",
+      style:{background:MES_AZULES[i%MES_AZULES.length],borderColor:MES_AZULES_BDR[i%MES_AZULES_BDR.length]}},
+      mes.split(" ")[0].slice(0,3),h("b",null,"$"+Math.round(totalesResumen.meses[mes]||0).toLocaleString("es-CL")))),
     h("span",{key:"total",className:"hist-marquee-item total"},"Total 2026",h("b",null,"$"+Math.round(totalesResumen.total).toLocaleString("es-CL")))
   ]:[];
 
