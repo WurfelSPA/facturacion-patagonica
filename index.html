@@ -640,6 +640,14 @@ const MESES_NOMBRES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","A
 const ANIOS_VENTAS=[2022,2023,2024,2025,2026];
 const PERIODOS=(()=>{const p=[];for(let y=2022;y<=2026;y++)for(const m of MESES_NOMBRES)p.push(`${m} ${y}`);return p;})();
 const SITIO_C={"5-A":"#7c3aed","4-A":"#0d9488","A-2":"#ea580c","A-1":"#2563eb","D-2":"#db2777","B":"#64748b","J":"#b45309","D-3":"#0891b2","24.0":"#6d28d9"};
+/* Un color fijo por mes (Ene=0…Dic=11) — para que una fecha de término nunca
+   se confunda con la de otro mes de un vistazo (ej. agosto vs octubre). */
+const MES_COLOR=["#2563eb","#7c3aed","#db2777","#dc2626","#ea580c","#b45309","#65a30d","#16a34a","#0d9488","#0891b2","#4338ca","#9333ea"];
+function colorPorMesFecha(fechaStr){
+  if(!fechaStr||typeof fechaStr!=="string"||!fechaStr.includes("/"))return null;
+  const mm=parseInt(fechaStr.split("/")[1],10);
+  return mm>=1&&mm<=12?MES_COLOR[mm-1]:null;
+}
 const MES_NUM={"Enero":1,"Febrero":2,"Marzo":3,"Abril":4,"Mayo":5,"Junio":6,"Julio":7,"Agosto":8,"Septiembre":9,"Octubre":10,"Noviembre":11,"Diciembre":12};
 /* Convierte índice 0-based de columna a letra Excel: 0→A, 25→Z, 26→AA, 210→HC */
 function colIndexToLetter(idx){let r='',n=idx+1;while(n>0){const rem=(n-1)%26;r=String.fromCharCode(65+rem)+r;n=Math.floor((n-1)/26);}return r;}
@@ -3392,7 +3400,7 @@ function ContratosView({dashData,driveLoading}){
                 h("td",{style:{padding:"9px 12px"}},h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},c.sitio||"—")),
                 h("td",{style:{padding:"9px 12px",maxWidth:200}},h("div",{style:{fontWeight:600,fontSize:11,lineHeight:1.3}},c.nombre),h("div",{style:{fontSize:9,color:"var(--txd)",fontFamily:"'DM Mono',monospace",marginTop:2}},c.rut)),
                 h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)"}},c.edificio||"—"),
-                h("td",{style:{padding:"9px 12px"}},h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,color:dias!==null&&dias<0?"var(--red)":dias!==null&&dias<=90?"var(--amber)":"var(--tx)"}},c.termTermino||"—")),
+                h("td",{style:{padding:"9px 12px"}},h("span",{title:"Color fijo por mes de vencimiento",style:{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,color:colorPorMesFecha(c.termTermino)||"var(--tx)"}},c.termTermino||"—")),
                 h("td",{style:{padding:"9px 12px"}},dias!==null?h("span",{style:{padding:"2px 8px",borderRadius:10,fontSize:10,fontWeight:700,background:bg,color:col,border:"1px solid "+bdr}},dias<0?"Vencido hace "+Math.abs(dias)+"d":dias===0?"Hoy":dias+"d"):h("span",{style:{color:"var(--txd)"}},"—")),
                 h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.renovacion||"—"),
                 h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.aviso||"—"),
