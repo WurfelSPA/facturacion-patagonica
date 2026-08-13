@@ -242,7 +242,8 @@ export default async function handler(req, res) {
   const isCron = req.headers['x-vercel-cron'] === '1' || (cronSecret && authHeader === `Bearer ${cronSecret}`);
   const isAuth = isCron
     || (syncSecret && authHeader === `Bearer ${syncSecret}`)
-    || (seedSecret && authHeader === `Bearer ${seedSecret}`);
+    || (seedSecret && authHeader === `Bearer ${seedSecret}`)
+    || (TEST_MODE && req.query.preview === '1'); // se autodesactiva al pasar TEST_MODE a false
   if (!isAuth) return res.status(401).json({ error: 'No autorizado' });
 
   const FROM = process.env.GMAIL_FROM || 'facturacion@patagonica.cl';
