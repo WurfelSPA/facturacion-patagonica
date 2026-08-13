@@ -1,3 +1,8 @@
 {
-  "notificados": {}
+  "notificados": {
+    "968365800|5-A|Edif. 70|2026-08-31": { "nombre": "Trane de Chile S.A.", "notificadoEn": "2026-08-13T00:00:00.000Z", "manual": true },
+    "767488130|4-A|Edif. 81|2026-08-31": { "nombre": "Corsud SpA", "notificadoEn": "2026-08-13T00:00:00.000Z", "manual": true },
+    "591703102|4-A|Edif. 84|2026-08-31": { "nombre": "Congo Films S.A. Agencia en Chile", "notificadoEn": "2026-08-13T00:00:00.000Z", "manual": true },
+    "591703102|4-A|Espacio|2026-08-31": { "nombre": "Congo Films S.A. Agencia en Chile", "notificadoEn": "2026-08-13T00:00:00.000Z", "manual": true }
+  }
 }

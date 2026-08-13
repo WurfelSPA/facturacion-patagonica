@@ -264,17 +264,17 @@ export default async function handler(req, res) {
 
     for (const c of clientes) {
       if (!c.termTermino) continue;
-      // Nunca avisar automáticamente por contratos cuyo término ya quedó en un año
-      // anterior al actual — son datos probablemente desactualizados en la Planilla
-      // (inquilino cambiado, renovación ya resuelta a mano, etc.) y requieren revisión
-      // manual, no un correo automático de "su contrato vence el [hace más de un año]".
-      if (c.termTermino.getUTCFullYear() < hoy.getUTCFullYear()) { detalle.push({ ...pick(c), skip: 'término en año anterior — requiere revisión manual' }); continue; }
+      // Nunca avisar automáticamente si el Término ya pasó: la renovación automática
+      // ya ocurrió sola (silenciosa) y mandar un aviso "su contrato vence el [fecha
+      // pasada]" no tiene sentido — esos casos requieren revisión manual caso a caso.
+      // Solo interesa avisar mientras el contrato todavía está dentro de su plazo vigente.
+      if (c.termTermino < hoy) { detalle.push({ ...pick(c), skip: 'término ya pasado — requiere revisión manual' }); continue; }
       const diasAviso = parseDiasAviso(c.aviso);
       if (diasAviso == null) { detalle.push({ ...pick(c), skip: 'sin días de aviso configurados' }); continue; }
       const fechaNotif = new Date(c.termTermino.getTime() - diasAviso * 86400000);
       if (fechaNotif > limiteMes) continue; // aún no le corresponde este ciclo
 
-      const key = `${rutNorm(c.rut)}|${c.sitio}|${c.termTermino.toISOString().slice(0, 10)}`;
+      const key = `${rutNorm(c.rut)}|${c.sitio}|${c.edificio}|${c.termTermino.toISOString().slice(0, 10)}`;
       if (tracking.notificados[key]) continue; // ya se le avisó por este mismo vencimiento
 
       if (!c.correo) { detalle.push({ ...pick(c), fechaNotif: fmtDate(fechaNotif), skip: 'sin correo en planilla' }); continue; }
