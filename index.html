@@ -6256,7 +6256,8 @@ function App(){
               const clpTotal=c.ufTotal>0?Math.round(c.ufTotal*tblUf):null;
               const isSelected=histClient&&histClient.rut===c.rut&&histClient.sitio===c.sitio;
               const numDirM=(c.dir||"").match(/(\d+(?:-[A-Za-z0-9]+)?)\s*$/);
-              const numDir=numDirM?(numDirM[1].includes("-")?numDirM[1]:"Piso "+numDirM[1]):null;
+              const edifTienePiso=/piso/i.test(c.edificio||"");
+              const numDir=numDirM?((numDirM[1].includes("-")||!edifTienePiso)?numDirM[1]:"Piso "+numDirM[1]):null;
               return h("div",{key:c.rut+c.nombre+c.sitio+"_wrap",style:{borderBottom:"1px solid var(--bdr)",background:isSelected?"var(--bbg)":"transparent"}},
               h("div",{
                 className:"dash-client-row",
