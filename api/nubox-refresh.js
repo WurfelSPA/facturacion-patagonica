@@ -268,7 +268,75 @@ async function updateCacheViaGitHub(data) {
   return await putRes.json();
 }
 
-// ── Handler principal ─────────────────────────────────────────────────────────
+// ── Lógica central, reutilizable desde el handler del cron y desde el botón manual ──
+export async function runNuboxRefresh() {
+  const RUT               = process.env.NUBOX_API_USER;
+  const CLAVE             = process.env.NUBOX_API_PASS;
+  const BROWSERLESS_TOKEN = process.env.BROWSERLESS_TOKEN;
+
+  if (!RUT || !CLAVE)     throw new Error('Faltan NUBOX_API_USER / NUBOX_API_PASS');
+  if (!BROWSERLESS_TOKEN) throw new Error('Falta BROWSERLESS_TOKEN');
+
+  console.log('[nubox-refresh] Iniciando scraping Nubox Resumen de Ventas...');
+
+  // Llamar a Browserless
+  const blRes = await fetch(
+    `https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code:    BROWSER_CODE,
+        context: { rut: RUT, clave: CLAVE }
+      })
+    }
+  );
+
+  if (!blRes.ok) {
+    const errText = await blRes.text();
+    throw new Error(`Browserless ${blRes.status}: ${errText.slice(0, 300)}`);
+  }
+
+  const blData = await blRes.json();
+  if (!blData.excelBase64) {
+    throw new Error('No se recibió Excel de Browserless: ' + JSON.stringify(blData).slice(0, 200));
+  }
+
+  console.log('[nubox-refresh] Excel recibido, parseando...');
+
+  // Parsear Excel
+  const excelBuffer            = Buffer.from(blData.excelBase64, 'base64');
+  const { columnas, clientes } = parseNuboxExcel(excelBuffer);
+
+  console.log(`[nubox-refresh] ${clientes.length} clientes, meses: ${columnas.join(', ')}`);
+
+  if (clientes.length < 10) {
+    throw new Error(`Solo ${clientes.length} clientes encontrados — posible error de parseo`);
+  }
+
+  // Construir cache
+  const cacheData = {
+    ok:        true,
+    updatedAt: new Date().toISOString(),
+    source:    'browserless-excel',
+    columnas,
+    clientes
+  };
+
+  // Subir a GitHub → dispara redeploy automático en Vercel
+  await updateCacheViaGitHub(cacheData);
+  console.log('[nubox-refresh] nubox-resumen-cache.json actualizado en GitHub');
+
+  return {
+    ok:        true,
+    updatedAt: cacheData.updatedAt,
+    clientes:  clientes.length,
+    columnas:  columnas.length,
+    meses:     columnas
+  };
+}
+
+// ── Handler principal (cron semanal de Vercel o llamada manual con SYNC_SECRET) ──
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -284,68 +352,12 @@ export default async function handler(req, res) {
   const isAuth     = isCron || (syncSecret && authHeader === `Bearer ${syncSecret}`);
   if (!isAuth) return res.status(401).json({ error: 'No autorizado' });
 
-  const RUT               = process.env.NUBOX_API_USER;
-  const CLAVE             = process.env.NUBOX_API_PASS;
-  const BROWSERLESS_TOKEN = process.env.BROWSERLESS_TOKEN;
-
-  if (!RUT || !CLAVE)         return res.status(500).json({ error: 'Faltan NUBOX_API_USER / NUBOX_API_PASS' });
-  if (!BROWSERLESS_TOKEN)     return res.status(500).json({ error: 'Falta BROWSERLESS_TOKEN' });
-
   try {
-    console.log('[nubox-refresh] Iniciando scraping Nubox Resumen de Ventas...');
-
-    // Llamar a Browserless
-    const blRes = await fetch(
-      `https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code:    BROWSER_CODE,
-          context: { rut: RUT, clave: CLAVE }
-        })
-      }
-    );
-
-    if (!blRes.ok) {
-      const errText = await blRes.text();
-      throw new Error(`Browserless ${blRes.status}: ${errText.slice(0, 300)}`);
-    }
-
-    const blData = await blRes.json();
-    if (!blData.excelBase64) {
-      throw new Error('No se recibió Excel de Browserless: ' + JSON.stringify(blData).slice(0, 200));
-    }
-
-    console.log('[nubox-refresh] Excel recibido, parseando...');
-
-    // Parsear Excel
-    const excelBuffer        = Buffer.from(blData.excelBase64, 'base64');
-    const { columnas, clientes } = parseNuboxExcel(excelBuffer);
-
-    console.log(`[nubox-refresh] ${clientes.length} clientes, meses: ${columnas.join(', ')}`);
-
-    if (clientes.length < 10) {
-      throw new Error(`Solo ${clientes.length} clientes encontrados — posible error de parseo`);
-    }
-
-    // Construir cache
-    const cacheData = {
-      ok:        true,
-      updatedAt: new Date().toISOString(),
-      source:    'browserless-excel',
-      columnas,
-      clientes
-    };
-
-    // Subir a GitHub → dispara redeploy automático en Vercel
-    await updateCacheViaGitHub(cacheData);
-    console.log('[nubox-refresh] nubox-resumen-cache.json actualizado en GitHub');
-
-    return res.status(200).json({
-      ok:       true,
-      updatedAt: cacheData.updatedAt,
-      clientes:  clientes.length,
-      columnas:  columnas.length,
-      meses:     columnas
+    const result = await runNuboxRefresh();
+    return res.status(200).json(result);
+  } catch (e) {
+    console.error('[nubox-refresh] Error:', e.message);
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+}
    

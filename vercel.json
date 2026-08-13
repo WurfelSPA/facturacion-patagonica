@@ -25,6 +25,9 @@
     "api/nubox-refresh.js": {
       "maxDuration": 300
     },
+    "api/nubox-refresh-now.js": {
+      "maxDuration": 300
+    },
     "api/enel-refresh.js": {
       "maxDuration": 300
     },
