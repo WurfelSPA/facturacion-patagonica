@@ -264,6 +264,11 @@ export default async function handler(req, res) {
 
     for (const c of clientes) {
       if (!c.termTermino) continue;
+      // Nunca avisar automáticamente por contratos cuyo término ya quedó en un año
+      // anterior al actual — son datos probablemente desactualizados en la Planilla
+      // (inquilino cambiado, renovación ya resuelta a mano, etc.) y requieren revisión
+      // manual, no un correo automático de "su contrato vence el [hace más de un año]".
+      if (c.termTermino.getUTCFullYear() < hoy.getUTCFullYear()) { detalle.push({ ...pick(c), skip: 'término en año anterior — requiere revisión manual' }); continue; }
       const diasAviso = parseDiasAviso(c.aviso);
       if (diasAviso == null) { detalle.push({ ...pick(c), skip: 'sin días de aviso configurados' }); continue; }
       const fechaNotif = new Date(c.termTermino.getTime() - diasAviso * 86400000);
