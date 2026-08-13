@@ -42,6 +42,9 @@
     },
     "api/recordatorio-pago.js": {
       "maxDuration": 120
+    },
+    "api/renovacion-contratos.js": {
+      "maxDuration": 120
     }
   },
   "crons": [
@@ -72,6 +75,10 @@
     {
       "path": "/api/recordatorio-pago?trigger=fin-mes",
       "schedule": "0 13 28-31 * *"
+    },
+    {
+      "path": "/api/renovacion-contratos",
+      "schedule": "0 13 1 * *"
     }
   ],
   "routes": [
@@ -98,6 +105,10 @@
     {
       "src": "/clientes-seguimiento.json",
       "dest": "/clientes-seguimiento.json"
+    },
+    {
+      "src": "/renovaciones-notificadas.json",
+      "dest": "/renovaciones-notificadas.json"
     },
     {
       "src": "/(.+\\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2))",
