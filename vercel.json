@@ -31,6 +31,9 @@
     "api/enel-refresh.js": {
       "maxDuration": 300
     },
+    "api/enel-debug-consumos.js": {
+      "maxDuration": 300
+    },
     "api/nubox-pdf.js": {
       "maxDuration": 300
     },
