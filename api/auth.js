@@ -581,6 +581,7 @@ a{display:inline-block;padding:10px 20px;background:#4f46e5;color:#fff;border-ra
     }
 
     return res.status(400).json({error:'Action desconocida: '+action});
+    // redeploy trigger: nuevo valor de ADMIN_SEED_SECRET 2026-08-14
 
   } catch(e) {
     console.error('auth handler error:', e);
