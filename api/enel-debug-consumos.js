@@ -109,6 +109,13 @@ export default async function handler(req, res) {
   // (evita depender de SYNC_SECRET, que quedó marcado como Sensitive en Vercel
   // y ya no se puede leer desde el dashboard).
   const debugKey = process.env.ENEL_DEBUG_KEY;
+  if (req.query.diag === '1') {
+    return res.status(200).json({
+      envSet: !!debugKey, envLen: debugKey ? debugKey.length : 0,
+      receivedLen: (req.query.debugkey || '').length,
+      match: req.query.debugkey === debugKey
+    });
+  }
   if (!debugKey || req.query.debugkey !== debugKey) {
     return res.status(401).json({ error: 'No autorizado' });
   }
