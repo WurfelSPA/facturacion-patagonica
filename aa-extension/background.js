@@ -2,8 +2,13 @@ const N8N_WEBHOOK_URL_AA = 'https://wurfel.app.n8n.cloud/webhook/aa-import-sessi
 const N8N_WEBHOOK_URL_ENEL = 'https://wurfel.app.n8n.cloud/webhook/enel-import-session';
 
 // Endpoint temporal en Vercel: usa las mismas cookies para leer "Mis Consumos"
-// directamente vía Browserless, sin depender del flujo de n8n. Se envía en
-// paralelo (no bloquea el resultado que ve el usuario en el popup).
+// directamente vía Browserless, sin depender del flujo de n8n.
+//
+// IMPORTANTE: esto se ESPERA (no es fire-and-forget) porque en Manifest V3 el
+// service worker de la extensión puede apagarse apenas termina de responder al
+// webhook de n8n, matando cualquier fetch en paralelo que siga pendiente antes
+// de completarse. Por eso el popup puede tardar hasta ~1 minuto en mostrar el
+// resultado final: está esperando a que Browserless termine de verdad.
 const VERCEL_ENEL_IMPORT_URL = 'https://facturacion-patagonica.vercel.app/api/enel-import-session';
 
 // chrome.cookies usa sameSite: 'no_restriction'|'lax'|'strict'|'unspecified' y
@@ -44,27 +49,35 @@ async function exportarSesion({ dominioFiltro, criticas, webhookUrl, urlParaCrit
 
   const puppeteerCookies = cookies.map(toPuppeteerCookie);
 
-  if (extraWebhookUrl) {
-    // Fire-and-forget: este endpoint corre Browserless (puede tardar minutos),
-    // no debe bloquear la respuesta que ve el usuario en el popup.
-    fetch(extraWebhookUrl, {
+  // Se esperan AMBAS peticiones (Promise.allSettled) antes de responder al
+  // popup: si el service worker se apaga tras la primera en resolver, la otra
+  // se pierde. Ninguna de las dos bloquea a la otra si falla.
+  const [n8nResult, extraResult] = await Promise.allSettled([
+    fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cookies: puppeteerCookies })
-    }).catch(e => console.warn('enel-import-session error:', e.message));
+    }),
+    extraWebhookUrl
+      ? fetch(extraWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cookies: puppeteerCookies })
+        })
+      : Promise.resolve(null)
+  ]);
+
+  if (extraResult.status === 'rejected') {
+    console.warn('enel-import-session error:', extraResult.reason && extraResult.reason.message);
   }
 
-  try {
-    const res = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cookies: puppeteerCookies })
-    });
-    if (res.ok) return { ok: true, count: cookies.length };
-    return { ok: false, error: 'n8n respondió con error ' + res.status };
-  } catch (e) {
-    return { ok: false, error: 'No se pudo conectar a n8n: ' + e.message };
+  if (n8nResult.status === 'fulfilled' && n8nResult.value.ok) {
+    return { ok: true, count: cookies.length };
   }
+  if (n8nResult.status === 'fulfilled') {
+    return { ok: false, error: 'n8n respondió con error ' + n8nResult.value.status };
+  }
+  return { ok: false, error: 'No se pudo conectar a n8n: ' + n8nResult.reason.message };
 }
 
 function exportarSesionAA() {
