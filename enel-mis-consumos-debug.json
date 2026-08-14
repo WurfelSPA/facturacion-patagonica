@@ -1,12 +1,12 @@
 {
-  "actualizado": "2026-08-14T17:40:21.947Z",
+  "actualizado": "2026-08-14T17:46:32.666Z",
   "ok": true,
   "parsed": {
     "error": "sin-csrf",
     "accountIds": [
+      "1371157-7",
       "137147-9",
       "137142-8",
-      "438261-7",
       "137143-6",
       "2685615-9",
       "3435471-5",
@@ -118,7 +118,22 @@
     ],
     "csrfDebug": {
       "status": 200,
-      "body": "{}"
+      "body": "{}",
+      "headers": {
+        "cache-control": "no-cache",
+        "content-encoding": "gzip",
+        "content-type": "application/json;charset=iso-8859-1",
+        "date": "Fri, 14 Aug 2026 17:46:32 GMT",
+        "expires": "-1",
+        "server": "Apache",
+        "server-timing": "dtSInfo;desc=\"0\", dtRpid;desc=\"195252022\"",
+        "strict-transport-security": "max-age=31536000",
+        "x-cdn": "Imperva",
+        "x-content-type-options": "nosniff",
+        "x-disp": "1",
+        "x-frame-options": "SAMEORIGIN",
+        "x-iinfo": "61-116724075-116713553 PNYy RT(1786729569853 22260) q(0 0 0 -1) r(3 3) U2"
+      }
     }
   }
 }
