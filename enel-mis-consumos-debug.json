@@ -1,5 +1,11 @@
 {
-  "actualizado": "2026-08-14T17:26:03.312Z",
-  "ok": false,
-  "error": "GraphQL: [{\"message\":\"Protocol error (Runtime.evaluate): Inspected target navigated or closed (requestId: eeac877e-4343-49ed-932d-bedf21cffada)\",\"locations\":[{\"line\":2,\"column\":3}],\"path\":[\"extraccion\"]}]"
+  "actualizado": "2026-08-14T17:26:45.905Z",
+  "ok": true,
+  "parsed": {
+    "error": "sin-cuentas",
+    "title": "Ingreso a Sucursal Virtual Enel - Gestiona tu Cuenta",
+    "url": "https://www.enel.cl/es/Ingresar.html?commonAuthCallerPath=%2Fsamlsso&forceAuth=false&passiveAuth=false&spEntityID=ENEL_WEB_CIL&sessionDataKey=46883294-251a-4311-b051-4035dd095306&relyingParty=ENEL_WEB_CIL&type=samlsso&sp=ENEL_WEB_CIL&spId=e7d6de4c-436f-471e-a729-39c9ffc38892&isSaaSApp=false&authenticators=FacebookAuthenticator%3Afacebook%3BGoogleOIDCAuthenticator%3Agoogle%3BEnelCustomBasicAuthenticator%3ALOCAL",
+    "totalElements": 605,
+    "snippet": "Saltar al contenido principal\n  \n\nBocamina: compromiso cumplido\n\nNavidad Segura\n\nEnel, un siglo entregando energía a la ciudad y bienestar a las personas\n\nSon 100 años de contribución al progreso de la ciudad y mejoramiento de la calidad de vida de millones de personas.\n\nES EN\nAcceder a mi Enel\nLogin\nenel.cl\nINICIO\nCanal Ético\nPERSONAS\nAcceder a mi Enel\nServicios en Línea\nConsultar y pagar cuenta\nLectura y Medidor\nEmergencias\nFormulario de Contacto\nEmpalmes y proyectos eléctricos\nTarifas y Regulación\nEMPRESAS\nCONOCE ENEL\nDirectorios\nEjecutivos\nPrensa\nTrabaja con nosotros\nProveedores\nHISTORIAS\nINNOVACIÓN Y SOSTENIBILIDAD\nINVERSIONISTAS\nEnel Chile\nEnel Distribución Chile\nEnel Generación Chile\nEnel Green Power Chile\nMemorias\nOtros Sitios\nDe Interés\n¿Aún no tienes cuenta?\nREGISTRARME\nIngresa a tu sitio privado\nPERSONAS EMPRESAS E INSTITUCIONES\nUsuario (*Ingrese su email o Teléfono)\n\n\nContraseña\nINGRESAR\nOlvidé mi contraseña\nOlvidé mi usuario\n\n\nIngresar con Google\nIngresar con Facebook\n\n\n\n\n© Enel Chile | Enel Distribución | Enel Generación | Enel Green Power\nTérminos Uso\nPolítica Privacidad\nContacto\nCanal Ético\nCertificaciones\nPreferencias sobre cookies\n\nSíguenos en:\n\nX\n \nFacebook\n \nYouTube\n \nLinkedIn\n \nInstagram\nTu opinión es importante\n×\nUtilizamos cookies y rastreadores web para mejorar su experiencia online en nuestro sitio web, permitirle guardar información, facilitar su interacción con redes sociales (Facebook, Instagram, etc.), personalizar el contenido y los anuncios que "
+  }
 }
