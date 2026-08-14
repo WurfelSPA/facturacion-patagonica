@@ -2,13 +2,22 @@
  * POST /api/enel-import-session
  *
  * Recibe las cookies reales de una sesión ya autenticada en enel.cl
- * (exportadas por la extensión de Chrome) y las inyecta directamente en una
- * página de Browserless — sin intentar loguearse con usuario/clave, que es
- * lo que venía fallando de forma automatizada.
+ * (exportadas por la extensión de Chrome) y las usa para leer "Mis Consumos"
+ * — sin login automatizado.
  *
- * TEMPORAL: además de autenticar, navega a "Mis consumos" y devuelve la
- * tabla resultante, para descubrir la estructura real de Lectura Anterior /
- * Lectura Actual antes de escribir la lógica definitiva.
+ * IMPORTANTE: la primera versión de este endpoint clickeaba el selector de
+ * cuentas del portal (UI), lo que disparaba un segundo paso de SSO/SAML que
+ * la sesión exportada no lograba completar en silencio (terminaba en la
+ * pantalla de login, y de paso invalidaba la sesión real del usuario más de
+ * una vez). El workflow n8n existente ("enel-import-session" en
+ * wurfel.app.n8n.cloud), que sí funciona en producción para leer el saldo de
+ * cada cuenta, NUNCA clickea ese selector: obtiene el token CSRF una sola
+ * vez y llama directo, por AJAX, a AccountInfoChileThreadCommand.html pasando
+ * supplyCode como parámetro — sin tocar el DOM del selector. Esta versión
+ * copia ese mismo patrón (BQL de Browserless + fetch interno con CSRF), y de
+ * paso rastrea el JS de la página para encontrar el endpoint real de
+ * "Mis Consumos" (equivalente a AccountInfoChileThreadCommand pero para
+ * lecturas), en vez de intentar clickear el acordeón.
  *
  * Body: { cookies: [...] }  (formato Puppeteer, ya generado por la extensión)
  *
@@ -61,158 +70,63 @@ function setCors(res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-const BROWSER_CODE = `
-  export default async function ({ page, context }) {
-    const { cookies } = context;
+// Mismo patrón que el nodo "Preparar Script Enel" del workflow n8n que ya
+// funciona en producción: nunca clickea el selector de cuentas. Obtiene el
+// token CSRF una sola vez y llama por fetch directo a los endpoints internos
+// (AJAX), pasando el account id como parámetro. Además, busca en el JS de la
+// página el endpoint real de "Mis Consumos" sin ejecutar ningún clic.
+const TARGET_ACCOUNT = '1582840-4';
 
-    // Inyectar la sesión real ANTES de navegar
-    await page.setCookie(...cookies);
+const evalJsLines = [
+  "const accountIds = [...document.querySelectorAll('.pvtArea-account-select-option[data-target]')].map(el => el.dataset.target).filter(Boolean);",
+  "if (!accountIds.length) return JSON.stringify({ error: 'sin-cuentas', title: document.title, url: location.href, snippet: (document.body ? document.body.innerText : 'NO_BODY').slice(0, 500) });",
+  "async function getCsrfToken() {",
+  "  const r = await fetch('/libs/granite/csrf/token.json', { credentials: 'include' });",
+  "  const j = await r.json();",
+  "  return j.token;",
+  "}",
+  "const token = await getCsrfToken();",
+  "if (!token) return JSON.stringify({ error: 'sin-csrf', accountIds });",
+  "",
+  "// Confirmar que la sesión autentica bien contra el endpoint que YA se sabe que funciona,",
+  "// llamando directo por AJAX (sin clickear el selector de cuentas).",
+  "let accountInfoTest = null;",
+  "try {",
+  "  const params = new URLSearchParams({ ':cq_csrf_token': token, supplyCode: '" + TARGET_ACCOUNT + "' });",
+  "  const r = await fetch('/es/private-area.mdwedgeohl.AccountInfoChileThreadCommand.html', { method: 'POST', credentials: 'include', headers: { 'X-Requested-With': 'XMLHttpRequest', 'CSRF-Token': token }, body: params });",
+  "  accountInfoTest = { status: r.status, body: (await r.text()).slice(0, 500) };",
+  "} catch (e) { accountInfoTest = { error: e.message }; }",
+  "",
+  "// Rastrear el JS de la página (inline + externo) buscando el endpoint real de",
+  "// Mis Consumos, sin clickear nada.",
+  "const inline = [...document.querySelectorAll('script:not([src])')].map(s => s.textContent).join('\\n');",
+  "const srcs = [...new Set([...document.querySelectorAll('script[src]')].map(s => s.src))];",
+  "let external = '';",
+  "for (const src of srcs) {",
+  "  try {",
+  "    const r = await fetch(src, { credentials: 'include' });",
+  "    external += '\\n/*==' + src + '==*/\\n' + (await r.text());",
+  "  } catch (e) {}",
+  "}",
+  "const allJs = inline + external;",
+  "const endpointMatches = [...new Set((allJs.match(/private-area\\.[\\w.-]+\\.html/gi) || []))];",
+  "const consumoContext = [...new Set((allJs.match(/.{0,30}(consum|reading|lectura|medidor).{0,80}/gi) || []))].slice(0, 80);",
+  "",
+  "return JSON.stringify({ accountIds, accountInfoTest, endpointMatches, consumoContext, scriptCount: srcs.length, jsLen: allJs.length });"
+].join(String.fromCharCode(10));
 
-    await page.goto('https://www.enel.cl/es/Ingresar.html', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await new Promise(r => setTimeout(r, 2500));
-
-    // Si las cookies son válidas, Enel redirige solo al área privada
-    let onPrivate = page.url().includes('private-area');
-    if (!onPrivate) {
-      // reintento: a veces el redirect necesita una segunda navegación
-      await page.goto('https://www.enel.cl/es/private-area.html', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-      await new Promise(r => setTimeout(r, 2000));
-      onPrivate = page.url().includes('private-area');
-    }
-
-    if (!onPrivate) {
-      const diag = await page.evaluate(() => ({
-        title: document.title,
-        url: location.href,
-        bodySnippet: (document.body.innerText || '').slice(0, 500),
-      })).catch(() => null);
-      throw new Error('Las cookies no autenticaron: ' + JSON.stringify(diag));
-    }
-
-    // Capturar respuestas JSON relacionadas a consumo/lectura (desde ahora, por si
-    // el SPA las dispara solo al llegar, sin necesitar clic)
-    const capturedResponses = [];
-    page.on('response', async (resp) => {
-      try {
-        const ct = resp.headers()['content-type'] || '';
-        const url = resp.url();
-        if (ct.includes('json') && /consum|reading|lectura/i.test(url)) {
-          const body = await resp.text();
-          capturedResponses.push({ url, body: body.slice(0, 6000) });
-        }
-      } catch (_) {}
-    });
-
-    // El área privada es un SPA: puede tardar en renderizar. En vez de esperar
-    // un selector fijo (que puede no existir o llamarse distinto), sondear
-    // hasta 20s buscando cualquier señal de que la cuenta/consumo ya cargó.
-    let ready = false;
-    for (let i = 0; i < 10 && !ready; i++) {
-      ready = await page.evaluate(() => {
-        const txt = document.body.innerText || '';
-        return document.querySelector('.pvtArea-account-select-option') ||
-               /consumo/i.test(txt) ||
-               /n[uú]mero de cliente/i.test(txt);
-      }).catch(() => false);
-      if (!ready) await new Promise(r => setTimeout(r, 2000));
-    }
-
-    // Diagnóstico rico del estado real de la página, autenticados o no.
-    const pageSnapshot = await page.evaluate(() => {
-      const iframes = [...document.querySelectorAll('iframe')].map(f => f.src);
-      const pvtEls = [...document.querySelectorAll('[class*="pvtArea"]')]
-        .slice(0, 30)
-        .map(el => ({ tag: el.tagName, cls: el.className, text: (el.textContent || '').trim().slice(0, 80) }));
-      const consumoMatches = [...document.querySelectorAll('*')]
-        .filter(el => el.children.length === 0 && /consumo/i.test(el.textContent || ''))
-        .slice(0, 20)
-        .map(el => ({ tag: el.tagName, cls: el.className, text: el.textContent.trim().slice(0, 80) }));
-      return {
-        title: document.title,
-        url: location.href,
-        totalElements: document.querySelectorAll('*').length,
-        iframes,
-        bodyTextSample: (document.body.innerText || '').slice(0, 3000),
-        pvtEls,
-        consumoMatches,
-      };
-    }).catch(e => ({ error: e.message }));
-
-    const accountIds = await page.evaluate(() =>
-      [...document.querySelectorAll('.pvtArea-account-select-option[data-target]')]
-        .map(el => el.dataset.target)
-        .filter(Boolean)
-    ).catch(() => []);
-
-    // Click que puede disparar una navegación completa (no es un SPA puro): en
-    // vez de esperar el resultado de evaluate() -que puede lanzar "Execution
-    // context was destroyed"-, correr una espera de navegación en paralelo y
-    // tragarnos el error del evaluate si la página ya se está yendo.
-    async function clickAndSurvive(fn, arg) {
-      const navP = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => null);
-      let result;
-      try { result = await page.evaluate(fn, arg); }
-      catch (e) { result = 'context-destroyed:' + e.message; }
-      await navP;
-      await new Promise(r => setTimeout(r, 1500));
-      return result;
-    }
-
-    // 1) Elegir una cuenta del selector (sin cuenta seleccionada, la página
-    // muestra "Se ha producido un error" en vez del resumen).
-    // TEMPORAL: forzar fallback a la primera cuenta del selector, para comparar
-    // si el rebote a SSO/login ocurre con CUALQUIER cuenta o es específico de
-    // la 1582840-4.
-    const TARGET_ACCOUNT = '__test_generic_account__';
-    await clickAndSurvive(() => {
-      const cnt = document.querySelector('.pvtArea-account-select-cnt');
-      if (cnt) cnt.click();
-      return true;
-    });
-    const accountPicked = await clickAndSurvive((targetId) => {
-      const options = [...document.querySelectorAll('.pvtArea-account-select-option')];
-      let opt = options.find(o => (o.textContent || '').includes(targetId));
-      if (!opt) opt = options[0];
-      if (opt) { opt.click(); return opt.textContent.trim().slice(0, 100); }
-      return null;
-    }, TARGET_ACCOUNT);
-
-    const afterAccountSnapshot = await page.evaluate(() => ({
-      url: location.href,
-      bodyHasError: /se ha producido un error/i.test(document.body.innerText || ''),
-      bodyTextSample: (document.body.innerText || '').slice(0, 1500),
-    })).catch(e => ({ error: e.message }));
-
-    // 2) Expandir "Mis consumos"
-    const clicked = await clickAndSurvive(() => {
-      const btns = [...document.querySelectorAll('.button-accordeon-plus')];
-      const btn = btns.find(b => /mis consumos/i.test(b.textContent || ''));
-      if (btn) { btn.click(); return true; }
-      const all = [...document.querySelectorAll('*')];
-      const target = all.find(el => el.children.length === 0 && /mis consumos/i.test(el.textContent || ''));
-      if (target) { target.click(); return true; }
-      return false;
-    });
-
-    await new Promise(r => setTimeout(r, 3000));
-
-    const domInfo = await page.evaluate(() => {
-      const tables = [...document.querySelectorAll('table')];
-      return {
-        tablesCount: tables.length,
-        tablesHtml: tables.map(t => t.outerHTML.slice(0, 8000)),
-        bodyHasError: /se ha producido un error/i.test(document.body.innerText),
-        bodyTextSample: (document.body.innerText || '').slice(0, 3000),
-        url: location.href,
-      };
-    }).catch(e => ({ error: e.message }));
-
-    return {
-      data: { ready, pageSnapshot, accountIds, accountPicked, afterAccountSnapshot, clicked, domInfo, capturedResponses },
-      type: 'application/json'
-    };
-  }
-`;
+function buildBqlQuery() {
+  const escapedEvalJs = evalJsLines.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+  return [
+    'mutation LeerMisConsumos($cookies: [CookieInput!]!) {',
+    '  proxy(network: residential, country: CL, sticky: true) { time }',
+    '  setCookies: cookies(cookies: $cookies) { cookies { name } }',
+    '  nav: goto(url: "https://www.enel.cl/es/Ingresar.html", waitUntil: domContentLoaded, timeout: 30000) { status }',
+    '  espera: waitForTimeout(time: 8000) { time }',
+    '  extraccion: evaluate(content: "' + escapedEvalJs + '") { value }',
+    '}'
+  ].join(String.fromCharCode(10));
+}
 
 export default async function handler(req, res) {
   setCors(res);
@@ -228,23 +142,15 @@ export default async function handler(req, res) {
   if (!BROWSERLESS_TOKEN) return res.status(500).json({ error: 'Falta BROWSERLESS_TOKEN' });
 
   try {
-    // stealth:true + proxy residencial chileno: mismo fix ya usado en nubox-pdf.js
-    // para el bloqueo de Incapsula que también afecta a enel.cl (confirmado por el
-    // iframe "_Incapsula_Resource" devuelto en la primera prueba de este endpoint).
-    //
-    // TEMPORAL: se saca el proxy residencial. Sospecha: cada llamada obtiene una
-    // IP residencial distinta, y Enel (WSO2 SSO) parece atar la validez de la
-    // sesión a la IP de origen — funcionó una sola vez de varios intentos, y en
-    // el camino cerró la sesión real del usuario más de una vez. Sin proxy,
-    // Browserless sale siempre desde IPs de su propio datacenter (más estables
-    // entre llamadas), a costa de arriesgar que vuelva el bloqueo de Incapsula.
-    const launchB64 = Buffer.from(JSON.stringify({ stealth: true })).toString('base64');
+    // /stealth/bql: mismo endpoint y patrón (proxy residencial CL + cookies +
+    // goto + evaluate, todo en una sola query GraphQL) que usa el workflow n8n
+    // que YA funciona en producción para leer el saldo de cada cuenta.
     const blRes = await fetch(
-      `https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}&timeout=120000&launch=${launchB64}`,
+      `https://production-sfo.browserless.io/stealth/bql?token=${BROWSERLESS_TOKEN}&timeout=58000`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: BROWSER_CODE, context: { cookies } })
+        body: JSON.stringify({ query: buildBqlQuery(), variables: { cookies } })
       }
     );
     if (!blRes.ok) {
@@ -253,8 +159,15 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: `Browserless ${blRes.status}: ${errText.slice(0, 800)}` });
     }
     const blData = await blRes.json();
-    await guardarDebugViaGitHub({ ok: true, ...blData });
-    return res.status(200).json(blData);
+    if (blData.errors) {
+      await guardarDebugViaGitHub({ ok: false, error: `GraphQL: ${JSON.stringify(blData.errors).slice(0, 800)}` });
+      return res.status(500).json({ error: `GraphQL: ${JSON.stringify(blData.errors).slice(0, 800)}` });
+    }
+    const raw = blData.data && blData.data.extraccion && blData.data.extraccion.value;
+    let parsed = null;
+    try { parsed = raw ? JSON.parse(raw) : null; } catch (_) { parsed = { parseError: true, raw: String(raw).slice(0, 2000) }; }
+    await guardarDebugViaGitHub({ ok: true, parsed, raw: raw ? undefined : blData });
+    return res.status(200).json({ parsed });
   } catch (e) {
     await guardarDebugViaGitHub({ ok: false, error: e.message });
     return res.status(500).json({ error: e.message });
