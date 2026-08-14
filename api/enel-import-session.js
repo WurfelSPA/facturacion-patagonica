@@ -229,6 +229,53 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: e.message });
     }
   }
+  if (req.method === 'GET' && req.query.trivial === '6') {
+    const BROWSERLESS_TOKEN = process.env.BROWSERLESS_TOKEN;
+    if (!BROWSERLESS_TOKEN) return res.status(500).json({ error: 'Falta BROWSERLESS_TOKEN' });
+    // FULL content + setCookies + real URL, SIN proxy.
+    const escapedEvalJs = evalJsLines.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+    const q = [
+      'mutation Trivial6($cookies: [CookieInput!]!) {',
+      '  setCookies: cookies(cookies: $cookies) { cookies { name } }',
+      '  nav: goto(url: "https://www.enel.cl/es/Ingresar.html", waitUntil: domContentLoaded, timeout: 30000) { status }',
+      '  extraccion: evaluate(content: "' + escapedEvalJs + '") { value }',
+      '}'
+    ].join(String.fromCharCode(10));
+    const testCookies = [{ name: 'test', value: 'x', domain: '.enel.cl', path: '/' }];
+    try {
+      const blRes = await fetch(
+        `https://production-sfo.browserless.io/stealth/bql?token=${BROWSERLESS_TOKEN}&timeout=40000`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: q, variables: { cookies: testCookies } }) }
+      );
+      const text = await blRes.text();
+      return res.status(200).json({ status: blRes.status, body: text.slice(0, 2000) });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+  if (req.method === 'GET' && req.query.trivial === '7') {
+    const BROWSERLESS_TOKEN = process.env.BROWSERLESS_TOKEN;
+    if (!BROWSERLESS_TOKEN) return res.status(500).json({ error: 'Falta BROWSERLESS_TOKEN' });
+    // FULL content + proxy + real URL, SIN setCookies.
+    const escapedEvalJs = evalJsLines.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+    const q = [
+      'mutation Trivial7 {',
+      '  proxy(network: residential, country: CL, sticky: true) { time }',
+      '  nav: goto(url: "https://www.enel.cl/es/Ingresar.html", waitUntil: domContentLoaded, timeout: 30000) { status }',
+      '  extraccion: evaluate(content: "' + escapedEvalJs + '") { value }',
+      '}'
+    ].join(String.fromCharCode(10));
+    try {
+      const blRes = await fetch(
+        `https://production-sfo.browserless.io/stealth/bql?token=${BROWSERLESS_TOKEN}&timeout=40000`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: q }) }
+      );
+      const text = await blRes.text();
+      return res.status(200).json({ status: blRes.status, body: text.slice(0, 2000) });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { cookies } = req.body || {};
