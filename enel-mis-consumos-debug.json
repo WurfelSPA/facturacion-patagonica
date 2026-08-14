@@ -1,5 +1,5 @@
 {
-  "actualizado": "2026-08-14T17:52:00.538Z",
+  "actualizado": "2026-08-14T17:59:10.947Z",
   "ok": false,
-  "error": "GraphQL: [{\"message\":\"SyntaxError: Invalid or unexpected token (requestId: 1703a1c1-5872-4f81-adc0-644b2f525554)\",\"locations\":[{\"line\":2,\"column\":3}],\"path\":[\"extraccion\"]}]"
+  "error": "GraphQL: [{\"message\":\"SyntaxError: Invalid or unexpected token (requestId: 18567d30-69ad-47a0-b9ad-536d776fce3a)\",\"locations\":[{\"line\":2,\"column\":3}],\"path\":[\"extraccion\"]}]"
 }
