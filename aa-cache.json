@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updatedAt": "2026-08-14T20:53:01.783Z",
+  "updatedAt": "2026-08-14T20:53:24.025Z",
   "source": "n8n",
   "accounts": {
     "672977-0": {
@@ -235,19 +235,16 @@
       "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: 4c90dad9-9ba0-4ceb-abe2-73fd28fa7587)"
     },
     "1534333-8": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "nombre": null
+      "deuda": null,
+      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: db943f69-a359-4790-afd8-e878f8b4a008)"
     },
     "1534334-6": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "nombre": null
+      "deuda": null,
+      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: db943f69-a359-4790-afd8-e878f8b4a008)"
     },
     "1534335-4": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "nombre": null
+      "deuda": null,
+      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: db943f69-a359-4790-afd8-e878f8b4a008)"
     },
     "1534336-2": {
       "deuda": "$0",
