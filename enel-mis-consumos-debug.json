@@ -1,7 +1,19 @@
 {
-  "actualizado": "2026-08-14T13:50:53.761Z",
+  "actualizado": "2026-08-14T13:54:37.024Z",
   "ok": true,
   "data": {
+    "ready": false,
+    "pageSnapshot": {
+      "title": "",
+      "url": "https://www.enel.cl/es/private-area.html",
+      "totalElements": 9,
+      "iframes": [
+        "https://www.enel.cl/_Incapsula_Resource?CWUDNSAI=23&xinfo=54-120220222-0%20NNNN%20RT%281786715650437%202%29%20q%280%20-1%20-1%20-1%29%20r%280%20-1%29%20B15%2814%2c0%2c0%29%20U18&incident_id=362000330333985538-654007499252959350&edet=15&cinfo=0e000000c699&rpinfo=0&cip=159.223.201.225&mth=GET"
+      ],
+      "bodyTextSample": "",
+      "pvtEls": [],
+      "consumoMatches": []
+    },
     "accountIds": [],
     "clicked": false,
     "domInfo": {
