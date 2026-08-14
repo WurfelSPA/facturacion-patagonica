@@ -1,39 +1,5 @@
 {
-  "actualizado": "2026-08-14T15:03:07.797Z",
-  "ok": true,
-  "data": {
-    "ready": false,
-    "pageSnapshot": {
-      "title": "Personas - Área privada",
-      "url": "https://www.enel.cl/es/private-area.html",
-      "totalElements": 49,
-      "iframes": [],
-      "bodyTextSample": "",
-      "pvtEls": [
-        {
-          "tag": "BODY",
-          "cls": "pvtArea",
-          "text": ""
-        }
-      ],
-      "consumoMatches": []
-    },
-    "accountIds": [],
-    "accountPicked": null,
-    "afterAccountSnapshot": {
-      "url": "https://www.enel.cl/es/private-area.html",
-      "bodyHasError": false,
-      "bodyTextSample": ""
-    },
-    "clicked": false,
-    "domInfo": {
-      "tablesCount": 0,
-      "tablesHtml": [],
-      "bodyHasError": false,
-      "bodyTextSample": "",
-      "url": "https://www.enel.cl/es/private-area.html"
-    },
-    "capturedResponses": []
-  },
-  "type": "application/json"
+  "actualizado": "2026-08-14T16:00:20.425Z",
+  "ok": false,
+  "error": "GraphQL: [{\"message\":\"SyntaxError: Invalid or unexpected token (requestId: 34643f3e-9f67-4e6d-a7f2-0a0d751e9b03)\",\"locations\":[{\"line\":2,\"column\":3}],\"path\":[\"extraccion\"]}]"
 }
