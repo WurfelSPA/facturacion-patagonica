@@ -89,15 +89,8 @@ const BROWSER_CODE = `
       throw new Error('Las cookies no autenticaron: ' + JSON.stringify(diag));
     }
 
-    await page.waitForSelector('.pvtArea-account-select-option', { timeout: 15000 }).catch(() => {});
-
-    const accountIds = await page.evaluate(() =>
-      [...document.querySelectorAll('.pvtArea-account-select-option[data-target]')]
-        .map(el => el.dataset.target)
-        .filter(Boolean)
-    );
-
-    // Capturar respuestas JSON relacionadas a consumo/lectura
+    // Capturar respuestas JSON relacionadas a consumo/lectura (desde ahora, por si
+    // el SPA las dispara solo al llegar, sin necesitar clic)
     const capturedResponses = [];
     page.on('response', async (resp) => {
       try {
@@ -110,6 +103,47 @@ const BROWSER_CODE = `
       } catch (_) {}
     });
 
+    // El área privada es un SPA: puede tardar en renderizar. En vez de esperar
+    // un selector fijo (que puede no existir o llamarse distinto), sondear
+    // hasta 20s buscando cualquier señal de que la cuenta/consumo ya cargó.
+    let ready = false;
+    for (let i = 0; i < 10 && !ready; i++) {
+      ready = await page.evaluate(() => {
+        const txt = document.body.innerText || '';
+        return document.querySelector('.pvtArea-account-select-option') ||
+               /consumo/i.test(txt) ||
+               /n[uú]mero de cliente/i.test(txt);
+      }).catch(() => false);
+      if (!ready) await new Promise(r => setTimeout(r, 2000));
+    }
+
+    // Diagnóstico rico del estado real de la página, autenticados o no.
+    const pageSnapshot = await page.evaluate(() => {
+      const iframes = [...document.querySelectorAll('iframe')].map(f => f.src);
+      const pvtEls = [...document.querySelectorAll('[class*="pvtArea"]')]
+        .slice(0, 30)
+        .map(el => ({ tag: el.tagName, cls: el.className, text: (el.textContent || '').trim().slice(0, 80) }));
+      const consumoMatches = [...document.querySelectorAll('*')]
+        .filter(el => el.children.length === 0 && /consumo/i.test(el.textContent || ''))
+        .slice(0, 20)
+        .map(el => ({ tag: el.tagName, cls: el.className, text: el.textContent.trim().slice(0, 80) }));
+      return {
+        title: document.title,
+        url: location.href,
+        totalElements: document.querySelectorAll('*').length,
+        iframes,
+        bodyTextSample: (document.body.innerText || '').slice(0, 3000),
+        pvtEls,
+        consumoMatches,
+      };
+    }).catch(e => ({ error: e.message }));
+
+    const accountIds = await page.evaluate(() =>
+      [...document.querySelectorAll('.pvtArea-account-select-option[data-target]')]
+        .map(el => el.dataset.target)
+        .filter(Boolean)
+    ).catch(() => []);
+
     const clicked = await page.evaluate(() => {
       const all = [...document.querySelectorAll('*')];
       const target = all.find(el => el.children.length === 0 && /mis consumos/i.test(el.textContent || ''));
@@ -117,7 +151,7 @@ const BROWSER_CODE = `
       const container = all.find(el => /mis consumos/i.test(el.textContent || '') && el.textContent.trim().length < 40);
       if (container) { container.click(); return true; }
       return false;
-    });
+    }).catch(() => false);
 
     await new Promise(r => setTimeout(r, 4000));
 
@@ -129,10 +163,10 @@ const BROWSER_CODE = `
         bodyHasError: /se ha producido un error/i.test(document.body.innerText),
         url: location.href,
       };
-    });
+    }).catch(e => ({ error: e.message }));
 
     return {
-      data: { accountIds, clicked, domInfo, capturedResponses },
+      data: { ready, pageSnapshot, accountIds, clicked, domInfo, capturedResponses },
       type: 'application/json'
     };
   }
