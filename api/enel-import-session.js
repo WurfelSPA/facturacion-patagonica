@@ -116,6 +116,9 @@ function buildBqlQuery() {
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method === 'GET' && req.query.debugQuery === '1') {
+    return res.status(200).json({ query: buildBqlQuery(), evalJsLines });
+  }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { cookies } = req.body || {};
