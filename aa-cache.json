@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updatedAt": "2026-08-14T20:53:24.025Z",
+  "updatedAt": "2026-08-14T20:53:39.513Z",
   "source": "n8n",
   "accounts": {
     "672977-0": {
@@ -148,9 +148,8 @@
       "nombre": null
     },
     "1127209-6": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "nombre": null
+      "deuda": null,
+      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: 55ac153f-c979-4b49-878f-e0d9d7a2a86f)"
     },
     "1127211-8": {
       "deuda": "$0",
@@ -158,7 +157,7 @@
       "nombre": null
     },
     "1127212-6": {
-      "deuda": "$0",
+      "deuda": "$58.170",
       "vencimiento": null,
       "nombre": null
     },
