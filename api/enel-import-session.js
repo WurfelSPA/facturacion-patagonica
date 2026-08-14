@@ -330,35 +330,44 @@ export default async function handler(req, res) {
   const BROWSERLESS_TOKEN = process.env.BROWSERLESS_TOKEN;
   if (!BROWSERLESS_TOKEN) return res.status(500).json({ error: 'Falta BROWSERLESS_TOKEN' });
 
-  try {
-    // /stealth/bql: mismo endpoint y patrón (proxy residencial CL + cookies +
-    // goto + evaluate, todo en una sola query GraphQL) que usa el workflow n8n
-    // que YA funciona en producción para leer el saldo de cada cuenta.
-    const blRes = await fetch(
-      `https://production-sfo.browserless.io/stealth/bql?token=${BROWSERLESS_TOKEN}&timeout=58000`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: buildBqlQuery(), variables: { cookies } })
+  // El login/BQL de Enel es intermitente cuando se automatiza (mismo
+  // comportamiento ya documentado en enel-refresh.js: errores transitorios
+  // distintos que no se repiten igual dos veces). Reintentar el flujo completo
+  // hasta 3 veces en vez de perseguir cada síntoma como si fuera un bug fijo.
+  const MAX_ATTEMPTS = 3;
+  let lastError = null;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      // /stealth/bql: mismo endpoint y patrón (proxy residencial CL + cookies +
+      // goto + evaluate, todo en una sola query GraphQL) que usa el workflow n8n
+      // que YA funciona en producción para leer el saldo de cada cuenta.
+      const blRes = await fetch(
+        `https://production-sfo.browserless.io/stealth/bql?token=${BROWSERLESS_TOKEN}&timeout=58000`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: buildBqlQuery(), variables: { cookies } })
+        }
+      );
+      if (!blRes.ok) {
+        const errText = await blRes.text();
+        lastError = `Browserless ${blRes.status}: ${errText.slice(0, 800)}`;
+        continue;
       }
-    );
-    if (!blRes.ok) {
-      const errText = await blRes.text();
-      await guardarDebugViaGitHub({ ok: false, error: `Browserless ${blRes.status}: ${errText.slice(0, 800)}` });
-      return res.status(500).json({ error: `Browserless ${blRes.status}: ${errText.slice(0, 800)}` });
+      const blData = await blRes.json();
+      if (blData.errors) {
+        lastError = `GraphQL: ${JSON.stringify(blData.errors).slice(0, 800)}`;
+        continue;
+      }
+      const raw = blData.data && blData.data.extraccion && blData.data.extraccion.value;
+      let parsed = null;
+      try { parsed = raw ? JSON.parse(raw) : null; } catch (_) { parsed = { parseError: true, raw: String(raw).slice(0, 2000) }; }
+      const guardado = await guardarDebugViaGitHub({ ok: true, attempt, parsed, raw: raw ? undefined : blData });
+      return res.status(200).json({ parsed, guardado, attempt });
+    } catch (e) {
+      lastError = e.message;
     }
-    const blData = await blRes.json();
-    if (blData.errors) {
-      await guardarDebugViaGitHub({ ok: false, error: `GraphQL: ${JSON.stringify(blData.errors).slice(0, 800)}` });
-      return res.status(500).json({ error: `GraphQL: ${JSON.stringify(blData.errors).slice(0, 800)}` });
-    }
-    const raw = blData.data && blData.data.extraccion && blData.data.extraccion.value;
-    let parsed = null;
-    try { parsed = raw ? JSON.parse(raw) : null; } catch (_) { parsed = { parseError: true, raw: String(raw).slice(0, 2000) }; }
-    const guardado = await guardarDebugViaGitHub({ ok: true, parsed, raw: raw ? undefined : blData });
-    return res.status(200).json({ parsed, guardado });
-  } catch (e) {
-    const guardado = await guardarDebugViaGitHub({ ok: false, error: e.message });
-    return res.status(500).json({ error: e.message, guardado });
   }
+  const guardado = await guardarDebugViaGitHub({ ok: false, attempts: MAX_ATTEMPTS, error: lastError });
+  return res.status(500).json({ error: lastError, guardado });
 }
