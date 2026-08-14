@@ -1,10 +1,10 @@
 {
-  "actualizado": "2026-08-14T16:14:24.201Z",
+  "actualizado": "2026-08-14T16:43:55.329Z",
   "ok": true,
   "parsed": {
     "error": "sin-cuentas",
     "title": "Ingreso a Sucursal Virtual Enel - Gestiona tu Cuenta",
-    "url": "https://www.enel.cl/es/Ingresar.html?commonAuthCallerPath=%2Fsamlsso&forceAuth=false&passiveAuth=false&spEntityID=ENEL_WEB_CIL&sessionDataKey=39e6c51c-b253-4c7f-9bf5-7965e74bc807&relyingParty=ENEL_WEB_CIL&type=samlsso&sp=ENEL_WEB_CIL&spId=e7d6de4c-436f-471e-a729-39c9ffc38892&isSaaSApp=false&authenticators=FacebookAuthenticator%3Afacebook%3BGoogleOIDCAuthenticator%3Agoogle%3BEnelCustomBasicAuthenticator%3ALOCAL",
-    "snippet": ""
+    "url": "https://www.enel.cl/es/Ingresar.html",
+    "snippet": "  \nES EN\nAcceder a mi Enel\nLogin\nBienvenido\nIR AL ÁREA CLIENTE\nModificar perfil\nLogout\nenel.cl\nINICIO\nCanal Ético\nPERSONAS\nAcceder a mi Enel\nServicios en Línea\nConsultar y pagar cuenta\nLectura y Medidor\nEmergencias\nFormulario de Contacto\nEmpalmes y proyectos eléctricos\nTarifas y Regulación\nEMPRESAS\nCONOCE ENEL\nDirectorios\nEjecutivos\nPrensa\nTrabaja con nosotros\nProveedores\nHISTORIAS\nINNOVACIÓN Y SOSTENIBILIDAD\nINVERSIONISTAS\nEnel Chile\nEnel Distribución Chile\nEnel Generación Chile\nEnel Green Powe"
   }
 }
