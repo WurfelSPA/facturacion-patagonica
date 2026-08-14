@@ -54,7 +54,14 @@ const BROWSER_CODE = `
     }
 
     if (!page.url().includes('private-area')) {
-      throw new Error('Login fallido: URL actual = ' + page.url());
+      const diag = await page.evaluate(() => ({
+        title: document.title,
+        bodySnippet: (document.body.innerText || '').slice(0, 500),
+        hasCaptcha: /captcha|recaptcha|verificaci[oó]n humana|robot/i.test(document.body.innerHTML || ''),
+        usernamePresent: !!document.querySelector('#username'),
+        passwordPresent: !!document.querySelector('#password, input[type="password"]'),
+      })).catch(() => null);
+      throw new Error('Login fallido: URL actual = ' + page.url() + ' | diag=' + JSON.stringify(diag));
     }
 
     // Capturar cualquier respuesta JSON que se dispare al expandir "Mis consumos"
