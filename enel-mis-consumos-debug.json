@@ -1,26 +1,337 @@
 {
-  "actualizado": "2026-08-14T13:54:37.024Z",
+  "actualizado": "2026-08-14T13:58:41.101Z",
   "ok": true,
   "data": {
-    "ready": false,
+    "ready": {},
     "pageSnapshot": {
-      "title": "",
+      "title": "Personas - Área privada",
       "url": "https://www.enel.cl/es/private-area.html",
-      "totalElements": 9,
+      "totalElements": 1558,
       "iframes": [
-        "https://www.enel.cl/_Incapsula_Resource?CWUDNSAI=23&xinfo=54-120220222-0%20NNNN%20RT%281786715650437%202%29%20q%280%20-1%20-1%20-1%29%20r%280%20-1%29%20B15%2814%2c0%2c0%29%20U18&incident_id=362000330333985538-654007499252959350&edet=15&cinfo=0e000000c699&rpinfo=0&cip=159.223.201.225&mth=GET"
+        "https://enelglobal.demdex.net/dest5.html?d_nsid=0#https%3A%2F%2Fwww.enel.cl"
       ],
-      "bodyTextSample": "",
-      "pvtEls": [],
-      "consumoMatches": []
+      "bodyTextSample": "Saltar al contenido principal\n  \n\nBocamina: compromiso cumplido\n\nNavidad Segura\n\nEnel, un siglo entregando energía a la ciudad y bienestar a las personas\n\nSon 100 años de contribución al progreso de la ciudad y mejoramiento de la calidad de vida de millones de personas.\n\nES EN\nAcceder a mi Enel\nLogin\nenel.cl\nINICIO\nCanal Ético\nPERSONAS\nAcceder a mi Enel\nServicios en Línea\nConsultar y pagar cuenta\nLectura y Medidor\nEmergencias\nFormulario de Contacto\nEmpalmes y proyectos eléctricos\nTarifas y Regulación\nEMPRESAS\nCONOCE ENEL\nDirectorios\nEjecutivos\nPrensa\nTrabaja con nosotros\nProveedores\nHISTORIAS\nINNOVACIÓN Y SOSTENIBILIDAD\nINVERSIONISTAS\nEnel Chile\nEnel Distribución Chile\nEnel Generación Chile\nEnel Green Power Chile\nMemorias\nOtros Sitios\nDe Interés\nRESUMEN DE CUENTA\n \nPAGO EN LÍNEA\n \nSOLICITAR CONVENIO\n \nCONSULTA NETBILLING / PMGD\n \nNUEVAS CONEXIONES Y MODIFICACIONES DE EMPALMES\n \nAGREGAR SUMINISTRO\n \nMIS DATOS\n \nSALIR\nResumen de cuenta\nInformación de la cuenta\n\t\nNº de cliente\nFecha último pago:\nMonto último pago:\nMis boletas\nDescargar cartola\nMeses 1–13\nMeses 14–24\nMeses 25–36\nNº Documento\tTipo de documento\tFecha de emisión\tFecha de vencimiento\tMonto\tBoleta\tDetalle de cargos\nMis pagos\nMis consumos\n\nInformación de suministro\n\nInformación del empalme\n\nCapacidad de empalme (kWh)\nId del transformador\nCapacidad nominal (kVA)\nTensiones (kV/kV)\n\nInformación de la propiedad\n\nNúmero de cliente\nRut\nDirección\nEstado de Contrato\nTipo de Suministro\n\nDatos del medidor\n\nNúmero de equipo\nMarca\nModelo\nClase\nConstante\nPropiedad\n\nTarifa de datos\n\nTarifa\nAño de cálculo límite de invierno\nLímite de invierno (kWh)\n\nInformación detallada de las compensaciones\n\nCompensación SEC por interrupciones internas y externas\nTiempo total de interrupción no autorizado (seg)\nTotal de interrupciones no autorizadas\nConsumo medio (kWh / seg)\nTiempo total para compensar (seg)\nCosto de falla ($ / kWh)\nEnergía no suministrada (kWh)\nTiempo compensado (Horas y minutos)\nImporte a compensar\nConsumo de referencia (kWh)\nGrupo de consumo\nSubscribirme al envío de boleta electrónica\nTu correo electrónico\n\t\nRelación con la cuenta*\nPropietario\nBloquear (nadie podrá suscribirse a boleta electrónica)\nBloquear\nAcepto términos y condiciones\n\nEstos campos son obligatorios *\n\n¿Quieres desasociar esta cuenta?\nN° de cuenta\nDirección\nCANCELAR\nManual De Usuario\nCargos Facturados\nMeses 1–13\nMeses 14–24\nMeses 25–36\n© Enel Chile | Enel Distribución | Enel Generación | Enel Green Power\nTérminos Uso\nPolítica Privacidad\nContacto\nCanal Ético\nCertificaciones\n\nSíguenos en:\n\nX\n \nFacebook\n \nYouTube\n \nLinkedIn\n \nInstagram",
+      "pvtEls": [
+        {
+          "tag": "BODY",
+          "cls": "pvtArea",
+          "text": "Saltar al contenido principal\n            \n        Texto editado: \n\n\n\n\t \n\n\n\n\n \n\t"
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "pvtArea-btn-myEnel desktop-visible",
+          "text": "Mi Enel"
+        },
+        {
+          "tag": "DIV",
+          "cls": "pvtArea-wrapper",
+          "text": "Bienvenido a Mi Enel\n    FRANCISCO GABRIEL FLORES FUENTEALBA\n  \n  \n    \n      \n "
+        },
+        {
+          "tag": "DIV",
+          "cls": "pvtArea-header",
+          "text": ""
+        },
+        {
+          "tag": "DIV",
+          "cls": "pvtArea-container",
+          "text": "Bienvenido a Mi Enel\n    FRANCISCO GABRIEL FLORES FUENTEALBA\n  \n  \n    \n      \n "
+        },
+        {
+          "tag": "DIV",
+          "cls": "pvtArea-menu pvtArea-column",
+          "text": "Bienvenido a Mi Enel\n    FRANCISCO GABRIEL FLORES FUENTEALBA\n  \n  \n    \n      \n "
+        },
+        {
+          "tag": "DIV",
+          "cls": "pvtArea-userCnt",
+          "text": "Bienvenido a Mi Enel\n    FRANCISCO GABRIEL FLORES FUENTEALBA"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "pvtArea-welcome",
+          "text": "Bienvenido a Mi Enel"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "pvtArea-userName",
+          "text": "FRANCISCO GABRIEL FLORES FUENTEALBA"
+        },
+        {
+          "tag": "DIV",
+          "cls": "pvtArea-main pvtArea-column",
+          "text": "Se ha producido un error\n\t\t\t\t\t\n\t\t\t\t\n\t\t\t\t\n\t\t\t\t\tenel.cl / Mi Enel\n\t\t\t\t\t\n\t\t\t\t\n\t\t\t\t\n"
+        },
+        {
+          "tag": "DIV",
+          "cls": "pvtArea-account mobile-white",
+          "text": "Se ha producido un error"
+        },
+        {
+          "tag": "DIV",
+          "cls": "pvtArea-breadcrumb desktop-visible",
+          "text": "enel.cl / Mi Enel"
+        },
+        {
+          "tag": "DIV",
+          "cls": "pvtArea-account pvtArea-account-multirow pvtArea-dashboard",
+          "text": "Resumen de cuenta\n\t\t\t\tInformación de la cuenta\n\t\t\t\n\t\t\t\n\n\t.pvtArea-account-select"
+        },
+        {
+          "tag": "DIV",
+          "cls": "pvtArea-account-row",
+          "text": "Resumen de cuenta\n\t\t\t\tInformación de la cuenta\n\t\t\t\n\t\t\t\n\n\t.pvtArea-account-select"
+        },
+        {
+          "tag": "DIV",
+          "cls": "pvtArea-account-item1",
+          "text": "Resumen de cuenta\n\t\t\t\tInformación de la cuenta"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "pvtArea-account-item-title",
+          "text": "Resumen de cuenta"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "pvtArea-account-item-text",
+          "text": "Información de la cuenta"
+        },
+        {
+          "tag": "DIV",
+          "cls": "pvtArea-account-select-cnt",
+          "text": "Nº de cliente \n\t\t\n\t\t\n\t\t\n\t\n\t\n\t\t\n\t\t\t\n\t\t\t\t\n\t\t\t\n\t\tNº de cliente 1371157-7PBN AMERICO"
+        },
+        {
+          "tag": "DIV",
+          "cls": "pvtArea-account-select",
+          "text": "Nº de cliente"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "pvtArea-account-select-title val-clientcode",
+          "text": "Nº de cliente"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "pvtArea-account-select-title val-alias",
+          "text": ""
+        },
+        {
+          "tag": "SPAN",
+          "cls": "pvtArea-account-select-text",
+          "text": ""
+        },
+        {
+          "tag": "DIV",
+          "cls": "pvtArea-account-select-dropdown pvtArea-account-select-dropdown-b",
+          "text": "Nº de cliente 1371157-7PBN AMERICO VESPUCIO 2760-F, CONCHALINº de cliente 137147"
+        },
+        {
+          "tag": "LI",
+          "cls": "pvtArea-account-select-input",
+          "text": ""
+        },
+        {
+          "tag": "LI",
+          "cls": "pvtArea-account-select-option",
+          "text": "Nº de cliente 1371157-7PBN AMERICO VESPUCIO 2760-F, CONCHALI"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "pvtArea-account-select-title",
+          "text": "Nº de cliente 1371157-7"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "pvtArea-account-select-text",
+          "text": "PBN AMERICO VESPUCIO 2760-F, CONCHALI"
+        },
+        {
+          "tag": "LI",
+          "cls": "pvtArea-account-select-option",
+          "text": "Nº de cliente 137147-9CAL FUNDO EL PARRAL, COLINA"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "pvtArea-account-select-title",
+          "text": "Nº de cliente 137147-9"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "pvtArea-account-select-text",
+          "text": "CAL FUNDO EL PARRAL, COLINA"
+        }
+      ],
+      "consumoMatches": [
+        {
+          "tag": "SCRIPT",
+          "cls": "",
+          "text": "$(function(){\n\tvar previosBalanceLabel;\n\tvar actualBalanceLabel;\n\tvar companyCod"
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "button-accordeon-plus",
+          "text": "Mis consumos"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "pvtArea-account-item-title",
+          "text": "Tu Consumo"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "pvtArea-account-item-text",
+          "text": "Revisa el consumo de energía de tu hogar"
+        },
+        {
+          "tag": "TH",
+          "cls": "",
+          "text": "Consumo (kWh)"
+        },
+        {
+          "tag": "TH",
+          "cls": "",
+          "text": "Consumo adicional invierno"
+        },
+        {
+          "tag": "SCRIPT",
+          "cls": "",
+          "text": "var currentDay = \"\";\n\tvar dataserie1 =  [];\n\tvar dataserie2 = [];\n\tconst monthNa"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "label",
+          "text": "Consumo medio (kWh / seg)"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "label",
+          "text": "Consumo de referencia (kWh)"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "label",
+          "text": "Grupo de consumo"
+        }
+      ]
     },
-    "accountIds": [],
-    "clicked": false,
+    "accountIds": [
+      "1371157-7",
+      "137147-9",
+      "137142-8",
+      "438261-7",
+      "137143-6",
+      "2685615-9",
+      "3435471-5",
+      "3127088-K",
+      "1581431-4",
+      "1597012-K",
+      "1644343-3",
+      "2860724-5",
+      "2654429-7",
+      "2915655-7",
+      "1597-0",
+      "3556489-6",
+      "2519544-2",
+      "2625020-K",
+      "1411174-3",
+      "2625682-8",
+      "2519548-5",
+      "1411175-1",
+      "2519556-6",
+      "2519552-3",
+      "2796368-4",
+      "1394178-5",
+      "1539336-K",
+      "2594605-7",
+      "1581430-6",
+      "1412246-K",
+      "3208936-4",
+      "3208937-2",
+      "3208939-9",
+      "3208940-2",
+      "2519550-7",
+      "1535863-7",
+      "1463135-6",
+      "2519537-K",
+      "2519555-8",
+      "2501959-8",
+      "1412244-3",
+      "1438605-K",
+      "3032684-9",
+      "1394177-7",
+      "1535861-0",
+      "1433632-K",
+      "1426065-K",
+      "1304895-9",
+      "1328650-7",
+      "1362114-4",
+      "1371156-9",
+      "1394181-5",
+      "1411172-7",
+      "1412245-1",
+      "1419703-6",
+      "1426066-8",
+      "1433629-K",
+      "1438105-8",
+      "1440008-7",
+      "1448720-4",
+      "1448721-2",
+      "1448723-9",
+      "1455292-8",
+      "1484606-9",
+      "1488773-3",
+      "1500815-6",
+      "1535735-5",
+      "1545115-7",
+      "1545117-3",
+      "1557641-3",
+      "1567741-4",
+      "1573913-4",
+      "1574988-1",
+      "1580246-4",
+      "1581429-2",
+      "1584500-7",
+      "1584601-1",
+      "1597010-3",
+      "1597011-1",
+      "1597013-8",
+      "1627202-7",
+      "1634128-2",
+      "1641128-0",
+      "1644345-K",
+      "1652427-1",
+      "1652428-K",
+      "1652682-7",
+      "1655304-2",
+      "1656177-0",
+      "1679094-K",
+      "2519540-K",
+      "2519545-0",
+      "2591419-8",
+      "2676959-0",
+      "2736195-1",
+      "2796367-6",
+      "2796369-2",
+      "2796371-4",
+      "2796372-2",
+      "2902495-2",
+      "2902496-0",
+      "3060213-7",
+      "3060214-5",
+      "1412243-5",
+      "1655288-7",
+      "1567687-6",
+      "1356462-0",
+      "2796370-6",
+      "3634922-0",
+      "1663497-2",
+      "3506274-2"
+    ],
+    "clicked": true,
     "domInfo": {
-      "tablesCount": 0,
-      "tablesHtml": [],
-      "bodyHasError": false,
-      "url": "https://www.enel.cl/es/private-area.html"
+      "error": "Execution context was destroyed, most likely because of a navigation."
     },
     "capturedResponses": []
   },
