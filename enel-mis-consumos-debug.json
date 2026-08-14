@@ -1,10 +1,10 @@
 {
-  "actualizado": "2026-08-14T16:47:12.104Z",
+  "actualizado": "2026-08-14T16:47:45.854Z",
   "ok": true,
   "parsed": {
     "error": "sin-cuentas",
-    "title": "Personas - Área privada",
-    "url": "https://www.enel.cl/es/private-area.html",
-    "snippet": "  \nES EN\nAcceder a mi Enel\nLogin\nBienvenido\nIR AL ÁREA CLIENTE\nModificar perfil\nLogout\nenel.cl\nINICIO\nCanal Ético\nPERSONAS\nAcceder a mi Enel\nServicios en Línea\nConsultar y pagar cuenta\nLectura y Medidor\nEmergencias\nFormulario de Contacto\nEmpalmes y proyectos eléctricos\nTarifas y Regulación\nEMPRESAS\nCONOCE ENEL\nDirectorios\nEjecutivos\nPrensa\nTrabaja con nosotros\nProveedores\nHISTORIAS\nINNOVACIÓN Y SOSTENIBILIDAD\nINVERSIONISTAS\nEnel Chile\nEnel Distribución Chile\nEnel Generación Chile\nEnel Green Powe"
+    "title": "",
+    "url": "https://www.enel.cl/es/Ingresar.html?commonAuthCallerPath=%2Fsamlsso&forceAuth=false&passiveAuth=false&spEntityID=ENEL_WEB_CIL&sessionDataKey=30884243-546d-41f2-9bdc-85a673e49c6d&relyingParty=ENEL_WEB_CIL&type=samlsso&sp=ENEL_WEB_CIL&spId=e7d6de4c-436f-471e-a729-39c9ffc38892&isSaaSApp=false&authenticators=FacebookAuthenticator%3Afacebook%3BGoogleOIDCAuthenticator%3Agoogle%3BEnelCustomBasicAuthenticator%3ALOCAL",
+    "snippet": "NO_BODY"
   }
 }
