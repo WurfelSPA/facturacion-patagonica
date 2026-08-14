@@ -3911,7 +3911,7 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
                       whiteSpace:"nowrap",
                       background:isAA?`${AA_BLUE}0d`:isEnel?`${ENEL_GRN}0d`:"var(--surf2)",
                       cursor:"pointer",userSelect:"none"
-                    }},col.toUpperCase()+(active?(sortDir==='asc'?' ▲':' ▼'):''));
+                    }},col.toUpperCase(),h("span",{style:{opacity:active?1:.4,fontSize:9,marginLeft:3}},active?(sortDir==='asc'?'▲':'▼'):'↕'));
                   })
                 )
               ),
