@@ -78,7 +78,10 @@ function exportarSesionAA() {
 
 function exportarSesionEnel() {
   return exportarSesion({
-    dominioFiltro: 'enel.cl',
+    // Antes filtraba solo "enel.cl": el rebote a SSO al elegir cualquier cuenta
+    // sugiere que falta una cookie del proveedor de identidad (WSO2), que podría
+    // vivir en un dominio distinto (ej. enel.com). Se amplía a "enel" a secas.
+    dominioFiltro: 'enel',
     criticas: [],
     webhookUrl: N8N_WEBHOOK_URL_ENEL,
     urlParaCriticas: 'https://www.enel.cl/',
