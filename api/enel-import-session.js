@@ -186,11 +186,18 @@ export default async function handler(req, res) {
   if (!BROWSERLESS_TOKEN) return res.status(500).json({ error: 'Falta BROWSERLESS_TOKEN' });
 
   try {
-    const blRes = await fetch(`https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: BROWSER_CODE, context: { cookies } })
-    });
+    // stealth:true + proxy residencial chileno: mismo fix ya usado en nubox-pdf.js
+    // para el bloqueo de Incapsula que también afecta a enel.cl (confirmado por el
+    // iframe "_Incapsula_Resource" devuelto en la primera prueba de este endpoint).
+    const launchB64 = Buffer.from(JSON.stringify({ stealth: true })).toString('base64');
+    const blRes = await fetch(
+      `https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}&timeout=120000&proxy=residential&proxyCountry=cl&proxySticky=true&launch=${launchB64}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: BROWSER_CODE, context: { cookies } })
+      }
+    );
     if (!blRes.ok) {
       const errText = await blRes.text();
       await guardarDebugViaGitHub({ ok: false, error: `Browserless ${blRes.status}: ${errText.slice(0, 800)}` });
