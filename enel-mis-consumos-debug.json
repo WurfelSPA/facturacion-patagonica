@@ -1,191 +1,37 @@
 {
-  "actualizado": "2026-08-14T14:51:33.983Z",
+  "actualizado": "2026-08-14T15:03:07.797Z",
   "ok": true,
   "data": {
-    "ready": true,
+    "ready": false,
     "pageSnapshot": {
       "title": "Personas - Área privada",
       "url": "https://www.enel.cl/es/private-area.html",
-      "totalElements": 467,
+      "totalElements": 49,
       "iframes": [],
-      "bodyTextSample": "  \nES EN\nAcceder a mi Enel\nLogin\nBienvenido\nIR AL ÁREA CLIENTE\nModificar perfil\nLogout\nenel.cl\nINICIO\nCanal Ético\nPERSONAS\nAcceder a mi Enel\nServicios en Línea\nConsultar y pagar cuenta\nLectura y Medidor\nEmergencias\nFormulario de Contacto\nEmpalmes y proyectos eléctricos\nTarifas y Regulación\nEMPRESAS\nCONOCE ENEL\nDirectorios\nEjecutivos\nPrensa\nTrabaja con nosotros\nProveedores\nHISTORIAS\nINNOVACIÓN Y SOSTENIBILIDAD\nINVERSIONISTAS\nEnel Chile\nEnel Distribución Chile\nEnel Generación Chile\nEnel Green Power Chile\nMemorias\nOtros Sitios\nDe Interés\nRESUMEN DE CUENTA\n \nPAGO EN LÍNEA\n \nSOLICITAR CONVENIO\n \nCONSULTA NETBILLING / PMGD\n \nNUEVAS CONEXIONES Y MODIFICACIONES DE EMPALMES\n \nAGREGAR SUMINISTRO\n \nMIS DATOS\n \nSALIR\nResumen de cuenta\nInformación de la cuenta\n\t\nNº de cliente\nFecha último pago:\nMonto último pago:\nMis boletas\nDescargar cartola\nMeses 1–13\nMeses 14–24\nMeses 25–36\nNº Documento\tTipo de documento\tFecha de emisión\tFecha de vencimiento\tMonto\tBoleta\tDetalle de cargos\nMis pagos\nMis consumos",
+      "bodyTextSample": "",
       "pvtEls": [
         {
           "tag": "BODY",
           "cls": "pvtArea",
-          "text": "var enel_data = {};\n\tvar enel_data_navigation_base = [];\n\n\t//Fix manejo de apost"
-        },
-        {
-          "tag": "BUTTON",
-          "cls": "pvtArea-btn-myEnel desktop-visible",
-          "text": "Mi Enel"
-        },
-        {
-          "tag": "DIV",
-          "cls": "pvtArea-wrapper",
-          "text": "Bienvenido a Mi Enel\n    \n  \n  \n    \n      \n        \n          Resumen de cuenta"
-        },
-        {
-          "tag": "DIV",
-          "cls": "pvtArea-header",
           "text": ""
-        },
-        {
-          "tag": "DIV",
-          "cls": "pvtArea-container",
-          "text": "Bienvenido a Mi Enel\n    \n  \n  \n    \n      \n        \n          Resumen de cuenta"
-        },
-        {
-          "tag": "DIV",
-          "cls": "pvtArea-menu pvtArea-column",
-          "text": "Bienvenido a Mi Enel\n    \n  \n  \n    \n      \n        \n          Resumen de cuenta"
-        },
-        {
-          "tag": "DIV",
-          "cls": "pvtArea-userCnt",
-          "text": "Bienvenido a Mi Enel"
-        },
-        {
-          "tag": "SPAN",
-          "cls": "pvtArea-welcome",
-          "text": "Bienvenido a Mi Enel"
-        },
-        {
-          "tag": "SPAN",
-          "cls": "pvtArea-userName",
-          "text": ""
-        },
-        {
-          "tag": "DIV",
-          "cls": "pvtArea-main pvtArea-column",
-          "text": "Se ha producido un error\n\t\t\t\t\t\n\t\t\t\t\n\t\t\t\t\n\t\t\t\t\tenel.cl / Mi Enel\n\t\t\t\t\t\n\t\t\t\t\n\t\t\t\t\n"
-        },
-        {
-          "tag": "DIV",
-          "cls": "pvtArea-account mobile-white",
-          "text": "Se ha producido un error"
-        },
-        {
-          "tag": "DIV",
-          "cls": "pvtArea-breadcrumb desktop-visible",
-          "text": "enel.cl / Mi Enel"
-        },
-        {
-          "tag": "DIV",
-          "cls": "pvtArea-account pvtArea-account-multirow pvtArea-dashboard",
-          "text": "Resumen de cuenta\n\t\t\t\tInformación de la cuenta\n\t\t\t\n\t\t\t\n\n\t.pvtArea-account-select"
-        },
-        {
-          "tag": "DIV",
-          "cls": "pvtArea-account-row",
-          "text": "Resumen de cuenta\n\t\t\t\tInformación de la cuenta\n\t\t\t\n\t\t\t\n\n\t.pvtArea-account-select"
-        },
-        {
-          "tag": "DIV",
-          "cls": "pvtArea-account-item1",
-          "text": "Resumen de cuenta\n\t\t\t\tInformación de la cuenta"
-        },
-        {
-          "tag": "SPAN",
-          "cls": "pvtArea-account-item-title",
-          "text": "Resumen de cuenta"
-        },
-        {
-          "tag": "SPAN",
-          "cls": "pvtArea-account-item-text",
-          "text": "Información de la cuenta"
-        },
-        {
-          "tag": "DIV",
-          "cls": "pvtArea-account-select-cnt",
-          "text": "Nº de cliente"
-        },
-        {
-          "tag": "DIV",
-          "cls": "pvtArea-account-select without-after-element",
-          "text": "Nº de cliente"
-        },
-        {
-          "tag": "SPAN",
-          "cls": "pvtArea-account-select-title val-clientcode",
-          "text": "Nº de cliente"
-        },
-        {
-          "tag": "SPAN",
-          "cls": "pvtArea-account-select-title val-alias",
-          "text": ""
-        },
-        {
-          "tag": "SPAN",
-          "cls": "pvtArea-account-select-text",
-          "text": ""
-        },
-        {
-          "tag": "DIV",
-          "cls": "pvtArea-account-select-dropdown pvtArea-account-select-dropdown-b",
-          "text": ""
-        },
-        {
-          "tag": "LI",
-          "cls": "pvtArea-account-select-input",
-          "text": ""
-        },
-        {
-          "tag": "DIV",
-          "cls": "pvtArea-account-row",
-          "text": "Fecha último pago:\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t\n\t\t\t\t\t\t\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t"
-        },
-        {
-          "tag": "DIV",
-          "cls": "pvtArea-account-table",
-          "text": "Fecha último pago:\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t\n\t\t\t\t\t\t\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t"
-        },
-        {
-          "tag": "DIV",
-          "cls": "pvtArea-account-table-row twoItems",
-          "text": "Fecha último pago:\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t\n\t\t\t\t\t\t\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t"
-        },
-        {
-          "tag": "DIV",
-          "cls": "form-group pvtArea-account-table-item",
-          "text": "Fecha último pago:\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t\n\t\t\t\t\t\t\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t"
-        },
-        {
-          "tag": "DIV",
-          "cls": "pvtArea-account-radio pvtArea-account-table-item",
-          "text": "Suscribir boleta electrónica\n\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\tIngresar lectura de medi"
-        },
-        {
-          "tag": "DIV",
-          "cls": "row pvtArea-home pvtArea-home-left",
-          "text": "Suscribir boleta electrónica\n\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\tIngresar lectura de medi"
         }
       ],
-      "consumoMatches": [
-        {
-          "tag": "SCRIPT",
-          "cls": "",
-          "text": "$(function(){\n\tvar previosBalanceLabel;\n\tvar actualBalanceLabel;\n\tvar companyCod"
-        },
-        {
-          "tag": "BUTTON",
-          "cls": "button-accordeon-plus",
-          "text": "Mis consumos"
-        }
-      ]
+      "consumoMatches": []
     },
     "accountIds": [],
-    "accountPicked": "Nº de cliente 137147-9CAL FUNDO EL PARRAL, COLINA",
+    "accountPicked": null,
     "afterAccountSnapshot": {
-      "error": "Execution context was destroyed, most likely because of a navigation."
+      "url": "https://www.enel.cl/es/private-area.html",
+      "bodyHasError": false,
+      "bodyTextSample": ""
     },
     "clicked": false,
     "domInfo": {
       "tablesCount": 0,
       "tablesHtml": [],
       "bodyHasError": false,
-      "bodyTextSample": "Saltar al contenido principal\n  \n\nBocamina: compromiso cumplido\n\nNavidad Segura\n\nEnel, un siglo entregando energía a la ciudad y bienestar a las personas\n\nSon 100 años de contribución al progreso de la ciudad y mejoramiento de la calidad de vida de millones de personas.\n\nES EN\nAcceder a mi Enel\nLogin\nenel.cl\nINICIO\nCanal Ético\nPERSONAS\nAcceder a mi Enel\nServicios en Línea\nConsultar y pagar cuenta\nLectura y Medidor\nEmergencias\nFormulario de Contacto\nEmpalmes y proyectos eléctricos\nTarifas y Regulación\nEMPRESAS\nCONOCE ENEL\nDirectorios\nEjecutivos\nPrensa\nTrabaja con nosotros\nProveedores\nHISTORIAS\nINNOVACIÓN Y SOSTENIBILIDAD\nINVERSIONISTAS\nEnel Chile\nEnel Distribución Chile\nEnel Generación Chile\nEnel Green Power Chile\nMemorias\nOtros Sitios\nDe Interés\n¿Aún no tienes cuenta?\nREGISTRARME\nIngresa a tu sitio privado\nPERSONAS EMPRESAS E INSTITUCIONES\nUsuario (*Ingrese su email o Teléfono)\n\n\nContraseña\nINGRESAR\nOlvidé mi contraseña\nOlvidé mi usuario\n\n\nIngresar con Google\nIngresar con Facebook\n\n\n\n\n© Enel Chile | Enel Distribución | Enel Generación | Enel Green Power\nTérminos Uso\nPolítica Privacidad\nContacto\nCanal Ético\nCertificaciones\n\nSíguenos en:\n\nX\n \nFacebook\n \nYouTube\n \nLinkedIn\n \nInstagram\nUtilizamos cookies y rastreadores web para mejorar su experiencia online en nuestro sitio web, permitirle guardar información, facilitar su interacción con redes sociales (Facebook, Instagram, etc.), personalizar el contenido y los anuncios que ve en función del análisis de sus intereses. Las cookies también pueden ayudarnos a mejorar nuestro sitio web y sus funcionalidades.Puede leer nuestra Política de cookies aquí.\nConfiguración\nAceptar\nPreferencias sobre cookies\nTu opinión es importante\n×",
-      "url": "https://www.enel.cl/es/Ingresar.html?commonAuthCallerPath=%2Fsamlsso&forceAuth=false&passiveAuth=false&spEntityID=ENEL_WEB_CIL&sessionDataKey=d55b11ec-e88a-4593-8fa1-c6417d862ea9&relyingParty=ENEL_WEB_CIL&type=samlsso&sp=ENEL_WEB_CIL&spId=e7d6de4c-436f-471e-a729-39c9ffc38892&isSaaSApp=false&authenticators=FacebookAuthenticator%3Afacebook%3BGoogleOIDCAuthenticator%3Agoogle%3BEnelCustomBasicAuthenticator%3ALOCAL"
+      "bodyTextSample": "",
+      "url": "https://www.enel.cl/es/private-area.html"
     },
     "capturedResponses": []
   },
