@@ -97,22 +97,7 @@ const evalJsLines = [
   "  accountInfoTest = { status: r.status, body: (await r.text()).slice(0, 500) };",
   "} catch (e) { accountInfoTest = { error: e.message }; }",
   "",
-  "// Rastrear el JS de la página (inline + externo) buscando el endpoint real de",
-  "// Mis Consumos, sin clickear nada.",
-  "const inline = [...document.querySelectorAll('script:not([src])')].map(s => s.textContent).join('\\n');",
-  "const srcs = [...new Set([...document.querySelectorAll('script[src]')].map(s => s.src))];",
-  "let external = '';",
-  "for (const src of srcs) {",
-  "  try {",
-  "    const r = await fetch(src, { credentials: 'include' });",
-  "    external += '\\n/*==' + src + '==*/\\n' + (await r.text());",
-  "  } catch (e) {}",
-  "}",
-  "const allJs = inline + external;",
-  "const endpointMatches = [...new Set((allJs.match(/private-area\\.[\\w.-]+\\.html/gi) || []))];",
-  "const consumoContext = [...new Set((allJs.match(/.{0,30}(consum|reading|lectura|medidor).{0,80}/gi) || []))].slice(0, 80);",
-  "",
-  "return JSON.stringify({ accountIds, accountInfoTest, endpointMatches, consumoContext, scriptCount: srcs.length, jsLen: allJs.length });"
+  "return JSON.stringify({ accountIds, accountInfoTest });"
 ].join(String.fromCharCode(10));
 
 function buildBqlQuery() {
