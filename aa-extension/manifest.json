@@ -1,14 +1,15 @@
 {
   "manifest_version": 3,
   "name": "AA/Enel Session Exporter — Patagónica",
-  "version": "1.2",
+  "version": "1.3",
   "description": "Envía tu sesión de aguasandinas.cl o enel.cl al scraper de Patagónica Inmobiliaria (solo uso personal).",
   "permissions": ["cookies"],
   "host_permissions": [
     "https://www.aguasandinas.cl/*",
     "https://aguasandinas.cl/*",
     "https://www.enel.cl/*",
-    "https://wurfel.app.n8n.cloud/*"
+    "https://wurfel.app.n8n.cloud/*",
+    "https://facturacion-patagonica.vercel.app/*"
   ],
   "background": {
     "service_worker": "background.js"

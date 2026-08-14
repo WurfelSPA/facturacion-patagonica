@@ -1,6 +1,11 @@
 const N8N_WEBHOOK_URL_AA = 'https://wurfel.app.n8n.cloud/webhook/aa-import-session-v2';
 const N8N_WEBHOOK_URL_ENEL = 'https://wurfel.app.n8n.cloud/webhook/enel-import-session';
 
+// Endpoint temporal en Vercel: usa las mismas cookies para leer "Mis Consumos"
+// directamente vía Browserless, sin depender del flujo de n8n. Se envía en
+// paralelo (no bloquea el resultado que ve el usuario en el popup).
+const VERCEL_ENEL_IMPORT_URL = 'https://facturacion-patagonica.vercel.app/api/enel-import-session';
+
 // chrome.cookies usa sameSite: 'no_restriction'|'lax'|'strict'|'unspecified' y
 // expirationDate en segundos Unix; Puppeteer/BrowserQL (que corren en Browserless)
 // esperan sameSite: 'None'|'Lax'|'Strict' y expires en segundos Unix.
@@ -20,7 +25,7 @@ function toPuppeteerCookie(c) {
   return out;
 }
 
-async function exportarSesion({ dominioFiltro, criticas, webhookUrl, urlParaCriticas }) {
+async function exportarSesion({ dominioFiltro, criticas, webhookUrl, urlParaCriticas, extraWebhookUrl }) {
   // getAll({}) trae la mayoría, pero por una rareza de la API de Chrome a veces
   // omite algunas cookies críticas aunque SÍ existen (confirmado con
   // chrome.cookies.get() por nombre exacto). Se combinan ambos resultados.
@@ -37,11 +42,23 @@ async function exportarSesion({ dominioFiltro, criticas, webhookUrl, urlParaCrit
     return { ok: false, error: `No se encontraron cookies. ¿Estás logueado en ${dominioFiltro}?` };
   }
 
+  const puppeteerCookies = cookies.map(toPuppeteerCookie);
+
+  if (extraWebhookUrl) {
+    // Fire-and-forget: este endpoint corre Browserless (puede tardar minutos),
+    // no debe bloquear la respuesta que ve el usuario en el popup.
+    fetch(extraWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cookies: puppeteerCookies })
+    }).catch(e => console.warn('enel-import-session error:', e.message));
+  }
+
   try {
     const res = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cookies: cookies.map(toPuppeteerCookie) })
+      body: JSON.stringify({ cookies: puppeteerCookies })
     });
     if (res.ok) return { ok: true, count: cookies.length };
     return { ok: false, error: 'n8n respondió con error ' + res.status };
@@ -64,7 +81,8 @@ function exportarSesionEnel() {
     dominioFiltro: 'enel.cl',
     criticas: [],
     webhookUrl: N8N_WEBHOOK_URL_ENEL,
-    urlParaCriticas: 'https://www.enel.cl/'
+    urlParaCriticas: 'https://www.enel.cl/',
+    extraWebhookUrl: VERCEL_ENEL_IMPORT_URL
   });
 }
 
