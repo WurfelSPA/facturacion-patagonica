@@ -231,9 +231,16 @@ export default async function handler(req, res) {
     // stealth:true + proxy residencial chileno: mismo fix ya usado en nubox-pdf.js
     // para el bloqueo de Incapsula que también afecta a enel.cl (confirmado por el
     // iframe "_Incapsula_Resource" devuelto en la primera prueba de este endpoint).
+    //
+    // TEMPORAL: se saca el proxy residencial. Sospecha: cada llamada obtiene una
+    // IP residencial distinta, y Enel (WSO2 SSO) parece atar la validez de la
+    // sesión a la IP de origen — funcionó una sola vez de varios intentos, y en
+    // el camino cerró la sesión real del usuario más de una vez. Sin proxy,
+    // Browserless sale siempre desde IPs de su propio datacenter (más estables
+    // entre llamadas), a costa de arriesgar que vuelva el bloqueo de Incapsula.
     const launchB64 = Buffer.from(JSON.stringify({ stealth: true })).toString('base64');
     const blRes = await fetch(
-      `https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}&timeout=120000&proxy=residential&proxyCountry=cl&proxySticky=true&launch=${launchB64}`,
+      `https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}&timeout=120000&launch=${launchB64}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
