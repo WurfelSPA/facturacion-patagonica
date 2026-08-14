@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updatedAt": "2026-08-14T20:55:48.464Z",
+  "updatedAt": "2026-08-14T20:56:40.780Z",
   "source": "n8n",
   "accounts": {
     "672977-0": {
@@ -210,7 +210,7 @@
     },
     "1534326-5": {
       "deuda": null,
-      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: 538a4cc5-a500-4e72-b5e7-dcae6a9b57ed)"
+      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: 7e6ba439-8bcc-4519-97ad-60665b0d1938)"
     },
     "1534327-3": {
       "deuda": "$0",
