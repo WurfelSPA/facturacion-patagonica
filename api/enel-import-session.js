@@ -32,36 +32,51 @@ export const config = { api: { bodyParser: { sizeLimit: '2mb' } } };
 async function guardarDebugViaGitHub(data) {
   const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
   const GITHUB_REPO = process.env.GITHUB_REPO || 'WurfelSPA/facturacion-patagonica';
-  if (!GITHUB_TOKEN) return;
+  if (!GITHUB_TOKEN) return { ok: false, error: 'Falta GITHUB_TOKEN' };
 
   const filePath = 'enel-mis-consumos-debug.json';
   const apiBase = `https://api.github.com/repos/${GITHUB_REPO}/contents/${filePath}`;
-
-  let sha = null;
-  try {
-    const getRes = await fetch(apiBase, {
-      headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' }
-    });
-    if (getRes.ok) { const j = await getRes.json(); sha = j.sha; }
-  } catch (_) {}
-
   const payload = { actualizado: new Date().toISOString(), ...data };
   const content = Buffer.from(JSON.stringify(payload, null, 2), 'utf-8').toString('base64');
-  const body = {
-    message: `chore: debug mis consumos Enel ${new Date().toISOString().slice(0, 10)}`,
-    content,
-    ...(sha ? { sha } : {})
-  };
 
-  await fetch(apiBase, {
-    method: 'PUT',
-    headers: {
-      Authorization: `Bearer ${GITHUB_TOKEN}`,
-      Accept: 'application/vnd.github+json',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(body)
-  }).catch(() => {});
+  // Hasta 3 intentos: si el PUT falla por sha desactualizado (409/422, otra
+  // escritura concurrente), se vuelve a pedir el sha fresco y se reintenta —
+  // antes esto fallaba en silencio (.catch(() => {})) y parecía que el click
+  // "no hacía nada".
+  let lastError = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let sha = null;
+    try {
+      const getRes = await fetch(apiBase, {
+        headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' }
+      });
+      if (getRes.ok) { const j = await getRes.json(); sha = j.sha; }
+    } catch (e) { lastError = 'GET falló: ' + e.message; }
+
+    const body = {
+      message: `chore: debug mis consumos Enel ${new Date().toISOString().slice(0, 10)}`,
+      content,
+      ...(sha ? { sha } : {})
+    };
+
+    try {
+      const putRes = await fetch(apiBase, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${GITHUB_TOKEN}`,
+          Accept: 'application/vnd.github+json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+      if (putRes.ok) return { ok: true };
+      lastError = `PUT ${putRes.status}: ${(await putRes.text()).slice(0, 300)}`;
+    } catch (e) {
+      lastError = 'PUT falló: ' + e.message;
+    }
+    await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+  }
+  return { ok: false, error: lastError };
 }
 
 function setCors(res) {
@@ -322,10 +337,10 @@ export default async function handler(req, res) {
     const raw = blData.data && blData.data.extraccion && blData.data.extraccion.value;
     let parsed = null;
     try { parsed = raw ? JSON.parse(raw) : null; } catch (_) { parsed = { parseError: true, raw: String(raw).slice(0, 2000) }; }
-    await guardarDebugViaGitHub({ ok: true, parsed, raw: raw ? undefined : blData });
-    return res.status(200).json({ parsed });
+    const guardado = await guardarDebugViaGitHub({ ok: true, parsed, raw: raw ? undefined : blData });
+    return res.status(200).json({ parsed, guardado });
   } catch (e) {
-    await guardarDebugViaGitHub({ ok: false, error: e.message });
-    return res.status(500).json({ error: e.message });
+    const guardado = await guardarDebugViaGitHub({ ok: false, error: e.message });
+    return res.status(500).json({ error: e.message, guardado });
   }
 }
