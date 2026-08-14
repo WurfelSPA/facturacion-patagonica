@@ -1,5 +1,10 @@
 {
-  "actualizado": "2026-08-14T16:03:08.937Z",
-  "ok": false,
-  "error": "GraphQL: [{\"message\":\"SyntaxError: Invalid or unexpected token (requestId: 79bac753-479d-46e7-aa11-c4e9b8c85f3e)\",\"locations\":[{\"line\":2,\"column\":3}],\"path\":[\"extraccion\"]}]"
+  "actualizado": "2026-08-14T16:14:24.201Z",
+  "ok": true,
+  "parsed": {
+    "error": "sin-cuentas",
+    "title": "Ingreso a Sucursal Virtual Enel - Gestiona tu Cuenta",
+    "url": "https://www.enel.cl/es/Ingresar.html?commonAuthCallerPath=%2Fsamlsso&forceAuth=false&passiveAuth=false&spEntityID=ENEL_WEB_CIL&sessionDataKey=39e6c51c-b253-4c7f-9bf5-7965e74bc807&relyingParty=ENEL_WEB_CIL&type=samlsso&sp=ENEL_WEB_CIL&spId=e7d6de4c-436f-471e-a729-39c9ffc38892&isSaaSApp=false&authenticators=FacebookAuthenticator%3Afacebook%3BGoogleOIDCAuthenticator%3Agoogle%3BEnelCustomBasicAuthenticator%3ALOCAL",
+    "snippet": ""
+  }
 }
