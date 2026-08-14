@@ -139,6 +139,27 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: e.message });
     }
   }
+  if (req.method === 'GET' && req.query.trivial === '2') {
+    const BROWSERLESS_TOKEN = process.env.BROWSERLESS_TOKEN;
+    if (!BROWSERLESS_TOKEN) return res.status(500).json({ error: 'Falta BROWSERLESS_TOKEN' });
+    const escapedEvalJs = evalJsLines.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+    const q = [
+      'mutation Trivial2 {',
+      '  nav: goto(url: "https://example.com", waitUntil: domContentLoaded, timeout: 20000) { status }',
+      '  extraccion: evaluate(content: "' + escapedEvalJs + '") { value }',
+      '}'
+    ].join(String.fromCharCode(10));
+    try {
+      const blRes = await fetch(
+        `https://production-sfo.browserless.io/stealth/bql?token=${BROWSERLESS_TOKEN}&timeout=30000`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: q }) }
+      );
+      const text = await blRes.text();
+      return res.status(200).json({ status: blRes.status, body: text.slice(0, 2000) });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { cookies } = req.body || {};
