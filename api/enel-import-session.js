@@ -160,7 +160,10 @@ const BROWSER_CODE = `
 
     // 1) Elegir una cuenta del selector (sin cuenta seleccionada, la página
     // muestra "Se ha producido un error" en vez del resumen).
-    const TARGET_ACCOUNT = '1582840-4';
+    // TEMPORAL: forzar fallback a la primera cuenta del selector, para comparar
+    // si el rebote a SSO/login ocurre con CUALQUIER cuenta o es específico de
+    // la 1582840-4.
+    const TARGET_ACCOUNT = '__test_generic_account__';
     await clickAndSurvive(() => {
       const cnt = document.querySelector('.pvtArea-account-select-cnt');
       if (cnt) cnt.click();
