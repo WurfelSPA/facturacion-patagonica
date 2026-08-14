@@ -106,7 +106,7 @@ function buildBqlQuery() {
     'mutation LeerMisConsumos($cookies: [CookieInput!]!) {',
     '  proxy(network: residential, country: CL, sticky: true) { time }',
     '  setCookies: cookies(cookies: $cookies) { cookies { name } }',
-    '  nav: goto(url: "https://www.enel.cl/es/Ingresar.html", waitUntil: domContentLoaded, timeout: 30000) { status }',
+    '  nav: goto(url: "https://www.enel.cl/es/private-area.html", waitUntil: domContentLoaded, timeout: 30000) { status }',
     '  espera: waitForTimeout(time: 8000) { time }',
     '  extraccion: evaluate(content: "' + escapedEvalJs + '") { value }',
     '}'
