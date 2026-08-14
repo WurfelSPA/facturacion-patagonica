@@ -117,6 +117,10 @@
       "dest": "/renovaciones-notificadas.json"
     },
     {
+      "src": "/enel-mis-consumos-debug.json",
+      "dest": "/enel-mis-consumos-debug.json"
+    },
+    {
       "src": "/(.+\\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2))",
       "dest": "/$1"
     },

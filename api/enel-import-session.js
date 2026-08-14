@@ -11,9 +11,49 @@
  * Lectura Actual antes de escribir la lógica definitiva.
  *
  * Body: { cookies: [...] }  (formato Puppeteer, ya generado por la extensión)
+ *
+ * El resultado (o el error de diagnóstico) se guarda además en
+ * enel-mis-consumos-debug.json vía GitHub API, porque quien llama a este
+ * endpoint es la extensión (fire-and-forget) y nadie ve la respuesta HTTP
+ * directamente.
  */
 
 export const config = { api: { bodyParser: { sizeLimit: '2mb' } } };
+
+async function guardarDebugViaGitHub(data) {
+  const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+  const GITHUB_REPO = process.env.GITHUB_REPO || 'WurfelSPA/facturacion-patagonica';
+  if (!GITHUB_TOKEN) return;
+
+  const filePath = 'enel-mis-consumos-debug.json';
+  const apiBase = `https://api.github.com/repos/${GITHUB_REPO}/contents/${filePath}`;
+
+  let sha = null;
+  try {
+    const getRes = await fetch(apiBase, {
+      headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' }
+    });
+    if (getRes.ok) { const j = await getRes.json(); sha = j.sha; }
+  } catch (_) {}
+
+  const payload = { actualizado: new Date().toISOString(), ...data };
+  const content = Buffer.from(JSON.stringify(payload, null, 2), 'utf-8').toString('base64');
+  const body = {
+    message: `chore: debug mis consumos Enel ${new Date().toISOString().slice(0, 10)}`,
+    content,
+    ...(sha ? { sha } : {})
+  };
+
+  await fetch(apiBase, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  }).catch(() => {});
+}
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -119,11 +159,14 @@ export default async function handler(req, res) {
     });
     if (!blRes.ok) {
       const errText = await blRes.text();
+      await guardarDebugViaGitHub({ ok: false, error: `Browserless ${blRes.status}: ${errText.slice(0, 800)}` });
       return res.status(500).json({ error: `Browserless ${blRes.status}: ${errText.slice(0, 800)}` });
     }
     const blData = await blRes.json();
+    await guardarDebugViaGitHub({ ok: true, ...blData });
     return res.status(200).json(blData);
   } catch (e) {
+    await guardarDebugViaGitHub({ ok: false, error: e.message });
     return res.status(500).json({ error: e.message });
   }
 }
