@@ -105,9 +105,11 @@ export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const authHeader = req.headers['authorization'] || '';
-  const syncSecret = process.env.SYNC_SECRET;
-  if (!syncSecret || authHeader !== `Bearer ${syncSecret}`) {
+  // Variable de entorno desechable creada solo para este endpoint temporal
+  // (evita depender de SYNC_SECRET, que quedó marcado como Sensitive en Vercel
+  // y ya no se puede leer desde el dashboard).
+  const debugKey = process.env.ENEL_DEBUG_KEY;
+  if (!debugKey || req.query.debugkey !== debugKey) {
     return res.status(401).json({ error: 'No autorizado' });
   }
 
