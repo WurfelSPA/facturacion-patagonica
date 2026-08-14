@@ -144,29 +144,68 @@ const BROWSER_CODE = `
         .filter(Boolean)
     ).catch(() => []);
 
-    const clicked = await page.evaluate(() => {
+    // Click que puede disparar una navegación completa (no es un SPA puro): en
+    // vez de esperar el resultado de evaluate() -que puede lanzar "Execution
+    // context was destroyed"-, correr una espera de navegación en paralelo y
+    // tragarnos el error del evaluate si la página ya se está yendo.
+    async function clickAndSurvive(fn, arg) {
+      const navP = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => null);
+      let result;
+      try { result = await page.evaluate(fn, arg); }
+      catch (e) { result = 'context-destroyed:' + e.message; }
+      await navP;
+      await new Promise(r => setTimeout(r, 1500));
+      return result;
+    }
+
+    // 1) Elegir una cuenta del selector (sin cuenta seleccionada, la página
+    // muestra "Se ha producido un error" en vez del resumen).
+    const TARGET_ACCOUNT = '1582840-4';
+    await clickAndSurvive(() => {
+      const cnt = document.querySelector('.pvtArea-account-select-cnt');
+      if (cnt) cnt.click();
+      return true;
+    });
+    const accountPicked = await clickAndSurvive((targetId) => {
+      const options = [...document.querySelectorAll('.pvtArea-account-select-option')];
+      let opt = options.find(o => (o.textContent || '').includes(targetId));
+      if (!opt) opt = options[0];
+      if (opt) { opt.click(); return opt.textContent.trim().slice(0, 100); }
+      return null;
+    }, TARGET_ACCOUNT);
+
+    const afterAccountSnapshot = await page.evaluate(() => ({
+      url: location.href,
+      bodyHasError: /se ha producido un error/i.test(document.body.innerText || ''),
+      bodyTextSample: (document.body.innerText || '').slice(0, 1500),
+    })).catch(e => ({ error: e.message }));
+
+    // 2) Expandir "Mis consumos"
+    const clicked = await clickAndSurvive(() => {
+      const btns = [...document.querySelectorAll('.button-accordeon-plus')];
+      const btn = btns.find(b => /mis consumos/i.test(b.textContent || ''));
+      if (btn) { btn.click(); return true; }
       const all = [...document.querySelectorAll('*')];
       const target = all.find(el => el.children.length === 0 && /mis consumos/i.test(el.textContent || ''));
       if (target) { target.click(); return true; }
-      const container = all.find(el => /mis consumos/i.test(el.textContent || '') && el.textContent.trim().length < 40);
-      if (container) { container.click(); return true; }
       return false;
-    }).catch(() => false);
+    });
 
-    await new Promise(r => setTimeout(r, 4000));
+    await new Promise(r => setTimeout(r, 3000));
 
     const domInfo = await page.evaluate(() => {
       const tables = [...document.querySelectorAll('table')];
       return {
         tablesCount: tables.length,
-        tablesHtml: tables.map(t => t.outerHTML.slice(0, 6000)),
+        tablesHtml: tables.map(t => t.outerHTML.slice(0, 8000)),
         bodyHasError: /se ha producido un error/i.test(document.body.innerText),
+        bodyTextSample: (document.body.innerText || '').slice(0, 3000),
         url: location.href,
       };
     }).catch(e => ({ error: e.message }));
 
     return {
-      data: { ready, pageSnapshot, accountIds, clicked, domInfo, capturedResponses },
+      data: { ready, pageSnapshot, accountIds, accountPicked, afterAccountSnapshot, clicked, domInfo, capturedResponses },
       type: 'application/json'
     };
   }
