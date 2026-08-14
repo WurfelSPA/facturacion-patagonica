@@ -78,8 +78,15 @@ function setCors(res) {
 const TARGET_ACCOUNT = '1582840-4';
 
 const evalJsLines = [
-  "const accountIds = [...document.querySelectorAll('.pvtArea-account-select-option[data-target]')].map(el => el.dataset.target).filter(Boolean);",
-  "if (!accountIds.length) return JSON.stringify({ error: 'sin-cuentas', title: document.title, url: location.href, snippet: (document.body ? document.body.innerText : 'NO_BODY').slice(0, 500) });",
+  "function leerAccountIds() {",
+  "  return [...document.querySelectorAll('.pvtArea-account-select-option[data-target]')].map(el => el.dataset.target).filter(Boolean);",
+  "}",
+  "let accountIds = leerAccountIds();",
+  "for (let i = 0; i < 8 && !accountIds.length; i++) {",
+  "  await new Promise(r => setTimeout(r, 2000));",
+  "  accountIds = leerAccountIds();",
+  "}",
+  "if (!accountIds.length) return JSON.stringify({ error: 'sin-cuentas', title: document.title, url: location.href, totalElements: document.querySelectorAll('*').length, snippet: (document.body ? document.body.innerText : 'NO_BODY').slice(0, 1500) });",
   "async function getCsrfToken() {",
   "  const r = await fetch('/libs/granite/csrf/token.json', { credentials: 'include' });",
   "  const j = await r.json();",
