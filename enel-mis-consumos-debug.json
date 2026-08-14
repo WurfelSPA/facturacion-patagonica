@@ -1,5 +1,16 @@
 {
-  "actualizado": null,
-  "ok": null,
-  "nota": "Se llena automáticamente al usar el botón Actualizar de Enel en Cuentas de Servicios (o el popup de la extensión)."
+  "actualizado": "2026-08-14T13:50:50.993Z",
+  "ok": true,
+  "data": {
+    "accountIds": [],
+    "clicked": false,
+    "domInfo": {
+      "tablesCount": 0,
+      "tablesHtml": [],
+      "bodyHasError": false,
+      "url": "https://www.enel.cl/es/private-area.html"
+    },
+    "capturedResponses": []
+  },
+  "type": "application/json"
 }
