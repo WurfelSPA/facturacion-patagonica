@@ -3555,6 +3555,11 @@ function CatastroSitiosView({dashData,driveLoading}){
   function toggleSort(col){if(sortCol===col)setSortDir(d=>d==="asc"?"desc":"asc");else{setSortCol(col);setSortDir("asc");}}
   function fmtCLP(v){return v==null||isNaN(v)?"—":"$"+Math.round(v).toLocaleString("es-CL");}
   function fmtUF(v){return v==null||isNaN(v)?"—":v.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})+" UF";}
+  /* Tasa por m²: se muestra con más decimales que fmtUF porque, al dividir
+     un arriendo total (ej. ~50 UF) por 200+ m², el resultado suele ser un
+     número pequeño (ej. 0.23 UF/m²) donde 2 decimales pierden precisión. */
+  function fmtUFm2(v){return v==null||isNaN(v)?"—":v.toLocaleString("es-CL",{minimumFractionDigits:4,maximumFractionDigits:4})+" UF/m²";}
+  function ufPorM2(v){return(v.arriendoActual!=null&&v.m2!=null&&v.m2>0)?v.arriendoActual/v.m2:null;}
   if(!dashData)return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,overflow:"hidden",minHeight:0},className:"fade-up epv2"},
     driveLoading
       ?h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},h("span",{className:"fv2-loader",style:{width:18,height:18,fontSize:18}}),"Cargando planilla desde Drive...")
@@ -3578,15 +3583,15 @@ function CatastroSitiosView({dashData,driveLoading}){
       case "Edificio":return(v.edificio||"").toLowerCase();
       case "Dirección":return(v.dir||"").toLowerCase();
       case "m² Total":return v.m2!=null?v.m2:-Infinity;
+      case "UF/m²":{const r=ufPorM2(v);return r!=null?r:-Infinity;}
       case "UF Arriendo":return v.arriendoActual!=null?v.arriendoActual:-Infinity;
-      case "UF×m²":return v.ufM2!=null?v.ufM2:-Infinity;
       case "UF Serv Admin":return v.servAdminActual!=null?v.servAdminActual:-Infinity;
       case "% Arriendo":return v.pctAdm!=null?v.pctAdm:-Infinity;
       default:return"";
     }
   }
   const sorted=sortCol?[...filtered].sort((a,b)=>{const va=getSortVal(a,sortCol),vb=getSortVal(b,sortCol);const cmp=typeof va==="number"?va-vb:va.localeCompare(vb,"es");return sortDir==="asc"?cmp:-cmp;}):filtered;
-  const COLS=["Sitio","Edificio","Dirección","m² Total","UF Arriendo","UF×m²","UF Serv Admin","% Arriendo"];
+  const COLS=["Sitio","Edificio","Dirección","m² Total","UF/m²","UF Arriendo","UF Serv Admin","% Arriendo"];
   const totalM2=sitios.reduce((s,v)=>s+(v.m2||0),0);
   const totalArriendoUF=sitios.reduce((s,v)=>s+(v.arriendoActual||0),0);
   return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up epv2"},
@@ -3609,8 +3614,8 @@ function CatastroSitiosView({dashData,driveLoading}){
               "Sitio":v.sitio||"","Edificio":v.edificio||"","Dirección":v.dir||"",
               "Estado":v.isVacante?"VACANTE":"",
               "m² Total":v.m2!=null?v.m2:"",
+              "UF/m²":ufPorM2(v)!=null?Number(ufPorM2(v).toFixed(4)):"",
               "UF Arriendo":v.arriendoActual!=null?v.arriendoActual:"",
-              "UF×m²":v.ufM2!=null?v.ufM2:"",
               "UF Serv Admin":v.servAdminActual!=null?v.servAdminActual:"",
               "% Arriendo":v.pctAdm!=null?(v.pctAdm>0&&v.pctAdm<1?(v.pctAdm*100).toFixed(0)+"%":v.pctAdm):"",
             }));
@@ -3648,7 +3653,8 @@ function CatastroSitiosView({dashData,driveLoading}){
                 sorted.map((v,i)=>{
                   const sCol=SITIO_C[v.sitio]||"#888";
                   const arriendoCLP=ufHoy&&v.arriendoActual!=null?v.arriendoActual*ufHoy:null;
-                  const ufM2CLP=ufHoy&&v.ufM2!=null?v.ufM2*ufHoy:null;
+                  const ufM2Rate=ufPorM2(v);
+                  const ufM2CLP=ufHoy&&ufM2Rate!=null?ufM2Rate*ufHoy:null;
                   const servAdmCLP=ufHoy&&v.servAdminActual!=null?v.servAdminActual*ufHoy:null;
                   const pctTxt=v.pctAdm==null?"—":(v.pctAdm>0&&v.pctAdm<1?(v.pctAdm*100).toFixed(0)+"%":fmtUF(v.pctAdm));
                   return h("tr",{key:v.sitio+"|"+v.edificio+"|"+i,style:{
@@ -3663,19 +3669,19 @@ function CatastroSitiosView({dashData,driveLoading}){
                     h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)"}},v.edificio||"—"),
                     h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",maxWidth:220}},v.dir||"—"),
                     h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--tx)"}},v.m2!=null?v.m2.toLocaleString("es-CL")+" m²":"—"),
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap"},title:"Calculado: UF Arriendo ÷ m² Total"},
+                      ufM2Rate!=null
+                        ?h(React.Fragment,null,
+                            h("span",{style:{fontSize:13,fontWeight:700,color:"var(--green)"}},fmtUFm2(ufM2Rate)),
+                            ufM2CLP&&h("span",{style:{fontSize:12,color:"var(--txm)",marginLeft:6}},"("+fmtCLP(ufM2CLP)+"/m²)")
+                          )
+                        :h("span",{style:{color:"var(--bdr)"}},"—")
+                    ),
                     h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap"},title:v.mesActual?"Tarifa real vigente, según "+v.mesActual:"Sin facturación reciente"},
                       v.arriendoActual!=null
                         ?h(React.Fragment,null,
                             h("span",{style:{fontSize:14,fontWeight:700,color:"var(--green)"}},fmtUF(v.arriendoActual)),
                             arriendoCLP&&h("span",{style:{fontSize:12,color:"var(--txm)",marginLeft:6}},"("+fmtCLP(arriendoCLP)+")")
-                          )
-                        :h("span",{style:{color:"var(--bdr)"}},"—")
-                    ),
-                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap"},title:"Tarifa pactada al inicio del contrato (col. AV) — puede no reflejar reajustes posteriores"},
-                      v.ufM2!=null
-                        ?h(React.Fragment,null,
-                            h("span",{style:{fontSize:14,fontWeight:700,color:"var(--green)"}},fmtUF(v.ufM2)),
-                            ufM2CLP&&h("span",{style:{fontSize:12,color:"var(--txm)",marginLeft:6}},"("+fmtCLP(ufM2CLP)+")")
                           )
                         :h("span",{style:{color:"var(--bdr)"}},"—")
                     ),
