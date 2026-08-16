@@ -3598,6 +3598,7 @@ function CatastroSitiosView({dashData,driveLoading}){
             const wb=XLSX.utils.book_new();
             const rows=filtered.map(v=>({
               "Sitio":v.sitio||"","Edificio":v.edificio||"","Dirección":v.dir||"",
+              "Estado":v.isVacante?"VACANTE":"",
               "m² Total":v.m2!=null?v.m2:"",
               "UF×m²":v.ufM2!=null?v.ufM2:"",
               "Valor en UF Serv. Admin.":v.rentaAplicable!=null?v.rentaAplicable:"",
