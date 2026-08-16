@@ -3583,7 +3583,7 @@ function CatastroSitiosView({dashData,driveLoading}){
   return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up epv2"},
     h("div",{style:{padding:"14px 24px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,flexShrink:0,borderBottom:"1px solid var(--bdr)"}},
       h("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
-        h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"🗂️ CATASTRO DE SITIOS"),
+        h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"🗺️ CATASTRO DE SITIOS"),
         h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},filtered.length+" / "+sitios.length),
         h("span",{style:{width:1,height:16,background:"var(--bdr)",display:"inline-block",margin:"0 4px"}}),
         h("span",{title:"Suma de m² Total de todos los sitios",style:{fontSize:10,color:"var(--amber)",background:"var(--abg)",border:"1px solid var(--adim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",cursor:"default"}},totalM2.toLocaleString("es-CL")+" m² totales"),
@@ -3637,8 +3637,15 @@ function CatastroSitiosView({dashData,driveLoading}){
                   const sCol=SITIO_C[v.sitio]||"#888";
                   const rentaCLP=ufHoy&&v.rentaAplicable!=null?v.rentaAplicable*ufHoy:null;
                   const ufM2CLP=ufHoy&&v.ufM2!=null?v.ufM2*ufHoy:null;
-                  return h("tr",{key:v.sitio+"|"+v.edificio+"|"+i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"var(--surf2)"}},
-                    h("td",{style:{padding:"9px 12px"}},h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},v.sitio||"—")),
+                  return h("tr",{key:v.sitio+"|"+v.edificio+"|"+i,style:{
+                    borderBottom:"1px solid var(--bdr)",
+                    background:v.isVacante?"var(--abg)":(i%2===0?"var(--surf)":"var(--surf2)"),
+                    borderLeft:v.isVacante?"3px solid var(--amber)":"3px solid transparent"
+                  }},
+                    h("td",{style:{padding:"9px 12px"}},
+                      h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},v.sitio||"—"),
+                      v.isVacante&&h("span",{style:{marginLeft:6,padding:"2px 7px",borderRadius:5,fontSize:9,fontWeight:700,background:"var(--adim)",color:"var(--amber)",border:"1px solid var(--amber)"}},"VACANTE")
+                    ),
                     h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)"}},v.edificio||"—"),
                     h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",maxWidth:220}},v.dir||"—"),
                     h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--tx)"}},v.m2!=null?v.m2.toLocaleString("es-CL")+" m²":"—"),
@@ -5254,7 +5261,7 @@ function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlo
     {id:"fact-cobrar", icon:"💰", label:"Facturas x Cobrar"},
     {id:"contratos", icon:"📄", label:"Contratos"},
     {id:"cuentas",   icon:"🔌", label:"Cuentas Servicios"},
-    {id:"vacantes",  icon:"🗂️", label:"Catastro de Sitios"},
+    {id:"vacantes",  icon:"🗺️", label:"Catastro de Sitios"},
     {id:"cortijo",   icon:"🏡", label:"El Cortijo"},
   ];
   const isActive = id => id==="factura" ? (view==="table"||view==="upload") : view===id;
@@ -7157,7 +7164,7 @@ function App(){
     h("header",{className:(view==="table"||view==="upload")?"fv2":undefined,style:{background:view==="table"?"#0F1B33":"var(--surf)",borderBottom:view==="table"?"1px solid #1C2C4A":"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:49,gap:10}},
       h("div",{style:{display:"flex",alignItems:"center",gap:10}},
         h("div",{className:view==="table"?"fv2-title":undefined,style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px",color:view==="table"?"#fff":"var(--tx)"}},
-          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="cuentas"?"🔌 Cuentas Servicios":view==="vacantes"?"🗂️ Catastro de Sitios":view==="fact-cobrar"?"💰 Facturas x Cobrar":view==="pagos"?"✅ Estado de Pagos":view==="cortijo"?"🏡 El Cortijo":"📋 Facturación"
+          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="cuentas"?"🔌 Cuentas Servicios":view==="vacantes"?"🗺️ Catastro de Sitios":view==="fact-cobrar"?"💰 Facturas x Cobrar":view==="pagos"?"✅ Estado de Pagos":view==="cortijo"?"🏡 El Cortijo":"📋 Facturación"
         ),
         view==="table"&&h("span",{style:{display:"inline-flex",alignItems:"center",gap:6,fontSize:14,fontWeight:600,color:"#8FB0FF",marginLeft:6}},h("span",{className:"fv2-pulse"}),periodo)
       ),
