@@ -710,10 +710,21 @@ async function parsePlanillaParaDashboard(file){
     /* Capturar VACANTE separado para Cuentas Servicios */
     if(/^(VACANTE|Vacante)/.test(name)){
       const cta2=(()=>{const raw2=row[6]?String(row[6]):"";const o={idAgua:"",medAgua:"",idEnel:"",medEnel:""};if(!raw2)return o;const p=raw2.split("||").map(s=>s.trim());const lim=v=>{const t=(v||"").trim();return(!t||t==="?"||t==="-")?"":t;};if(p[0]){const[a,b]=p[0].split("/");o.idAgua=lim(a);o.medAgua=lim(b);}if(p[1]){const[a,b]=p[1].split("/");o.idEnel=lim(a);o.medEnel=lim(b);}return o;})();
+      /* Un sitio vacante hoy pudo haber estado ocupado antes: retroceder por
+         las columnas mensuales de Arriendo y quedarse con el último mes que
+         SÍ tuvo un valor facturado (ej. may-26), aunque los meses posteriores
+         estén en cero. El GC/Serv. Admin. no se rastrea igual — queda fijo en
+         0, ya que dependerá del contrato nuevo cuando se arriende de nuevo. */
+      let vArriendoVal=null,vArriendoLabel=null;
+      for(const mc of monthCols){
+        const vv=row[mc.col];
+        if(typeof vv==="number"&&vv>0&&vv<15000){vArriendoVal=Math.round(vv*100)/100;vArriendoLabel=mc.label;}
+      }
       vacantes.push({ri,isVacante:true,nombre:"VACANTE",rut:"",sitio:String(row[7]||"").replace(/\s+/g," ").trim(),edificio:String(row[8]||"").trim(),dir:String(row[10]||"").trim(),
         m2:row[42]!=null&&row[42]!==""?Number(row[42]):null,        /* Col AQ: Metros cuadrados */
         ufM2:row[47]!=null&&row[47]!==""?Number(row[47]):null,      /* Col AV: UF x m2 */
         pctAdm:row[51]!=null&&row[51]!==""?Number(row[51]):null,    /* Col AZ: % Arriendo (Serv. Admin.) */
+        arriendoActual:vArriendoVal,mesActual:vArriendoLabel,servAdminActual:0,
         ...cta2});
       continue;
     }
@@ -3666,19 +3677,23 @@ function CatastroSitiosView({dashData,driveLoading}){
                     h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)"}},v.edificio||"—"),
                     h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",maxWidth:220}},v.dir||"—"),
                     h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--tx)"}},v.m2!=null?v.m2.toLocaleString("es-CL")+" m²":"—"),
-                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap"},title:"Calculado: UF Arriendo ÷ m² Total"},
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap"},title:v.isVacante?"Calculado con el último arriendo facturado ("+(v.mesActual||"—")+") ÷ m² Total":"Calculado: UF Arriendo ÷ m² Total"},
                       ufM2Rate!=null
                         ?h(React.Fragment,null,
                             h("span",{style:{fontSize:13,fontWeight:700,color:"var(--green)"}},fmtUFm2(ufM2Rate)),
-                            ufM2CLP&&h("span",{style:{fontSize:12,color:"var(--txm)",marginLeft:6}},"("+fmtCLP(ufM2CLP)+"/m²)")
+                            v.isVacante
+                              ?v.mesActual&&h("span",{style:{fontSize:12,color:"var(--txm)",marginLeft:6}},"("+v.mesActual+")")
+                              :ufM2CLP&&h("span",{style:{fontSize:12,color:"var(--txm)",marginLeft:6}},"("+fmtCLP(ufM2CLP)+"/m²)")
                           )
                         :h("span",{style:{color:"var(--bdr)"}},"—")
                     ),
-                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap"},title:v.mesActual?"Tarifa real vigente, según "+v.mesActual:"Sin facturación reciente"},
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap"},title:v.isVacante?"Último arriendo facturado antes de quedar vacante, según "+(v.mesActual||"—"):(v.mesActual?"Tarifa real vigente, según "+v.mesActual:"Sin facturación reciente")},
                       v.arriendoActual!=null
                         ?h(React.Fragment,null,
                             h("span",{style:{fontSize:14,fontWeight:700,color:"var(--green)"}},fmtUF(v.arriendoActual)),
-                            arriendoCLP&&h("span",{style:{fontSize:12,color:"var(--txm)",marginLeft:6}},"("+fmtCLP(arriendoCLP)+")")
+                            v.isVacante
+                              ?v.mesActual&&h("span",{style:{fontSize:12,color:"var(--txm)",marginLeft:6}},"("+v.mesActual+")")
+                              :arriendoCLP&&h("span",{style:{fontSize:12,color:"var(--txm)",marginLeft:6}},"("+fmtCLP(arriendoCLP)+")")
                           )
                         :h("span",{style:{color:"var(--bdr)"}},"—")
                     ),
