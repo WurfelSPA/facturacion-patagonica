@@ -3584,10 +3584,14 @@ function CatastroSitiosView({dashData,driveLoading}){
       .sort((a,b)=>a.ri-b.ri);
   })();
   const q=normQ(search);
-  const filtered=!q?sitios:sitios.filter(v=>normQ(v.sitio).includes(q)||normQ(v.edificio).includes(q)||normQ(v.dir).includes(q));
+  const filtered=!q?sitios:sitios.filter(v=>
+    normQ(v.sitio).includes(q)||normQ(v.edificio).includes(q)||normQ(v.dir).includes(q)||
+    (v.isVacante&&normQ("vacante").includes(q))
+  );
   function getSortVal(v,col){
     switch(col){
       case "Sitio":return(v.sitio||"").toLowerCase();
+      case "Estado":return v.isVacante?"vacante":"ocupado";
       case "Edificio":return(v.edificio||"").toLowerCase();
       case "Dirección":return(v.dir||"").toLowerCase();
       case "m² Total":return v.m2!=null?v.m2:-Infinity;
@@ -3599,7 +3603,7 @@ function CatastroSitiosView({dashData,driveLoading}){
     }
   }
   const sorted=sortCol?[...filtered].sort((a,b)=>{const va=getSortVal(a,sortCol),vb=getSortVal(b,sortCol);const cmp=typeof va==="number"?va-vb:va.localeCompare(vb,"es");return sortDir==="asc"?cmp:-cmp;}):filtered;
-  const COLS=["Sitio","Edificio","Dirección","m² Total","UF/m²","UF Arriendo","UF Serv Admin","% Arriendo"];
+  const COLS=["Sitio","Estado","Edificio","Dirección","m² Total","UF/m²","UF Arriendo","UF Serv Admin","% Arriendo"];
   const totalM2=sitios.reduce((s,v)=>s+(v.m2||0),0);
   const totalArriendoUF=sitios.reduce((s,v)=>s+(v.arriendoActual||0),0);
   return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up epv2"},
@@ -3619,8 +3623,7 @@ function CatastroSitiosView({dashData,driveLoading}){
           onClick:()=>{
             const wb=XLSX.utils.book_new();
             const rows=filtered.map(v=>({
-              "Sitio":v.sitio||"","Edificio":v.edificio||"","Dirección":v.dir||"",
-              "Estado":v.isVacante?"VACANTE":"",
+              "Sitio":v.sitio||"","Estado":v.isVacante?"VACANTE":"","Edificio":v.edificio||"","Dirección":v.dir||"",
               "m² Total":v.m2!=null?v.m2:"",
               "UF/m²":ufPorM2(v)!=null?Number(ufPorM2(v).toFixed(2)):"",
               "UF Arriendo":v.arriendoActual!=null?v.arriendoActual:"",
@@ -3671,8 +3674,12 @@ function CatastroSitiosView({dashData,driveLoading}){
                     borderLeft:v.isVacante?"3px solid var(--amber)":"3px solid transparent"
                   }},
                     h("td",{style:{padding:"9px 12px"}},
-                      h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},v.sitio||"—"),
-                      v.isVacante&&h("span",{style:{marginLeft:6,padding:"2px 7px",borderRadius:5,fontSize:9,fontWeight:700,background:"var(--adim)",color:"var(--amber)",border:"1px solid var(--amber)"}},"VACANTE")
+                      h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},v.sitio||"—")
+                    ),
+                    h("td",{style:{padding:"9px 12px"}},
+                      v.isVacante
+                        ?h("span",{style:{padding:"2px 8px",borderRadius:6,fontSize:9,fontWeight:700,background:"var(--adim)",color:"var(--amber)",border:"1px solid var(--amber)"}},"VACANTE")
+                        :h("span",{style:{fontSize:10,color:"var(--txd)"}},"—")
                     ),
                     h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)"}},v.edificio||"—"),
                     h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",maxWidth:220}},v.dir||"—"),
