@@ -713,7 +713,7 @@ async function parsePlanillaParaDashboard(file){
       vacantes.push({ri,isVacante:true,nombre:"VACANTE",rut:"",sitio:String(row[7]||"").replace(/\s+/g," ").trim(),edificio:String(row[8]||"").trim(),dir:String(row[10]||"").trim(),
         m2:row[42]!=null&&row[42]!==""?Number(row[42]):null,        /* Col AQ: Metros cuadrados */
         ufM2:row[47]!=null&&row[47]!==""?Number(row[47]):null,      /* Col AV: UF x m2 */
-        rentaAplicable:row[55]!=null&&row[55]!==""?Number(row[55]):null, /* Col BD: Renta Aplicable */
+        pctAdm:row[51]!=null&&row[51]!==""?Number(row[51]):null,    /* Col AZ: % Arriendo (Serv. Admin.) */
         ...cta2});
       continue;
     }
@@ -727,14 +727,21 @@ async function parsePlanillaParaDashboard(file){
     else if(typeof pctAdm==="number"&&pctAdm>=1&&pctAdm<=10) ufSrv=pctAdm;
     const monthly={};
     const monthlyGC={};
+    let currentMonthKey=null,currentMonthLabel=null;
     for(const mc of monthCols){
       const v=row[mc.col];
-      if(typeof v==="number"&&v>0&&v<15000) monthly[mc.key]=Math.round(v*100)/100;
+      if(typeof v==="number"&&v>0&&v<15000){monthly[mc.key]=Math.round(v*100)/100;currentMonthKey=mc.key;currentMonthLabel=mc.label;}
       if(mc.gcCol>=0){
         const vg=row[mc.gcCol];
         if(typeof vg==="number"&&vg>0&&vg<15000) monthlyGC[mc.key]=Math.round(vg*100)/100;
       }
     }
+    /* Tarifa REAL vigente (post-reajuste): el último mes con arriendo
+       efectivamente facturado en la planilla, no el valor pactado al inicio
+       del contrato (col AV) — así lo pidió el usuario tras notar que AV queda
+       desactualizado apenas hay un reajuste. */
+    const arriendoActual=currentMonthKey!=null?monthly[currentMonthKey]:null;
+    const servAdminActual=currentMonthKey!=null&&monthlyGC[currentMonthKey]!=null?monthlyGC[currentMonthKey]:null;
     /* Conversión serial Excel → fecha legible */
     function serialToDate(v){if(!v||typeof v!=="number")return"";try{const d=new Date(new Date(Date.UTC(1899,11,30)).getTime()+Math.round(v)*86400000);return`${d.getUTCDate().toString().padStart(2,"0")}/${(d.getUTCMonth()+1).toString().padStart(2,"0")}/${d.getUTCFullYear()}`;}catch(e){return"";}}
     /* Col G (row[6]): "idAgua / medAgua || idEnel / medEnel" */
@@ -764,8 +771,8 @@ async function parsePlanillaParaDashboard(file){
       pctReaj:row[53]!=null?String(row[53]):"",            /* Col BB: % Reajuste */
       cadaAnios:row[54]!=null?String(row[54]).trim():"",   /* Col BC: Cada cuántos años */
       m2:row[42]!=null&&row[42]!==""?Number(row[42]):null,   /* Col AQ: Metros cuadrados */
-      ufM2:row[47]!=null&&row[47]!==""?Number(row[47]):null, /* Col AV: UF x m2 */
-      rentaAplicable:row[55]!=null&&row[55]!==""?Number(row[55]):null, /* Col BD: Renta Aplicable */
+      ufM2:row[47]!=null&&row[47]!==""?Number(row[47]):null, /* Col AV: UF x m2 (tarifa pactada al inicio) */
+      arriendoActual,servAdminActual,mesActual:currentMonthLabel, /* Tarifa real vigente, último mes facturado */
       hist:(()=>{
         /* BN=65, cada mes ocupa 4 cols: UF planilla, Facturado, Diferencia, Comentarios */
         /* Desde Abr-2023 hasta el presente */
@@ -3571,15 +3578,17 @@ function CatastroSitiosView({dashData,driveLoading}){
       case "Edificio":return(v.edificio||"").toLowerCase();
       case "Dirección":return(v.dir||"").toLowerCase();
       case "m² Total":return v.m2!=null?v.m2:-Infinity;
+      case "UF Arriendo":return v.arriendoActual!=null?v.arriendoActual:-Infinity;
       case "UF×m²":return v.ufM2!=null?v.ufM2:-Infinity;
-      case "Valor en UF Serv. Admin.":return v.rentaAplicable!=null?v.rentaAplicable:-Infinity;
+      case "UF Serv Admin":return v.servAdminActual!=null?v.servAdminActual:-Infinity;
+      case "% Arriendo":return v.pctAdm!=null?v.pctAdm:-Infinity;
       default:return"";
     }
   }
   const sorted=sortCol?[...filtered].sort((a,b)=>{const va=getSortVal(a,sortCol),vb=getSortVal(b,sortCol);const cmp=typeof va==="number"?va-vb:va.localeCompare(vb,"es");return sortDir==="asc"?cmp:-cmp;}):filtered;
-  const COLS=["Sitio","Edificio","Dirección","m² Total","UF×m²","Valor en UF Serv. Admin."];
+  const COLS=["Sitio","Edificio","Dirección","m² Total","UF Arriendo","UF×m²","UF Serv Admin","% Arriendo"];
   const totalM2=sitios.reduce((s,v)=>s+(v.m2||0),0);
-  const totalRentaUF=sitios.reduce((s,v)=>s+(v.rentaAplicable||0),0);
+  const totalArriendoUF=sitios.reduce((s,v)=>s+(v.arriendoActual||0),0);
   return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up epv2"},
     h("div",{style:{padding:"14px 24px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,flexShrink:0,borderBottom:"1px solid var(--bdr)"}},
       h("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
@@ -3587,7 +3596,7 @@ function CatastroSitiosView({dashData,driveLoading}){
         h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},filtered.length+" / "+sitios.length),
         h("span",{style:{width:1,height:16,background:"var(--bdr)",display:"inline-block",margin:"0 4px"}}),
         h("span",{title:"Suma de m² Total de todos los sitios",style:{fontSize:10,color:"var(--amber)",background:"var(--abg)",border:"1px solid var(--adim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",cursor:"default"}},totalM2.toLocaleString("es-CL")+" m² totales"),
-        h("span",{title:"Suma de Valor en UF Serv. Admin. (Renta Aplicable) de todos los sitios",style:{fontSize:12,fontWeight:700,color:"var(--green)",background:"var(--gbg)",border:"1px solid var(--gdim)",padding:"3px 10px",borderRadius:10,fontFamily:"'DM Mono',monospace",cursor:"default"}},fmtUF(totalRentaUF)+(ufHoy?" ("+fmtCLP(totalRentaUF*ufHoy)+")":"")),
+        h("span",{title:"Suma de UF Arriendo (tarifa real vigente, último mes facturado) de todos los sitios",style:{fontSize:12,fontWeight:700,color:"var(--green)",background:"var(--gbg)",border:"1px solid var(--gdim)",padding:"3px 10px",borderRadius:10,fontFamily:"'DM Mono',monospace",cursor:"default"}},fmtUF(totalArriendoUF)+(ufHoy?" ("+fmtCLP(totalArriendoUF*ufHoy)+")":"")),
         h("span",{style:{fontSize:14,fontWeight:700,color:"var(--tx)",marginLeft:6}},ufHoy?"UF hoy: "+ufHoy.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2}):"UF hoy: cargando…")
       ),
       h("div",{style:{display:"flex",alignItems:"center",gap:8}},
@@ -3600,8 +3609,10 @@ function CatastroSitiosView({dashData,driveLoading}){
               "Sitio":v.sitio||"","Edificio":v.edificio||"","Dirección":v.dir||"",
               "Estado":v.isVacante?"VACANTE":"",
               "m² Total":v.m2!=null?v.m2:"",
+              "UF Arriendo":v.arriendoActual!=null?v.arriendoActual:"",
               "UF×m²":v.ufM2!=null?v.ufM2:"",
-              "Valor en UF Serv. Admin.":v.rentaAplicable!=null?v.rentaAplicable:"",
+              "UF Serv Admin":v.servAdminActual!=null?v.servAdminActual:"",
+              "% Arriendo":v.pctAdm!=null?(v.pctAdm>0&&v.pctAdm<1?(v.pctAdm*100).toFixed(0)+"%":v.pctAdm):"",
             }));
             const ws=XLSX.utils.json_to_sheet(rows);
             XLSX.utils.book_append_sheet(wb,ws,"Catastro Sitios");
@@ -3636,8 +3647,10 @@ function CatastroSitiosView({dashData,driveLoading}){
               h("tbody",null,
                 sorted.map((v,i)=>{
                   const sCol=SITIO_C[v.sitio]||"#888";
-                  const rentaCLP=ufHoy&&v.rentaAplicable!=null?v.rentaAplicable*ufHoy:null;
+                  const arriendoCLP=ufHoy&&v.arriendoActual!=null?v.arriendoActual*ufHoy:null;
                   const ufM2CLP=ufHoy&&v.ufM2!=null?v.ufM2*ufHoy:null;
+                  const servAdmCLP=ufHoy&&v.servAdminActual!=null?v.servAdminActual*ufHoy:null;
+                  const pctTxt=v.pctAdm==null?"—":(v.pctAdm>0&&v.pctAdm<1?(v.pctAdm*100).toFixed(0)+"%":fmtUF(v.pctAdm));
                   return h("tr",{key:v.sitio+"|"+v.edificio+"|"+i,style:{
                     borderBottom:"1px solid var(--bdr)",
                     background:v.isVacante?"var(--abg)":(i%2===0?"var(--surf)":"var(--surf2)"),
@@ -3650,7 +3663,15 @@ function CatastroSitiosView({dashData,driveLoading}){
                     h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)"}},v.edificio||"—"),
                     h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",maxWidth:220}},v.dir||"—"),
                     h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--tx)"}},v.m2!=null?v.m2.toLocaleString("es-CL")+" m²":"—"),
-                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap"}},
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap"},title:v.mesActual?"Tarifa real vigente, según "+v.mesActual:"Sin facturación reciente"},
+                      v.arriendoActual!=null
+                        ?h(React.Fragment,null,
+                            h("span",{style:{fontSize:14,fontWeight:700,color:"var(--green)"}},fmtUF(v.arriendoActual)),
+                            arriendoCLP&&h("span",{style:{fontSize:12,color:"var(--txm)",marginLeft:6}},"("+fmtCLP(arriendoCLP)+")")
+                          )
+                        :h("span",{style:{color:"var(--bdr)"}},"—")
+                    ),
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap"},title:"Tarifa pactada al inicio del contrato (col. AV) — puede no reflejar reajustes posteriores"},
                       v.ufM2!=null
                         ?h(React.Fragment,null,
                             h("span",{style:{fontSize:14,fontWeight:700,color:"var(--green)"}},fmtUF(v.ufM2)),
@@ -3658,14 +3679,15 @@ function CatastroSitiosView({dashData,driveLoading}){
                           )
                         :h("span",{style:{color:"var(--bdr)"}},"—")
                     ),
-                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap"}},
-                      v.rentaAplicable!=null
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap"},title:v.mesActual?"Gastos comunes / Serv. Admin. realmente facturados, según "+v.mesActual:"Sin facturación reciente"},
+                      v.servAdminActual!=null
                         ?h(React.Fragment,null,
-                            h("span",{style:{fontSize:14,fontWeight:700,color:"var(--green)"}},fmtUF(v.rentaAplicable)),
-                            rentaCLP&&h("span",{style:{fontSize:12,color:"var(--txm)",marginLeft:6}},"("+fmtCLP(rentaCLP)+")")
+                            h("span",{style:{fontSize:14,fontWeight:700,color:"var(--green)"}},fmtUF(v.servAdminActual)),
+                            servAdmCLP&&h("span",{style:{fontSize:12,color:"var(--txm)",marginLeft:6}},"("+fmtCLP(servAdmCLP)+")")
                           )
                         :h("span",{style:{color:"var(--bdr)"}},"—")
-                    )
+                    ),
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:v.pctAdm!=null?"var(--tx)":"var(--bdr)"}},pctTxt)
                   );
                 })
               )
