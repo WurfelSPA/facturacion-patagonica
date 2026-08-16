@@ -710,7 +710,11 @@ async function parsePlanillaParaDashboard(file){
     /* Capturar VACANTE separado para Cuentas Servicios */
     if(/^(VACANTE|Vacante)/.test(name)){
       const cta2=(()=>{const raw2=row[6]?String(row[6]):"";const o={idAgua:"",medAgua:"",idEnel:"",medEnel:""};if(!raw2)return o;const p=raw2.split("||").map(s=>s.trim());const lim=v=>{const t=(v||"").trim();return(!t||t==="?"||t==="-")?"":t;};if(p[0]){const[a,b]=p[0].split("/");o.idAgua=lim(a);o.medAgua=lim(b);}if(p[1]){const[a,b]=p[1].split("/");o.idEnel=lim(a);o.medEnel=lim(b);}return o;})();
-      vacantes.push({ri,isVacante:true,nombre:"VACANTE",rut:"",sitio:String(row[7]||"").replace(/\s+/g," ").trim(),edificio:String(row[8]||"").trim(),dir:String(row[10]||"").trim(),...cta2});
+      vacantes.push({ri,isVacante:true,nombre:"VACANTE",rut:"",sitio:String(row[7]||"").replace(/\s+/g," ").trim(),edificio:String(row[8]||"").trim(),dir:String(row[10]||"").trim(),
+        m2:row[42]!=null&&row[42]!==""?Number(row[42]):null,        /* Col AQ: Metros cuadrados */
+        ufM2:row[47]!=null&&row[47]!==""?Number(row[47]):null,      /* Col AV: UF x m2 */
+        rentaAplicable:row[55]!=null&&row[55]!==""?Number(row[55]):null, /* Col BD: Renta Aplicable */
+        ...cta2});
       continue;
     }
     if(!rut||typeof rut!=="string")continue;
@@ -3532,6 +3536,116 @@ function ContratosView({dashData,driveLoading}){
 }
 
 /* ══════════════════════════════════════════════════════════
+   SITIOS VACANTES
+══════════════════════════════════════════════════════════ */
+function SitiosVacantesView({dashData,driveLoading}){
+  const [search,setSearch]=useState("");
+  const [sortCol,setSortCol]=useState(null);
+  const [sortDir,setSortDir]=useState("asc");
+  const [ufHoy,setUfHoy]=useState(null);
+  useEffect(()=>{getUFHoy().then(setUfHoy);},[]);
+  function toggleSort(col){if(sortCol===col)setSortDir(d=>d==="asc"?"desc":"asc");else{setSortCol(col);setSortDir("asc");}}
+  function fmtCLP(v){return v==null||isNaN(v)?"—":"$"+Math.round(v).toLocaleString("es-CL");}
+  function fmtUF(v){return v==null||isNaN(v)?"—":v.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})+" UF";}
+  if(!dashData)return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,overflow:"hidden",minHeight:0},className:"fade-up epv2"},
+    driveLoading
+      ?h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},h("span",{className:"fv2-loader",style:{width:18,height:18,fontSize:18}}),"Cargando planilla desde Drive...")
+      :h("div",{style:{fontSize:13,color:"var(--txd)"}},"Sin datos — carga la planilla de facturación")
+  );
+  const normQ=s=>(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," ").trim();
+  const vacantes=dashData.vacantes||[];
+  const q=normQ(search);
+  const filtered=!q?vacantes:vacantes.filter(v=>normQ(v.sitio).includes(q)||normQ(v.edificio).includes(q)||normQ(v.dir).includes(q));
+  function getSortVal(v,col){
+    switch(col){
+      case "Sitio":return(v.sitio||"").toLowerCase();
+      case "Edificio":return(v.edificio||"").toLowerCase();
+      case "Dirección":return(v.dir||"").toLowerCase();
+      case "m² Total":return v.m2!=null?v.m2:-Infinity;
+      case "UF×m²":return v.ufM2!=null?v.ufM2:-Infinity;
+      case "Valor en UF Serv. Admin.":return v.rentaAplicable!=null?v.rentaAplicable:-Infinity;
+      default:return"";
+    }
+  }
+  const sorted=sortCol?[...filtered].sort((a,b)=>{const va=getSortVal(a,sortCol),vb=getSortVal(b,sortCol);const cmp=typeof va==="number"?va-vb:va.localeCompare(vb,"es");return sortDir==="asc"?cmp:-cmp;}):filtered;
+  const COLS=["Sitio","Edificio","Dirección","Nombre Cliente","m² Total","UF×m²","Valor en UF Serv. Admin."];
+  const totalM2=vacantes.reduce((s,v)=>s+(v.m2||0),0);
+  const totalRentaUF=vacantes.reduce((s,v)=>s+(v.rentaAplicable||0),0);
+  return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up epv2"},
+    h("div",{style:{padding:"14px 24px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,flexShrink:0,borderBottom:"1px solid var(--bdr)"}},
+      h("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
+        h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"🏚️ SITIOS VACANTES"),
+        h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},filtered.length+" / "+vacantes.length),
+        h("span",{style:{width:1,height:16,background:"var(--bdr)",display:"inline-block",margin:"0 4px"}}),
+        h("span",{title:"Suma de m² Total de todos los sitios vacantes",style:{fontSize:10,color:"var(--amber)",background:"var(--abg)",border:"1px solid var(--adim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",cursor:"default"}},totalM2.toLocaleString("es-CL")+" m² vacantes"),
+        h("span",{title:"Suma de Valor en UF Serv. Admin. (Renta Aplicable) de todos los sitios vacantes",style:{fontSize:10,color:"var(--red)",background:"var(--rbg)",border:"1px solid var(--rdim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",cursor:"default"}},fmtUF(totalRentaUF)+(ufHoy?" ("+fmtCLP(totalRentaUF*ufHoy)+")":"")),
+        h("span",{style:{fontSize:9,color:"var(--txd)",marginLeft:4}},ufHoy?"UF hoy: "+ufHoy.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2}):"UF hoy: cargando…")
+      ),
+      h("div",{style:{display:"flex",alignItems:"center",gap:8}},
+        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar sitio, edificio, dirección...",style:{width:220}}),
+        h("button",{
+          title:"Exportar a Excel",
+          onClick:()=>{
+            const wb=XLSX.utils.book_new();
+            const rows=filtered.map(v=>({
+              "Sitio":v.sitio||"","Edificio":v.edificio||"","Dirección":v.dir||"",
+              "Nombre Cliente":"VACANTE",
+              "m² Total":v.m2!=null?v.m2:"",
+              "UF×m²":v.ufM2!=null?v.ufM2:"",
+              "Valor en UF Serv. Admin.":v.rentaAplicable!=null?v.rentaAplicable:"",
+            }));
+            const ws=XLSX.utils.json_to_sheet(rows);
+            XLSX.utils.book_append_sheet(wb,ws,"Sitios Vacantes");
+            XLSX.writeFile(wb,"SitiosVacantes_"+new Date().toISOString().slice(0,10)+".xlsx");
+          },
+          style:{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)",fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}
+        },"📊 Excel"),
+        h("button",{onClick:()=>window.print(),title:"Imprimir tabla completa",style:{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)",fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}},"🖨️ Imprimir")
+      )
+    ),
+    h("div",{style:{flex:1,overflowY:"auto",overflowX:"auto",minHeight:0}},
+      filtered.length===0&&!search
+        ?h("div",{style:{padding:"40px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin sitios vacantes en la planilla")
+        :filtered.length===0
+          ?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:12}},"Sin resultados para \""+search+"\"")
+          :h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
+              h("thead",null,
+                h("tr",{style:{background:"var(--surf2)",position:"sticky",top:0,zIndex:2}},
+                  COLS.map(col=>{
+                    const active=sortCol===col;
+                    return h("th",{key:col,onClick:()=>toggleSort(col),style:{
+                      padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,
+                      color:active?"var(--acc)":"var(--txd)",
+                      letterSpacing:".06em",
+                      borderBottom:"2px solid var(--bdr)",
+                      whiteSpace:"nowrap",
+                      cursor:"pointer",userSelect:"none"
+                    }},col.toUpperCase(),h("span",{style:{opacity:active?1:.4,fontSize:9,marginLeft:3}},active?(sortDir==="asc"?"▲":"▼"):"↕"));
+                  })
+                )
+              ),
+              h("tbody",null,
+                sorted.map((v,i)=>{
+                  const sCol=SITIO_C[v.sitio]||"#888";
+                  const rentaCLP=ufHoy&&v.rentaAplicable!=null?v.rentaAplicable*ufHoy:null;
+                  const ufM2CLP=ufHoy&&v.ufM2!=null?v.ufM2*ufHoy:null;
+                  return h("tr",{key:v.sitio+"|"+v.edificio+"|"+i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"var(--surf2)"}},
+                    h("td",{style:{padding:"9px 12px"}},h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},v.sitio||"—")),
+                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)"}},v.edificio||"—"),
+                    h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",maxWidth:220}},v.dir||"—"),
+                    h("td",{style:{padding:"9px 12px",fontWeight:600,fontSize:11}},h("span",{style:{padding:"2px 8px",borderRadius:6,fontSize:10,fontWeight:700,background:"var(--abg)",color:"var(--amber)",border:"1px solid var(--adim)"}},"VACANTE")),
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},v.m2!=null?v.m2.toLocaleString("es-CL")+" m²":"—"),
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},v.ufM2!=null?fmtUF(v.ufM2)+(ufM2CLP?" ("+fmtCLP(ufM2CLP)+")":""):"—"),
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},v.rentaAplicable!=null?fmtUF(v.rentaAplicable)+(rentaCLP?" ("+fmtCLP(rentaCLP)+")":""):"—")
+                  );
+                })
+              )
+            )
+    )
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
    EL CORTIJO
 ══════════════════════════════════════════════════════════ */
 function ElCortijoView(){
@@ -5119,6 +5233,7 @@ function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlo
     {id:"fact-cobrar", icon:"💰", label:"Facturas x Cobrar"},
     {id:"contratos", icon:"📄", label:"Contratos"},
     {id:"cuentas",   icon:"🔌", label:"Cuentas Servicios"},
+    {id:"vacantes",  icon:"🏚️", label:"Sitios Vacantes"},
     {id:"cortijo",   icon:"🏡", label:"El Cortijo"},
   ];
   const isActive = id => id==="factura" ? (view==="table"||view==="upload") : view===id;
@@ -7021,7 +7136,7 @@ function App(){
     h("header",{className:(view==="table"||view==="upload")?"fv2":undefined,style:{background:view==="table"?"#0F1B33":"var(--surf)",borderBottom:view==="table"?"1px solid #1C2C4A":"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:49,gap:10}},
       h("div",{style:{display:"flex",alignItems:"center",gap:10}},
         h("div",{className:view==="table"?"fv2-title":undefined,style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px",color:view==="table"?"#fff":"var(--tx)"}},
-          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="cuentas"?"🔌 Cuentas Servicios":view==="fact-cobrar"?"💰 Facturas x Cobrar":view==="pagos"?"✅ Estado de Pagos":view==="cortijo"?"🏡 El Cortijo":"📋 Facturación"
+          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="cuentas"?"🔌 Cuentas Servicios":view==="vacantes"?"🏚️ Sitios Vacantes":view==="fact-cobrar"?"💰 Facturas x Cobrar":view==="pagos"?"✅ Estado de Pagos":view==="cortijo"?"🏡 El Cortijo":"📋 Facturación"
         ),
         view==="table"&&h("span",{style:{display:"inline-flex",alignItems:"center",gap:6,fontSize:14,fontWeight:600,color:"#8FB0FF",marginLeft:6}},h("span",{className:"fv2-pulse"}),periodo)
       ),
@@ -7399,6 +7514,7 @@ function App(){
     ,view==="pagos"&&h(EstadoPagosView,{notify})
     ,view==="contratos"&&h(ContratosView,{dashData,driveLoading})
     ,view==="cuentas"&&h(CuentasServiciosView,{dashData,driveLoading,notify})
+    ,view==="vacantes"&&h(SitiosVacantesView,{dashData,driveLoading})
     ,view==="cortijo"&&h(ElCortijoView,null)
     ,view==="historial-fact"&&h(HistorialFactView,{dashData,driveLoading,notify,planillaFile:files.planilla,marcarPagadoSheet})
   ));
