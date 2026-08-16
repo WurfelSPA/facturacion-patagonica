@@ -765,6 +765,7 @@ async function parsePlanillaParaDashboard(file){
       cadaAnios:row[54]!=null?String(row[54]).trim():"",   /* Col BC: Cada cuántos años */
       m2:row[42]!=null&&row[42]!==""?Number(row[42]):null,   /* Col AQ: Metros cuadrados */
       ufM2:row[47]!=null&&row[47]!==""?Number(row[47]):null, /* Col AV: UF x m2 */
+      rentaAplicable:row[55]!=null&&row[55]!==""?Number(row[55]):null, /* Col BD: Renta Aplicable */
       hist:(()=>{
         /* BN=65, cada mes ocupa 4 cols: UF planilla, Facturado, Diferencia, Comentarios */
         /* Desde Abr-2023 hasta el presente */
@@ -3536,9 +3537,9 @@ function ContratosView({dashData,driveLoading}){
 }
 
 /* ══════════════════════════════════════════════════════════
-   SITIOS VACANTES
+   CATASTRO DE SITIOS (todos los sitios, ocupados y vacantes)
 ══════════════════════════════════════════════════════════ */
-function SitiosVacantesView({dashData,driveLoading}){
+function CatastroSitiosView({dashData,driveLoading}){
   const [search,setSearch]=useState("");
   const [sortCol,setSortCol]=useState(null);
   const [sortDir,setSortDir]=useState("asc");
@@ -3553,9 +3554,17 @@ function SitiosVacantesView({dashData,driveLoading}){
       :h("div",{style:{fontSize:13,color:"var(--txd)"}},"Sin datos — carga la planilla de facturación")
   );
   const normQ=s=>(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," ").trim();
-  const vacantes=dashData.vacantes||[];
+  /* Catastro completo: todos los sitios/locales registrados en la Planilla,
+     ocupados y vacantes, sin nombre de cliente — igual criterio de
+     deduplicación (sitio+edificio) que usa Cuentas de Servicios. */
+  const sitios=(()=>{
+    const seen=new Set();
+    return [...(dashData.clients||[]),...(dashData.vacantes||[])]
+      .filter(c=>{const k=c.sitio+"|"+c.edificio;if(seen.has(k))return false;seen.add(k);return true;})
+      .sort((a,b)=>a.ri-b.ri);
+  })();
   const q=normQ(search);
-  const filtered=!q?vacantes:vacantes.filter(v=>normQ(v.sitio).includes(q)||normQ(v.edificio).includes(q)||normQ(v.dir).includes(q));
+  const filtered=!q?sitios:sitios.filter(v=>normQ(v.sitio).includes(q)||normQ(v.edificio).includes(q)||normQ(v.dir).includes(q));
   function getSortVal(v,col){
     switch(col){
       case "Sitio":return(v.sitio||"").toLowerCase();
@@ -3569,17 +3578,17 @@ function SitiosVacantesView({dashData,driveLoading}){
   }
   const sorted=sortCol?[...filtered].sort((a,b)=>{const va=getSortVal(a,sortCol),vb=getSortVal(b,sortCol);const cmp=typeof va==="number"?va-vb:va.localeCompare(vb,"es");return sortDir==="asc"?cmp:-cmp;}):filtered;
   const COLS=["Sitio","Edificio","Dirección","m² Total","UF×m²","Valor en UF Serv. Admin."];
-  const totalM2=vacantes.reduce((s,v)=>s+(v.m2||0),0);
-  const totalRentaUF=vacantes.reduce((s,v)=>s+(v.rentaAplicable||0),0);
+  const totalM2=sitios.reduce((s,v)=>s+(v.m2||0),0);
+  const totalRentaUF=sitios.reduce((s,v)=>s+(v.rentaAplicable||0),0);
   return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up epv2"},
     h("div",{style:{padding:"14px 24px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,flexShrink:0,borderBottom:"1px solid var(--bdr)"}},
       h("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
-        h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"🏚️ SITIOS VACANTES"),
-        h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},filtered.length+" / "+vacantes.length),
+        h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"🗂️ CATASTRO DE SITIOS"),
+        h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},filtered.length+" / "+sitios.length),
         h("span",{style:{width:1,height:16,background:"var(--bdr)",display:"inline-block",margin:"0 4px"}}),
-        h("span",{title:"Suma de m² Total de todos los sitios vacantes",style:{fontSize:10,color:"var(--amber)",background:"var(--abg)",border:"1px solid var(--adim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",cursor:"default"}},totalM2.toLocaleString("es-CL")+" m² vacantes"),
-        h("span",{title:"Suma de Valor en UF Serv. Admin. (Renta Aplicable) de todos los sitios vacantes",style:{fontSize:12,fontWeight:700,color:"var(--green)",background:"var(--gbg)",border:"1px solid var(--gdim)",padding:"3px 10px",borderRadius:10,fontFamily:"'DM Mono',monospace",cursor:"default"}},fmtUF(totalRentaUF)+(ufHoy?" ("+fmtCLP(totalRentaUF*ufHoy)+")":"")),
-        h("span",{style:{fontSize:9,color:"var(--txd)",marginLeft:4}},ufHoy?"UF hoy: "+ufHoy.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2}):"UF hoy: cargando…")
+        h("span",{title:"Suma de m² Total de todos los sitios",style:{fontSize:10,color:"var(--amber)",background:"var(--abg)",border:"1px solid var(--adim)",padding:"2px 8px",borderRadius:10,fontFamily:"'DM Mono',monospace",cursor:"default"}},totalM2.toLocaleString("es-CL")+" m² totales"),
+        h("span",{title:"Suma de Valor en UF Serv. Admin. (Renta Aplicable) de todos los sitios",style:{fontSize:12,fontWeight:700,color:"var(--green)",background:"var(--gbg)",border:"1px solid var(--gdim)",padding:"3px 10px",borderRadius:10,fontFamily:"'DM Mono',monospace",cursor:"default"}},fmtUF(totalRentaUF)+(ufHoy?" ("+fmtCLP(totalRentaUF*ufHoy)+")":"")),
+        h("span",{style:{fontSize:14,fontWeight:700,color:"var(--tx)",marginLeft:6}},ufHoy?"UF hoy: "+ufHoy.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2}):"UF hoy: cargando…")
       ),
       h("div",{style:{display:"flex",alignItems:"center",gap:8}},
         h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar sitio, edificio, dirección...",style:{width:220}}),
@@ -3594,8 +3603,8 @@ function SitiosVacantesView({dashData,driveLoading}){
               "Valor en UF Serv. Admin.":v.rentaAplicable!=null?v.rentaAplicable:"",
             }));
             const ws=XLSX.utils.json_to_sheet(rows);
-            XLSX.utils.book_append_sheet(wb,ws,"Sitios Vacantes");
-            XLSX.writeFile(wb,"SitiosVacantes_"+new Date().toISOString().slice(0,10)+".xlsx");
+            XLSX.utils.book_append_sheet(wb,ws,"Catastro Sitios");
+            XLSX.writeFile(wb,"CatastroSitios_"+new Date().toISOString().slice(0,10)+".xlsx");
           },
           style:{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)",fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}
         },"📊 Excel"),
@@ -3604,7 +3613,7 @@ function SitiosVacantesView({dashData,driveLoading}){
     ),
     h("div",{style:{flex:1,overflowY:"auto",overflowX:"auto",minHeight:0}},
       filtered.length===0&&!search
-        ?h("div",{style:{padding:"40px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin sitios vacantes en la planilla")
+        ?h("div",{style:{padding:"40px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin sitios registrados en la planilla")
         :filtered.length===0
           ?h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:12}},"Sin resultados para \""+search+"\"")
           :h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
@@ -5245,7 +5254,7 @@ function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlo
     {id:"fact-cobrar", icon:"💰", label:"Facturas x Cobrar"},
     {id:"contratos", icon:"📄", label:"Contratos"},
     {id:"cuentas",   icon:"🔌", label:"Cuentas Servicios"},
-    {id:"vacantes",  icon:"🏚️", label:"Sitios Vacantes"},
+    {id:"vacantes",  icon:"🗂️", label:"Catastro de Sitios"},
     {id:"cortijo",   icon:"🏡", label:"El Cortijo"},
   ];
   const isActive = id => id==="factura" ? (view==="table"||view==="upload") : view===id;
@@ -7148,7 +7157,7 @@ function App(){
     h("header",{className:(view==="table"||view==="upload")?"fv2":undefined,style:{background:view==="table"?"#0F1B33":"var(--surf)",borderBottom:view==="table"?"1px solid #1C2C4A":"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:49,gap:10}},
       h("div",{style:{display:"flex",alignItems:"center",gap:10}},
         h("div",{className:view==="table"?"fv2-title":undefined,style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px",color:view==="table"?"#fff":"var(--tx)"}},
-          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="cuentas"?"🔌 Cuentas Servicios":view==="vacantes"?"🏚️ Sitios Vacantes":view==="fact-cobrar"?"💰 Facturas x Cobrar":view==="pagos"?"✅ Estado de Pagos":view==="cortijo"?"🏡 El Cortijo":"📋 Facturación"
+          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="cuentas"?"🔌 Cuentas Servicios":view==="vacantes"?"🗂️ Catastro de Sitios":view==="fact-cobrar"?"💰 Facturas x Cobrar":view==="pagos"?"✅ Estado de Pagos":view==="cortijo"?"🏡 El Cortijo":"📋 Facturación"
         ),
         view==="table"&&h("span",{style:{display:"inline-flex",alignItems:"center",gap:6,fontSize:14,fontWeight:600,color:"#8FB0FF",marginLeft:6}},h("span",{className:"fv2-pulse"}),periodo)
       ),
@@ -7526,7 +7535,7 @@ function App(){
     ,view==="pagos"&&h(EstadoPagosView,{notify})
     ,view==="contratos"&&h(ContratosView,{dashData,driveLoading})
     ,view==="cuentas"&&h(CuentasServiciosView,{dashData,driveLoading,notify})
-    ,view==="vacantes"&&h(SitiosVacantesView,{dashData,driveLoading})
+    ,view==="vacantes"&&h(CatastroSitiosView,{dashData,driveLoading})
     ,view==="cortijo"&&h(ElCortijoView,null)
     ,view==="historial-fact"&&h(HistorialFactView,{dashData,driveLoading,notify,planillaFile:files.planilla,marcarPagadoSheet})
   ));
