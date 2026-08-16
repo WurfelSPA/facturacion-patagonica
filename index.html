@@ -3555,10 +3555,7 @@ function CatastroSitiosView({dashData,driveLoading}){
   function toggleSort(col){if(sortCol===col)setSortDir(d=>d==="asc"?"desc":"asc");else{setSortCol(col);setSortDir("asc");}}
   function fmtCLP(v){return v==null||isNaN(v)?"—":"$"+Math.round(v).toLocaleString("es-CL");}
   function fmtUF(v){return v==null||isNaN(v)?"—":v.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})+" UF";}
-  /* Tasa por m²: se muestra con más decimales que fmtUF porque, al dividir
-     un arriendo total (ej. ~50 UF) por 200+ m², el resultado suele ser un
-     número pequeño (ej. 0.23 UF/m²) donde 2 decimales pierden precisión. */
-  function fmtUFm2(v){return v==null||isNaN(v)?"—":v.toLocaleString("es-CL",{minimumFractionDigits:4,maximumFractionDigits:4})+" UF/m²";}
+  function fmtUFm2(v){return v==null||isNaN(v)?"—":v.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})+" UF/m²";}
   function ufPorM2(v){return(v.arriendoActual!=null&&v.m2!=null&&v.m2>0)?v.arriendoActual/v.m2:null;}
   if(!dashData)return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,overflow:"hidden",minHeight:0},className:"fade-up epv2"},
     driveLoading
@@ -3614,7 +3611,7 @@ function CatastroSitiosView({dashData,driveLoading}){
               "Sitio":v.sitio||"","Edificio":v.edificio||"","Dirección":v.dir||"",
               "Estado":v.isVacante?"VACANTE":"",
               "m² Total":v.m2!=null?v.m2:"",
-              "UF/m²":ufPorM2(v)!=null?Number(ufPorM2(v).toFixed(4)):"",
+              "UF/m²":ufPorM2(v)!=null?Number(ufPorM2(v).toFixed(2)):"",
               "UF Arriendo":v.arriendoActual!=null?v.arriendoActual:"",
               "UF Serv Admin":v.servAdminActual!=null?v.servAdminActual:"",
               "% Arriendo":v.pctAdm!=null?(v.pctAdm>0&&v.pctAdm<1?(v.pctAdm*100).toFixed(0)+"%":v.pctAdm):"",
