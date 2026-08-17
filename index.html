@@ -3856,6 +3856,8 @@ function Torre2680View({dashData,driveLoading}){
   const [search,setSearch]=useState("");
   const [vistaPlano,setVistaPlano]=useState(true);
   const [zoomOficina,setZoomOficina]=useState(null);
+  const [ufHoy,setUfHoy]=useState(null);
+  useEffect(()=>{getUFHoy().then(setUfHoy);},[]);
   if(!dashData)return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,overflow:"hidden",minHeight:0},className:"fade-up epv2"},
     driveLoading
       ?h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},h("span",{className:"fv2-loader",style:{width:18,height:18,fontSize:18}}),"Cargando planilla desde Drive...")
@@ -3872,6 +3874,10 @@ function Torre2680View({dashData,driveLoading}){
     return candidatos.find(c=>(c.dir||"").toLowerCase().includes("piso "+pisoNum))||candidatos[0];
   }
   function fmtCLP(v){return v==null||isNaN(v)?"—":"$"+Math.round(v).toLocaleString("es-CL");}
+  function fmtUF(v){return v==null||isNaN(v)?"—":v.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})+" UF";}
+  function fmtUFm2(v){return v==null||isNaN(v)?"—":v.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})+" UF/m²";}
+  function ufPorM2(v){return(v.arriendoActual!=null&&v.m2!=null&&v.m2>0)?v.arriendoActual/v.m2:null;}
+  function fmtPct(v){return v==null||isNaN(v)?"—":(v>0&&v<1?(v*100).toFixed(0)+"%":String(v));}
   const q=normQ(search);
   const buscando=q.length>0;
   const oficinasFiltradas=buscando
@@ -3949,6 +3955,19 @@ function Torre2680View({dashData,driveLoading}){
                 h("button",{onClick:()=>setZoomOficina(null),style:{alignSelf:"flex-start",fontSize:11,color:"var(--acc)",background:"none",border:"none",cursor:"pointer",padding:0,marginBottom:4}},"← Volver al plano"),
                 h("div",{style:{fontSize:20,fontWeight:700,color:"var(--tx)"}},unidadLabel(piso,zoomData.num)),
                 h("div",{style:{fontSize:14,fontWeight:600,color:esVacanteZ?"var(--amber)":"var(--tx)"}},zoomPl?(esVacanteZ?"VACANTE":zoomPl.nombre):"Sin datos de Planilla"),
+                zoomPl?.rut&&h("div",{style:{fontSize:11,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},"RUT: "+formatRUT(zoomPl.rut)),
+                zoomPl&&!esVacanteZ&&(()=>{
+                  const ufM2Rate=ufPorM2(zoomPl);
+                  const ufM2CLP=ufHoy&&ufM2Rate!=null?ufM2Rate*ufHoy:null;
+                  const arriendoCLP=ufHoy&&zoomPl.arriendoActual!=null?zoomPl.arriendoActual*ufHoy:null;
+                  const servAdmCLP=ufHoy&&zoomPl.servAdminActual!=null?zoomPl.servAdminActual*ufHoy:null;
+                  return h("div",{style:{display:"flex",flexDirection:"column",gap:6,fontSize:12,color:"var(--txm)",borderTop:"1px solid var(--bdr)",paddingTop:10}},
+                    h("div",null,"UF/m²: ",h("b",{style:{color:"var(--green)"}},fmtUFm2(ufM2Rate)),ufM2CLP!=null&&h("span",{style:{color:"var(--txd)"}}," ("+fmtCLP(ufM2CLP)+")")),
+                    h("div",null,"UF Arriendo: ",h("b",{style:{color:"var(--tx)"}},fmtUF(zoomPl.arriendoActual)),arriendoCLP!=null&&h("span",{style:{color:"var(--txd)"}}," ("+fmtCLP(arriendoCLP)+")")),
+                    h("div",null,"UF Serv Admin: ",h("b",{style:{color:"var(--tx)"}},fmtUF(zoomPl.servAdminActual)),servAdmCLP!=null&&h("span",{style:{color:"var(--txd)"}}," ("+fmtCLP(servAdmCLP)+")")),
+                    h("div",null,"% Arriendo: ",h("b",{style:{color:"var(--tx)"}},fmtPct(zoomPl.pctAdm)))
+                  );
+                })(),
                 h("div",{style:{display:"flex",flexDirection:"column",gap:6,fontSize:12,color:"var(--txm)",borderTop:"1px solid var(--bdr)",paddingTop:10}},
                   h("div",null,"m² ficha: ",h("b",{style:{color:"var(--tx)"}},zoomData.m2!=null?zoomData.m2:"—")),
                   h("div",null,"m² planilla: ",h("b",{style:{color:discZ?"var(--red)":"var(--tx)"}},m2PlanillaZ!=null?m2PlanillaZ:"—")),
