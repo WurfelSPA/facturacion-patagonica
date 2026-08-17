@@ -3730,6 +3730,11 @@ function CatastroSitiosView({dashData,driveLoading}){
    que en Catastro de Sitios.
 ══════════════════════════════════════════════════════════ */
 const TORRE2680_FICHAS={
+  1:[
+    {num:"L1",m2:360,edif:null,nota:"Nivel 1 (Locales comerciales) — agregado por referencia, sin match confirmado aún en la Planilla"},
+    {num:"L2",m2:195,edif:null,nota:"Nivel 1 (Locales comerciales) — agregado por referencia, sin match confirmado aún en la Planilla"},
+    {num:"L3",m2:165,edif:null,nota:"Nivel 1 (Locales comerciales) — agregado por referencia, sin match confirmado aún en la Planilla"},
+  ],
   2:[
     {num:"23",m2:112,edif:"T. Of. 23"},
     {num:"24",m2:33,edif:"T. Of. 24"},
@@ -3786,18 +3791,65 @@ const TORRE2680_FICHAS={
     {num:"12",m2:null,edif:"T. Piso 12",nota:"Piso completo — sin ficha propia revisada aún"},
   ],
 };
-/* Hotspots del plano real (imagen renderizada desde el PDF vectorial de la
-   ficha Oficina 53, recorte "PLANTA PISO 5"). Coordenadas en % del contenedor
-   — aproximadas a ojo sobre la imagen, no trazadas desde los muros exactos:
-   sirven para la demo de interacción/zoom, se reemplazan por polígonos reales
-   cuando estén disponibles desde AutoCAD. */
-const PISO5_HOTSPOTS=[
-  {num:"55",x:16.5,y:7,w:23,h:31},
-  {num:"51",x:59,y:7,w:35,h:31},
-  {num:"54",x:16.5,y:38,w:33,h:48},
-  {num:"52",x:70,y:38,w:24,h:34},
-  {num:"53",x:49,y:75,w:36,h:25},
-];
+/* Hotspots del plano real (imágenes renderizadas desde los PDF vectoriales de
+   cada ficha "Oficina N", recorte "PLANTA PISO N"). Coordenadas en % del
+   contenedor — aproximadas a ojo sobre la imagen, no trazadas desde los muros
+   exactos: sirven para la demo de interacción/zoom, se reemplazan por
+   polígonos reales cuando estén disponibles desde AutoCAD. */
+const PISO_HOTSPOTS={
+  1:[
+    {num:"L1",x:10,y:8,w:38,h:88},
+    {num:"L2",x:52,y:8,w:42,h:50},
+    {num:"L3",x:56,y:60,w:38,h:36},
+  ],
+  2:[
+    {num:"27",x:9.75,y:66.4,w:24.5,h:33.6},
+    {num:"26",x:34.25,y:66.4,w:9.75,h:33.6},
+    {num:"25",x:44,y:66.4,w:11.25,h:33.6},
+    {num:"24",x:55.25,y:66.4,w:9.25,h:33.6},
+    {num:"23",x:64.5,y:66.4,w:26,h:33.6},
+  ],
+  3:[
+    {num:"31",x:20,y:10,w:38,h:52},
+    {num:"32",x:59,y:8,w:39,h:42},
+    {num:"33",x:75,y:70,w:24,h:20},
+    {num:"34",x:20,y:78,w:37,h:22},
+    {num:"35",x:58,y:80,w:32,h:20},
+  ],
+  4:[
+    {num:"41",x:66,y:2,w:34,h:58},
+    {num:"45",x:26,y:2,w:42,h:42},
+    {num:"44",x:26,y:47,w:42,h:32},
+    {num:"43",x:56,y:80,w:28,h:20},
+  ],
+  5:[
+    {num:"55",x:16.5,y:7,w:23,h:31},
+    {num:"51",x:59,y:7,w:35,h:31},
+    {num:"54",x:16.5,y:38,w:33,h:48},
+    {num:"52",x:70,y:38,w:24,h:34},
+    {num:"53",x:49,y:75,w:36,h:25},
+  ],
+  6:[
+    {num:"61",x:36,y:10,w:62,h:55},
+    {num:"63",x:14,y:18,w:32,h:72},
+    {num:"62",x:63,y:80,w:35,h:20},
+  ],
+  7:[
+    {num:"71",x:8,y:8,w:84,h:48},
+    {num:"72",x:8,y:63,w:84,h:35},
+  ],
+  8:[
+    {num:"81",x:10,y:8,w:80,h:38},
+    {num:"83",x:10,y:62,w:38,h:30},
+    {num:"82",x:50,y:68,w:40,h:26},
+  ],
+  9:[
+    {num:"91",x:8,y:5,w:88,h:88},
+  ],
+};
+function pisoImg(p){return p===1?"/torre2680-nivel1.png":"/torre2680-piso"+p+".png";}
+function pisoLabel(p){return p===1?"Nivel 1":"Piso "+p;}
+function unidadLabel(p,num){return p===1?"Local "+num.replace(/^L/,""):"Oficina "+num;}
 function Torre2680View({dashData,driveLoading}){
   const pisos=Object.keys(TORRE2680_FICHAS).map(Number).sort((a,b)=>a-b);
   const [piso,setPiso]=useState(pisos[0]);
@@ -3841,20 +3893,21 @@ function Torre2680View({dashData,driveLoading}){
           padding:"6px 14px",borderRadius:8,border:p===piso?"1px solid var(--acc)":"1px solid var(--bdr)",
           background:p===piso?"var(--acc)":"var(--surf2)",color:p===piso?"#fff":"var(--tx)",
           fontSize:12,fontWeight:700,cursor:"pointer"
-        }},"Piso "+p)),
-        piso===5&&h("button",{onClick:()=>{setVistaPlano(v=>!v);setZoomOficina(null);},style:{
+        }},pisoLabel(p))),
+        !!PISO_HOTSPOTS[piso]&&h("button",{onClick:()=>{setVistaPlano(v=>!v);setZoomOficina(null);},style:{
           marginLeft:"auto",padding:"6px 14px",borderRadius:8,border:"1px solid var(--bdr)",
           background:"var(--surf2)",color:"var(--tx)",fontSize:12,fontWeight:700,cursor:"pointer",
           display:"flex",alignItems:"center",gap:6
         }},vistaPlano?"📋 Ver lista":"🗺️ Ver plano")
       )
     ),
-    piso===5&&vistaPlano&&!buscando
+    !!PISO_HOTSPOTS[piso]&&vistaPlano&&!buscando
       ?(()=>{
-          const ofic53=TORRE2680_FICHAS[5];
-          const zoomData=zoomOficina?ofic53.find(o=>o.num===zoomOficina):null;
-          const zoomPl=zoomData?matchPlanilla(zoomData.edif,5):null;
-          const hs=zoomOficina?PISO5_HOTSPOTS.find(h2=>h2.num===zoomOficina):null;
+          const oficPiso=TORRE2680_FICHAS[piso];
+          const hotspotsPiso=PISO_HOTSPOTS[piso];
+          const zoomData=zoomOficina?oficPiso.find(o=>o.num===zoomOficina):null;
+          const zoomPl=zoomData?matchPlanilla(zoomData.edif,piso):null;
+          const hs=zoomOficina?hotspotsPiso.find(h2=>h2.num===zoomOficina):null;
           const cx=hs?hs.x+hs.w/2:50, cy=hs?hs.y+hs.h/2:50;
           const esVacanteZ=zoomPl?.isVacante;
           const m2PlanillaZ=zoomPl?.m2;
@@ -3862,17 +3915,17 @@ function Torre2680View({dashData,driveLoading}){
           return h("div",{style:{flex:1,display:"flex",overflow:"hidden",position:"relative",background:"var(--bg)"}},
             h("div",{style:{flex:1,overflow:"hidden",position:"relative",display:"flex",alignItems:"center",justifyContent:"center",padding:24}},
               h("div",{style:{position:"relative",width:"100%",maxWidth:720,transformOrigin:cx+"% "+cy+"%",transform:zoomOficina?"scale(2.3)":"scale(1)",transition:"transform .65s cubic-bezier(.4,0,.2,1)"}},
-                h("img",{src:"/torre2680-piso5.png",style:{width:"100%",display:"block",borderRadius:8,boxShadow:"0 4px 24px rgba(0,0,0,.15)"}}),
-                PISO5_HOTSPOTS.map(hsp=>{
-                  const o=ofic53.find(x=>x.num===hsp.num);
-                  const pl=matchPlanilla(o?.edif,5);
+                h("img",{src:pisoImg(piso),style:{width:"100%",display:"block",borderRadius:8,boxShadow:"0 4px 24px rgba(0,0,0,.15)"}}),
+                hotspotsPiso.map(hsp=>{
+                  const o=oficPiso.find(x=>x.num===hsp.num);
+                  const pl=matchPlanilla(o?.edif,piso);
                   const vac=pl?.isVacante;
                   const disc=o?.m2!=null&&pl?.m2!=null&&Math.abs(o.m2-pl.m2)>1;
                   const activo=zoomOficina===hsp.num;
                   return h("div",{
                     key:hsp.num,
                     onClick:()=>setZoomOficina(activo?null:hsp.num),
-                    title:"Oficina "+hsp.num,
+                    title:unidadLabel(piso,hsp.num),
                     style:{
                       position:"absolute",left:hsp.x+"%",top:hsp.y+"%",width:hsp.w+"%",height:hsp.h+"%",
                       border:"2px solid "+(disc?"var(--red)":vac?"var(--amber)":"var(--acc)"),
@@ -3894,7 +3947,7 @@ function Torre2680View({dashData,driveLoading}){
             }},
               zoomData&&h("div",{style:{padding:20,display:"flex",flexDirection:"column",gap:10,minWidth:320}},
                 h("button",{onClick:()=>setZoomOficina(null),style:{alignSelf:"flex-start",fontSize:11,color:"var(--acc)",background:"none",border:"none",cursor:"pointer",padding:0,marginBottom:4}},"← Volver al plano"),
-                h("div",{style:{fontSize:20,fontWeight:700,color:"var(--tx)"}},"Oficina "+zoomData.num),
+                h("div",{style:{fontSize:20,fontWeight:700,color:"var(--tx)"}},unidadLabel(piso,zoomData.num)),
                 h("div",{style:{fontSize:14,fontWeight:600,color:esVacanteZ?"var(--amber)":"var(--tx)"}},zoomPl?(esVacanteZ?"VACANTE":zoomPl.nombre):"Sin datos de Planilla"),
                 h("div",{style:{display:"flex",flexDirection:"column",gap:6,fontSize:12,color:"var(--txm)",borderTop:"1px solid var(--bdr)",paddingTop:10}},
                   h("div",null,"m² ficha: ",h("b",{style:{color:"var(--tx)"}},zoomData.m2!=null?zoomData.m2:"—")),
@@ -3923,7 +3976,7 @@ function Torre2680View({dashData,driveLoading}){
               borderLeft:hayDiscrepancia?"4px solid var(--red)":esVacante?"4px solid var(--amber)":"4px solid var(--green)"
             }},
               h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}},
-                h("span",{style:{fontSize:14,fontWeight:700,color:"var(--tx)"}},"Oficina "+o.num),
+                h("span",{style:{fontSize:14,fontWeight:700,color:"var(--tx)"}},unidadLabel(o.piso,o.num)),
                 buscando&&h("span",{style:{fontSize:9,color:"var(--txd)",background:"var(--surf2)",padding:"2px 6px",borderRadius:6}},"Piso "+o.piso)
               ),
               h("div",{style:{fontSize:12,fontWeight:600,color:esVacante?"var(--amber)":"var(--tx)",marginBottom:6}},
