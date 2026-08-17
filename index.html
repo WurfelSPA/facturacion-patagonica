@@ -4018,30 +4018,80 @@ function Torre2680View({dashData,driveLoading}){
 }
 
 /* ══════════════════════════════════════════════════════════
-   EL CORTIJO
+   EL CORTIJO — PLANO INTERACTIVO
+   Datos de m² extraídos de las fichas PDF (Desktop/Patagonica/
+   El Cortijo_Planos y Fichas/Lote A-2 y Lota A-2 Locales) — agosto 2026.
+   La cadena "edif" de cada unidad es EXACTAMENTE el texto de la columna
+   Edificios de la Planilla (verificado contra la hoja Flujo), para que
+   el mismo match por c.edificio===edif que usa Torre 2680 funcione aquí.
+   Coordenadas de los hotspots en % sobre cortijo-emplazamiento.png,
+   aproximadas a ojo sobre el plano de emplazamiento — no trazadas desde
+   los muros exactos (mismo criterio que Torre 2680).
 ══════════════════════════════════════════════════════════ */
-function ElCortijoView(){
-  /* estado: "loading" buscando en Drive | "fetching" descargando PDF | "ready" | "error" */
+const CORTIJO_UNIDADES=[
+  {edif:"Edif. 1",m2:744,x:90.7,y:64.4,w:3.6,h:3.2,nota:"114 (of. N1) + 534 (bodega N1) + 96 (of. N2)"},
+  {edif:"Edif. 2 y 2B",m2:1842,x:87.6,y:64.4,w:3.6,h:3.2,nota:"Edificio 2: 229+229 of. + 955 bodega = 1413. Edificio 2-B: 429 bodega. Combinados en la Planilla en una sola fila"},
+  {edif:"Edif. 3",m2:864,x:84.1,y:64.4,w:3.6,h:3.2,nota:"144 (of. N1) + 576 (bodega N1) + 144 (of. N2)"},
+  {edif:"Edif. 3-A",m2:528,x:84.1,y:72.2,w:3.6,h:3.2,nota:"528 bodega, N1 único"},
+  {edif:"Edif. 4-A",m2:816,x:80.6,y:64.4,w:3.4,h:3},
+  {edif:"Edif. 4-B",m2:785,x:81.5,y:67.8,w:3.4,h:3,nota:"785 bodega, N1 único — mismo edificio que 4-A, sin oval propio en el plano de emplazamiento"},
+  {edif:"Edif. 5",m2:615,x:77.0,y:63.7,w:3.4,h:3},
+  {edif:"Edif. 5-A",m2:569,x:77.9,y:67.1,w:3.4,h:3,nota:"569 bodega, N1 único — mismo edificio que 5, sin oval propio en el plano de emplazamiento"},
+  {edif:"Edif. 6",m2:1616,x:73.0,y:71.5,w:3.6,h:3.2,nota:"983 (bodega) + 233 + 400 (of.)"},
+  {edif:"Edif. 6-A",m2:753,x:68.6,y:72.4,w:3.6,h:3.2,nota:"444 (bodega) + 193 + 116 (of.)"},
+  {edif:"Edif. 7 B 7C",m2:1891,x:53.4,y:66.6,w:4,h:5,nota:"Edificio 7B (bodega 943 + of. 153×3 niveles = 1402) + Edificio 7C (of. 195+147+147 = 489)"},
+  {edif:"Edif. 7 H",m2:172,x:60.3,y:63.7,w:2.4,h:2.2,nota:"106 (N1) + 66 (N2)"},
+  {edif:"Edif. 7 G",m2:132,x:60.9,y:65.2,w:2.2,h:2,nota:"66 + 66 (2 niveles)"},
+  {edif:"Edif. 7 F",m2:132,x:61.0,y:66.4,w:2.2,h:2,nota:"66 + 66 (2 niveles)"},
+  {edif:"Edif. 7 E",m2:128,x:61.0,y:67.7,w:2.2,h:2,nota:"64 + 64 (2 niveles)"},
+  {edif:"Edif. 7 D",m2:94,x:61.0,y:68.9,w:2.2,h:2,nota:"47 + 47 (2 niveles)"},
+  {edif:"Edif. 8",m2:236,x:61.7,y:62.1,w:3.2,h:2.8,nota:"67 (N1) + 169 (N2)"},
+  {edif:"Edif. 9 (Incl Bod.8)",m2:394,x:56.4,y:61.5,w:3.4,h:3,nota:"Cifra aproximada a partir de la ficha (210+90 N1, 33+61 N2) — a verificar"},
+  {edif:"Edif. 10",m2:671,x:57.2,y:56.4,w:3.4,h:3,nota:"399 (bodega) + 136 + 136 (of.)"},
+  {edif:"Edif. 11",m2:735,x:57.2,y:52.7,w:3.4,h:3,nota:"399 (bodega) + 168 + 168 (of.)"},
+  {edif:"Edif. 12",m2:1169,x:64.2,y:43.6,w:3.6,h:3.2,nota:"881 (bodega) + 144 + 144 (of.)"},
+  {edif:"Edif. 13",m2:246,x:59.0,y:40.6,w:3.2,h:2.8,nota:"122 (N1) + 124 (N2)"},
+  {edif:"Edif. 14",m2:315,x:55.7,y:37.8,w:3.4,h:3,nota:"149 (of. N1) + 75 (bodega N2) + 91 (of. N2)"},
+  {edif:"Edif. 15",m2:521,x:52.9,y:38.0,w:3.4,h:3,nota:"233+122 (N1) + 28+138 (N2) — cifra a verificar"},
+  {edif:"P. C. L-1",m2:338,x:84.6,y:41.0,w:2.6,h:3.4,nota:"169 + 169 (2 niveles)"},
+  {edif:"P. C. L-2",m2:318,x:83.4,y:37.7,w:2.4,h:3,nota:"159 + 159 (2 niveles) — el diagrama de la ficha muestra 155, se usa el valor del Cuadro de Superficies"},
+  {edif:"P. C. L-3",m2:440,x:82.3,y:39.0,w:2.4,h:3,nota:"408 (N1) + 32 (N2)"},
+  {edif:"P. C. L-4",m2:131,x:82.0,y:41.0,w:2.4,h:2.6},
+  {edif:"P. C. L-4A",m2:137,x:81.4,y:40.2,w:2.2,h:2.4,nota:"Mismo edificio que P.C.L-4, ficha separada"},
+  {edif:"P. C. L-5",m2:220,x:80.5,y:43.7,w:2.4,h:2.6},
+  {edif:"P. C. L-6",m2:163,x:80.4,y:46.9,w:2.6,h:2.8,nota:"Cifra a verificar — la ficha muestra un segundo valor (673 m²) que no cuadra con un local de este tamaño, probablemente error de la ficha o de esta lectura"},
+  {edif:"P. C. L-7",m2:null,x:78.7,y:46.9,w:2.2,h:2.4,nota:"Sin ficha propia ubicada aún — la única ficha \"P.C.L-7\" encontrada corresponde por dirección (N°2740) a P.C.L-7-A"},
+  {edif:"P. C. L-7-A",m2:147.5,x:79.9,y:49.2,w:2.4,h:2.6,nota:"Ficha \"P.C.L.-7.pdf\", dirección N°2740"},
+  {edif:"P. C. L-9",m2:null,x:79.0,y:44.8,w:2.2,h:2.4,nota:"Sin ficha propia encontrada en la carpeta"},
+  {edif:"Torre L-1",m2:null,x:86.3,y:42.7,w:2.6,h:2.8,nota:"Local de Torre 2680 (planta baja) — sin ficha propia en esta carpeta"},
+  {edif:"Torre L-2",m2:null,x:89.0,y:41.9,w:2.6,h:2.8,nota:"Local de Torre 2680 (planta baja) — sin ficha propia en esta carpeta"},
+  {edif:"Torre L-3",m2:null,x:88.4,y:45.0,w:2.6,h:2.8,nota:"Local de Torre 2680 (planta baja) — sin ficha propia en esta carpeta"},
+];
+function ElCortijoView({dashData,driveLoading}){
+  const [zoomUnidad,setZoomUnidad]=useState(null);
+  const [search,setSearch]=useState("");
+  const [verPdf,setVerPdf]=useState(false);
+  const [ufHoy,setUfHoy]=useState(null);
+  useEffect(()=>{getUFHoy().then(setUfHoy);},[]);
+
+  /* estado del fallback PDF: "loading" buscando en Drive | "fetching" descargando | "ready" | "error" */
   const [phase,setPhase]=useState("loading");
   const [blobUrl,setBlobUrl]=useState(null);
   const [fileName,setFileName]=useState(null);
   const [error,setError]=useState(null);
-
   useEffect(function(){
+    if(!verPdf||blobUrl)return;
     let alive=true;
     let _url=null;
-    /* Paso 1: listar carpeta para encontrar el archivo exacto */
     fetch("/api/historial?ls="+DRIVE_FACTURACION_FOLDER_ID)
       .then(function(r){return r.json();})
       .then(function(d){
         if(!alive)return;
-        /* Buscar "El Cortijo 2026_Arriendos.pdf" — requiere ambas palabras clave */
         const f=(d.files||[]).find(function(f){
           return /cortijo/i.test(f.name)&&/arriendos/i.test(f.name)&&/\.pdf$/i.test(f.name);
         });
         if(!f){setError("No se encontró 'El Cortijo 2026_Arriendos.pdf' en Drive");setPhase("error");return null;}
         setFileName(f.name);setPhase("fetching");
-        /* Paso 2: descargar el PDF */
         return fetch("/api/historial?fileId="+f.id);
       })
       .then(function(r){
@@ -4057,31 +4107,148 @@ function ElCortijoView(){
       })
       .catch(function(e){if(alive){setError(e.message);setPhase("error");}});
     return function(){alive=false;if(_url)URL.revokeObjectURL(_url);};
-  },[]);
+  },[verPdf]);
+
+  const normQ=s=>(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," ").trim();
+  const todos=dashData?[...(dashData.clients||[]),...(dashData.vacantes||[])]:[];
+  function matchPlanilla(edif){return edif?(todos.find(c=>c.edificio===edif)||null):null;}
+  function fmtCLP(v){return v==null||isNaN(v)?"—":"$"+Math.round(v).toLocaleString("es-CL");}
+  function fmtUF(v){return v==null||isNaN(v)?"—":v.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})+" UF";}
+  function fmtUFm2(v){return v==null||isNaN(v)?"—":v.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})+" UF/m²";}
+  function ufPorM2(v){return(v.arriendoActual!=null&&v.m2!=null&&v.m2>0)?v.arriendoActual/v.m2:null;}
+  function fmtPct(v){return v==null||isNaN(v)?"—":(v>0&&v<1?(v*100).toFixed(0)+"%":String(v));}
+
+  const q=normQ(search);
+  const buscando=q.length>0;
+  const unidadesFiltradas=buscando
+    ?CORTIJO_UNIDADES.filter(u=>{
+        const pl=matchPlanilla(u.edif);
+        return normQ(u.edif).includes(q)||normQ(pl?.nombre).includes(q);
+      })
+    :[];
+
+  const zoomData=zoomUnidad?CORTIJO_UNIDADES.find(u=>u.edif===zoomUnidad):null;
+  const zoomPl=zoomData?matchPlanilla(zoomData.edif):null;
+  const cx=zoomData?zoomData.x+zoomData.w/2:50, cy=zoomData?zoomData.y+zoomData.h/2:50;
+  const esVacanteZ=zoomPl?.isVacante;
+  const m2PlanillaZ=zoomPl?.m2;
+  const discZ=zoomData&&zoomData.m2!=null&&m2PlanillaZ!=null&&Math.abs(zoomData.m2-m2PlanillaZ)>1;
 
   return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up"},
-    h("div",{style:{padding:"8px 20px",borderBottom:"1px solid var(--bdr)",flexShrink:0,background:"var(--surf)"}},
-      h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"🏡 EL CORTIJO — PLANO DE ARRIENDOS 2026")
+    h("div",{style:{padding:"10px 20px",borderBottom:"1px solid var(--bdr)",flexShrink:0,background:"var(--surf)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
+      h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"🏡 EL CORTIJO — PLANO INTERACTIVO"),
+      !verPdf&&h("input",{value:search,onChange:e=>{setSearch(e.target.value);setZoomUnidad(null);},placeholder:"Buscar edificio, cliente...",style:{width:220,marginLeft:"auto"}}),
+      h("button",{onClick:()=>{setVerPdf(v=>!v);setZoomUnidad(null);},style:{
+        marginLeft:verPdf?"auto":0,padding:"6px 14px",borderRadius:8,border:"1px solid var(--bdr)",
+        background:"var(--surf2)",color:"var(--tx)",fontSize:12,fontWeight:700,cursor:"pointer"
+      }},verPdf?"🗺️ Ver plano interactivo":"📄 Ver PDF original")
     ),
-    /* Área del viewer — ocupa todo el espacio restante */
-    h("div",{style:{flex:1,position:"relative",overflow:"hidden",background:"#404040"}},
-      phase==="loading"&&h("div",{style:{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",color:"#ccc",fontSize:13}},
-        "Buscando plano en Drive..."
-      ),
-      phase==="fetching"&&h("div",{style:{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,color:"#ccc"}},
-        h("div",{className:"spin",style:{fontSize:28,display:"inline-block"}},"⧭"),
-        h("div",{style:{fontSize:13}},"Cargando plano..."),
-        fileName&&h("div",{style:{fontSize:11,opacity:.6}},fileName)
-      ),
-      phase==="error"&&h("div",{style:{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",color:"#f88",fontSize:13}},
-        "⚠ "+error
-      ),
-      phase==="ready"&&h("iframe",{
-        src:blobUrl,
-        title:"Plano El Cortijo 2026",
-        style:{width:"100%",height:"100%",border:"none",display:"block"}
-      })
-    )
+    verPdf
+      ?h("div",{style:{flex:1,position:"relative",overflow:"hidden",background:"#404040"}},
+          phase==="loading"&&h("div",{style:{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",color:"#ccc",fontSize:13}},"Buscando plano en Drive..."),
+          phase==="fetching"&&h("div",{style:{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,color:"#ccc"}},
+            h("div",{className:"spin",style:{fontSize:28,display:"inline-block"}},"⧭"),
+            h("div",{style:{fontSize:13}},"Cargando plano..."),
+            fileName&&h("div",{style:{fontSize:11,opacity:.6}},fileName)
+          ),
+          phase==="error"&&h("div",{style:{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",color:"#f88",fontSize:13}},"⚠ "+error),
+          phase==="ready"&&h("iframe",{src:blobUrl,title:"Plano El Cortijo 2026",style:{width:"100%",height:"100%",border:"none",display:"block"}})
+        )
+      :buscando
+        ?h("div",{style:{flex:1,overflowY:"auto",padding:"18px 24px",display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14,alignContent:"start"}},
+            unidadesFiltradas.length===0
+              ?h("div",{style:{gridColumn:"1/-1",padding:40,textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados para \""+search+"\"")
+              :unidadesFiltradas.map((u,i)=>{
+                  const pl=matchPlanilla(u.edif);
+                  const esVacante=pl?.isVacante;
+                  const m2Planilla=pl?.m2;
+                  const hayDiscrepancia=u.m2!=null&&m2Planilla!=null&&Math.abs(u.m2-m2Planilla)>1;
+                  return h("div",{key:u.edif+"-"+i,style:{
+                    border:"1px solid var(--bdr)",borderRadius:10,padding:14,background:"var(--surf)",
+                    borderLeft:hayDiscrepancia?"4px solid var(--red)":esVacante?"4px solid var(--amber)":"4px solid var(--green)"
+                  }},
+                    h("div",{style:{fontSize:14,fontWeight:700,color:"var(--tx)",marginBottom:8}},u.edif),
+                    h("div",{style:{fontSize:12,fontWeight:600,color:esVacante?"var(--amber)":"var(--tx)",marginBottom:6}},
+                      pl?(esVacante?"VACANTE":pl.nombre):"Sin datos de Planilla"
+                    ),
+                    h("div",{style:{display:"flex",gap:10,fontSize:11,color:"var(--txm)",marginBottom:6,flexWrap:"wrap"}},
+                      h("span",null,"m² ficha: ",h("b",{style:{color:"var(--tx)"}},u.m2!=null?u.m2:"—")),
+                      h("span",null,"m² planilla: ",h("b",{style:{color:hayDiscrepancia?"var(--red)":"var(--tx)"}},m2Planilla!=null?m2Planilla:"—")),
+                    ),
+                    (pl?.idAgua||pl?.idEnel)&&h("div",{style:{display:"flex",gap:6,fontSize:10,marginBottom:6,flexWrap:"wrap"}},
+                      pl.idAgua&&h("span",{style:{color:"#38BDF8",background:"rgba(56,189,248,.1)",padding:"2px 7px",borderRadius:6}},"💧 AA "+pl.idAgua),
+                      pl.idEnel&&h("span",{style:{color:"#34D399",background:"rgba(52,211,153,.1)",padding:"2px 7px",borderRadius:6}},"⚡ Enel "+pl.idEnel),
+                    ),
+                    hayDiscrepancia&&h("div",{style:{fontSize:10,color:"var(--red)",fontWeight:600,marginTop:4}},"⚠ Diferencia de "+Math.abs(u.m2-m2Planilla).toFixed(2)+" m² vs. la Planilla"),
+                    u.nota&&h("div",{style:{fontSize:10,color:"var(--txd)",marginTop:6,fontStyle:"italic",borderTop:"1px solid var(--bdr)",paddingTop:6}},u.nota)
+                  );
+                })
+          )
+        :h("div",{style:{flex:1,display:"flex",overflow:"hidden",position:"relative",background:"var(--bg)"}},
+            h("div",{style:{flex:1,overflow:"hidden",position:"relative",display:"flex",alignItems:"center",justifyContent:"center",padding:24}},
+              !dashData
+                ?h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},
+                    driveLoading?h(React.Fragment,null,h("span",{className:"fv2-loader",style:{width:18,height:18,fontSize:18}}),"Cargando planilla desde Drive..."):"Sin datos — carga la planilla de facturación")
+                :h("div",{style:{position:"relative",width:"100%",maxWidth:1100,transformOrigin:cx+"% "+cy+"%",transform:zoomUnidad?"scale(4.2)":"scale(1)",transition:"transform .65s cubic-bezier(.4,0,.2,1)"}},
+                    h("img",{src:"/cortijo-emplazamiento.png",style:{width:"100%",display:"block",borderRadius:8,boxShadow:"0 4px 24px rgba(0,0,0,.15)"}}),
+                    CORTIJO_UNIDADES.map(u=>{
+                      const pl=matchPlanilla(u.edif);
+                      const vac=pl?.isVacante;
+                      const disc=u.m2!=null&&pl?.m2!=null&&Math.abs(u.m2-pl.m2)>1;
+                      const activo=zoomUnidad===u.edif;
+                      return h("div",{
+                        key:u.edif,
+                        onClick:()=>setZoomUnidad(activo?null:u.edif),
+                        title:u.edif,
+                        style:{
+                          position:"absolute",left:u.x+"%",top:u.y+"%",width:u.w+"%",height:u.h+"%",
+                          border:"2px solid "+(disc?"var(--red)":vac?"var(--amber)":"var(--acc)"),
+                          background:activo?(disc?"rgba(220,38,38,.16)":vac?"rgba(245,158,11,.16)":"rgba(91,76,219,.16)"):"transparent",
+                          borderRadius:4,cursor:zoomUnidad?(activo?"zoom-out":"default"):"zoom-in",
+                          transition:"background .25s, opacity .3s",
+                          opacity:zoomUnidad&&!activo?0:1,
+                          pointerEvents:zoomUnidad&&!activo?"none":"auto"
+                        },
+                        onMouseEnter:e=>{if(!zoomUnidad)e.currentTarget.style.background=disc?"rgba(220,38,38,.10)":vac?"rgba(245,158,11,.10)":"rgba(91,76,219,.10)";},
+                        onMouseLeave:e=>{if(!activo)e.currentTarget.style.background="transparent";}
+                      });
+                    })
+                  )
+            ),
+            h("div",{style:{
+              width:zoomUnidad?320:0,flexShrink:0,overflow:"hidden",borderLeft:zoomUnidad?"1px solid var(--bdr)":"none",
+              background:"var(--surf)",transition:"width .4s ease",display:"flex",flexDirection:"column"
+            }},
+              zoomData&&h("div",{style:{padding:20,display:"flex",flexDirection:"column",gap:10,minWidth:320}},
+                h("button",{onClick:()=>setZoomUnidad(null),style:{alignSelf:"flex-start",fontSize:11,color:"var(--acc)",background:"none",border:"none",cursor:"pointer",padding:0,marginBottom:4}},"← Volver al plano"),
+                h("div",{style:{fontSize:20,fontWeight:700,color:"var(--tx)"}},zoomData.edif),
+                h("div",{style:{fontSize:14,fontWeight:600,color:esVacanteZ?"var(--amber)":"var(--tx)"}},zoomPl?(esVacanteZ?"VACANTE":zoomPl.nombre):"Sin datos de Planilla"),
+                zoomPl?.rut&&h("div",{style:{fontSize:11,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},"RUT: "+formatRUT(zoomPl.rut)),
+                zoomPl&&!esVacanteZ&&(()=>{
+                  const ufM2Rate=ufPorM2(zoomPl);
+                  const ufM2CLP=ufHoy&&ufM2Rate!=null?ufM2Rate*ufHoy:null;
+                  const arriendoCLP=ufHoy&&zoomPl.arriendoActual!=null?zoomPl.arriendoActual*ufHoy:null;
+                  const servAdmCLP=ufHoy&&zoomPl.servAdminActual!=null?zoomPl.servAdminActual*ufHoy:null;
+                  return h("div",{style:{display:"flex",flexDirection:"column",gap:6,fontSize:12,color:"var(--txm)",borderTop:"1px solid var(--bdr)",paddingTop:10}},
+                    h("div",null,"UF/m²: ",h("b",{style:{color:"var(--green)"}},fmtUFm2(ufM2Rate)),ufM2CLP!=null&&h("span",{style:{color:"var(--txd)"}}," ("+fmtCLP(ufM2CLP)+")")),
+                    h("div",null,"UF Arriendo: ",h("b",{style:{color:"var(--tx)"}},fmtUF(zoomPl.arriendoActual)),arriendoCLP!=null&&h("span",{style:{color:"var(--txd)"}}," ("+fmtCLP(arriendoCLP)+")")),
+                    h("div",null,"UF Serv Admin: ",h("b",{style:{color:"var(--tx)"}},fmtUF(zoomPl.servAdminActual)),servAdmCLP!=null&&h("span",{style:{color:"var(--txd)"}}," ("+fmtCLP(servAdmCLP)+")")),
+                    h("div",null,"% Arriendo: ",h("b",{style:{color:"var(--tx)"}},fmtPct(zoomPl.pctAdm)))
+                  );
+                })(),
+                h("div",{style:{display:"flex",flexDirection:"column",gap:6,fontSize:12,color:"var(--txm)",borderTop:"1px solid var(--bdr)",paddingTop:10}},
+                  h("div",null,"m² ficha: ",h("b",{style:{color:"var(--tx)"}},zoomData.m2!=null?zoomData.m2:"—")),
+                  h("div",null,"m² planilla: ",h("b",{style:{color:discZ?"var(--red)":"var(--tx)"}},m2PlanillaZ!=null?m2PlanillaZ:"—")),
+                  discZ&&h("div",{style:{color:"var(--red)",fontWeight:600}},"⚠ Diferencia de "+Math.abs(zoomData.m2-m2PlanillaZ).toFixed(2)+" m²")
+                ),
+                (zoomPl?.idAgua||zoomPl?.idEnel)&&h("div",{style:{display:"flex",gap:6,flexWrap:"wrap"}},
+                  zoomPl.idAgua&&h("span",{style:{fontSize:10,color:"#38BDF8",background:"rgba(56,189,248,.1)",padding:"3px 8px",borderRadius:6}},"💧 AA "+zoomPl.idAgua),
+                  zoomPl.idEnel&&h("span",{style:{fontSize:10,color:"#34D399",background:"rgba(52,211,153,.1)",padding:"3px 8px",borderRadius:6}},"⚡ Enel "+zoomPl.idEnel)
+                ),
+                zoomData.nota&&h("div",{style:{fontSize:11,color:"var(--txd)",fontStyle:"italic",borderTop:"1px solid var(--bdr)",paddingTop:10}},zoomData.nota)
+              )
+            )
+          )
   );
 }
 
@@ -7888,7 +8055,7 @@ function App(){
     ,view==="contratos"&&h(ContratosView,{dashData,driveLoading})
     ,view==="cuentas"&&h(CuentasServiciosView,{dashData,driveLoading,notify})
     ,view==="vacantes"&&h(CatastroSitiosView,{dashData,driveLoading})
-    ,view==="cortijo"&&h(ElCortijoView,null)
+    ,view==="cortijo"&&h(ElCortijoView,{dashData,driveLoading})
     ,view==="torre2680"&&h(Torre2680View,{dashData,driveLoading})
     ,view==="historial-fact"&&h(HistorialFactView,{dashData,driveLoading,notify,planillaFile:files.planilla,marcarPagadoSheet})
   ));
