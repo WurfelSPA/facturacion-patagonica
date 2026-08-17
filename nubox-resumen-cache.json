@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updatedAt": "2026-08-13T13:52:59.580Z",
+  "updatedAt": "2026-08-17T11:01:21.013Z",
   "source": "browserless-excel",
   "columnas": [
     "Septiembre 2025",
@@ -449,9 +449,10 @@
         "Abril 2026": 4267000,
         "Mayo 2026": 4304000,
         "Junio 2026": 4359000,
-        "Julio 2026": 4375000
+        "Julio 2026": 4375000,
+        "Agosto 2026": 4374000
       },
-      "total": 30149000
+      "total": 34524000
     },
     {
       "rut": "76.754.296-8",
