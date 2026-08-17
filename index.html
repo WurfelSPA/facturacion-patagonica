@@ -3722,6 +3722,150 @@ function CatastroSitiosView({dashData,driveLoading}){
 }
 
 /* ══════════════════════════════════════════════════════════
+   TORRE 2680 — PROTOTIPO "EDIFICIO VIRTUAL"
+   Datos de m² verificados manualmente contra las fichas arquitectónicas
+   en PDF (carpeta Desktop/Patagonica/Fichas/Torre 2680) y los contratos
+   reales (Descargas/SLEP, Anexo Olympus) — agosto 2026. El resto de los
+   datos (cliente, cuentas AA/Enel) se lee en vivo desde la Planilla, igual
+   que en Catastro de Sitios.
+══════════════════════════════════════════════════════════ */
+const TORRE2680_FICHAS={
+  2:[
+    {num:"23",m2:112,edif:"T. Of. 23"},
+    {num:"24",m2:33,edif:"T. Of. 24"},
+    {num:"25",m2:61,edif:"T. Of. 25",nota:"36 propios + 25 de bodega"},
+    {num:"26",m2:36,edif:"T. Of. 26"},
+    {num:"27",m2:93,edif:"T. Of. 27"},
+  ],
+  3:[
+    {num:"31",m2:120,edif:"T. Of. 31",nota:"Contrato de Olympus aún no ubicado — Planilla muestra 395 (suma del piso), pendiente de confirmar"},
+    {num:"32",m2:120,edif:"T. Of. 32"},
+    {num:"33",m2:45,edif:"T. Of. 33"},
+    {num:"34",m2:69,edif:"T. Of. 34"},
+    {num:"35",m2:41,edif:"T. Of. 35"},
+  ],
+  4:[
+    {num:"41",m2:396,edif:"T. Of. 41",nota:"396 m² confirmado por el Anexo N°1 de Olympus (consolida el piso completo bajo un solo contrato)"},
+    {num:"43",m2:25,edif:null,nota:"Sin fila propia en la Planilla — incluida dentro del contrato consolidado de Olympus (T. Of. 41)"},
+    {num:"44",m2:65,edif:"T. Of. 44"},
+    {num:"45",m2:111.21,edif:"T. Of. 45"},
+  ],
+  5:[
+    {num:"51",m2:118.5,edif:"T. Of. 51",nota:"106 propios + 12,5 de bodega"},
+    {num:"52",m2:129.35,edif:"T. Of. 52",nota:"105 propios + 24,35 de bodega — Planilla aún muestra 89,35 (65+24,35), pendiente de corregir"},
+    {num:"53",m2:40,edif:"T. Of. 53",nota:"Planilla aún muestra 62 m² (tabla de piso desactualizada) — pendiente de corregir"},
+    {num:"54",m2:65,edif:"T. Of. 54"},
+    {num:"55",m2:94,edif:"T. Of. 55"},
+  ],
+  6:[
+    {num:"61",m2:152.70,edif:"T. Of. 61. Of. 63",nota:"61+63 combinados = 263 m² según contrato SLEP — Planilla aún muestra 440, pendiente de corregir"},
+    {num:"62",m2:221,edif:"T. Of. 62",nota:"137 propios + 84 de bodega"},
+    {num:"63",m2:110,edif:"T. Of. 61. Of. 63"},
+  ],
+  7:[
+    {num:"71",m2:223,edif:"T. Piso 7"},
+    {num:"72",m2:177,edif:"T. Piso 7",nota:"71+72 = 400 m² de oficinas + 12 m² de estacionamiento = 412 m² según contrato SLEP (coincide con la Planilla)"},
+  ],
+  8:[
+    {num:"81",m2:252,edif:"T. Piso 8"},
+    {num:"82",m2:65,edif:"T. Piso 8"},
+    {num:"83",m2:83,edif:"T. Piso 8",nota:"81+82+83 = 400 m², + áreas comunes = 468 m² según contrato SLEP (coincide con la fila \"T. Piso 8\")"},
+  ],
+  9:[
+    {num:"91",m2:400,edif:"T. Piso 9"},
+  ],
+  10:[
+    {num:"101",m2:null,edif:"T. Of. 101",nota:"Sin ficha propia revisada aún"},
+    {num:"102",m2:null,edif:"T. Of. 102",nota:"Sin ficha propia revisada aún"},
+  ],
+  11:[
+    {num:"111",m2:null,edif:"T. Of. 111",nota:"Sin ficha propia revisada aún"},
+    {num:"112",m2:null,edif:"T. Of. 112",nota:"Sin ficha propia revisada aún"},
+  ],
+  12:[
+    {num:"12",m2:null,edif:"T. Piso 12",nota:"Piso completo — sin ficha propia revisada aún"},
+  ],
+};
+function Torre2680View({dashData,driveLoading}){
+  const pisos=Object.keys(TORRE2680_FICHAS).map(Number).sort((a,b)=>a-b);
+  const [piso,setPiso]=useState(pisos[0]);
+  const [search,setSearch]=useState("");
+  if(!dashData)return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,overflow:"hidden",minHeight:0},className:"fade-up epv2"},
+    driveLoading
+      ?h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},h("span",{className:"fv2-loader",style:{width:18,height:18,fontSize:18}}),"Cargando planilla desde Drive...")
+      :h("div",{style:{fontSize:13,color:"var(--txd)"}},"Sin datos — carga la planilla de facturación")
+  );
+  const normQ=s=>(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," ").trim();
+  const todos=[...(dashData.clients||[]),...(dashData.vacantes||[])];
+  function matchPlanilla(edif,pisoNum){
+    if(!edif)return null;
+    const candidatos=todos.filter(c=>c.edificio===edif);
+    if(candidatos.length<=1)return candidatos[0]||null;
+    // Desambiguar cuando la misma etiqueta de Edificio se repite en pisos distintos
+    // (ej. "T. Of. 26" existe tanto en piso 2 como, por error, en una fila de piso 8).
+    return candidatos.find(c=>(c.dir||"").toLowerCase().includes("piso "+pisoNum))||candidatos[0];
+  }
+  function fmtCLP(v){return v==null||isNaN(v)?"—":"$"+Math.round(v).toLocaleString("es-CL");}
+  const q=normQ(search);
+  const buscando=q.length>0;
+  const oficinasFiltradas=buscando
+    ?pisos.flatMap(p=>TORRE2680_FICHAS[p].map(o=>({...o,piso:p})))
+      .filter(o=>{
+        const pl=matchPlanilla(o.edif,o.piso);
+        return normQ(o.num).includes(q)||normQ(o.edif).includes(q)||normQ(pl?.nombre).includes(q);
+      })
+    :TORRE2680_FICHAS[piso].map(o=>({...o,piso}));
+  return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up epv2"},
+    h("div",{style:{padding:"14px 24px 10px",display:"flex",flexDirection:"column",gap:10,flexShrink:0,borderBottom:"1px solid var(--bdr)"}},
+      h("div",{style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
+        h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"🏢 TORRE 2680 · PROTOTIPO"),
+        h("span",{style:{fontSize:10,color:"var(--acc)",background:"rgba(91,76,219,.12)",border:"1px solid rgba(91,76,219,.3)",padding:"2px 8px",borderRadius:10,fontWeight:700}},"Vista de prueba — no reemplaza El Cortijo"),
+        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar oficina, cliente...",style:{width:220,marginLeft:"auto"}})
+      ),
+      !buscando&&h("div",{style:{display:"flex",gap:6,flexWrap:"wrap"}},
+        pisos.map(p=>h("button",{key:p,onClick:()=>setPiso(p),style:{
+          padding:"6px 14px",borderRadius:8,border:p===piso?"1px solid var(--acc)":"1px solid var(--bdr)",
+          background:p===piso?"var(--acc)":"var(--surf2)",color:p===piso?"#fff":"var(--tx)",
+          fontSize:12,fontWeight:700,cursor:"pointer"
+        }},"Piso "+p))
+      )
+    ),
+    h("div",{style:{flex:1,overflowY:"auto",padding:"18px 24px",display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14,alignContent:"start"}},
+      oficinasFiltradas.length===0
+        ?h("div",{style:{gridColumn:"1/-1",padding:40,textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados para \""+search+"\"")
+        :oficinasFiltradas.map((o,i)=>{
+            const pl=matchPlanilla(o.edif,o.piso);
+            const esVacante=pl?.isVacante;
+            const m2Planilla=pl?.m2;
+            const hayDiscrepancia=o.m2!=null&&m2Planilla!=null&&Math.abs(o.m2-m2Planilla)>1;
+            return h("div",{key:o.num+"-"+i,style:{
+              border:"1px solid var(--bdr)",borderRadius:10,padding:14,background:"var(--surf)",
+              borderLeft:hayDiscrepancia?"4px solid var(--red)":esVacante?"4px solid var(--amber)":"4px solid var(--green)"
+            }},
+              h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}},
+                h("span",{style:{fontSize:14,fontWeight:700,color:"var(--tx)"}},"Oficina "+o.num),
+                buscando&&h("span",{style:{fontSize:9,color:"var(--txd)",background:"var(--surf2)",padding:"2px 6px",borderRadius:6}},"Piso "+o.piso)
+              ),
+              h("div",{style:{fontSize:12,fontWeight:600,color:esVacante?"var(--amber)":"var(--tx)",marginBottom:6}},
+                pl?(esVacante?"VACANTE":pl.nombre):"Sin datos de Planilla"
+              ),
+              h("div",{style:{display:"flex",gap:10,fontSize:11,color:"var(--txm)",marginBottom:6,flexWrap:"wrap"}},
+                h("span",null,"m² ficha: ",h("b",{style:{color:"var(--tx)"}},o.m2!=null?o.m2:"—")),
+                h("span",null,"m² planilla: ",h("b",{style:{color:hayDiscrepancia?"var(--red)":"var(--tx)"}},m2Planilla!=null?m2Planilla:"—")),
+              ),
+              (pl?.idAgua||pl?.idEnel)&&h("div",{style:{display:"flex",gap:6,fontSize:10,marginBottom:6,flexWrap:"wrap"}},
+                pl.idAgua&&h("span",{style:{color:"#38BDF8",background:"rgba(56,189,248,.1)",padding:"2px 7px",borderRadius:6}},"💧 AA "+pl.idAgua),
+                pl.idEnel&&h("span",{style:{color:"#34D399",background:"rgba(52,211,153,.1)",padding:"2px 7px",borderRadius:6}},"⚡ Enel "+pl.idEnel),
+              ),
+              hayDiscrepancia&&h("div",{style:{fontSize:10,color:"var(--red)",fontWeight:600,marginTop:4}},"⚠ Diferencia de "+Math.abs(o.m2-m2Planilla).toFixed(2)+" m² vs. la Planilla"),
+              o.nota&&h("div",{style:{fontSize:10,color:"var(--txd)",marginTop:6,fontStyle:"italic",borderTop:"1px solid var(--bdr)",paddingTop:6}},o.nota)
+            );
+          })
+    )
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
    EL CORTIJO
 ══════════════════════════════════════════════════════════ */
 function ElCortijoView(){
@@ -5311,6 +5455,7 @@ function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlo
     {id:"cuentas",   icon:"🔌", label:"Cuentas Servicios"},
     {id:"vacantes",  icon:"🗺️", label:"Catastro de Sitios"},
     {id:"cortijo",   icon:"🏡", label:"El Cortijo"},
+    {id:"torre2680", icon:"🏢", label:"Torre 2680"},
   ];
   const isActive = id => id==="factura" ? (view==="table"||view==="upload") : view===id;
   const handleNav = id => {
@@ -7212,7 +7357,7 @@ function App(){
     h("header",{className:(view==="table"||view==="upload")?"fv2":undefined,style:{background:view==="table"?"#0F1B33":"var(--surf)",borderBottom:view==="table"?"1px solid #1C2C4A":"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:49,gap:10}},
       h("div",{style:{display:"flex",alignItems:"center",gap:10}},
         h("div",{className:view==="table"?"fv2-title":undefined,style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px",color:view==="table"?"#fff":"var(--tx)"}},
-          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="cuentas"?"🔌 Cuentas Servicios":view==="vacantes"?"🗺️ Catastro de Sitios":view==="fact-cobrar"?"💰 Facturas x Cobrar":view==="pagos"?"✅ Estado de Pagos":view==="cortijo"?"🏡 El Cortijo":"📋 Facturación"
+          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="cuentas"?"🔌 Cuentas Servicios":view==="vacantes"?"🗺️ Catastro de Sitios":view==="fact-cobrar"?"💰 Facturas x Cobrar":view==="pagos"?"✅ Estado de Pagos":view==="cortijo"?"🏡 El Cortijo":view==="torre2680"?"🏢 Torre 2680":"📋 Facturación"
         ),
         view==="table"&&h("span",{style:{display:"inline-flex",alignItems:"center",gap:6,fontSize:14,fontWeight:600,color:"#8FB0FF",marginLeft:6}},h("span",{className:"fv2-pulse"}),periodo)
       ),
@@ -7592,6 +7737,7 @@ function App(){
     ,view==="cuentas"&&h(CuentasServiciosView,{dashData,driveLoading,notify})
     ,view==="vacantes"&&h(CatastroSitiosView,{dashData,driveLoading})
     ,view==="cortijo"&&h(ElCortijoView,null)
+    ,view==="torre2680"&&h(Torre2680View,{dashData,driveLoading})
     ,view==="historial-fact"&&h(HistorialFactView,{dashData,driveLoading,notify,planillaFile:files.planilla,marcarPagadoSheet})
   ));
 }
