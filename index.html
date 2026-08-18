@@ -4238,7 +4238,8 @@ function ElCortijoView({dashData,driveLoading}){
                     border:"1px solid var(--bdr)",borderRadius:10,padding:14,background:"var(--surf)",
                     borderLeft:hayDiscrepancia?"4px solid var(--red)":esVacante?"4px solid var(--amber)":"4px solid var(--green)"
                   }},
-                    h("div",{style:{fontSize:14,fontWeight:700,color:"var(--tx)",marginBottom:8}},u.edif),
+                    h("div",{style:{fontSize:14,fontWeight:700,color:"var(--tx)",marginBottom:2}},u.edif),
+                    pl?.dir&&h("div",{style:{fontSize:10,color:"var(--txd)",marginBottom:6}},pl.dir),
                     h("div",{style:{fontSize:12,fontWeight:600,color:esVacante?"var(--amber)":"var(--tx)",marginBottom:6}},
                       pl?(esVacante?"VACANTE":pl.nombre):"Sin datos de Planilla"
                     ),
@@ -4280,14 +4281,14 @@ function ElCortijoView({dashData,driveLoading}){
                         style:{
                           position:"absolute",left:u.x+"%",top:u.y+"%",width:u.w+"%",height:u.h+"%",
                           border:"2px solid "+(disc?"var(--red)":vac?"var(--amber)":"var(--acc)"),
-                          background:activo?(disc?"rgba(220,38,38,.16)":vac?"rgba(245,158,11,.16)":"rgba(91,76,219,.16)"):"transparent",
+                          background:activo?(disc?"rgba(220,38,38,.16)":vac?"rgba(245,158,11,.4)":"rgba(91,76,219,.16)"):(vac?"rgba(245,158,11,.32)":"transparent"),
                           borderRadius:4,cursor:zoomUnidad?(activo?"zoom-out":"default"):"zoom-in",
                           transition:"background .25s, opacity .3s",
                           opacity:zoomUnidad&&!activo?0:1,
                           pointerEvents:zoomUnidad&&!activo?"none":"auto"
                         },
-                        onMouseEnter:e=>{if(!zoomUnidad)e.currentTarget.style.background=disc?"rgba(220,38,38,.10)":vac?"rgba(245,158,11,.10)":"rgba(91,76,219,.10)";},
-                        onMouseLeave:e=>{if(!activo)e.currentTarget.style.background="transparent";}
+                        onMouseEnter:e=>{if(!zoomUnidad)e.currentTarget.style.background=disc?"rgba(220,38,38,.10)":vac?"rgba(245,158,11,.45)":"rgba(91,76,219,.10)";},
+                        onMouseLeave:e=>{if(!activo)e.currentTarget.style.background=vac?"rgba(245,158,11,.32)":"transparent";}
                       });
                     })
                   )
@@ -4299,6 +4300,7 @@ function ElCortijoView({dashData,driveLoading}){
               zoomData&&h("div",{style:{padding:20,display:"flex",flexDirection:"column",gap:10,minWidth:320}},
                 h("button",{onClick:()=>setZoomUnidad(null),style:{alignSelf:"flex-start",fontSize:11,color:"var(--acc)",background:"none",border:"none",cursor:"pointer",padding:0,marginBottom:4}},"← Volver al plano"),
                 h("div",{style:{fontSize:20,fontWeight:700,color:"var(--tx)"}},zoomData.edif),
+                zoomPl?.dir&&h("div",{style:{fontSize:11,color:"var(--txd)"}},zoomPl.dir),
                 h("div",{style:{fontSize:14,fontWeight:600,color:esVacanteZ?"var(--amber)":"var(--tx)"}},zoomPl?(esVacanteZ?"VACANTE":zoomPl.nombre):"Sin datos de Planilla"),
                 zoomPl?.rut&&h("div",{style:{fontSize:11,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},"RUT: "+formatRUT(zoomPl.rut)),
                 zoomPl&&!esVacanteZ&&(()=>{
