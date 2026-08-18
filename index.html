@@ -118,6 +118,7 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 .sidebar-item.active .sidebar-item-label{color:#fff!important;}
 .sidebar-footer{padding:10px 6px;border-top:1px solid var(--bdr);font-size:9px;color:var(--txd);font-family:'DM Mono',monospace;white-space:nowrap;overflow:hidden;display:flex;align-items:center;gap:8px;}
 .sidebar-footer-dot{width:6px;height:6px;min-width:6px;border-radius:50%;background:var(--green);flex-shrink:0;}
+.app-shell{display:flex;height:100vh;height:100dvh;overflow:hidden;}
 .app-content{margin-left:48px;flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
 .app-content>header{flex-shrink:0;}
 .app-content>main{flex:1;min-height:0;}
@@ -7663,7 +7664,7 @@ function App(){
   );
   if(!currentUser) return h(LoginScreen,null);
   if(authMustChange) return h(ForceChangeScreen,null);
-  return h("div",{style:{display:"flex",height:"100vh",overflow:"hidden"}},
+  return h("div",{className:"app-shell"},
     h(Sidebar,{view,setView,procesar,files,periodo,splitLoading,splitPDF,unlocked,setShowPwdModal,sendAll,setUnlocked,stats:statsSB,sentSet,currentUser,onChangePwd:function(){setShowChangePwd(true);},userMenuOpen,setUserMenuOpen,hasFacturaData:data.length>0}),
     h("div",{className:"app-content"},
     notif&&h("div",{className:"notif",style:{background:notif.t==="ok"?"var(--gbg)":notif.t==="err"?"var(--rbg)":"var(--abg)",border:`1px solid ${notif.t==="ok"?"var(--gdim)":notif.t==="err"?"var(--rdim)":"var(--adim)"}`,color:notif.t==="ok"?"var(--green)":notif.t==="err"?"var(--red)":"var(--amber)"}},
