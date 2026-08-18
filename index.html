@@ -4293,12 +4293,29 @@ function ElCortijoView({dashData,driveLoading}){
                     })
                   )
             ),
-            h("div",{style:{
-              width:zoomUnidad?320:0,flexShrink:0,overflow:"hidden",borderLeft:zoomUnidad?"1px solid var(--bdr)":"none",
-              background:"var(--surf)",transition:"width .4s ease",display:"flex",flexDirection:"column"
+            sector&&h("div",{style:{
+              width:320,flexShrink:0,overflow:"hidden",borderLeft:"1px solid var(--bdr)",
+              background:"var(--surf)",display:"flex",flexDirection:"column"
             }},
-              zoomData&&h("div",{style:{padding:20,display:"flex",flexDirection:"column",gap:10,minWidth:320}},
-                h("button",{onClick:()=>setZoomUnidad(null),style:{alignSelf:"flex-start",fontSize:11,color:"var(--acc)",background:"none",border:"none",cursor:"pointer",padding:0,marginBottom:4}},"← Volver al plano"),
+              !zoomData&&h("div",{style:{overflowY:"auto",flex:1}},
+                activeUnidades.map(u=>{
+                  const pl=matchPlanilla(u.edif);
+                  const vac=pl?.isVacante;
+                  return h("div",{
+                    key:u.edif,onClick:()=>setZoomUnidad(u.edif),
+                    style:{padding:"10px 16px",borderBottom:"1px solid var(--bdr)",cursor:"pointer",borderLeft:vac?"3px solid var(--amber)":"3px solid transparent"},
+                    onMouseEnter:e=>{e.currentTarget.style.background="var(--surf2)";},
+                    onMouseLeave:e=>{e.currentTarget.style.background="transparent";}
+                  },
+                    h("div",{style:{fontSize:11,fontWeight:700,color:"var(--acc)"}},u.edif),
+                    pl?.dir&&h("div",{style:{fontSize:10,color:"var(--txd)",marginBottom:4}},pl.dir),
+                    h("div",{style:{fontSize:12,fontWeight:600,color:vac?"var(--amber)":"var(--tx)"}},pl?(vac?"VACANTE":pl.nombre):"Sin datos"),
+                    pl?.rut&&!vac&&h("div",{style:{fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace",marginTop:2}},formatRUT(pl.rut))
+                  );
+                })
+              ),
+              zoomData&&h("div",{style:{padding:20,display:"flex",flexDirection:"column",gap:10,minWidth:320,overflowY:"auto"}},
+                h("button",{onClick:()=>setZoomUnidad(null),style:{alignSelf:"flex-start",fontSize:11,color:"var(--acc)",background:"none",border:"none",cursor:"pointer",padding:0,marginBottom:4}},"← Volver a la lista"),
                 h("div",{style:{fontSize:20,fontWeight:700,color:"var(--tx)"}},zoomData.edif),
                 zoomPl?.dir&&h("div",{style:{fontSize:11,color:"var(--txd)"}},zoomPl.dir),
                 h("div",{style:{fontSize:14,fontWeight:600,color:esVacanteZ?"var(--amber)":"var(--tx)"}},zoomPl?(esVacanteZ?"VACANTE":zoomPl.nombre):"Sin datos de Planilla"),
