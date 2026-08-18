@@ -3581,6 +3581,10 @@ function CatastroSitiosView({dashData,driveLoading}){
     const seen=new Set();
     return [...(dashData.clients||[]),...(dashData.vacantes||[])]
       .filter(c=>{const k=c.sitio+"|"+c.edificio;if(seen.has(k))return false;seen.add(k);return true;})
+      /* Los sitios vacantes de El Cortijo (Edif./P.C.L. del Sitio A-2) ya no
+         se ofrecen en arriendo — se excluyen del catastro. Los de Torre 2680
+         (T. Of. ...) sí se mantienen. */
+      .filter(c=>!(c.isVacante&&c.sitio==="A-2"&&/^(Edif\.|P\.\s*C\.\s*L)/i.test(c.edificio||"")))
       .sort((a,b)=>a.ri-b.ri);
   })();
   const q=normQ(search);
