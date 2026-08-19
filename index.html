@@ -3266,10 +3266,9 @@ function ContratosView({dashData,driveLoading}){
       case"ai1":{const p=eventosPriorizados(r._ajusteItem)[0];return p?new Date(p.fecha+"T00:00:00"):new Date(8640000000000000);}
       case"ai2":{const p=eventosPriorizados(r._ajusteItem)[1];return p?new Date(p.fecha+"T00:00:00"):new Date(8640000000000000);}
       case"ufinicio":{const item=r._ajusteItem;const v=(item&&item.ufInicio>0)?item.ufInicio:(r.ufInicio>0?r.ufInicio:null);return v!=null?v:-Infinity;}
-      case"ufactual":return r.ufArr>0?r.ufArr:-Infinity;
       case"iniciosa":{const item=r._ajusteItem;return(item&&item.inicioSA)?parseDate(item.inicioSA)||new Date(0):new Date(0);}
       case"m2":return r.m2!=null?r.m2:-Infinity;
-      case"ufm2":return r.ufM2!=null?r.ufM2:-Infinity;
+      case"ufm2":return(r.ufArr>0&&r.m2>0)?r.ufArr/r.m2:-Infinity;
       case"arriendo":return ufHoy&&r.ufArr>0?r.ufArr*ufHoy:-Infinity;
       case"servadm":return ufHoy&&r.ufSrv>0?r.ufSrv*ufHoy:-Infinity;
       default:return"";
@@ -3378,7 +3377,7 @@ function ContratosView({dashData,driveLoading}){
         h("div",{style:{overflow:"auto",maxHeight:"calc(100vh - 260px)"}},
           h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
             h("thead",{style:{position:"sticky",top:0,zIndex:2}},h("tr",{style:{background:"#f0f4f8"}},
-              [["sitio","Sitio"],["cliente","Cliente / RUT"],["edificio","Edificio"],["inicio","Inicio"],["ufinicio","UF Inicio"],["periodo","Periodo"],["pctreaj","% Reaj."],["aviso","Aviso"],["ai1","Ajuste Intermedio 1"],["ai2","Ajuste Intermedio 2"],["termino","Renovación"],["ufactual","UF Actual (actual)"],["m2","m²"],["ufm2","UF×m²"],["arriendo","Arriendo CLP (actual)"],["iniciosa","Inicio S.A."],["servadm","Serv.Adm. CLP (actual)"]].map(([key,label])=>h("th",{key,onClick:()=>toggleSort(key),style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:sortCol===key?"var(--acc)":"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap",cursor:"pointer",userSelect:"none"}},label.toUpperCase()+sortArrow(key))))),
+              [["sitio","Sitio"],["cliente","Cliente / RUT"],["edificio","Edificio"],["inicio","Inicio"],["ufinicio","UF Inicio"],["periodo","Periodo"],["pctreaj","% Reaj."],["aviso","Aviso"],["ai1","Ajuste Intermedio 1"],["ai2","Ajuste Intermedio 2"],["termino","Renovación"],["m2","m²"],["ufm2","UF×m²"],["arriendo","Arriendo CLP (actual)"],["iniciosa","Inicio S.A."],["servadm","Serv.Adm. CLP (actual)"]].map(([key,label])=>h("th",{key,onClick:()=>toggleSort(key),style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:sortCol===key?"var(--acc)":"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap",cursor:"pointer",userSelect:"none"}},label.toUpperCase()+sortArrow(key))))),
             h("tbody",null,contratosOrdenados.map((c,i)=>{
               const sCol=SITIO_C[c.sitio]||"#888";
               const arriendoCLP=ufHoy&&c.ufArr>0?c.ufArr*ufHoy:null;
@@ -3402,9 +3401,8 @@ function ContratosView({dashData,driveLoading}){
                 h("td",{style:{padding:"9px 12px"}},renderAjusteCol(c,0)),
                 h("td",{style:{padding:"9px 12px"}},renderAjusteCol(c,1)),
                 h("td",{style:{padding:"9px 12px"}},renderRenovacionCol(c)),
-                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.ufArr>0?c.ufArr.toFixed(2):"—"),
                 h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.m2!=null?c.m2:"—"),
-                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--blue)"}},c.ufM2!=null?c.ufM2.toFixed(2):"—"),
+                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--blue)"}},(c.ufArr>0&&c.m2>0)?(c.ufArr/c.m2).toFixed(2):"—"),
                 h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600,color:"var(--tx)"}},fmtCLP(arriendoCLP)),
                 h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},inicioSA||"—"),
                 h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600,color:"var(--tx)"}},fmtCLP(servAdmCLP)),
