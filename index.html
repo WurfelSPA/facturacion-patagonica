@@ -3143,7 +3143,10 @@ function ContratosView({dashData,driveLoading}){
     const fechaTxt=`${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
     const ordTxt=p.recurrente?"Recurrente":(["1era","2da","3era","4ta","5ta"][p.ord]||`${p.ord+1}ª`)+" Renov";
     const fmtUF=v=>v.toFixed(2).replace(".",",");
-    const base=baseUFParaColumna(c,p.ord);
+    /* p.base permite fijar a mano la UF de comparación cuando c.ufInicio (col.
+       UF Inicio de la Planilla) ya no refleja la UF original del contrato —
+       ej. si esa columna se sobrescribió con la UF vigente tras una renovación. */
+    const base=p.base!=null?p.base:baseUFParaColumna(c,p.ord);
     let valorTxt="",pctTxt=null;
     if(p.uf!=null){
       if(base>0){

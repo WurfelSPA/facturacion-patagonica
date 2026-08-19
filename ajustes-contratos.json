@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-19T15:49:05.000Z",
+  "updatedAt": "2026-08-19T19:13:59.000Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -157,7 +157,8 @@
       "pasos": [
         {
           "fecha": "2022-06-01",
-          "uf": 324.64
+          "uf": 324.64,
+          "base": 309.18
         }
       ],
       "notas": "Renovación automática 01-06-2022: UF sube de 309.18 (contrato inicial) a 324.64 (+5%), según el 5% cada 3 años estipulado en el contrato (ya reflejado en las columnas % Reaj./Cada de la planilla, por lo que no se registra regla recurrente aparte aquí)."
