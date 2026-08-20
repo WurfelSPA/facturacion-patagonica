@@ -48,6 +48,8 @@ let _excelCache = null;
 let _excelCacheTs = 0;
 let _rutMapCache = null;
 let _rutMapCacheTs = 0;
+let _totalMapCache = null;
+let _totalMapCacheTs = 0;
 const EXCEL_CACHE_TTL = 3600 * 1000;
 
 const MES_NOM = {
@@ -752,6 +754,47 @@ export default async function handler(req, res) {
       }
       res.setHeader("Cache-Control","public, max-age=1800");
       return res.status(200).json({ ruts: _rutMapCache || {} });
+    }
+
+    // ── GET ?totalMap=1 ── mapa Folio→MntTotal real (XML DTE) desde ZIPs Drive ──
+    // El total real del DTE (MntTotal) es la única fuente confiable cuando una
+    // factura mezcla líneas Afecto y Exento (ej. arriendo + habilitación exenta
+    // en el mismo folio) — la extracción de texto del PDF puede fallar en ese
+    // caso porque no hay forma de saber, sin el XML, qué parte lleva IVA.
+    if (req.method === "GET" && req.query.totalMap === "1") {
+      const now = Date.now();
+      if (_totalMapCache && (now - _totalMapCacheTs) < 3600000) {
+        res.setHeader("Cache-Control","public, max-age=1800");
+        return res.status(200).json({ totales: _totalMapCache });
+      }
+      const totales = {};
+      try {
+        const files = await driveFiles(token, FACT_FOLDER_ID);
+        const pisaZips = files.filter(f => f.name.match(/Facturas XML_PISA_/i))
+          .sort((a,b)=>b.name.localeCompare(a.name));
+        for (const f of pisaZips) {
+          try {
+            const rz = await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`,
+              { headers:{ Authorization:`Bearer ${token}` } });
+            if (!rz.ok) continue;
+            const buf = await rz.arrayBuffer();
+            const zip = await JSZip.loadAsync(buf);
+            for (const name of Object.keys(zip.files)) {
+              if (!name.match(/\.xml$/i)) continue;
+              const xml = await zip.files[name].async("string");
+              const folio = (xml.match(/<Folio>([^<]+)<\/Folio>/) || [])[1];
+              const total = parseInt((xml.match(/<MntTotal>([^<]+)<\/MntTotal>/) || [])[1], 10);
+              if (folio && total > 0 && !totales[folio.trim()]) totales[folio.trim()] = total;
+            }
+          } catch(_) {}
+        }
+        _totalMapCache = totales;
+        _totalMapCacheTs = now;
+      } catch(e) {
+        if (!_totalMapCache) return res.status(503).json({ error:"Drive no disponible", totales:{} });
+      }
+      res.setHeader("Cache-Control","public, max-age=1800");
+      return res.status(200).json({ totales: _totalMapCache || {} });
     }
 
     // ── GET ?buildJson=1[&mes=01] ── reconstruye JSON desde ZIPs XML de PISA ────

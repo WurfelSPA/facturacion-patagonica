@@ -6450,6 +6450,29 @@ function App(){
           addLog("⚠ No se pudieron extraer datos del servidor","warn");
         }
       }catch(e){addLog("⚠ Error extrayendo datos: "+e.message,"warn");}
+      /* Sobrescribir montoTotal con el MntTotal real del XML DTE cuando esté
+         disponible — es la única fuente confiable para facturas que mezclan
+         líneas Afecto y Exento en el mismo folio (ej. arriendo + habilitación
+         exenta): la extracción de texto del PDF puede calcular el IVA sobre
+         el monto equivocado en ese caso, porque no distingue qué parte de
+         los números que ve en la página lleva 19% y cuál no. */
+      try{
+        addLog("▶ Verificando montos contra el XML DTE real...","info");
+        const tmRes=await fetch("/api/historial?totalMap=1");
+        if(tmRes.ok){
+          const tmData=await tmRes.json();
+          const totales=tmData.totales||{};
+          let corregidos=0;
+          for(const p of pdfs){
+            const folioNum=(p.nroFact||"").replace(/^(F|FEE)-/i,"");
+            if(folioNum&&totales[folioNum]&&totales[folioNum]!==p.montoTotal){
+              p.montoTotal=totales[folioNum];
+              corregidos++;
+            }
+          }
+          if(corregidos>0)addLog(`✓ ${corregidos} monto(s) corregido(s) con el total real del XML DTE`,"ok");
+        }
+      }catch(e){console.warn("totalMap:",e.message);}
       setProcProgress(75);
       addLog("▶ Cruzando datos planilla vs PDFs...","info");
       const pdfUsado=new Set();
