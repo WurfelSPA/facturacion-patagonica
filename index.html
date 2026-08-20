@@ -7948,7 +7948,7 @@ function App(){
     h("header",{className:(view==="table"||view==="upload")?"fv2":undefined,style:{background:view==="table"?"#0F1B33":"var(--surf)",borderBottom:view==="table"?"1px solid #1C2C4A":"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:49,gap:10}},
       h("div",{style:{display:"flex",alignItems:"center",gap:10}},
         h("div",{className:view==="table"?"fv2-title":undefined,style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px",color:view==="table"?"#fff":"var(--tx)"}},
-          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="cuentas"?"🔌 Cuentas Servicios":view==="vacantes"?"🗺️ Catastro de Sitios":view==="fact-cobrar"?"💰 Facturas x Cobrar":view==="pagos"?"✅ Estado de Pagos":view==="cortijo"?"🏡 El Cortijo":view==="torre2680"?"🏢 Torre 2680":"📋 Facturación"
+          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="cuentas"?"🔌 Cuentas Servicios":view==="vacantes"?"🗺️ Catastro de Sitios":view==="fact-cobrar"?"💰 Facturas x Cobrar":view==="pagos"?"✅ Estado de Pagos":view==="cortijo"?"🏡 El Cortijo":view==="torre2680"?"🏢 Torre 2680":view==="historial-fact"?"📂 Facturación - Nubox Resumen de Ventas":"📋 Facturación"
         ),
         view==="table"&&h("span",{style:{display:"inline-flex",alignItems:"center",gap:6,fontSize:14,fontWeight:600,color:"#8FB0FF",marginLeft:6}},h("span",{className:"fv2-pulse"}),periodo)
       ),
