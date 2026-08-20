@@ -134,7 +134,9 @@ export default async function handler(req, res) {
   if (!BROWSERLESS_TOKEN) return res.status(500).json({ error: 'Falta BROWSERLESS_TOKEN' });
 
   try {
-    const blRes = await fetch(`https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}`, {
+    // timeout=150000: ver nota en enel-refresh.js — 60s por defecto se
+    // queda corto para el login SSO de Enel.
+    const blRes = await fetch(`https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}&timeout=150000`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code: BROWSER_CODE, context: { rut: RUT, clave: CLAVE } })

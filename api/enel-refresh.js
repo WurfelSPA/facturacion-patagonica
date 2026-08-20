@@ -262,7 +262,12 @@ export default async function handler(req, res) {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS && !blData; attempt++) {
       console.log(`[enel-refresh] Intento ${attempt}/${MAX_ATTEMPTS} con Browserless...`);
       try {
-        const blRes = await fetch(`https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}`, {
+        // timeout=150000: sesión de Browserless por defecto es 60s si no se
+        // especifica — el login SSO de Enel (WSO2 + SAML) suma ~125s en el
+        // peor caso entre goto() inicial + waitForSelector/waitForNavigation
+        // internos, así que 60s quedaba corto (aviso de Browserless 2026-08-20:
+        // sesiones cortándose por timeout).
+        const blRes = await fetch(`https://production-sfo.browserless.io/function?token=${BROWSERLESS_TOKEN}&timeout=150000`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
