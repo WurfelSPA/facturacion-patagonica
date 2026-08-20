@@ -8,6 +8,24 @@ export default async function({ page }) {
     return { error: 'UTN_EXPIRED: ' + currentUrl };
   }
 
+  // El reporte SSRS puede seguir mostrando "Loading..." incluso después de que
+  // networkidle2 se cumple (carga interna propia, sin XHR que Puppeteer pueda
+  // detectar) — esperar explícitamente hasta 30s a que aparezca una celda con
+  // el patrón de mes antes de extraer. Si nunca aparece, seguimos igual: la
+  // extracción de abajo reporta el error con más contexto (tdCount/sample).
+  try {
+    await page.waitForFunction(
+      '(function(){' +
+      '  var tds=document.querySelectorAll("td");' +
+      '  for(var i=0;i<tds.length;i++){' +
+      '    if(/[A-Z][a-z]{2}-\\d{2}/.test(tds[i].innerText||""))return true;' +
+      '  }' +
+      '  return false;' +
+      '})()',
+      { timeout: 30000, polling: 1000 }
+    );
+  } catch (_) { /* timeout — continuar igual, la extracción de abajo reporta el detalle */ }
+
   // Extraer datos directamente del DOM ya renderizado
   const jsonStr = await page.evaluate(
     '(function(){' +
