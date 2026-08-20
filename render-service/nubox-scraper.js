@@ -57,7 +57,12 @@ async function scrapeNuboxResumen() {
         if (result.diag) {
           console.warn('[scraper] diag:', JSON.stringify(result.diag));
         }
-        throw new Error('Browser error: ' + result.error + (result.diag ? ' | diag=' + JSON.stringify(result.diag) : ''));
+        if (result.details) {
+          console.warn('[scraper] details:', JSON.stringify(result.details));
+        }
+        const e = new Error('Browser error: ' + result.error + (result.diag ? ' | diag=' + JSON.stringify(result.diag) : ''));
+        e.details = result.details;
+        throw e;
       }
       if (!Array.isArray(result.clientes)) throw new Error('Respuesta inesperada: ' + JSON.stringify(result).slice(0, 200));
 
@@ -68,7 +73,9 @@ async function scrapeNuboxResumen() {
       lastErr = err;
     }
   }
-  throw new Error('Todos los endpoints fallaron. Ultimo: ' + lastErr.message);
+  const finalErr = new Error('Todos los endpoints fallaron. Ultimo: ' + lastErr.message);
+  finalErr.details = lastErr.details;
+  throw finalErr;
 }
 
 module.exports = { scrapeNuboxResumen };

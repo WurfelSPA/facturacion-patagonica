@@ -116,10 +116,11 @@ app.post('/sync-nubox', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('[sync] ERROR:', err.message);
+    console.error('[sync] ERROR:', err.message, err.details ? JSON.stringify(err.details) : '');
     return res.status(500).json({
       ok:      false,
       error:   err.message,
+      details: err.details,
       elapsed: Date.now() - start,
     });
   }
