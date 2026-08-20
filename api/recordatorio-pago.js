@@ -15,11 +15,14 @@
  * registrado de cada cliente con deuda pendiente. Para volver a modo
  * prueba (solo 1 envío, a TEST_DEST), cambiar TEST_MODE a true.
  *
- * Env vars requeridas (todas ya existentes en el proyecto):
+ * Env vars requeridas:
  *   GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_FROM
  *   GOOGLE_SERVICE_ACCOUNT   - lectura de Drive (Planilla y F x Cobrar)
  *   DRIVE_PLANILLA_ID        - id de la Planilla en Drive
  *   CRON_SECRET / SYNC_SECRET / ADMIN_SEED_SECRET - autenticación
+ *   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID - notificación de resumen al
+ *     terminar cada corrida (no reemplaza los envíos individuales, solo
+ *     confirma que el flujo corrió sin acumular copias en un buzón)
  */
 
 import XLSX from 'xlsx';
@@ -206,6 +209,23 @@ function esUltimoDiaDelMes(d) {
   return t.getDate() === 1;
 }
 
+// ── Notificación de resumen por Telegram (confirma que el flujo corrió,
+//    sin que se acumulen copias de cada recordatorio individual) ────────────
+async function notificarTelegram(mensaje) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: mensaje, parse_mode: 'Markdown' })
+    });
+  } catch (e) {
+    console.warn('[recordatorio-pago] Error enviando Telegram:', e.message);
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -259,6 +279,16 @@ export default async function handler(req, res) {
       }
     }
 
+    const errores = detalle.filter(d => d.error).length;
+    const sinCorreo = detalle.filter(d => d.skip === 'sin correo en planilla').length;
+    await notificarTelegram(
+      `📨 *Recordatorio de pagos* (${trigger})\n` +
+      `✅ Enviados: ${enviados}\n` +
+      (errores ? `⚠️ Con error: ${errores}\n` : '') +
+      (sinCorreo ? `✉️ Sin correo en planilla: ${sinCorreo}\n` : '') +
+      `📄 Archivo deuda: ${archivo}`
+    );
+
     return res.status(200).json({
       ok: true, trigger, testMode: TEST_MODE, archivoDeuda: archivo,
       enviados, clientesConDeuda: Object.keys(porRut).filter(k => porRut[k].total > 0).length,
@@ -266,6 +296,7 @@ export default async function handler(req, res) {
     });
   } catch (e) {
     console.error('[recordatorio-pago] Error:', e);
+    await notificarTelegram(`🔴 *Recordatorio de pagos* — error en la ejecución:\n${e.message}`);
     return res.status(500).json({ error: e.message });
   }
 }
