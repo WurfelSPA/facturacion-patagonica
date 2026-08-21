@@ -1000,20 +1000,15 @@ function parseFacturasPorCobrarBase(values){
   if(!values||values.length<2)throw new Error("Sin datos en hoja Base");
   const hdr=values[0].map(h=>String(h||"").toLowerCase().replace(/[\r\n\s_]/g,""));
   function fi(tests){for(let i=0;i<hdr.length;i++)for(const t of tests)if(hdr[i].includes(t))return i;return -1;}
-  const iFecha=fi(["fecha"])>=0?fi(["fecha"]):1;
   const iCod=fi(["cod"])>=0?fi(["cod"]):3;
   const iCliente=fi(["cliente"])>=0?fi(["cliente"]):4;
-  const iGlosa=fi(["glosa"])>=0?fi(["glosa"]):5;
-  const iFolio=fi(["folio"])>=0?fi(["folio"]):8;
   const iDiasDoc=fi(["diasdoc","ddoc","diaspag"])>=0?fi(["diasdoc","ddoc","diaspag"]):11;
   const iMonto=fi(["monto","c/d(ml)","c/d(m"])>=0?fi(["monto","c/d(ml)","c/d(m"]):13;
   const iSdo=fi(["sdo","vencido"])>=0?fi(["sdo","vencido"]):14;
   function n(v){return parseFloat(String(v||"0").replace(/[^0-9.\-]/g,""))||0;}
-  function fmtFecha(v){const s=String(v||"").trim();const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return m[3]+"-"+m[2]+"-"+m[1];return s.replace(/\//g,"-");}
   return values.slice(1)
     .filter(r=>r.length>4&&String(r[iCliente]||"").trim()!==""&&String(r[iCliente]||"").trim()!=="Cliente")
-    .map(r=>({fecha:fmtFecha(r[iFecha]),folio:String(r[iFolio]||"").trim(),glosa:String(r[iGlosa]||"").trim(),
-      rut:String(r[iCod]||"").trim(),cliente:String(r[iCliente]||"").trim(),diasDoc:n(r[iDiasDoc]),monto:n(r[iMonto]),sdoVencido:n(r[iSdo])}))
+    .map(r=>({rut:String(r[iCod]||"").trim(),cliente:String(r[iCliente]||"").trim(),diasDoc:n(r[iDiasDoc]),monto:n(r[iMonto]),sdoVencido:n(r[iSdo])}))
     .filter(r=>r.monto>0||r.sdoVencido>0);
 }
 /* Descubre y carga el último "F x Cobrar Pisa *.xlsx" en Drive, agregado por RUT → {maxDias,totalDeuda,nombre} */
@@ -1036,15 +1031,9 @@ async function fetchFacturasPorCobrarMora(){
   rows.forEach(r=>{
     const key=_rutNormMora(r.rut);
     if(!key)return;
-    if(!porRut[key])porRut[key]={maxDias:0,totalDeuda:0,nombre:r.cliente,facturas:[]};
+    if(!porRut[key])porRut[key]={maxDias:0,totalDeuda:0,nombre:r.cliente};
     porRut[key].totalDeuda+=r.monto;
     if(r.diasDoc>porRut[key].maxDias)porRut[key].maxDias=r.diasDoc;
-    /* tipo derivado de la glosa (misma convención usada en toda la app) —
-       para poder emparejar cada línea de "Facturas x Cobrar" con la fila de
-       Estado de Pagos correspondiente (Arriendo vs Serv. Adm.) */
-    const g=r.glosa.toLowerCase();
-    const tipo=g.includes("arriendo")?"arriendo":(g.includes("serv")||g.includes("adm"))?"serv_adm":null;
-    porRut[key].facturas.push({fecha:r.fecha,folio:r.folio,monto:r.monto,tipo});
   });
   return{porRut,fecha:dateKey(last.name)};
 }
@@ -2940,24 +2929,12 @@ function EstadoPagosView({notify}){
   const enriched=React.useMemo(()=>{
     const porRut=mora?.porRut||{};
     return rows.map(r=>{
-      const rutInfo=porRut[_rutNormMora(r.rut)];
-      const dias=rutInfo?.maxDias||0;
+      const dias=porRut[_rutNormMora(r.rut)]?.maxDias||0;
       /* Igual criterio que en Facturación: valores >500 ya están en CLP fijo (no UF) — no multiplicar por UF del día.
          Clientes Exentos no llevan el 19% de IVA. */
       const iva=r.afecto==="Exento"?1:1.19;
       const montoClp=r.uf>500?Math.round(r.uf*iva):(ufDia5?Math.round(r.uf*ufDia5*iva):null);
-      /* Fecha de la factura pendiente: viene de "Facturas x Cobrar" (solo
-         lista lo NO pagado), emparejada por tipo (Arriendo/Serv.Adm.) y,
-         cuando el mismo cliente tiene más de una del mismo tipo (varios
-         sitios), por el monto más cercano — no hay otra clave en común. */
-      let fecha=null;
-      const candidatas=(rutInfo?.facturas||[]).filter(f=>f.tipo===r.tipo);
-      if(candidatas.length===1)fecha=candidatas[0].fecha;
-      else if(candidatas.length>1&&montoClp!=null){
-        const mejor=candidatas.reduce((best,f)=>Math.abs(f.monto-montoClp)<Math.abs(best.monto-montoClp)?f:best);
-        fecha=mejor.fecha;
-      }
-      return{...r,dias,moroso:dias>30,montoClp,fecha};
+      return{...r,dias,moroso:dias>30,montoClp};
     });
   },[rows,mora,ufDia5]);
 
@@ -3006,7 +2983,6 @@ function EstadoPagosView({notify}){
       case"cliente":return r.cliente||"";
       case"rut":return r.rut||"";
       case"tipo":return r.tipo==="arriendo"?"Arriendo":"Serv. Adm.";
-      case"fecha":return r.fecha?r.fecha.split("-").reverse().join(""):"";
       case"monto":return r.montoClp??-Infinity;
       case"estado":return r.yaPagado?1:0;
       case"dias":return r.dias||0;
@@ -3093,19 +3069,18 @@ function EstadoPagosView({notify}){
       h("div",{style:{maxHeight:"calc(100vh - 420px)",minHeight:220,overflowY:"auto",overflowX:"auto"}},
         h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:12}},
           h("thead",null,h("tr",{style:{background:"var(--surf2)",position:"sticky",top:0,zIndex:2}},
-            [["Cliente","cliente"],["RUT","rut"],["Concepto","tipo"],["Fecha","fecha"],["Monto","monto"],["Estado","estado"],["Días mora","dias"]].map(([lbl,col])=>
+            [["Cliente","cliente"],["RUT","rut"],["Concepto","tipo"],["Monto","monto"],["Estado","estado"],["Días mora","dias"]].map(([lbl,col])=>
               h("th",{key:col,onClick:()=>toggleSort(col),style:{padding:"8px 11px",textAlign:(col==="monto"||col==="dias")?"right":"left",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",cursor:"pointer",userSelect:"none",whiteSpace:"nowrap",background:"var(--surf2)"}},
                 lbl.toUpperCase(),h("span",{style:{opacity:.5,fontSize:9}},sortArrow(col)))
             )
           )),
           h("tbody",null,
-            loading?h("tr",null,h("td",{colSpan:7,style:{padding:32,textAlign:"center",color:"var(--txd)"}},h("div",{className:"fv2-loading-row"},h("span",{className:"fv2-loader"}),"Cargando..."))):
-            sortedRows.length===0?h("tr",null,h("td",{colSpan:7,style:{padding:32,textAlign:"center",color:"var(--txd)"}},"Sin resultados")):
+            loading?h("tr",null,h("td",{colSpan:6,style:{padding:32,textAlign:"center",color:"var(--txd)"}},h("div",{className:"fv2-loading-row"},h("span",{className:"fv2-loader"}),"Cargando..."))):
+            sortedRows.length===0?h("tr",null,h("td",{colSpan:6,style:{padding:32,textAlign:"center",color:"var(--txd)"}},"Sin resultados")):
             sortedRows.map((r,i)=>h("tr",{key:r.rut+"|"+r.tipo+"|"+i,style:{borderBottom:"1px solid var(--bdr)"}},
               h("td",{style:{padding:"7px 11px",fontWeight:600}},r.cliente),
               h("td",{style:{padding:"7px 11px",fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:"var(--txm)"}},formatRUT(r.rut)),
               h("td",{style:{padding:"7px 11px"}},h("span",{className:r.tipo==="arriendo"?"tag-arr":"tag-srv"},r.tipo==="arriendo"?"Arriendo":"Serv. Adm.")),
-              h("td",{style:{padding:"7px 11px",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--txm)"}},r.fecha||"—"),
               h("td",{style:{padding:"7px 11px",textAlign:"right",fontFamily:"'DM Mono',monospace"}},r.montoClp!=null?"$"+r.montoClp.toLocaleString("es-CL"):"—"),
               h("td",{style:{padding:"7px 11px"}},
                 h("label",{style:{display:"inline-flex",alignItems:"center",gap:6,cursor:(r.sheetRow&&r.pagadoColLetter)?"pointer":"default"}},
