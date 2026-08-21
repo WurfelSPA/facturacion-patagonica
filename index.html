@@ -6105,6 +6105,31 @@ async function enriquecerConHistorialXML(filas,clientes,periodo){
   }catch(_e){return 0;}
 }
 
+/* Corrección final por folio contra el MntTotal real del XML DTE — debe
+   llamarse SIEMPRE después de enriquecerConHistorialXML, porque esa función
+   prioriza un JSON estático embebido (historial-excel-2026.json) que puede
+   tener el monto viejo/mal calculado para facturas que mezclan líneas
+   Afecto y Exento (ej. 2R Spa: arriendo con un componente exento aparte).
+   El XML del DTE siempre es la fuente de verdad, así que esto tiene la
+   última palabra sin importar qué fuente haya llenado montoTotal antes. */
+async function corregirMontosConXmlReal(filas){
+  try{
+    const r=await fetch("/api/historial?totalMap=1");
+    if(!r.ok)return 0;
+    const {totales}=await r.json();
+    if(!totales)return 0;
+    let corregidos=0;
+    for(const f of filas){
+      const folioNum=(f.factura||"").replace(/^(F|FEE)-/i,"");
+      if(folioNum&&totales[folioNum]!=null&&totales[folioNum]!==f.montoTotal){
+        f.montoTotal=totales[folioNum];
+        corregidos++;
+      }
+    }
+    return corregidos;
+  }catch(_e){return 0;}
+}
+
 function App(){
   /* Config viene 100% de env vars Vercel — no hay setup manual */
   const apiKey=PRESET_KEY;
@@ -6648,6 +6673,8 @@ function App(){
       setProcProgress(100);setProcDone(true);
       const _enriched=await enriquecerConHistorialXML(filas,clientes,periodo);
       if(_enriched>0)addLog(`✓ Historial XML: ${_enriched} facturas verificadas`,"ok");
+      const _corregidos=await corregirMontosConXmlReal(filas);
+      if(_corregidos>0)addLog(`✓ ${_corregidos} monto(s) corregido(s) con el total real del XML DTE`,"ok");
       setTimeout(()=>{setShowProc(false);setView("table");},1800);
       setData(filas);
       const prevSent=new Set();
@@ -6997,6 +7024,7 @@ function App(){
            la estimación UF×1.19 (no contempla montos exentos) mientras no se
            haya hecho clic en "Procesar". */
         await enriquecerConHistorialXML(filas,clientes,periodo);
+        await corregirMontosConXmlReal(filas);
         setData(filas);setSoloPlanilla(true);setView("table");
         /* Descargar ZIP en segundo plano para habilitar previsualización en meses procesados */
         if(zipStatus!=="ready"&&zipStatus!=="loading")buscarZip(periodo);
