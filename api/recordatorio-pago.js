@@ -9,11 +9,17 @@
  *
  * Envía un recordatorio de pago individual (sin CC/BCC) a cada cliente con
  * deuda pendiente en "Facturas x Cobrar PISA", usando el correo registrado
- * en la Planilla de facturación.
+ * en la Planilla de facturación. El correo incluye el detalle de facturas
+ * pendientes (Fecha - N° Factura - Monto) y el Total general de ese RUT.
  *
  * ✅ EN PRODUCCIÓN (TEST_MODE=false): se entrega de verdad al correo
  * registrado de cada cliente con deuda pendiente. Para volver a modo
  * prueba (solo 1 envío, a TEST_DEST), cambiar TEST_MODE a true.
+ *
+ * Prueba dirigida (sin tocar TEST_MODE): GET con ?testDest=correo@x.cl y
+ * &testRut=RUT — envía solo el recordatorio de ese RUT a testDest, con los
+ * datos reales de ese cliente, sin afectar al resto del batch ni marcar
+ * nada. No dispara la notificación de Telegram.
  *
  * Env vars requeridas:
  *   GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_FROM
@@ -106,19 +112,34 @@ function rutNorm(r) {
   return s.slice(0, -1);
 }
 
+/* ISO YYYY-MM-DD → DD-MM-YYYY, o DD/MM/YYYY → DD-MM-YYYY (mismo formato que
+   usa la vista Facturas x Cobrar de la app). */
+function fmtFechaCobrar(v) {
+  const s = String(v || '').trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  return s.replace(/\//g, '-');
+}
+
 // ── Deuda por cliente desde "Facturas x Cobrar PISA" (misma lógica que la vista de la app) ──
 function parseFacturasPorCobrarBase(values) {
   if (!values || values.length < 2) return [];
   const hdr = values[0].map(h => String(h || '').toLowerCase().replace(/[\r\n\s_]/g, ''));
   function fi(tests) { for (let i = 0; i < hdr.length; i++) for (const t of tests) if (hdr[i].includes(t)) return i; return -1; }
+  const iFecha = fi(['fecha']) >= 0 ? fi(['fecha']) : 1;
   const iCod = fi(['cod']) >= 0 ? fi(['cod']) : 3;
   const iCliente = fi(['cliente']) >= 0 ? fi(['cliente']) : 4;
+  const iFolio = fi(['folio']) >= 0 ? fi(['folio']) : 8;
   const iMonto = fi(['monto', 'c/d(ml)', 'c/d(m']) >= 0 ? fi(['monto', 'c/d(ml)', 'c/d(m']) : 13;
   const iSdo = fi(['sdo', 'vencido']) >= 0 ? fi(['sdo', 'vencido']) : 14;
   function n(v) { return parseFloat(String(v || '0').replace(/[^0-9.\-]/g, '')) || 0; }
   return values.slice(1)
     .filter(r => r.length > 4 && String(r[iCliente] || '').trim() !== '' && String(r[iCliente] || '').trim() !== 'Cliente')
-    .map(r => ({ rut: String(r[iCod] || '').trim(), cliente: String(r[iCliente] || '').trim(), monto: n(r[iMonto]), sdoVencido: n(r[iSdo]) }))
+    .map(r => ({
+      fecha: fmtFechaCobrar(r[iFecha]), folio: String(r[iFolio] || '').trim(),
+      rut: String(r[iCod] || '').trim(), cliente: String(r[iCliente] || '').trim(),
+      monto: n(r[iMonto]), sdoVencido: n(r[iSdo]),
+    }))
     .filter(r => r.monto > 0 || r.sdoVencido > 0);
 }
 
@@ -140,8 +161,12 @@ async function obtenerDeudaPorCliente(saToken) {
   for (const r of rows) {
     const key = rutNorm(r.rut);
     if (!key) continue;
-    if (!porRut[key]) porRut[key] = { total: 0, nombre: r.cliente };
+    if (!porRut[key]) porRut[key] = { total: 0, nombre: r.cliente, facturas: [] };
     porRut[key].total += r.monto;
+    if (r.monto > 0) porRut[key].facturas.push({ fecha: r.fecha, folio: r.folio, monto: r.monto });
+  }
+  for (const key of Object.keys(porRut)) {
+    porRut[key].facturas.sort((a, b) => a.fecha.split('-').reverse().join('').localeCompare(b.fecha.split('-').reverse().join('')));
   }
   return { porRut, archivo: ultimo.name };
 }
@@ -168,10 +193,19 @@ async function obtenerCorreosPlanilla(saToken) {
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
 // ── Email HTML — mismo estilo visual que buildEmailHtml() del cliente ────────
-function buildRecordatorioHtml(nombreCliente) {
+// facturas: [{fecha, folio, monto}] — detalle de "Facturas x Cobrar" para ese RUT.
+function buildRecordatorioHtml(nombreCliente, facturas, total) {
+  const fmtClp = v => '$' + Math.round(v).toLocaleString('es-CL');
+  const filasHtml = (facturas || []).map(f =>
+    `<tr><td style="padding:9px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">${esc(f.fecha || '—')}</td>` +
+    `<td style="padding:9px 16px;font-size:13px;color:#111;font-family:monospace;border-bottom:1px solid #f0f0f0">${esc(f.folio || '—')}</td>` +
+    `<td style="padding:9px 16px;font-size:13px;color:#111;text-align:right;border-bottom:1px solid #f0f0f0">${fmtClp(f.monto)}</td></tr>`
+  ).join('');
+  const tablaHtml = (facturas && facturas.length) ? `<table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e8e8;border-radius:6px;margin:0 0 20px"><tr style="background:#f8f8f8"><td style="padding:10px 16px;font-size:11px;font-weight:600;color:#999;border-bottom:1px solid #e8e8e8">FECHA</td><td style="padding:10px 16px;font-size:11px;font-weight:600;color:#999;border-bottom:1px solid #e8e8e8">N° FACTURA</td><td style="padding:10px 16px;font-size:11px;font-weight:600;color:#999;border-bottom:1px solid #e8e8e8;text-align:right">MONTO</td></tr>${filasHtml}<tr style="background:#f8f8f8"><td colspan="2" style="padding:11px 16px;font-size:13px;font-weight:700;color:#111">Total general</td><td style="padding:11px 16px;font-size:14px;font-weight:700;color:#111;text-align:right">${fmtClp(total)}</td></tr></table>` : '';
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#f4f4f4;font-family:Helvetica,Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:28px 0"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;border:1px solid #e0e0e0;overflow:hidden"><tr><td style="background:#0f1117;padding:22px 32px"><div style="font-size:18px;font-weight:700;color:#fff">Patagónica Inmobiliaria SpA</div><div style="font-size:11px;color:#7b8299;margin-top:4px">Av. Américo Vespucio 2680, Conchalí, Santiago</div></td></tr><tr><td style="padding:28px 32px">
     <p style="font-size:14px;color:#333;margin:0 0 16px">Estimado(a) ${nombreCliente ? esc(nombreCliente) : 'cliente'},</p>
     <p style="font-size:14px;color:#333;line-height:1.7;margin:0 0 16px">Junto con saludar, le recordamos que registra factura(s) pendiente(s) de pago con Patagónica Inmobiliaria SpA.</p>
+    ${tablaHtml}
     <p style="font-size:14px;color:#333;line-height:1.7;margin:0 0 20px">Le solicitamos regularizar el pago a la brevedad, y enviar el comprobante correspondiente a <a href="mailto:facturacion@patagonica.cl" style="color:#2563eb">facturacion@patagonica.cl</a> y <a href="mailto:contabilidad@patagonica.cl" style="color:#2563eb">contabilidad@patagonica.cl</a>.</p>
     <p style="font-size:13px;color:#666;margin:0">Quedamos atentos a cualquier consulta.</p>
   </td></tr><tr><td style="background:#f8f8f8;border-top:1px solid #e8e8e8;padding:18px 32px"><p style="font-size:13px;font-weight:600;color:#111;margin:0 0 2px">Área de Administración</p><p style="font-size:12px;color:#666;margin:0">Patagónica Inmobiliaria SpA · RUT 96.673.250-4</p><p style="font-size:11px;color:#999;margin:6px 0 0">Correo generado automáticamente.</p></td></tr></table></td></tr></table></body></html>`;
@@ -246,6 +280,12 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, skip: 'hoy no es el último día del mes' });
   }
 
+  // ── Prueba dirigida: ?testDest=correo@x.cl&testRut=96866330-5 ──────────────
+  // Envía SOLO el recordatorio de ese RUT, a testDest en vez del correo real
+  // del cliente. No afecta el resto del batch ni requiere tocar TEST_MODE.
+  const testDest = req.query.testDest || null;
+  const testRut = req.query.testRut ? rutNorm(req.query.testRut) : null;
+
   const FROM = process.env.GMAIL_FROM || 'facturacion@patagonica.cl';
 
   try {
@@ -261,36 +301,40 @@ export default async function handler(req, res) {
     let enviados = 0;
     for (const [rut, deuda] of Object.entries(porRut)) {
       if (!(deuda.total > 0)) continue;
+      if (testRut && rut !== testRut) continue;
       const info = correos[rut];
       const nombre = info?.nombre || deuda.nombre;
       const correoReal = info?.correo || '';
-      if (!correoReal) { detalle.push({ rut, nombre, skip: 'sin correo en planilla' }); continue; }
-      if (TEST_MODE && enviados >= TEST_LIMIT) { detalle.push({ rut, nombre, skip: 'omitido — modo prueba' }); continue; }
+      if (!testDest && !correoReal) { detalle.push({ rut, nombre, skip: 'sin correo en planilla' }); continue; }
+      if (!testDest && TEST_MODE && enviados >= TEST_LIMIT) { detalle.push({ rut, nombre, skip: 'omitido — modo prueba' }); continue; }
 
-      const subject = 'Recordatorio de pago pendiente — Patagónica Inmobiliaria';
-      const htmlBody = buildRecordatorioHtml(nombre);
-      const destinatario = TEST_MODE ? TEST_DEST : correoReal;
+      const subject = (testDest ? '[PRUEBA] ' : '') + 'Recordatorio de pago pendiente — Patagónica Inmobiliaria';
+      const htmlBody = buildRecordatorioHtml(nombre, deuda.facturas, deuda.total);
+      const destinatario = testDest || (TEST_MODE ? TEST_DEST : correoReal);
       try {
         await sendGmailSimple(gmailToken, destinatario, FROM, subject, htmlBody);
-        detalle.push({ rut, nombre, enviadoA: destinatario, deudaTotal: Math.round(deuda.total) });
+        detalle.push({ rut, nombre, enviadoA: destinatario, deudaTotal: Math.round(deuda.total), facturas: deuda.facturas.length });
         enviados++;
       } catch (e) {
         detalle.push({ rut, nombre, error: e.message });
       }
+      if (testRut) break; // prueba dirigida: no seguir iterando el resto del batch
     }
 
     const errores = detalle.filter(d => d.error).length;
     const sinCorreo = detalle.filter(d => d.skip === 'sin correo en planilla').length;
-    await notificarTelegram(
-      `📨 *Recordatorio de pagos* (${trigger})\n` +
-      `✅ Enviados: ${enviados}\n` +
-      (errores ? `⚠️ Con error: ${errores}\n` : '') +
-      (sinCorreo ? `✉️ Sin correo en planilla: ${sinCorreo}\n` : '') +
-      `📄 Archivo deuda: ${archivo}`
-    );
+    if (!testDest) {
+      await notificarTelegram(
+        `📨 *Recordatorio de pagos* (${trigger})\n` +
+        `✅ Enviados: ${enviados}\n` +
+        (errores ? `⚠️ Con error: ${errores}\n` : '') +
+        (sinCorreo ? `✉️ Sin correo en planilla: ${sinCorreo}\n` : '') +
+        `📄 Archivo deuda: ${archivo}`
+      );
+    }
 
     return res.status(200).json({
-      ok: true, trigger, testMode: TEST_MODE, archivoDeuda: archivo,
+      ok: true, trigger, testMode: TEST_MODE, prueba: testDest || null, archivoDeuda: archivo,
       enviados, clientesConDeuda: Object.keys(porRut).filter(k => porRut[k].total > 0).length,
       detalle
     });
