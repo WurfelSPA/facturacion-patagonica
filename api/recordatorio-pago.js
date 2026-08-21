@@ -208,7 +208,7 @@ function buildRecordatorioHtml(nombreCliente, facturas, total) {
     ${tablaHtml}
     <p style="font-size:14px;color:#333;line-height:1.7;margin:0 0 20px">Le solicitamos regularizar el pago a la brevedad, y enviar el comprobante correspondiente a <a href="mailto:facturacion@patagonica.cl" style="color:#2563eb">facturacion@patagonica.cl</a> y <a href="mailto:contabilidad@patagonica.cl" style="color:#2563eb">contabilidad@patagonica.cl</a>.</p>
     <p style="font-size:13px;color:#666;margin:0">Quedamos atentos a cualquier consulta.</p>
-  </td></tr><tr><td style="background:#f8f8f8;border-top:1px solid #e8e8e8;padding:18px 32px"><p style="font-size:13px;font-weight:600;color:#111;margin:0 0 2px">Área de Administración</p><p style="font-size:12px;color:#666;margin:0">Patagónica Inmobiliaria SpA · RUT 96.673.250-4</p><p style="font-size:11px;color:#999;margin:6px 0 0">Correo generado automáticamente.</p></td></tr></table></td></tr></table></body></html>`;
+  </td></tr><tr><td style="background:#f8f8f8;border-top:1px solid #e8e8e8;padding:18px 32px"><p style="font-size:13px;font-weight:600;color:#111;margin:0 0 2px">Área de Facturación</p><p style="font-size:12px;color:#666;margin:0">Patagónica Inmobiliaria SpA · RUT 96.673.250-4</p><p style="font-size:11px;color:#999;margin:6px 0 0">Correo generado automáticamente.</p></td></tr></table></td></tr></table></body></html>`;
 }
 
 // ── Construir el MIME crudo (sin CC/BCC) ──────────────────────────────────────
