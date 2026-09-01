@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:19:44.162Z",
+  "updatedAt": "2026-09-01T21:19:45.119Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -196,6 +196,11 @@
       "pasos": [],
       "notas": "Cesion y Modificacion Ctto. Alimentos JP A2PCL6 160424.pdf. 12% fijo. Contrato original 2019 no tenia SA, se incorporo en esta modificacion abril-2024.",
       "inicioSA": "01/05/2024"
+    },
+    "77.660.405-4|A-2": {
+      "pasos": [],
+      "notas": "Ctto. Arrendamiento Sanvil A2T.Of.25 180523.pdf. 12% fijo. Modificacion 2024 agrega bodega pero no toca clausula SA.",
+      "inicioSA": "15/05/2023"
     }
   }
 }
