@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:07:38.841Z",
+  "updatedAt": "2026-09-01T21:19:27.525Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -175,6 +175,11 @@
       "pasos": [],
       "notas": "Mismo contrato que el sitio 5-A (Contrato 5A Edf77 2R Spa Ltda.pdf, firmado 15-04-2026) -- cubre ambos inmuebles (PCL 4A y EDF 77) con la misma fecha de entrega 02-05-2026. % Serv.Adm. escalona 6%->9%->12%, ver notas del sitio 5-A.",
       "inicioSA": "02/05/2026"
+    },
+    "79.913.320-2|5-A": {
+      "pasos": [],
+      "notas": "Ctto. Gallyas Telecom S.A.-5AE32 010823.pdf. Entrega 02/05/2023 (contrato retroactivo, firmado 01/08/2023). 12%.",
+      "inicioSA": "02/05/2023"
     }
   }
 }
