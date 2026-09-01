@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:19:41.394Z",
+  "updatedAt": "2026-09-01T21:19:43.054Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -186,6 +186,11 @@
       "pasos": [],
       "notas": "Modificacion Ctto. Baxter A2E5 171224.pdf (Edif.5-A, 2672-A). IMPORTANTE: % escala 6% (2025), 8% (2026), 12% desde 2027 - la planilla trae flat 6%, actualizar en enero 2026 y 2027. Contrato original 2012 no tenia SA, se incorporo recien en esta modificacion dic-2024.",
       "inicioSA": "01/01/2025"
+    },
+    "76.577.652-K|A-2": {
+      "pasos": [],
+      "notas": "Modificacion Ctto. Ilab A2PCL4 220125.pdf. 12% fijo. Contrato original 2017 no tenia SA; hay una modificacion intermedia 2022 no legible por OCR, no se pudo verificar el periodo 2022-2024.",
+      "inicioSA": "01/12/2024"
     }
   }
 }
