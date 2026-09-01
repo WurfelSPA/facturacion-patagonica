@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:07:02.625Z",
+  "updatedAt": "2026-09-01T21:07:26.871Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -173,10 +173,6 @@
     "78.371.217-2|A-2": {
       "pasos": [],
       "notas": "Mismo contrato que el sitio 5-A (Contrato 5A Edf77 2R Spa Ltda.pdf, firmado 15-04-2026) � cubre ambos inmuebles (PCL 4A y EDF 77) con la misma fecha de entrega 02-05-2026. % Serv.Adm. escalona 6%?9%?12%, ver notas del sitio 5-A."
-    },
-    "__deploy_check__|__x__": {
-      "pasos": [],
-      "inicioSA": "01/01/2000"
     }
   }
 }
