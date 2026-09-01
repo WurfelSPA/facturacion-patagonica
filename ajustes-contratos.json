@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:32:05.773Z",
+  "updatedAt": "2026-09-01T21:33:30.734Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -174,7 +174,8 @@
           "uf": 340.87
         }
       ],
-      "notas": "Renovacion automatica 01-06-2022: UF sube de 309.18 (contrato inicial) a 324.64 (+5%). Renovacion automatica 01-06-2025: UF sube de 324.64 a 340.87 (+5%, ya reflejado en la facturacion real). Proxima renovacion/reajuste: 01-06-2028 (contrato vigente hasta 31-05-2028 segun Anexo N1 en tramite; el contrato original no se dio por terminado por ninguna parte). 5% cada 3 anios estipulado en el contrato, ya reflejado en columnas % Reaj./Cada de la planilla, por lo que no se registra regla recurrente aparte aqui."
+      "notas": "Renovacion automatica 01-06-2022: UF sube de 309.18 (contrato inicial) a 324.64 (+5%). Renovacion automatica 01-06-2025: UF sube de 324.64 a 340.87 (+5%, ya reflejado en la facturacion real). Proxima renovacion/reajuste: 01-06-2028 (contrato vigente hasta 31-05-2028 segun Anexo N1 en tramite; el contrato original no se dio por terminado por ninguna parte). 5% cada 3 anios estipulado en el contrato, ya reflejado en columnas % Reaj./Cada de la planilla, por lo que no se registra regla recurrente aparte aqui. OJO Serv.Adm.: el contrato de arrendamiento (Ctto. Comercial Industrial W & L Ltda-5AE66 120419.pdf, 2019, vigente, leido completo) NO tiene clausula de Servicios de Administracion en absoluto. Confirmado por fichas internas. Se esta facturando 6% igual segun la Planilla.",
+      "inicioSA": "S/C - $928.682"
     },
     "78.371.217-2|5-A": {
       "pasos": [],
