@@ -1,8 +1,72 @@
 {
   "notificados": {
-    "968365800|5-A|Edif. 70|2026-08-31": { "nombre": "Trane de Chile S.A.", "notificadoEn": "2026-08-13T00:00:00.000Z", "manual": true },
-    "767488130|4-A|Edif. 81|2026-08-31": { "nombre": "Corsud SpA", "notificadoEn": "2026-08-13T00:00:00.000Z", "manual": true },
-    "591703102|4-A|Edif. 84|2026-08-31": { "nombre": "Congo Films S.A. Agencia en Chile", "notificadoEn": "2026-08-13T00:00:00.000Z", "manual": true },
-    "591703102|4-A|Espacio|2026-08-31": { "nombre": "Congo Films S.A. Agencia en Chile", "notificadoEn": "2026-08-13T00:00:00.000Z", "manual": true }
+    "968365800|5-A|Edif. 70|2026-08-31": {
+      "nombre": "Trane de Chile S.A.",
+      "notificadoEn": "2026-08-13T00:00:00.000Z",
+      "manual": true
+    },
+    "767488130|4-A|Edif. 81|2026-08-31": {
+      "nombre": "Corsud SpA",
+      "notificadoEn": "2026-08-13T00:00:00.000Z",
+      "manual": true
+    },
+    "591703102|4-A|Edif. 84|2026-08-31": {
+      "nombre": "Congo Films S.A. Agencia en Chile",
+      "notificadoEn": "2026-08-13T00:00:00.000Z",
+      "manual": true
+    },
+    "591703102|4-A|Espacio|2026-08-31": {
+      "nombre": "Congo Films S.A. Agencia en Chile",
+      "notificadoEn": "2026-08-13T00:00:00.000Z",
+      "manual": true
+    },
+    "763193241|5-A|Edif. 43|2026-11-30": {
+      "nombre": "Sociedad de Alimentos Leefood SpA",
+      "sitio": "5-A",
+      "termino": "30/11/2026",
+      "notificadoEn": "2026-09-01T13:00:22.114Z"
+    },
+    "760118095|5-A|Edif. 45|2026-10-31": {
+      "nombre": "Megamin S.A.",
+      "sitio": "5-A",
+      "termino": "31/10/2026",
+      "notificadoEn": "2026-09-01T13:00:22.404Z"
+    },
+    "775294701|5-A|Edif. 66 A|2026-11-30": {
+      "nombre": "Comercial Sna-e (Chile) Limitada",
+      "sitio": "5-A",
+      "termino": "30/11/2026",
+      "notificadoEn": "2026-09-01T13:00:22.702Z"
+    },
+    "76033880k|5-A|Edif. 68|2026-12-31": {
+      "nombre": "Drager Chile Limitada",
+      "sitio": "5-A",
+      "termino": "31/12/2026",
+      "notificadoEn": "2026-09-01T13:00:22.997Z"
+    },
+    "768631328|4-A|Edif. 58|2026-12-31": {
+      "nombre": "Tezman Chile SpA",
+      "sitio": "4-A",
+      "termino": "31/12/2026",
+      "notificadoEn": "2026-09-01T13:00:23.273Z"
+    },
+    "761326775|4-A|Edif. 83|2027-01-14": {
+      "nombre": "Comercial Juana Cataldo e Hijos Spa",
+      "sitio": "4-A",
+      "termino": "14/01/2027",
+      "notificadoEn": "2026-09-01T13:00:23.543Z"
+    },
+    "995760800|A-2|Edif. 4-A (Bodega)|2026-11-30": {
+      "nombre": "Olympus Corporation Chile Spa",
+      "sitio": "A-2",
+      "termino": "30/11/2026",
+      "notificadoEn": "2026-09-01T13:00:23.825Z"
+    },
+    "966316101|A-2|Subterraneo|2026-12-31": {
+      "nombre": "Claro Infraestructura 171 S.A.",
+      "sitio": "A-2",
+      "termino": "31/12/2026",
+      "notificadoEn": "2026-09-01T13:00:24.132Z"
+    }
   }
 }
