@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:19:39.342Z",
+  "updatedAt": "2026-09-01T21:19:40.393Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -189,6 +189,11 @@
       "pasos": [],
       "notas": "Ctto.In Wasser A2E1 050623.pdf. 12% fijo. Confirmado por Fichas Resumenes Contratos Lote A2.xlsx.",
       "inicioSA": "01/04/2023"
+    },
+    "78.366.970-6|A-2": {
+      "pasos": [],
+      "notas": "Modificacion Ctto. Baxter A2E5 171224.pdf (Edif.5-A, 2672-A). IMPORTANTE: % escala 6% (2025), 8% (2026), 12% desde 2027 - la planilla trae flat 6%, actualizar en enero 2026 y 2027. Contrato original 2012 no tenia SA, se incorporo recien en esta modificacion dic-2024.",
+      "inicioSA": "01/01/2025"
     }
   }
 }
