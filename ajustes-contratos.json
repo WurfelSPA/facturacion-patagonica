@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:33:41.839Z",
+  "updatedAt": "2026-09-01T21:33:44.225Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -296,6 +296,11 @@
       "pasos": [],
       "notas": "Olympus tiene DOS oficinas bajo el mismo codigo de zona A-2 (T.Of.31 y T.Of.41), ambas dentro del mismo Contrato Unificado Olympus (10/02/2026). Para ambas, el contrato deja la entrega material EXPRESAMENTE PENDIENTE de 'acuerdo mutuo futuro, una vez definido el proyecto y presupuesto de habilitacion' - no hay fecha fija ni Acta de Entrega archivada en Drive para ninguna de las dos. % de SA pactado: 6% año1, 9% año2, 12% desde año3 (para cuando se entreguen). Evidencia indirecta (cotizacion de habilitacion marzo-2026) sugiere entrega ~mediados 2026, pero sin fecha firmada - no se factura Servicios de Administracion todavia para estos dos sitios.",
       "inicioSA": "-"
+    },
+    "97.023.000-9|B": {
+      "pasos": [],
+      "notas": "Contrato original Ctto.Bco.Itau B2828 020497.pdf (1997) NO tiene clausula de Servicios de Administracion (solo servicios basicos). La modificacion mas reciente y candidata a haber introducido el esquema moderno (Modificacion Ctto.Bco.Itau B2828 031023.pdf, 03/10/2023, 25 paginas) es un escaneo cuyo cuerpo no se pudo leer pese a varios intentos - revisar ese PDF manualmente. La Planilla igual trae 12% activo (aprox $887.398) para este sitio.",
+      "inicioSA": "S/C - $887.398"
     }
   }
 }
