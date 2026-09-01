@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:23:00.967Z",
+  "updatedAt": "2026-09-01T21:23:03.277Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -86,7 +86,21 @@
       }
     },
     "78.216.401-5|A-2": {
-      "pasos": [],
+      "pasos": [
+        {
+          "fecha": "2026-08-01",
+          "uf": 176
+        },
+        {
+          "fecha": "2027-08-01",
+          "uf": 220
+        }
+      ],
+      "recurrente": {
+        "pct": 5,
+        "cadaAnios": 3,
+        "desde": "2028-08-01"
+      },
       "notas": "CTTO. A2 PCL 3 Casino Imperio 01082025 notariado.pdf. 12% fijo. Sociedad reconstituida 29/07/2025.",
       "inicioSA": "31/07/2025"
     },
