@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:19:37.214Z",
+  "updatedAt": "2026-09-01T21:19:38.307Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -179,6 +179,11 @@
       "pasos": [],
       "notas": "Ctto. Tezman Chile SpA-4AE58 131223.pdf. 12% fijo, sin escalonamiento.",
       "inicioSA": "01/01/2024"
+    },
+    "59.170.310-2|4-A": {
+      "pasos": [],
+      "notas": "Ctto. Congo Films SA Agencia en Chile-4AE85A 160524.pdf. 9,1% fijo.",
+      "inicioSA": "02/02/2024"
     }
   }
 }
