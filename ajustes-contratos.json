@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:19:30.395Z",
+  "updatedAt": "2026-09-01T21:19:31.594Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -174,6 +174,11 @@
       "pasos": [],
       "notas": "Ctto. Weidmuller SpA-5AE47 301122.pdf + Acta de Entrega. Confianza media: OCR del contrato fallo, fecha respaldada por Acta de Entrega y ficha interna (12%).",
       "inicioSA": "19/01/2023"
+    },
+    "77.454.587-5|5-A": {
+      "pasos": [],
+      "notas": "Ctto. Subarrendamiento DKo Home 5AE69 010424.pdf (cliente actual: Sanchez Hermanos SpA). CASO ESPECIAL: entrega material real 01/08/2023, pero el contrato (firmado 01/04/2024) exime el pago de SA hasta 01/08/2025 (2 anios de gracia pactados por escrito). 6% (no 12%).",
+      "inicioSA": "01/08/2025"
     }
   }
 }
