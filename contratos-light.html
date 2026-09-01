@@ -285,7 +285,11 @@ function poblarSelect(items,placeholder){
   });
 }
 
+let currentTab="contratos";
+let currentClientIdx=null;
+
 async function activarTab(tab){
+  currentTab=tab;
   document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
   sel.onchange=null;
   if(tab==="contratos"){
@@ -294,8 +298,13 @@ async function activarTab(tab){
       msg("Cargando planilla…");
       /* La UF del día (mindicador.cl) no debe frenar la carga de clientes —
          si esa API externa está lenta o caída, igual queremos mostrar la
-         lista; los montos en CLP simplemente muestran "—" hasta que llegue. */
-      if(ufHoy==null)getUFHoy().then(uf=>{ufHoy=uf;});
+         lista; los montos en CLP simplemente muestran "—" hasta que llegue,
+         y en cuanto la UF llegue se vuelve a pintar la ficha abierta. */
+      if(ufHoy==null)getUFHoy().then(uf=>{
+        ufHoy=uf;
+        if(ufHoy!=null&&currentTab==="contratos"&&currentClientIdx!=null)
+          renderContrato(cache.contratos[currentClientIdx],ufHoy);
+      });
       try{
         const buf=await fetchTimeout("/api/planilla",null,20000).then(r=>{if(!r.ok)throw new Error("No se pudo cargar la planilla (HTTP "+r.status+")");return r.arrayBuffer();});
         const clients=await parsePlanilla(buf);
@@ -310,8 +319,8 @@ async function activarTab(tab){
     poblarSelect(cache.contratos,"— Seleccionar cliente —");
     msg("Selecciona un cliente arriba para ver su ficha.");
     sel.onchange=()=>{
-      if(sel.value==="")msg("Selecciona un cliente arriba para ver su ficha.");
-      else renderContrato(cache.contratos[Number(sel.value)],ufHoy);
+      if(sel.value===""){currentClientIdx=null;msg("Selecciona un cliente arriba para ver su ficha.");}
+      else{currentClientIdx=Number(sel.value);renderContrato(cache.contratos[currentClientIdx],ufHoy);}
     };
   }else{
     if(!cache.fxc){
