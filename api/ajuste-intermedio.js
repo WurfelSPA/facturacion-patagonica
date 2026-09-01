@@ -11,9 +11,12 @@
  *   pasos: [{fecha:"YYYY-MM-DD", uf?:number, pct?:number}],
  *   recurrente?: {pct:number, cadaAnios:number, desde?:"YYYY-MM-DD"},
  *   notas?: string,
- *   inicioSA?: string  // "DD/MM/YYYY" — fecha de entrega/inicio de Servicio de
- *                      // Administración (misma convención que Inicio/Renovación
- *                      // en la vista Contratos, no ISO como "pasos")
+ *   inicioSA?: string  // normalmente "DD/MM/YYYY" (fecha de entrega/inicio de
+ *                      // Servicio de Administración, misma convención que
+ *                      // Inicio/Renovación en la vista Contratos, no ISO como
+ *                      // "pasos") — también puede ser un texto libre corto
+ *                      // (ej. "S/C — $243.615" cuando no hay contrato que
+ *                      // confirme la fecha pero igual se está cobrando)
  * }
  * Si pasos está vacío y no hay recurrente ni notas, se borra la entrada.
  *
@@ -98,7 +101,7 @@ export default async function handler(req, res) {
       : [];
     const tieneRecurrente = recurrente && typeof recurrente.pct === 'number' && typeof recurrente.cadaAnios === 'number';
     const tieneNotas = typeof notas === 'string' && notas.trim();
-    const tieneInicioSA = typeof inicioSA === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(inicioSA.trim());
+    const tieneInicioSA = typeof inicioSA === 'string' && inicioSA.trim() !== '';
 
     if (pasosLimpios.length === 0 && !tieneRecurrente && !tieneNotas && !tieneInicioSA) {
       delete cache.items[key];
