@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:19:45.119Z",
+  "updatedAt": "2026-09-01T21:19:46.032Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -201,6 +201,11 @@
       "pasos": [],
       "notas": "Ctto. Arrendamiento Sanvil A2T.Of.25 180523.pdf. 12% fijo. Modificacion 2024 agrega bodega pero no toca clausula SA.",
       "inicioSA": "15/05/2023"
+    },
+    "61.981.060-0|A-2": {
+      "pasos": [],
+      "notas": "Ctto. Arrendamiento SLEP A2TOF26,61,63,P8 231224.pdf + Acta de Entrega Oficina 26. CONFIANZA MEDIA: contrato madre de 28 paginas ilegible por OCR, fecha apoyada en Acta de Entrega especifica. Confirmar % y escalonamiento manualmente si es posible.",
+      "inicioSA": "17/03/2025"
     }
   }
 }
