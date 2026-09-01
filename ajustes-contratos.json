@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:19:50.014Z",
+  "updatedAt": "2026-09-01T21:19:50.951Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -216,6 +216,11 @@
       "pasos": [],
       "notas": "Ctto. Arrendamiento NCH A2T.Of.51 080523.pdf. Firmado 08/05/2023 pero retroactivo a 01/03/2023. 12%.",
       "inicioSA": "01/03/2023"
+    },
+    "76.634.820-3|B": {
+      "pasos": [],
+      "notas": "Ctto. Visibility S.A.-B2758D 160524.pdf. SA vinculado a fecha de entrega (29/04/2024), no a fecha de devengo de renta (01/06/2024). 12%. Sin Acta de Entrega separada que confirme.",
+      "inicioSA": "29/04/2024"
     }
   }
 }
