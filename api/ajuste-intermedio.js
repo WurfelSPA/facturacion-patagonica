@@ -10,7 +10,10 @@
  *   rut: string, sitio: string,
  *   pasos: [{fecha:"YYYY-MM-DD", uf?:number, pct?:number}],
  *   recurrente?: {pct:number, cadaAnios:number, desde?:"YYYY-MM-DD"},
- *   notas?: string
+ *   notas?: string,
+ *   inicioSA?: string  // "DD/MM/YYYY" — fecha de entrega/inicio de Servicio de
+ *                      // Administración (misma convención que Inicio/Renovación
+ *                      // en la vista Contratos, no ISO como "pasos")
  * }
  * Si pasos está vacío y no hay recurrente ni notas, se borra la entrada.
  *
@@ -75,7 +78,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { rut, sitio, pasos, recurrente, notas } = req.body || {};
+  const { rut, sitio, pasos, recurrente, notas, inicioSA } = req.body || {};
   if (!rut || typeof rut !== 'string') return res.status(400).json({ error: 'Falta rut' });
 
   const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
@@ -95,14 +98,16 @@ export default async function handler(req, res) {
       : [];
     const tieneRecurrente = recurrente && typeof recurrente.pct === 'number' && typeof recurrente.cadaAnios === 'number';
     const tieneNotas = typeof notas === 'string' && notas.trim();
+    const tieneInicioSA = typeof inicioSA === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(inicioSA.trim());
 
-    if (pasosLimpios.length === 0 && !tieneRecurrente && !tieneNotas) {
+    if (pasosLimpios.length === 0 && !tieneRecurrente && !tieneNotas && !tieneInicioSA) {
       delete cache.items[key];
     } else {
       cache.items[key] = {
         pasos: pasosLimpios,
         ...(tieneRecurrente ? { recurrente: { pct: recurrente.pct, cadaAnios: recurrente.cadaAnios, ...(recurrente.desde ? { desde: String(recurrente.desde) } : {}) } } : {}),
-        ...(tieneNotas ? { notas: notas.trim() } : {})
+        ...(tieneNotas ? { notas: notas.trim() } : {}),
+        ...(tieneInicioSA ? { inicioSA: inicioSA.trim() } : {})
       };
     }
     cache.updatedAt = new Date().toISOString();

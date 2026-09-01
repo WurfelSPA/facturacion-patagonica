@@ -173,11 +173,14 @@ function renderContrato(c,ufHoy){
 
   const arriendoCLP=ufHoy&&c.ufArr>0?c.ufArr*ufHoy:null;
   const servAdmCLP=ufHoy&&c.ufSrv>0?c.ufSrv*ufHoy:null;
+  const tieneSA=c.ufSrv>0;
+  const inicioSA=(cache.ajustes[ajusteKey(c.rut,c.sitio)]||{}).inicioSA||"";
   card.append(grupoTitulo("Arriendo"));
   card.append(fila("Arriendo actual UF",c.ufArr>0?fmtUF(c.ufArr):"—",!(c.ufArr>0)));
   card.append(fila("Arriendo actual",fmtCLP(arriendoCLP),arriendoCLP==null));
   card.append(fila("Serv.Adm. UF",c.ufSrv>0?fmtUF(c.ufSrv):"—",!(c.ufSrv>0)));
   card.append(fila("Serv.Adm.",fmtCLP(servAdmCLP),servAdmCLP==null));
+  card.append(fila("Inicio Serv.Adm.",tieneSA?(inicioSA||"—"):"NO",!tieneSA||!inicioSA));
 
   card.append(grupoTitulo("Contrato"));
   card.append(fila("Inicio",c.termContrato||"—",!c.termContrato));
@@ -274,7 +277,8 @@ function renderFxCCliente(cli){
    Estado / navegación entre pestañas
 ═══════════════════════════════════════════════════════════ */
 let ufHoy=null;
-const cache={contratos:null,fxc:null};
+const cache={contratos:null,fxc:null,ajustes:{}};
+function ajusteKey(rut,sitio){return `${String(rut||"").trim()}|${String(sitio||"").trim()}`;}
 
 function poblarSelect(items,placeholder){
   sel.innerHTML="";
@@ -308,10 +312,23 @@ async function activarTab(tab){
         if(ufHoy!=null&&currentTab==="contratos"&&currentClientIdx!=null)
           renderContrato(cache.contratos[currentClientIdx],ufHoy);
       });
+      /* ajustes-contratos.json (Inicio Serv.Adm., pasos de renta pactados) es
+         complementario — si falla o tarda, igual mostramos Contratos con lo
+         que sí viene de la planilla. */
+      fetchTimeout("/ajustes-contratos.json",null,10000).then(r=>r.ok?r.json():null).then(d=>{
+        if(d&&d.items){
+          cache.ajustes=d.items;
+          if(currentTab==="contratos"&&currentClientIdx!=null)
+            renderContrato(cache.contratos[currentClientIdx],ufHoy);
+        }
+      }).catch(()=>{});
       try{
         const buf=await fetchTimeout("/api/planilla",null,20000).then(r=>{if(!r.ok)throw new Error("No se pudo cargar la planilla (HTTP "+r.status+")");return r.arrayBuffer();});
         const clients=await parsePlanilla(buf);
-        cache.contratos=[...new Map(clients.map(c=>[c.rut,c])).values()].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es"));
+        /* Dedupe por rut+sitio, no solo por rut — un mismo cliente puede tener
+           más de un sitio arrendado (ej. 2R Spa: bodega 5-A y local A-2), cada
+           uno con su propio contrato/UF/Serv.Adm. */
+        cache.contratos=[...new Map(clients.map(c=>[c.rut+"|"+c.sitio,c])).values()].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es")||a.sitio.localeCompare(b.sitio,"es"));
       }catch(e){
         console.error(e);
         sel.innerHTML='<option value="">Error al cargar</option>';
