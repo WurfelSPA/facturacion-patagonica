@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:19:38.307Z",
+  "updatedAt": "2026-09-01T21:19:39.342Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -184,6 +184,11 @@
       "pasos": [],
       "notas": "Ctto. Congo Films SA Agencia en Chile-4AE85A 160524.pdf. 9,1% fijo.",
       "inicioSA": "02/02/2024"
+    },
+    "77.572.358-0|A-2": {
+      "pasos": [],
+      "notas": "Ctto.In Wasser A2E1 050623.pdf. 12% fijo. Confirmado por Fichas Resumenes Contratos Lote A2.xlsx.",
+      "inicioSA": "01/04/2023"
     }
   }
 }
