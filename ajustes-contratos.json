@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:19:35.403Z",
+  "updatedAt": "2026-09-01T21:19:36.322Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -182,6 +182,11 @@
       "pasos": [],
       "notas": "Modificacion Ctto. Alimentos Neva 5AE74 310524.pdf. Muy claro: contrato original 2003 no tenia SA, modificacion 2024 lo incorpora con fecha explicita. 12%.",
       "inicioSA": "01/06/2024"
+    },
+    "76.863.132-8|4-A": {
+      "pasos": [],
+      "notas": "Ctto. Tezman Chile SpA-4AE58 131223.pdf. 12% fijo, sin escalonamiento.",
+      "inicioSA": "01/01/2024"
     }
   }
 }
