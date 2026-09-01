@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:22:58.632Z",
+  "updatedAt": "2026-09-01T21:23:00.967Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -33,7 +33,17 @@
       "inicioSA": "10/02/2026"
     },
     "76.398.094-4|A-2": {
-      "pasos": [],
+      "pasos": [
+        {
+          "fecha": "2026-02-01",
+          "uf": 106.05
+        }
+      ],
+      "recurrente": {
+        "pct": 5,
+        "cadaAnios": 3,
+        "desde": "2028-02-01"
+      },
       "notas": "Ctto. Sociedad Comercial E Industrial Hydrotorc Limitada-A2E9 200225.pdf. 12% fijo.",
       "inicioSA": "31/01/2025"
     },
