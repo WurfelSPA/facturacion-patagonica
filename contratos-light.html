@@ -8,12 +8,15 @@
 <style>
   :root{
     --bg:#f5f6f8; --surf:#ffffff; --bdr:#e2e5ea; --tx:#1a1d24; --txm:#4a5063; --txd:#8890a0;
-    --acc:#5b4cdb;
+    --acc:#5b4cdb; --green:#0f9d68; --gbg:#e8f8f0;
   }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent;}
   header{position:sticky;top:0;z-index:5;background:var(--surf);border-bottom:1px solid var(--bdr);padding:12px 14px;box-shadow:0 1px 4px rgba(0,0,0,.04);}
-  header h1{font-size:14px;margin:0 0 8px;color:var(--txd);letter-spacing:.03em;font-weight:700;text-transform:uppercase;}
+  header h1{font-size:14px;margin:0 0 10px;color:var(--txd);letter-spacing:.03em;font-weight:700;text-transform:uppercase;}
+  .tabs{display:flex;gap:6px;margin-bottom:10px;}
+  .tab{flex:1;padding:9px 8px;font-size:12.5px;font-weight:700;border-radius:9px;border:1px solid var(--bdr);background:var(--bg);color:var(--txm);cursor:pointer;}
+  .tab.active{background:var(--acc);color:#fff;border-color:var(--acc);}
   select{width:100%;font-size:16px;padding:12px 14px;border-radius:10px;border:1px solid var(--bdr);background:var(--surf);color:var(--tx);}
   main{padding:14px;max-width:640px;margin:0 auto;}
   .msg{padding:40px 16px;text-align:center;color:var(--txd);font-size:14px;}
@@ -26,18 +29,38 @@
   .fila .val{font-weight:700;text-align:right;font-family:'DM Mono',monospace;font-size:13.5px;}
   .fila .val.vacio{color:var(--txd);font-weight:400;}
   .grupo-titulo{padding:10px 18px 2px;font-size:10px;font-weight:700;color:var(--acc);letter-spacing:.08em;text-transform:uppercase;}
+  .doc-row{display:flex;align-items:center;gap:10px;padding:11px 18px;border-bottom:1px solid var(--bdr);font-size:13px;}
+  .doc-row .fecha{color:var(--txm);font-family:'DM Mono',monospace;flex:0 0 78px;}
+  .doc-row .folio{color:var(--acc);font-weight:700;font-family:'DM Mono',monospace;flex:1;}
+  .doc-row .monto{font-weight:800;font-family:'DM Mono',monospace;text-align:right;}
+  .doc-total{display:flex;justify-content:space-between;align-items:center;padding:13px 18px;background:var(--gbg);font-weight:800;color:var(--green);}
+  .doc-total .n{font-size:12px;}
+  .doc-total .v{font-family:'DM Mono',monospace;font-size:15px;}
 </style>
 </head>
 <body>
 <header>
-  <h1>Contratos — Patagónica</h1>
+  <h1>Patagónica — vista móvil</h1>
+  <div class="tabs">
+    <button class="tab active" data-tab="contratos">📄 Contratos</button>
+    <button class="tab" data-tab="fxc">💰 Facturas x Cobrar</button>
+  </div>
   <select id="sel">
     <option value="">Cargando clientes…</option>
   </select>
 </header>
-<main id="main"><div class="msg">Selecciona un cliente arriba para ver su ficha.</div></main>
+<main id="main"><div class="msg">Cargando…</div></main>
 
 <script>
+const main=document.getElementById("main");
+const sel=document.getElementById("sel");
+function msg(t){main.innerHTML='<div class="msg">'+t+'</div>';}
+
+/* ═══════════════ helpers comunes ═══════════════ */
+function fmtCLP(v){return v==null||isNaN(v)?"—":"$"+Math.round(v).toLocaleString("es-CL");}
+function fmtUF(v){return v==null||isNaN(v)?"—":v.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2});}
+function el(tag,cls,txt){const d=document.createElement(tag);if(cls)d.className=cls;if(txt!=null)d.textContent=txt;return d;}
+
 const ufCache={};
 async function getUFHoy(){
   const now=new Date();
@@ -53,6 +76,10 @@ async function getUFHoy(){
   return null;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   TAB 1: CONTRATOS  (misma lógica que parsePlanillaParaDashboard()
+   en index.html — hoja "Flujo", filas desde la 5, columnas F→BJ)
+═══════════════════════════════════════════════════════════ */
 function serialToDate(v){
   if(!v||typeof v!=="number")return"";
   try{
@@ -60,7 +87,7 @@ function serialToDate(v){
     return`${String(d.getUTCDate()).padStart(2,"0")}/${String(d.getUTCMonth()+1).padStart(2,"0")}/${d.getUTCFullYear()}`;
   }catch(e){return"";}
 }
-function parseDate(v){
+function parseDateSlash(v){
   if(!v||v==="—"||v==="-"||v==="")return null;
   if(typeof v==="string"&&v.includes("/")){
     const[d,mm,y]=v.split("/").map(Number);
@@ -70,16 +97,11 @@ function parseDate(v){
   return null;
 }
 function renovacionTexto(termTermino){
-  const d=parseDate(termTermino);
+  const d=parseDateSlash(termTermino);
   if(!d)return"—";
   const d2=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1);
   return`${String(d2.getDate()).padStart(2,"0")}/${String(d2.getMonth()+1).padStart(2,"0")}/${d2.getFullYear()}`;
 }
-function fmtCLP(v){return v==null||isNaN(v)?"—":"$"+Math.round(v).toLocaleString("es-CL");}
-function fmtUF(v){return v==null||isNaN(v)?"—":v.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2});}
-
-/* Misma lógica de columnas que parsePlanillaParaDashboard() en index.html
-   (hoja "Flujo", filas desde la 5, columnas F→BJ). */
 async function parsePlanilla(buf){
   const wb=XLSX.read(buf,{type:"array"});
   const ws=wb.Sheets["Flujo"];
@@ -121,26 +143,17 @@ async function parsePlanilla(buf){
   }
   return clients;
 }
-
 function fila(lbl,val,vacio){
-  const d=document.createElement("div");
-  d.className="fila";
-  const l=document.createElement("span");l.className="lbl";l.textContent=lbl;
-  const v=document.createElement("span");v.className="val"+(vacio?" vacio":"");v.textContent=val;
-  d.append(l,v);
+  const d=el("div","fila");
+  d.append(el("span","lbl",lbl),el("span","val"+(vacio?" vacio":""),val));
   return d;
 }
-function grupoTitulo(txt){
-  const d=document.createElement("div");d.className="grupo-titulo";d.textContent=txt;return d;
-}
-
-function renderCliente(c,ufHoy){
-  const main=document.getElementById("main");
+function grupoTitulo(txt){return el("div","grupo-titulo",txt);}
+function renderContrato(c,ufHoy){
   main.innerHTML="";
-  const card=document.createElement("div");card.className="card";
-  const nom=document.createElement("div");nom.className="nombre";nom.textContent=c.nombre;
-  const rut=document.createElement("div");rut.className="rut";rut.textContent="RUT: "+(c.rut||"—");
-  card.append(nom,rut);
+  const card=el("div","card");
+  card.append(el("div","nombre",c.nombre));
+  card.append(el("div","rut","RUT: "+(c.rut||"—")));
 
   card.append(grupoTitulo("Ubicación"));
   card.append(fila("Sitio",c.sitio||"—",!c.sitio));
@@ -170,33 +183,155 @@ function renderCliente(c,ufHoy){
   main.append(card);
 }
 
-(async function init(){
-  const sel=document.getElementById("sel");
-  const main=document.getElementById("main");
-  try{
-    const[planillaRes,ufHoy]=await Promise.all([
-      fetch("/api/planilla").then(r=>{if(!r.ok)throw new Error("No se pudo cargar la planilla (HTTP "+r.status+")");return r.arrayBuffer();}),
-      getUFHoy()
-    ]);
-    const clients=await parsePlanilla(planillaRes);
-    const unicos=[...new Map(clients.map(c=>[c.rut,c])).values()].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es"));
-    sel.innerHTML="";
-    const opt0=document.createElement("option");opt0.value="";opt0.textContent="— Seleccionar cliente —";
-    sel.append(opt0);
-    unicos.forEach((c,i)=>{
-      const o=document.createElement("option");o.value=i;o.textContent=c.nombre+(c.sitio?" ("+c.sitio+")":"");
-      sel.append(o);
-    });
-    sel.onchange=()=>{
-      if(sel.value==="")main.innerHTML='<div class="msg">Selecciona un cliente arriba para ver su ficha.</div>';
-      else renderCliente(unicos[Number(sel.value)],ufHoy);
-    };
-  }catch(e){
-    console.error(e);
-    sel.innerHTML='<option value="">Error al cargar</option>';
-    main.innerHTML='<div class="msg">'+ (e.message||"Error al cargar la planilla") +'</div>';
+/* ═══════════════════════════════════════════════════════════
+   TAB 2: FACTURAS X COBRAR  (misma fuente que FactxCobrarView en
+   index.html — carpeta "Facturas x Cobrar PISA" en Drive, hoja "Base")
+═══════════════════════════════════════════════════════════ */
+const DRIVE_FACTURACION_FOLDER_ID="1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u";
+
+function parseFxCSheetValues(values){
+  if(!values||values.length<2)throw new Error("Sin datos");
+  const hdr=values[0].map(h=>String(h||"").toLowerCase().replace(/[\r\n\s_]/g,""));
+  function fi(tests){for(let i=0;i<hdr.length;i++)for(const t of tests)if(hdr[i].includes(t))return i;return -1;}
+  let iFecha=fi(["fecha"]); if(iFecha<0)iFecha=1;
+  let iCod=fi(["cod"]); if(iCod<0)iCod=3;
+  let iCliente=fi(["cliente"]); if(iCliente<0)iCliente=4;
+  let iFolio=fi(["folio"]); if(iFolio<0)iFolio=8;
+  let iDiasDoc=fi(["diasdoc","ddoc","diaspag"]); if(iDiasDoc<0)iDiasDoc=11;
+  let iMonto=fi(["monto","c/d(ml)","c/d(m"]); if(iMonto<0)iMonto=13;
+  let iSdo=fi(["sdo","vencido"]); if(iSdo<0)iSdo=14;
+  function n(v){return parseFloat(String(v||"0").replace(/[^0-9.\-]/g,""))||0;}
+  function fmtFecha(v){
+    const s=String(v||"").trim();
+    const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(m)return m[3]+"-"+m[2]+"-"+m[1];
+    return s.replace(/\//g,"-");
   }
-})();
+  return values.slice(1).filter(r=>r.length>4&&String(r[iCliente]||"").trim()!==""&&String(r[iCliente]||"").trim()!=="Cliente")
+    .map(r=>({fecha:fmtFecha(r[iFecha]),rut:String(r[iCod]||"").trim(),cliente:String(r[iCliente]||"").trim(),
+      folio:String(r[iFolio]||"").trim(),diasDoc:n(r[iDiasDoc]),monto:n(r[iMonto]),sdoVencido:n(r[iSdo])}))
+    .filter(r=>r.monto>0||r.sdoVencido>0);
+}
+function xlsxFromBuf(buf){
+  const wb=XLSX.read(new Uint8Array(buf),{type:"array",cellDates:true});
+  const ws=wb.Sheets["Base"]||wb.Sheets["base"]||wb.Sheets["BASE"]||wb.Sheets[wb.SheetNames[0]];
+  if(!ws)throw new Error("No se encontró hoja de datos");
+  const raw=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:""});
+  return parseFxCSheetValues(raw);
+}
+async function cargarFacturasXCobrar(){
+  const ls=await fetch("/api/historial?ls="+DRIVE_FACTURACION_FOLDER_ID).then(r=>r.json());
+  const sub=(ls.files||[]).find(f=>f.name.toLowerCase().includes("cobrar")&&(f.mimeType||"").includes("folder"));
+  if(!sub)throw new Error('No se encontró la carpeta "Facturas x Cobrar PISA" en Drive');
+  const ls2=await fetch("/api/historial?ls="+sub.id).then(r=>r.json());
+  function dateKey(name){const m=name.match(/(\d{2})-(\d{2})-(\d{4})/);return m?m[3]+m[2]+m[1]:name;}
+  const xl=(ls2.files||[]).filter(f=>f.name.toLowerCase().endsWith(".xlsx")).sort((a,b)=>dateKey(a.name).localeCompare(dateKey(b.name)));
+  if(!xl.length)throw new Error("No hay archivos de Facturas x Cobrar en Drive");
+  const last=xl[xl.length-1];
+  const buf=await fetch("/api/historial?fileId="+last.id).then(r=>{if(!r.ok)throw new Error("Drive "+r.status);return r.arrayBuffer();});
+  const rows=xlsxFromBuf(buf);
+  const clientMap={};
+  rows.forEach(r=>{
+    const k=r.rut||r.cliente;
+    if(!clientMap[k])clientMap[k]={rut:r.rut,nombre:r.cliente,docs:[],total:0};
+    clientMap[k].docs.push(r);
+    clientMap[k].total+=r.monto;
+  });
+  return Object.values(clientMap);
+}
+function renderFxCCliente(cli){
+  main.innerHTML="";
+  const card=el("div","card");
+  card.append(el("div","nombre",cli.nombre));
+  card.append(el("div","rut","RUT: "+(cli.rut||"—")));
+  const docsSorted=cli.docs.slice().sort((a,b)=>b.diasDoc-a.diasDoc);
+  docsSorted.forEach(r=>{
+    const row=el("div","doc-row");
+    row.append(el("span","fecha",r.fecha||"—"));
+    row.append(el("span","folio",r.folio&&r.folio!=="0"?r.folio:"—"));
+    row.append(el("span","monto",fmtCLP(r.monto)));
+    card.append(row);
+  });
+  const tot=el("div","doc-total");
+  tot.append(el("span","n","Total — "+cli.docs.length+" documento"+(cli.docs.length!==1?"s":"")));
+  tot.append(el("span","v",fmtCLP(cli.total)));
+  card.append(tot);
+  main.append(card);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Estado / navegación entre pestañas
+═══════════════════════════════════════════════════════════ */
+let ufHoy=null;
+const cache={contratos:null,fxc:null};
+
+function poblarSelect(items,placeholder){
+  sel.innerHTML="";
+  const opt0=el("option",null,placeholder);
+  opt0.value="";
+  sel.append(opt0);
+  items.forEach((it,i)=>{
+    const o=el("option",null,it.nombre+(it.sitio?" ("+it.sitio+")":""));
+    o.value=i;
+    sel.append(o);
+  });
+}
+
+async function activarTab(tab){
+  document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
+  sel.onchange=null;
+  if(tab==="contratos"){
+    if(!cache.contratos){
+      sel.innerHTML='<option value="">Cargando clientes…</option>';
+      msg("Cargando planilla…");
+      try{
+        const[buf,uf]=await Promise.all([
+          fetch("/api/planilla").then(r=>{if(!r.ok)throw new Error("No se pudo cargar la planilla (HTTP "+r.status+")");return r.arrayBuffer();}),
+          ufHoy!=null?Promise.resolve(ufHoy):getUFHoy()
+        ]);
+        ufHoy=uf;
+        const clients=await parsePlanilla(buf);
+        cache.contratos=[...new Map(clients.map(c=>[c.rut,c])).values()].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es"));
+      }catch(e){
+        console.error(e);
+        sel.innerHTML='<option value="">Error al cargar</option>';
+        msg(e.message||"Error al cargar la planilla");
+        return;
+      }
+    }
+    poblarSelect(cache.contratos,"— Seleccionar cliente —");
+    msg("Selecciona un cliente arriba para ver su ficha.");
+    sel.onchange=()=>{
+      if(sel.value==="")msg("Selecciona un cliente arriba para ver su ficha.");
+      else renderContrato(cache.contratos[Number(sel.value)],ufHoy);
+    };
+  }else{
+    if(!cache.fxc){
+      sel.innerHTML='<option value="">Cargando clientes…</option>';
+      msg("Cargando Facturas x Cobrar…");
+      try{
+        const clients=await cargarFacturasXCobrar();
+        cache.fxc=clients.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre,"es"));
+      }catch(e){
+        console.error(e);
+        sel.innerHTML='<option value="">Error al cargar</option>';
+        msg(e.message||"Error al cargar Facturas x Cobrar");
+        return;
+      }
+    }
+    poblarSelect(cache.fxc,"— Seleccionar cliente —");
+    msg("Selecciona un cliente arriba para ver sus documentos.");
+    sel.onchange=()=>{
+      if(sel.value==="")msg("Selecciona un cliente arriba para ver sus documentos.");
+      else renderFxCCliente(cache.fxc[Number(sel.value)]);
+    };
+  }
+}
+
+document.querySelectorAll(".tab").forEach(btn=>{
+  btn.addEventListener("click",()=>activarTab(btn.dataset.tab));
+});
+activarTab("contratos");
 </script>
 </body>
 </html>
