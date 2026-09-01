@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:33:35.311Z",
+  "updatedAt": "2026-09-01T21:33:37.432Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -285,6 +285,11 @@
       "pasos": [],
       "notas": "Ctto. Ind. y Com. Baxter de Chile Ltda-4AE57 131101.pdf (2001): gastos comunes van incluidos en la renta de arrendamiento, sin clausula separada de Servicios de Administracion. La Planilla igual trae 6% activo (aprox $2.028.222) para este sitio, lo que contradice el contrato vigente - revisar si corresponde cobrar esto por separado.",
       "inicioSA": "S/C - $2.028.222"
+    },
+    "76.319.324-1|4-A": {
+      "pasos": [],
+      "notas": "Ctto. Sociedad de Alimentos Leefood SpA-4AE51 101120.pdf (2020, unico contrato encontrado, leido completo): NO tiene clausula de Servicios de Administracion. Ficha interna confirma 'Servicio de Administracion: -'. La Planilla SI tiene 6% activo (aprox $164.727) para este cliente - posible cobro sin respaldo contractual.",
+      "inicioSA": "S/C - $164.727"
     }
   }
 }
