@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:19:49.142Z",
+  "updatedAt": "2026-09-01T21:19:50.014Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -211,6 +211,11 @@
       "pasos": [],
       "notas": "Ctto. CFMedica Limitada-A2T.Of.44 270324.pdf + Acta de Entrega. 12% fijo.",
       "inicioSA": "15/04/2024"
+    },
+    "59.005.950-1|A-2": {
+      "pasos": [],
+      "notas": "Ctto. Arrendamiento NCH A2T.Of.51 080523.pdf. Firmado 08/05/2023 pero retroactivo a 01/03/2023. 12%.",
+      "inicioSA": "01/03/2023"
     }
   }
 }
