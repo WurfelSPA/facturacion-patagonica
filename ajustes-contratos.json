@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:33:39.720Z",
+  "updatedAt": "2026-09-01T21:33:41.839Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -291,6 +291,11 @@
       "pasos": [],
       "notas": "Ctto. Sociedad de Alimentos Leefood SpA-4AE51 101120.pdf (2020, unico contrato encontrado, leido completo): NO tiene clausula de Servicios de Administracion. Ficha interna confirma 'Servicio de Administracion: -'. La Planilla SI tiene 6% activo (aprox $164.727) para este cliente - posible cobro sin respaldo contractual.",
       "inicioSA": "S/C - $164.727"
+    },
+    "99.576.080-0|A-2": {
+      "pasos": [],
+      "notas": "Olympus tiene DOS oficinas bajo el mismo codigo de zona A-2 (T.Of.31 y T.Of.41), ambas dentro del mismo Contrato Unificado Olympus (10/02/2026). Para ambas, el contrato deja la entrega material EXPRESAMENTE PENDIENTE de 'acuerdo mutuo futuro, una vez definido el proyecto y presupuesto de habilitacion' - no hay fecha fija ni Acta de Entrega archivada en Drive para ninguna de las dos. % de SA pactado: 6% año1, 9% año2, 12% desde año3 (para cuando se entreguen). Evidencia indirecta (cotizacion de habilitacion marzo-2026) sugiere entrega ~mediados 2026, pero sin fecha firmada - no se factura Servicios de Administracion todavia para estos dos sitios.",
+      "inicioSA": "-"
     }
   }
 }
