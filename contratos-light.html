@@ -74,12 +74,15 @@ async function getUFHoy(){
   const now=new Date();
   const key="hoy-"+now.toISOString().slice(0,10);
   if(ufCache[key])return ufCache[key];
+  /* Se pide vía nuestro propio /api/uf (proxy server-side a mindicador.cl) en
+     vez de llamar a mindicador.cl directo desde el navegador — algunas redes
+     móviles/DNS bloquean ese dominio de terceros aunque el resto del sitio
+     cargue bien. */
   try{
-    const r=await fetchTimeout("https://mindicador.cl/api/uf",null,6000);
+    const r=await fetchTimeout("/api/uf",null,10000);
     if(!r.ok)throw new Error("HTTP "+r.status);
     const d=await r.json();
-    const serie=d.serie||[];
-    if(serie.length){ufCache[key]=serie[0].valor;return serie[0].valor;}
+    if(d.valor){ufCache[key]=d.valor;return d.valor;}
   }catch(e){console.warn("UF hoy no disponible:",e.message);}
   return null;
 }
