@@ -125,6 +125,10 @@
       "dest": "/$1"
     },
     {
+      "src": "/contratos-light.html",
+      "dest": "/contratos-light.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }
