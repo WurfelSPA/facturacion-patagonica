@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:06:46.327Z",
+  "updatedAt": "2026-09-01T21:06:47.736Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -169,6 +169,10 @@
     "78.371.217-2|5-A": {
       "pasos": [],
       "notas": "Contrato 5A Edf77 2R Spa Ltda.pdf (firmado 15-04-2026). Cl�usula Sexta: Servicios de Administraci�n corren a contar de la fecha de entrega de la Propiedad Arrendada; Cl�usula S�ptima fija esa entrega en 02-05-2026. OJO: % Serv.Adm. escalona 6% meses 1-6, 9% meses 7-12, 12% desde la renovaci�n � la Planilla solo trae el 6% fijo."
+    },
+    "78.371.217-2|A-2": {
+      "pasos": [],
+      "notas": "Mismo contrato que el sitio 5-A (Contrato 5A Edf77 2R Spa Ltda.pdf, firmado 15-04-2026) � cubre ambos inmuebles (PCL 4A y EDF 77) con la misma fecha de entrega 02-05-2026. % Serv.Adm. escalona 6%?9%?12%, ver notas del sitio 5-A."
     }
   }
 }
