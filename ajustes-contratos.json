@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:19:27.525Z",
+  "updatedAt": "2026-09-01T21:19:28.774Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -180,6 +180,11 @@
       "pasos": [],
       "notas": "Ctto. Gallyas Telecom S.A.-5AE32 010823.pdf. Entrega 02/05/2023 (contrato retroactivo, firmado 01/08/2023). 12%.",
       "inicioSA": "02/05/2023"
+    },
+    "76.832.139-6|5-A": {
+      "pasos": [],
+      "notas": "Ctto. Weidmuller SpA-5AE47 301122.pdf + Acta de Entrega. Confianza media: OCR del contrato fallo, fecha respaldada por Acta de Entrega y ficha interna (12%).",
+      "inicioSA": "19/01/2023"
     }
   }
 }
