@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:19:50.951Z",
+  "updatedAt": "2026-09-01T21:20:41.297Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -204,8 +204,7 @@
     },
     "61.981.060-0|A-2": {
       "pasos": [],
-      "notas": "Acta de Entrega Piso 8 Slep Firmada.pdf. CONFIANZA MEDIA: contrato notarial de 28 paginas ilegible (mismo problema que Of.26), no se pudo confirmar textualmente la clausula de SA ni descartar un periodo de gracia como en Piso 7.",
-      "inicioSA": "17/02/2025"
+      "notas": "SLEP Los Libertadores arrienda VARIOS sitios distintos bajo el mismo codigo de zona A-2 (T.Of.26, T.Piso 7, T.Piso 8, Bodega 13, Bodega 16) - el sistema de Ajuste Intermedio solo distingue por rut+sitio, no por edificio, asi que NO se puede guardar una fecha unica de Inicio Serv.Adm aqui sin perder informacion. Fechas encontradas por edificio: T.Of.26 = 17/03/2025 (Acta de Entrega Oficina 26, contrato madre de 28 paginas ilegible por OCR). T.Piso 7 = 16/03/2024 (contrato con periodo de gracia explicito hasta esa fecha, cubre renta y SA). T.Piso 8 = 17/02/2025 (Acta de Entrega, contrato tambien ilegible). Bodega 13 y Bodega 16 = NO SE ENCONTRO CONTRATO, solo un Acta de Entrega sin fecha de inicio de contrato (13/01/2025), pero ya se factura Serv.Adm para estas bodegas en 2026 - pedir el documento real antes de asumir esa fecha."
     },
     "76.014.805-9|A-2": {
       "pasos": [],
