@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:19:48.151Z",
+  "updatedAt": "2026-09-01T21:19:49.142Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -206,6 +206,11 @@
       "pasos": [],
       "notas": "Acta de Entrega Piso 8 Slep Firmada.pdf. CONFIANZA MEDIA: contrato notarial de 28 paginas ilegible (mismo problema que Of.26), no se pudo confirmar textualmente la clausula de SA ni descartar un periodo de gracia como en Piso 7.",
       "inicioSA": "17/02/2025"
+    },
+    "76.014.805-9|A-2": {
+      "pasos": [],
+      "notas": "Ctto. CFMedica Limitada-A2T.Of.44 270324.pdf + Acta de Entrega. 12% fijo.",
+      "inicioSA": "15/04/2024"
     }
   }
 }
