@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:33:33.094Z",
+  "updatedAt": "2026-09-01T21:33:35.311Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -280,6 +280,11 @@
       "pasos": [],
       "notas": "Ctto. Unex-061124 a notaria Modificacion.pdf. IMPORTANTE: % escala 6% (01/11/2024 a 31/10/2026), 12% desde 01/11/2026 - la planilla trae flat, actualizar en noviembre 2026. Contrato original 2008 no tenia SA (no verificado al 100%).",
       "inicioSA": "01/11/2024"
+    },
+    "78.366.970-6|4-A": {
+      "pasos": [],
+      "notas": "Ctto. Ind. y Com. Baxter de Chile Ltda-4AE57 131101.pdf (2001): gastos comunes van incluidos en la renta de arrendamiento, sin clausula separada de Servicios de Administracion. La Planilla igual trae 6% activo (aprox $2.028.222) para este sitio, lo que contradice el contrato vigente - revisar si corresponde cobrar esto por separado.",
+      "inicioSA": "S/C - $2.028.222"
     }
   }
 }
