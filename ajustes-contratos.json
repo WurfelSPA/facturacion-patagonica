@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:23:06.658Z",
+  "updatedAt": "2026-09-01T21:23:08.869Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -149,7 +149,17 @@
       "notas": "Contrato 03-06-2022, Edif.44. Renta pactada: 206.72 UF meses 1-36 (ya en ufInicio), 217.03 UF desde mes 37 (03-06-2025) hasta término. Además cláusula de reajuste automático 5% cada 3 años que se reactiva recién 2 años después del último tramo pactado (~03-06-2027, con un primer ciclo de 2 años antes de volver a 3) — no representable con precisión en el campo recurrente, revisar cláusula Tres.Tres del contrato al llegar esa fecha."
     },
     "99.550.230-5|4-A": {
-      "pasos": [],
+      "pasos": [
+        {
+          "fecha": "2025-03-01",
+          "uf": 138.8
+        }
+      ],
+      "recurrente": {
+        "pct": 5,
+        "cadaAnios": 3,
+        "desde": "2028-03-01"
+      },
       "notas": "Ctto. Mediland SpA-4AE60 250124.pdf. 12% fijo. Modificacion 02/07/2024 solo cambia plazo/renta, no SA.",
       "inicioSA": "01/03/2024"
     },
