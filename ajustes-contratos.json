@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:33:37.432Z",
+  "updatedAt": "2026-09-01T21:33:39.720Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -249,7 +249,8 @@
     },
     "61.981.060-0|A-2": {
       "pasos": [],
-      "notas": "SLEP Los Libertadores arrienda VARIOS sitios distintos bajo el mismo codigo de zona A-2 (T.Of.26, T.Piso 7, T.Piso 8, Bodega 13, Bodega 16) - el sistema de Ajuste Intermedio solo distingue por rut+sitio, no por edificio, asi que NO se puede guardar una fecha unica de Inicio Serv.Adm aqui sin perder informacion. Fechas encontradas por edificio: T.Of.26 = 17/03/2025 (Acta de Entrega Oficina 26, contrato madre de 28 paginas ilegible por OCR). T.Piso 7 = 16/03/2024 (contrato con periodo de gracia explicito hasta esa fecha, cubre renta y SA). T.Piso 8 = 17/02/2025 (Acta de Entrega, contrato tambien ilegible). Bodega 13 y Bodega 16 = NO SE ENCONTRO CONTRATO, solo un Acta de Entrega sin fecha de inicio de contrato (13/01/2025), pero ya se factura Serv.Adm para estas bodegas en 2026 - pedir el documento real antes de asumir esa fecha."
+      "notas": "SLEP Los Libertadores arrienda VARIOS sitios distintos bajo el mismo codigo de zona A-2 (T.Of.26, T.Piso 7, T.Piso 8, Bodega 13, Bodega 16) - el sistema de Ajuste Intermedio solo distingue por rut+sitio, no por edificio, asi que NO se puede guardar una fecha unica de Inicio Serv.Adm aqui sin perder informacion. Fechas encontradas por edificio: T.Of.26 = 17/03/2025 (Acta de Entrega Oficina 26, contrato madre de 28 paginas ilegible por OCR). T.Piso 7 = 16/03/2024 (contrato con periodo de gracia explicito hasta esa fecha, cubre renta Y Servicios de Administracion). T.Piso 8 = 17/02/2025 (Acta de Entrega, contrato tambien ilegible). Bodega 13 (aprox $25.751) y Bodega 16 (aprox $38.831) = NO SE ENCONTRO CONTRATO, solo un Acta de Entrega sin fecha de inicio de contrato (13/01/2025), pero ya se factura Serv.Adm para estas bodegas en 2026 (confirmado en Facturas_PISA_2026-06.pdf) - pedir el documento real antes de asumir esa fecha.",
+      "inicioSA": "VARIOS - ver notas"
     },
     "76.014.805-9|A-2": {
       "pasos": [],
