@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:32:04.271Z",
+  "updatedAt": "2026-09-01T21:32:05.773Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -279,10 +279,6 @@
       "pasos": [],
       "notas": "Ctto. Unex-061124 a notaria Modificacion.pdf. IMPORTANTE: % escala 6% (01/11/2024 a 31/10/2026), 12% desde 01/11/2026 - la planilla trae flat, actualizar en noviembre 2026. Contrato original 2008 no tenia SA (no verificado al 100%).",
       "inicioSA": "01/11/2024"
-    },
-    "__deploy_check2__|__x__": {
-      "pasos": [],
-      "inicioSA": "S/C - test"
     }
   }
 }
