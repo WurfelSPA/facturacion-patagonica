@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:21:08.993Z",
+  "updatedAt": "2026-09-01T21:22:58.632Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -19,7 +19,16 @@
       }
     },
     "99.576.080-0|5-A": {
-      "pasos": [],
+      "pasos": [
+        {
+          "fecha": "2023-05-24",
+          "uf": 143.25
+        },
+        {
+          "fecha": "2024-05-24",
+          "uf": 154.71
+        }
+      ],
       "notas": "A2 -4A-5A Contrato Unificado Olympus firmado.pdf (Edif.71). Contrato unificado reemplaza instrumentos anteriores; Edif.71 ya entregado antes pero SA rige desde la firma del nuevo contrato. 12% plano (otros sitios del mismo contrato si escalan).",
       "inicioSA": "10/02/2026"
     },
