@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-25T19:58:41.132Z",
+  "updatedAt": "2026-09-01T21:06:46.327Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -165,6 +165,10 @@
         }
       ],
       "notas": "Renovacion automatica 01-06-2022: UF sube de 309.18 (contrato inicial) a 324.64 (+5%). Renovacion automatica 01-06-2025: UF sube de 324.64 a 340.87 (+5%, ya reflejado en la facturacion real). Proxima renovacion/reajuste: 01-06-2028 (contrato vigente hasta 31-05-2028 segun Anexo N1 en tramite; el contrato original no se dio por terminado por ninguna parte). 5% cada 3 anios estipulado en el contrato, ya reflejado en columnas % Reaj./Cada de la planilla, por lo que no se registra regla recurrente aparte aqui."
+    },
+    "78.371.217-2|5-A": {
+      "pasos": [],
+      "notas": "Contrato 5A Edf77 2R Spa Ltda.pdf (firmado 15-04-2026). Cl�usula Sexta: Servicios de Administraci�n corren a contar de la fecha de entrega de la Propiedad Arrendada; Cl�usula S�ptima fija esa entrega en 02-05-2026. OJO: % Serv.Adm. escalona 6% meses 1-6, 9% meses 7-12, 12% desde la renovaci�n � la Planilla solo trae el 6% fijo."
     }
   }
 }
