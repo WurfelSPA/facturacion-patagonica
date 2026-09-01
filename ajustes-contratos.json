@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:19:28.774Z",
+  "updatedAt": "2026-09-01T21:19:30.395Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -116,20 +116,9 @@
       }
     },
     "96.885.670-7|5-A": {
-      "pasos": [
-        {
-          "fecha": "2026-07-30",
-          "uf": 390.59
-        },
-        {
-          "fecha": "2027-07-30",
-          "uf": 400.6
-        },
-        {
-          "fecha": "2028-07-30",
-          "uf": 410.62
-        }
-      ]
+      "pasos": [],
+      "notas": "Ctto. Ingersoll 5A B-67 del 05-05-2025.pdf + Anexo Memo Comercial 12-06-2025. IMPORTANTE: % escala por anio de contrato: 3% anio1, 5% anio2, 7% anio3, 10% anio4, 12% anio5 - la planilla trae flat 6%, revisar segun el anio en que estemos. Entrega atrasada por habilitacion (original 30/07/2025 -> real 01/10/2025).",
+      "inicioSA": "01/10/2025"
     },
     "99.517.650-5|5-A": {
       "pasos": [
