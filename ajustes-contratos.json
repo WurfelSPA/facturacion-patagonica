@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:19:34.447Z",
+  "updatedAt": "2026-09-01T21:19:35.403Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -177,6 +177,11 @@
       "pasos": [],
       "notas": "Acta de Entrega 5AE73 NCH.pdf + Ficha Resumen interna (Edif.73). Confianza media: contrato PDF escaneado sin texto legible, fecha corroborada por Acta de Entrega y ficha interna (12%).",
       "inicioSA": "12/09/2022"
+    },
+    "76.914.556-7|5-A": {
+      "pasos": [],
+      "notas": "Modificacion Ctto. Alimentos Neva 5AE74 310524.pdf. Muy claro: contrato original 2003 no tenia SA, modificacion 2024 lo incorpora con fecha explicita. 12%.",
+      "inicioSA": "01/06/2024"
     }
   }
 }
