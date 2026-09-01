@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:33:30.734Z",
+  "updatedAt": "2026-09-01T21:33:33.094Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -229,8 +229,8 @@
     },
     "78.366.970-6|A-2": {
       "pasos": [],
-      "notas": "Modificacion Ctto. Baxter A2E5 171224.pdf (Edif.5-A, 2672-A). IMPORTANTE: % escala 6% (2025), 8% (2026), 12% desde 2027 - la planilla trae flat 6%, actualizar en enero 2026 y 2027. Contrato original 2012 no tenia SA, se incorporo recien en esta modificacion dic-2024.",
-      "inicioSA": "01/01/2025"
+      "notas": "Baxter tiene DOS sitios bajo el mismo codigo de zona A-2 (Edif.4-B y Edif.5-A) - el sistema de Ajuste Intermedio solo distingue por rut+sitio, no por edificio, asi que no se puede guardar un solo valor aqui sin perder informacion. EDIF.5-A (2672-A): SI tiene contrato (Modificacion Ctto. Baxter A2E5 171224.pdf) - Inicio Serv.Adm. 01/01/2025, % escala 6% (2025), 8% (2026), 12% desde 2027 - la planilla trae flat 6%, actualizar en enero 2026 y 2027. EDIF.4-B: NO EXISTE CONTRATO en Drive - la ficha interna de Patagonica dice literalmente 'NO TENEMOS EL CONTRATO' - y sin embargo se factura 6% (aprox $243.616) igual segun la Planilla.",
+      "inicioSA": "VARIOS - ver notas"
     },
     "76.577.652-K|A-2": {
       "pasos": [],
