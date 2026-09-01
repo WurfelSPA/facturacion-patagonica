@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:19:43.054Z",
+  "updatedAt": "2026-09-01T21:19:44.162Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -191,6 +191,11 @@
       "pasos": [],
       "notas": "Modificacion Ctto. Ilab A2PCL4 220125.pdf. 12% fijo. Contrato original 2017 no tenia SA; hay una modificacion intermedia 2022 no legible por OCR, no se pudo verificar el periodo 2022-2024.",
       "inicioSA": "01/12/2024"
+    },
+    "76.442.099-3|A-2": {
+      "pasos": [],
+      "notas": "Cesion y Modificacion Ctto. Alimentos JP A2PCL6 160424.pdf. 12% fijo. Contrato original 2019 no tenia SA, se incorporo en esta modificacion abril-2024.",
+      "inicioSA": "01/05/2024"
     }
   }
 }
