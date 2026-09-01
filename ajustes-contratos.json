@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:07:26.871Z",
+  "updatedAt": "2026-09-01T21:07:37.473Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -168,7 +168,8 @@
     },
     "78.371.217-2|5-A": {
       "pasos": [],
-      "notas": "Contrato 5A Edf77 2R Spa Ltda.pdf (firmado 15-04-2026). Cl�usula Sexta: Servicios de Administraci�n corren a contar de la fecha de entrega de la Propiedad Arrendada; Cl�usula S�ptima fija esa entrega en 02-05-2026. OJO: % Serv.Adm. escalona 6% meses 1-6, 9% meses 7-12, 12% desde la renovaci�n � la Planilla solo trae el 6% fijo."
+      "notas": "Contrato 5A Edf77 2R Spa Ltda.pdf (firmado 15-04-2026). Clausula Sexta: Servicios de Administracion corren a contar de la fecha de entrega de la Propiedad Arrendada; Clausula Septima fija esa entrega en 02-05-2026. OJO: % Serv.Adm. escalona 6% meses 1-6, 9% meses 7-12, 12% desde la renovacion -- la Planilla solo trae el 6% fijo.",
+      "inicioSA": "02/05/2026"
     },
     "78.371.217-2|A-2": {
       "pasos": [],
