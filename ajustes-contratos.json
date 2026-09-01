@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:21:06.504Z",
+  "updatedAt": "2026-09-01T21:21:08.993Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -218,6 +218,11 @@
       "pasos": [],
       "notas": "CONTRATO DE SUBARRENDAMIENTO A GRUPO DROP.pdf. IMPORTANTE: % escala 3% meses1-3, 6% meses4-6, 9% meses7-9, 12% desde mes10 (contado desde 01/12/2024) - deberia estar en 12% ya. La planilla trae flat, revisar.",
       "inicioSA": "01/12/2024"
+    },
+    "76.016.809-2|A-2": {
+      "pasos": [],
+      "notas": "Ctto. Unex-061124 a notaria Modificacion.pdf. IMPORTANTE: % escala 6% (01/11/2024 a 31/10/2026), 12% desde 01/11/2026 - la planilla trae flat, actualizar en noviembre 2026. Contrato original 2008 no tenia SA (no verificado al 100%).",
+      "inicioSA": "01/11/2024"
     }
   }
 }
