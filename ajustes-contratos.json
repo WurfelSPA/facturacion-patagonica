@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:21:00.970Z",
+  "updatedAt": "2026-09-01T21:21:03.921Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -225,6 +225,11 @@
       "pasos": [],
       "notas": "Ctto. Comercial Sna-e (Chile) Limitada-5AE66A 131223.pdf. Contrato pacta bodega=01/12/2023 y oficinas=01/03/2024 por separado, pero Acta de Entrega/Ficha Resumen fijan inicio real 01/04/2024 (usado). 12%.",
       "inicioSA": "01/04/2024"
+    },
+    "78.064.534-2|5-A": {
+      "pasos": [],
+      "notas": "CONTRATO DE SUBARRENDAMIENTO A GRUPO DROP.pdf. IMPORTANTE: % escala 3% meses1-3, 6% meses4-6, 9% meses7-9, 12% desde mes10 (contado desde 01/12/2024) - deberia estar en 12% ya. La planilla trae flat, revisar.",
+      "inicioSA": "01/12/2024"
     }
   }
 }
