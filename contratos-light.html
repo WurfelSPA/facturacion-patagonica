@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Contratos · Patagónica</title>
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#f5f6f8; --surf:#ffffff; --bdr:#e2e5ea; --tx:#1a1d24; --txm:#4a5063; --txd:#8890a0;
+    --acc:#5b4cdb;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent;}
+  header{position:sticky;top:0;z-index:5;background:var(--surf);border-bottom:1px solid var(--bdr);padding:12px 14px;box-shadow:0 1px 4px rgba(0,0,0,.04);}
+  header h1{font-size:14px;margin:0 0 8px;color:var(--txd);letter-spacing:.03em;font-weight:700;text-transform:uppercase;}
+  select{width:100%;font-size:16px;padding:12px 14px;border-radius:10px;border:1px solid var(--bdr);background:var(--surf);color:var(--tx);}
+  main{padding:14px;max-width:640px;margin:0 auto;}
+  .msg{padding:40px 16px;text-align:center;color:var(--txd);font-size:14px;}
+  .card{background:var(--surf);border:1px solid var(--bdr);border-radius:14px;overflow:hidden;margin-top:2px;}
+  .card .nombre{padding:16px 18px 4px;font-size:19px;font-weight:800;}
+  .card .rut{padding:0 18px 14px;color:var(--txd);font-family:'DM Mono',monospace;font-size:13px;border-bottom:1px solid var(--bdr);}
+  .fila{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid var(--bdr);font-size:14px;}
+  .fila:last-child{border-bottom:none;}
+  .fila .lbl{color:var(--txm);flex-shrink:0;}
+  .fila .val{font-weight:700;text-align:right;font-family:'DM Mono',monospace;font-size:13.5px;}
+  .fila .val.vacio{color:var(--txd);font-weight:400;}
+  .grupo-titulo{padding:10px 18px 2px;font-size:10px;font-weight:700;color:var(--acc);letter-spacing:.08em;text-transform:uppercase;}
+</style>
+</head>
+<body>
+<header>
+  <h1>Contratos — Patagónica</h1>
+  <select id="sel">
+    <option value="">Cargando clientes…</option>
+  </select>
+</header>
+<main id="main"><div class="msg">Selecciona un cliente arriba para ver su ficha.</div></main>
+
+<script>
+const ufCache={};
+async function getUFHoy(){
+  const now=new Date();
+  const key="hoy-"+now.toISOString().slice(0,10);
+  if(ufCache[key])return ufCache[key];
+  try{
+    const r=await fetch("https://mindicador.cl/api/uf");
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const d=await r.json();
+    const serie=d.serie||[];
+    if(serie.length){ufCache[key]=serie[0].valor;return serie[0].valor;}
+  }catch(e){console.warn("UF hoy",e.message);}
+  return null;
+}
+
+function serialToDate(v){
+  if(!v||typeof v!=="number")return"";
+  try{
+    const d=new Date(Date.UTC(1899,11,30)+Math.round(v)*86400000);
+    return`${String(d.getUTCDate()).padStart(2,"0")}/${String(d.getUTCMonth()+1).padStart(2,"0")}/${d.getUTCFullYear()}`;
+  }catch(e){return"";}
+}
+function parseDate(v){
+  if(!v||v==="—"||v==="-"||v==="")return null;
+  if(typeof v==="string"&&v.includes("/")){
+    const[d,mm,y]=v.split("/").map(Number);
+    if(!d||!mm||!y)return null;
+    return new Date(y,mm-1,d);
+  }
+  return null;
+}
+function renovacionTexto(termTermino){
+  const d=parseDate(termTermino);
+  if(!d)return"—";
+  const d2=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1);
+  return`${String(d2.getDate()).padStart(2,"0")}/${String(d2.getMonth()+1).padStart(2,"0")}/${d2.getFullYear()}`;
+}
+function fmtCLP(v){return v==null||isNaN(v)?"—":"$"+Math.round(v).toLocaleString("es-CL");}
+function fmtUF(v){return v==null||isNaN(v)?"—":v.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+/* Misma lógica de columnas que parsePlanillaParaDashboard() en index.html
+   (hoja "Flujo", filas desde la 5, columnas F→BJ). */
+async function parsePlanilla(buf){
+  const wb=XLSX.read(buf,{type:"array"});
+  const ws=wb.Sheets["Flujo"];
+  if(!ws)throw new Error("No se encontró la hoja 'Flujo' en la planilla");
+  const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+  const SKIP=/^(Total|Area|Arrendado|En negociación|Para confirmar|#|\d+$)/;
+  const clients=[];
+  for(let ri=4;ri<raw.length;ri++){
+    const row=raw[ri];
+    if(!row)continue;
+    const rut=row[9];
+    const nombre=row[11]||row[10];
+    if(!nombre)continue;
+    const name=String(nombre).trim();
+    if(/^(VACANTE|Vacante)/.test(name))continue;
+    if(!rut||typeof rut!=="string")continue;
+    if(!rut.match(/\d+\.\d+/))continue;
+    if(SKIP.test(name)||name.includes("Total")||name.startsWith("#")||name==="")continue;
+    const ufArr=typeof row[47]==="number"?row[47]:0;
+    const pctAdm=row[51];
+    let ufSrv=0;
+    if(typeof pctAdm==="number"&&pctAdm>0&&pctAdm<1)ufSrv=ufArr*pctAdm;
+    else if(typeof pctAdm==="number"&&pctAdm>=1&&pctAdm<=10)ufSrv=pctAdm;
+    clients.push({
+      nombre:name,rut:String(rut).trim(),
+      sitio:String(row[7]||"").replace(/\s+/g," ").trim(),
+      edificio:String(row[8]||"").trim(),
+      dir:String(row[10]||"").trim(),
+      termContrato:serialToDate(row[14]),
+      termTermino:serialToDate(row[15]),
+      renovacion:row[16]!=null?String(row[16]).trim():"",
+      aviso:row[17]!=null?String(row[17]).trim():"",
+      pctReaj:row[53]!=null?String(row[53]):"",
+      m2:row[42]!=null&&row[42]!==""?Number(row[42]):null,
+      ufInicio:typeof row[61]==="number"?Math.round(row[61]*100)/100:0,
+      ufArr:Math.round(ufArr*100)/100,
+      ufSrv:Math.round(ufSrv*100)/100,
+    });
+  }
+  return clients;
+}
+
+function fila(lbl,val,vacio){
+  const d=document.createElement("div");
+  d.className="fila";
+  const l=document.createElement("span");l.className="lbl";l.textContent=lbl;
+  const v=document.createElement("span");v.className="val"+(vacio?" vacio":"");v.textContent=val;
+  d.append(l,v);
+  return d;
+}
+function grupoTitulo(txt){
+  const d=document.createElement("div");d.className="grupo-titulo";d.textContent=txt;return d;
+}
+
+function renderCliente(c,ufHoy){
+  const main=document.getElementById("main");
+  main.innerHTML="";
+  const card=document.createElement("div");card.className="card";
+  const nom=document.createElement("div");nom.className="nombre";nom.textContent=c.nombre;
+  const rut=document.createElement("div");rut.className="rut";rut.textContent="RUT: "+(c.rut||"—");
+  card.append(nom,rut);
+
+  card.append(grupoTitulo("Ubicación"));
+  card.append(fila("Sitio",c.sitio||"—",!c.sitio));
+  card.append(fila("Edificio",c.edificio||"—",!c.edificio));
+  card.append(fila("Dirección",c.dir||"—",!c.dir));
+
+  const arriendoCLP=ufHoy&&c.ufArr>0?c.ufArr*ufHoy:null;
+  const servAdmCLP=ufHoy&&c.ufSrv>0?c.ufSrv*ufHoy:null;
+  card.append(grupoTitulo("Arriendo"));
+  card.append(fila("Arriendo actual UF",c.ufArr>0?fmtUF(c.ufArr):"—",!(c.ufArr>0)));
+  card.append(fila("Arriendo actual",fmtCLP(arriendoCLP),arriendoCLP==null));
+  card.append(fila("Serv.Adm. UF",c.ufSrv>0?fmtUF(c.ufSrv):"—",!(c.ufSrv>0)));
+  card.append(fila("Serv.Adm.",fmtCLP(servAdmCLP),servAdmCLP==null));
+
+  card.append(grupoTitulo("Contrato"));
+  card.append(fila("Inicio",c.termContrato||"—",!c.termContrato));
+  card.append(fila("UF Inicio",c.ufInicio>0?fmtUF(c.ufInicio):"—",!(c.ufInicio>0)));
+  card.append(fila("Periodo",c.renovacion||"—",!c.renovacion));
+  card.append(fila("% Reaj.",c.pctReaj&&c.pctReaj!=="-"?c.pctReaj+"%":"—",!(c.pctReaj&&c.pctReaj!=="-")));
+  card.append(fila("Aviso",c.aviso||"—",!c.aviso));
+  card.append(fila("Renovación",renovacionTexto(c.termTermino),renovacionTexto(c.termTermino)==="—"));
+
+  card.append(grupoTitulo("Superficie"));
+  card.append(fila("m2",c.m2!=null?c.m2:"—",c.m2==null));
+  card.append(fila("UF x m2",(c.ufArr>0&&c.m2>0)?fmtUF(c.ufArr/c.m2):"—",!(c.ufArr>0&&c.m2>0)));
+
+  main.append(card);
+}
+
+(async function init(){
+  const sel=document.getElementById("sel");
+  const main=document.getElementById("main");
+  try{
+    const[planillaRes,ufHoy]=await Promise.all([
+      fetch("/api/planilla").then(r=>{if(!r.ok)throw new Error("No se pudo cargar la planilla (HTTP "+r.status+")");return r.arrayBuffer();}),
+      getUFHoy()
+    ]);
+    const clients=await parsePlanilla(planillaRes);
+    const unicos=[...new Map(clients.map(c=>[c.rut,c])).values()].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es"));
+    sel.innerHTML="";
+    const opt0=document.createElement("option");opt0.value="";opt0.textContent="— Seleccionar cliente —";
+    sel.append(opt0);
+    unicos.forEach((c,i)=>{
+      const o=document.createElement("option");o.value=i;o.textContent=c.nombre+(c.sitio?" ("+c.sitio+")":"");
+      sel.append(o);
+    });
+    sel.onchange=()=>{
+      if(sel.value==="")main.innerHTML='<div class="msg">Selecciona un cliente arriba para ver su ficha.</div>';
+      else renderCliente(unicos[Number(sel.value)],ufHoy);
+    };
+  }catch(e){
+    console.error(e);
+    sel.innerHTML='<option value="">Error al cargar</option>';
+    main.innerHTML='<div class="msg">'+ (e.message||"Error al cargar la planilla") +'</div>';
+  }
+})();
+</script>
+</body>
+</html>
