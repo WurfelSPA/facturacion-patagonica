@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-01T21:19:46.032Z",
+  "updatedAt": "2026-09-01T21:19:48.151Z",
   "items": {
     "96.836.580-0|5-A": {
       "pasos": [
@@ -204,8 +204,8 @@
     },
     "61.981.060-0|A-2": {
       "pasos": [],
-      "notas": "Ctto. Arrendamiento SLEP A2TOF26,61,63,P8 231224.pdf + Acta de Entrega Oficina 26. CONFIANZA MEDIA: contrato madre de 28 paginas ilegible por OCR, fecha apoyada en Acta de Entrega especifica. Confirmar % y escalonamiento manualmente si es posible.",
-      "inicioSA": "17/03/2025"
+      "notas": "Acta de Entrega Piso 8 Slep Firmada.pdf. CONFIANZA MEDIA: contrato notarial de 28 paginas ilegible (mismo problema que Of.26), no se pudo confirmar textualmente la clausula de SA ni descartar un periodo de gracia como en Piso 7.",
+      "inicioSA": "17/02/2025"
     }
   }
 }
