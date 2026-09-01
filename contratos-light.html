@@ -61,18 +61,26 @@ function fmtCLP(v){return v==null||isNaN(v)?"—":"$"+Math.round(v).toLocaleStri
 function fmtUF(v){return v==null||isNaN(v)?"—":v.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2});}
 function el(tag,cls,txt){const d=document.createElement(tag);if(cls)d.className=cls;if(txt!=null)d.textContent=txt;return d;}
 
+/* fetch con timeout — evita que una API externa lenta/caída (ej. mindicador.cl)
+   deje la página colgada para siempre en "Cargando...". */
+function fetchTimeout(url,opts,ms){
+  const ctrl=new AbortController();
+  const t=setTimeout(()=>ctrl.abort(),ms||12000);
+  return fetch(url,{...(opts||{}),signal:ctrl.signal}).finally(()=>clearTimeout(t));
+}
+
 const ufCache={};
 async function getUFHoy(){
   const now=new Date();
   const key="hoy-"+now.toISOString().slice(0,10);
   if(ufCache[key])return ufCache[key];
   try{
-    const r=await fetch("https://mindicador.cl/api/uf");
+    const r=await fetchTimeout("https://mindicador.cl/api/uf",null,6000);
     if(!r.ok)throw new Error("HTTP "+r.status);
     const d=await r.json();
     const serie=d.serie||[];
     if(serie.length){ufCache[key]=serie[0].valor;return serie[0].valor;}
-  }catch(e){console.warn("UF hoy",e.message);}
+  }catch(e){console.warn("UF hoy no disponible:",e.message);}
   return null;
 }
 
@@ -220,15 +228,15 @@ function xlsxFromBuf(buf){
   return parseFxCSheetValues(raw);
 }
 async function cargarFacturasXCobrar(){
-  const ls=await fetch("/api/historial?ls="+DRIVE_FACTURACION_FOLDER_ID).then(r=>r.json());
+  const ls=await fetchTimeout("/api/historial?ls="+DRIVE_FACTURACION_FOLDER_ID,null,20000).then(r=>r.json());
   const sub=(ls.files||[]).find(f=>f.name.toLowerCase().includes("cobrar")&&(f.mimeType||"").includes("folder"));
   if(!sub)throw new Error('No se encontró la carpeta "Facturas x Cobrar PISA" en Drive');
-  const ls2=await fetch("/api/historial?ls="+sub.id).then(r=>r.json());
+  const ls2=await fetchTimeout("/api/historial?ls="+sub.id,null,20000).then(r=>r.json());
   function dateKey(name){const m=name.match(/(\d{2})-(\d{2})-(\d{4})/);return m?m[3]+m[2]+m[1]:name;}
   const xl=(ls2.files||[]).filter(f=>f.name.toLowerCase().endsWith(".xlsx")).sort((a,b)=>dateKey(a.name).localeCompare(dateKey(b.name)));
   if(!xl.length)throw new Error("No hay archivos de Facturas x Cobrar en Drive");
   const last=xl[xl.length-1];
-  const buf=await fetch("/api/historial?fileId="+last.id).then(r=>{if(!r.ok)throw new Error("Drive "+r.status);return r.arrayBuffer();});
+  const buf=await fetchTimeout("/api/historial?fileId="+last.id,null,20000).then(r=>{if(!r.ok)throw new Error("Drive "+r.status);return r.arrayBuffer();});
   const rows=xlsxFromBuf(buf);
   const clientMap={};
   rows.forEach(r=>{
@@ -284,12 +292,12 @@ async function activarTab(tab){
     if(!cache.contratos){
       sel.innerHTML='<option value="">Cargando clientes…</option>';
       msg("Cargando planilla…");
+      /* La UF del día (mindicador.cl) no debe frenar la carga de clientes —
+         si esa API externa está lenta o caída, igual queremos mostrar la
+         lista; los montos en CLP simplemente muestran "—" hasta que llegue. */
+      if(ufHoy==null)getUFHoy().then(uf=>{ufHoy=uf;});
       try{
-        const[buf,uf]=await Promise.all([
-          fetch("/api/planilla").then(r=>{if(!r.ok)throw new Error("No se pudo cargar la planilla (HTTP "+r.status+")");return r.arrayBuffer();}),
-          ufHoy!=null?Promise.resolve(ufHoy):getUFHoy()
-        ]);
-        ufHoy=uf;
+        const buf=await fetchTimeout("/api/planilla",null,20000).then(r=>{if(!r.ok)throw new Error("No se pudo cargar la planilla (HTTP "+r.status+")");return r.arrayBuffer();});
         const clients=await parsePlanilla(buf);
         cache.contratos=[...new Map(clients.map(c=>[c.rut,c])).values()].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es"));
       }catch(e){
