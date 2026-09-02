@@ -655,9 +655,15 @@ async function uploadZipToDrive(_token,zipName,zipBase64,folderId){
   if(!res.ok||!data.id) throw new Error("Upload Drive: "+(data.error||JSON.stringify(data)));
   return data.id;
 }
-function buildEmailHtml(cliente,concepto,periodo,ufPlan,factura,ufRate){
+function buildEmailHtml(cliente,concepto,periodo,ufPlan,factura,ufRate,montoTotal){
   const mes=periodo.toLowerCase();
-  const clp=ufRate?Math.round(ufPlan*ufRate):null;
+  /* Preferir el monto REAL de la factura (montoTotal, extraído del PDF/XML —
+     ya incluye IVA) por sobre recalcular ufPlan*ufRate: ese cálculo siempre
+     da el neto sin IVA, y además revienta si ufPlan no es en realidad una
+     cantidad UF (ej. clientes con Serv.Adm. facturado como monto fijo en
+     pesos — el "monto" quedaba leído como si fueran UF y multiplicado de
+     nuevo por la UF, dando cifras miles de veces más grandes que la real). */
+  const clp=(montoTotal!=null&&montoTotal>0)?Math.round(montoTotal):(ufRate?Math.round(ufPlan*ufRate):null);
   const fmtClp=v=>"$"+v.toLocaleString("es-CL");
   const ufStr=(ufPlan!=null&&ufPlan>0)?ufPlan.toFixed(2)+" UF":"—";
   const montoHtml=clp
@@ -672,7 +678,9 @@ function buildEmailHtmlMulti(cliente,periodo,filas,ufRate){
   const mes=periodo.toLowerCase();
   const fmtClp=v=>"$"+v.toLocaleString("es-CL");
   const filasHtml=filas.map(r=>{
-    const clp=ufRate&&r.ufPlan>0?Math.round(r.ufPlan*ufRate):null;
+    /* Mismo criterio que buildEmailHtml: preferir el monto real (con IVA) por
+       sobre recalcular ufPlan*ufRate. */
+    const clp=(r.montoTotal!=null&&r.montoTotal>0)?Math.round(r.montoTotal):(ufRate&&r.ufPlan>0?Math.round(r.ufPlan*ufRate):null);
     const ufStr=(r.ufPlan!=null&&r.ufPlan>0)?r.ufPlan.toFixed(2)+" UF":"—";
     const montoStr=clp?`${fmtClp(clp)} <span style="color:#888;font-size:11px">(${ufStr})</span>`:ufStr;
     return `<tr><td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0">${r.concepto}</td><td style="padding:11px 16px;font-size:13px;color:#111;font-weight:600;font-family:monospace;border-bottom:1px solid #f0f0f0">${r.factura||"—"}</td><td style="padding:11px 16px;font-size:13px;color:#111;border-bottom:1px solid #f0f0f0">${montoStr}</td></tr>`;
@@ -7081,7 +7089,7 @@ function App(){
         const folios=filas.map(f=>f.factura).filter(Boolean).join(", ");
         const conceptos=[...new Set(filas.map(f=>f.concepto))].join(" y ");
         const subject=row.cliente+" "+folios+" — "+conceptos+" "+periodo+" — Patagónica Inmobiliaria SpA";
-        const htmlBody=filas.length>1?buildEmailHtmlMulti(row.cliente,periodo,filas,ufSII):buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura,ufSII);
+        const htmlBody=filas.length>1?buildEmailHtmlMulti(row.cliente,periodo,filas,ufSII):buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura,ufSII,row.montoTotal);
         await sendGmailMulti(token,dest,CCO,REMITENTE,subject,htmlBody,attachments);
         for(const f of filas){
           const key=`${periodo}|${f.cliente}|${f.concepto}|${f.factura||""}`;
@@ -7091,7 +7099,7 @@ function App(){
         notify("✓ Correo enviado"+(MODO_PRUEBA?" (PRUEBA)":"")+" → "+dest+" · "+attachments.length+" archivo(s), "+filas.length+" factura(s)");
       }else{
         const subject=row.cliente+" "+row.factura+" — "+row.concepto+" "+periodo+" — Patagónica Inmobiliaria SpA";
-        const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura,ufSII);
+        const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura,ufSII,row.montoTotal);
         let attB64=null,attNombre=null;
         const pdf=pdfMap[row.factura];
         if(pdf?.zipPath&&files.zip){try{attB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}}
@@ -7209,7 +7217,7 @@ function App(){
             const folios=filas.map(f=>f.factura).filter(Boolean).join(", ");
             const conceptos=[...new Set(filas.map(f=>f.concepto))].join(" y ");
             const subject=row.cliente+" "+folios+" — "+conceptos+" "+periodo+" — Patagónica Inmobiliaria SpA";
-            const htmlBody=filas.length>1?buildEmailHtmlMulti(row.cliente,periodo,filas,ufSII):buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura,ufSII);
+            const htmlBody=filas.length>1?buildEmailHtmlMulti(row.cliente,periodo,filas,ufSII):buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura,ufSII,row.montoTotal);
             await sendGmailMulti(token,dest,CCO,REMITENTE,subject,htmlBody,attachments);
             for(const f of filas){
               const key=`${periodo}|${f.cliente}|${f.concepto}|${f.factura||""}`;
@@ -7219,7 +7227,7 @@ function App(){
             }
           }else{
             const subject=row.cliente+" "+row.factura+" — "+row.concepto+" "+periodo+" — Patagónica Inmobiliaria SpA";
-            const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura,ufSII);
+            const htmlBody=buildEmailHtml(row.cliente,row.concepto,periodo,row.ufPlan,row.factura,ufSII,row.montoTotal);
             let attB64=null,attNombre=null;
             const pdf=pdfMap[row.factura];
             if(pdf?.zipPath&&files.zip){try{attB64=await getPdfBase64FromZip(files.zip,pdf.zipPath);}catch(e){}}
