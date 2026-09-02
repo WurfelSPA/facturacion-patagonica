@@ -1001,16 +1001,23 @@ function _rutNormMora(r){const s=(r||"").replace(/\./g,"").replace(/-/g,"").toLo
 function parseFacturasPorCobrarBase(values){
   if(!values||values.length<2)throw new Error("Sin datos en hoja Base");
   const hdr=values[0].map(h=>String(h||"").toLowerCase().replace(/[\r\n\s_]/g,""));
-  function fi(tests){for(let i=0;i<hdr.length;i++)for(const t of tests)if(hdr[i].includes(t))return i;return -1;}
+  /* Prioriza por TEST, no por columna — "Días Doc" (antigüedad real) y "Días
+     Pag" (columna anterior, siempre "0" en facturas reales, solo distinta de
+     0 en los movimientos de Apertura/Cierre de año) matchean ambas contra
+     "diaspag"/"diasdoc". Escanear columnas de izquierda a derecha hacía que
+     siempre ganara "Días Pag" (viene antes), mostrando facturas vencidas
+     hace meses como si estuvieran al día. */
+  function fi(tests){for(const t of tests){for(let i=0;i<hdr.length;i++)if(hdr[i].includes(t))return i;}return -1;}
   const iCod=fi(["cod"])>=0?fi(["cod"]):3;
   const iCliente=fi(["cliente"])>=0?fi(["cliente"]):4;
-  const iDiasDoc=fi(["diasdoc","ddoc","diaspag"])>=0?fi(["diasdoc","ddoc","diaspag"]):11;
+  const iGlosa=fi(["glosa"])>=0?fi(["glosa"]):5;
+  const iDiasDoc=fi(["diasdoc","ddoc"])>=0?fi(["diasdoc","ddoc"]):11;
   const iMonto=fi(["monto","c/d(ml)","c/d(m"])>=0?fi(["monto","c/d(ml)","c/d(m"]):13;
   const iSdo=fi(["sdo","vencido"])>=0?fi(["sdo","vencido"]):14;
   function n(v){return parseFloat(String(v||"0").replace(/[^0-9.\-]/g,""))||0;}
   return values.slice(1)
     .filter(r=>r.length>4&&String(r[iCliente]||"").trim()!==""&&String(r[iCliente]||"").trim()!=="Cliente")
-    .map(r=>({rut:String(r[iCod]||"").trim(),cliente:String(r[iCliente]||"").trim(),diasDoc:n(r[iDiasDoc]),monto:n(r[iMonto]),sdoVencido:n(r[iSdo])}))
+    .map(r=>({rut:String(r[iCod]||"").trim(),cliente:String(r[iCliente]||"").trim(),glosa:String(r[iGlosa]||"").trim(),diasDoc:n(r[iDiasDoc]),monto:n(r[iMonto]),sdoVencido:n(r[iSdo])}))
     .filter(r=>r.monto>0||r.sdoVencido>0);
 }
 /* Descubre y carga el último "F x Cobrar Pisa *.xlsx" en Drive, agregado por RUT → {maxDias,totalDeuda,nombre} */
@@ -1035,7 +1042,10 @@ async function fetchFacturasPorCobrarMora(){
     if(!key)return;
     if(!porRut[key])porRut[key]={maxDias:0,totalDeuda:0,nombre:r.cliente};
     porRut[key].totalDeuda+=r.monto;
-    if(r.diasDoc>porRut[key].maxDias)porRut[key].maxDias=r.diasDoc;
+    /* "Apertura año X"/"Cierre año X" son traspasos contables (se anulan entre
+       sí, no son deuda real) pero traen una antigüedad grande (~desde el
+       1-ene) que distorsionaría la mora real si se cuenta. */
+    if(!/^(Apertura|Cierre) año/i.test(r.glosa)&&r.diasDoc>porRut[key].maxDias)porRut[key].maxDias=r.diasDoc;
   });
   return{porRut,fecha:dateKey(last.name)};
 }
@@ -2606,7 +2616,11 @@ function FactxCobrarView({notify}){
   function parseSheetValues(values){
     if(!values||values.length<2)throw new Error("Sin datos ("+( values?values.length:0)+" filas)");
     var hdr=values[0].map(function(h){return String(h||"").toLowerCase().replace(/[\r\n\s_]/g,"");});
-    function fi(tests){for(var i=0;i<hdr.length;i++){for(var t=0;t<tests.length;t++){if(hdr[i].includes(tests[t]))return i;}}return -1;}
+    /* Prioriza por TEST, no por columna — ver nota en parseFacturasPorCobrarBase:
+       "Días Pag" (siempre "0" en facturas reales) matchea "diaspag" y viene
+       antes que "Días Doc" en el archivo, así que escanear columnas de
+       izquierda a derecha elegía siempre la columna equivocada. */
+    function fi(tests){for(var t=0;t<tests.length;t++){for(var i=0;i<hdr.length;i++){if(hdr[i].includes(tests[t]))return i;}}return -1;}
     var iFecha=fi(["fecha"]); if(iFecha<0)iFecha=1;
     var iTipo=fi(["tipo"]); if(iTipo<0)iTipo=2;
     var iCod=fi(["cod"]); if(iCod<0)iCod=3;
@@ -2614,7 +2628,7 @@ function FactxCobrarView({notify}){
     var iGlosa=fi(["glosa"]); if(iGlosa<0)iGlosa=5;
     var iFolio=fi(["folio"]); if(iFolio<0)iFolio=8;
     var iVcto=fi(["vcto"]); if(iVcto<0)iVcto=9;
-    var iDiasDoc=fi(["diasdoc","ddoc","diaspag"]); if(iDiasDoc<0)iDiasDoc=11;
+    var iDiasDoc=fi(["diasdoc","ddoc"]); if(iDiasDoc<0)iDiasDoc=11;
     var iMonto=fi(["monto","c/d(ml)","c/d(m"]); if(iMonto<0)iMonto=13;
     var iSdo=fi(["sdo","vencido"]); if(iSdo<0)iSdo=14;
     function n(v){return parseFloat(String(v||"0").replace(/[^0-9.\-]/g,""))||0;}
@@ -2712,7 +2726,10 @@ function FactxCobrarView({notify}){
     if(!clientMap[k]){clientMap[k]={rut:r.rut,nombre:r.cliente,docs:[],total:0,maxDias:0};}
     clientMap[k].docs.push(r);
     clientMap[k].total+=r.monto;
-    if(r.diasDoc>clientMap[k].maxDias)clientMap[k].maxDias=r.diasDoc;
+    /* "Apertura año X"/"Cierre año X" son traspasos contables (se anulan
+       entre sí, no son deuda real) pero traen una antigüedad grande que
+       distorsionaría la mora real si se cuenta para el bucket de antigüedad. */
+    if(!/^(Apertura|Cierre) año/i.test(r.glosa)&&r.diasDoc>clientMap[k].maxDias)clientMap[k].maxDias=r.diasDoc;
   });
   var clients=Object.values(clientMap);
 

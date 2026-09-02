@@ -206,12 +206,16 @@ const DRIVE_FACTURACION_FOLDER_ID="1O1nBsti_reAKnAXXKdL2opNWz1ocZu8u";
 function parseFxCSheetValues(values){
   if(!values||values.length<2)throw new Error("Sin datos");
   const hdr=values[0].map(h=>String(h||"").toLowerCase().replace(/[\r\n\s_]/g,""));
-  function fi(tests){for(let i=0;i<hdr.length;i++)for(const t of tests)if(hdr[i].includes(t))return i;return -1;}
+  /* Prioriza por TEST, no por columna — "Días Pag" (siempre "0" en facturas
+     reales) matchea "diaspag" y viene antes que "Días Doc" en el archivo, así
+     que escanear columnas de izquierda a derecha elegía siempre la columna
+     equivocada (facturas vencidas hace meses mostraban antigüedad "—"). */
+  function fi(tests){for(const t of tests){for(let i=0;i<hdr.length;i++)if(hdr[i].includes(t))return i;}return -1;}
   let iFecha=fi(["fecha"]); if(iFecha<0)iFecha=1;
   let iCod=fi(["cod"]); if(iCod<0)iCod=3;
   let iCliente=fi(["cliente"]); if(iCliente<0)iCliente=4;
   let iFolio=fi(["folio"]); if(iFolio<0)iFolio=8;
-  let iDiasDoc=fi(["diasdoc","ddoc","diaspag"]); if(iDiasDoc<0)iDiasDoc=11;
+  let iDiasDoc=fi(["diasdoc","ddoc"]); if(iDiasDoc<0)iDiasDoc=11;
   let iMonto=fi(["monto","c/d(ml)","c/d(m"]); if(iMonto<0)iMonto=13;
   let iSdo=fi(["sdo","vencido"]); if(iSdo<0)iSdo=14;
   function n(v){return parseFloat(String(v||"0").replace(/[^0-9.\-]/g,""))||0;}
