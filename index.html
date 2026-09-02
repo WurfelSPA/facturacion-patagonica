@@ -10,6 +10,8 @@
 <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://unpkg.com/pdfjs-dist@2.16.105/build/pdf.min.js"></script>
+<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/jspdf-autotable@3.8.2/dist/jspdf-autotable.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -694,8 +696,8 @@ const MES_NUM={"Enero":1,"Febrero":2,"Marzo":3,"Abril":4,"Mayo":5,"Junio":6,"Jul
 function colIndexToLetter(idx){let r='',n=idx+1;while(n>0){const rem=(n-1)%26;r=String.fromCharCode(65+rem)+r;n=Math.floor((n-1)/26);}return r;}
 const SITIO_MAP={"5A":"5-A","4A":"4-A","A1":"A-1","A2":"A-2","B":"B","D2":"D-2","D3":"D-3"};
 
-async function callClaude(prompt){
-  const body={model:"claude-sonnet-4-5",max_tokens:4096,messages:[{role:"user",content:prompt}]};
+async function callClaude(prompt,maxTokens){
+  const body={model:"claude-sonnet-4-5",max_tokens:maxTokens||4096,messages:[{role:"user",content:prompt}]};
   const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json","anthropic-version":"2023-06-01"},body:JSON.stringify(body)});
   const text=await res.text();
   let data;
@@ -2262,6 +2264,201 @@ async function generarBorradorNuevaDenominacion(c, pdfTexto){
   setTimeout(()=>URL.revokeObjectURL(url),5000);
 }
 
+/* ── Modelos reales de Patagónica (Modificación de Contrato de Subarrendamiento) ──
+   Fuente: C:\Users\ALEX MELENDEZ\Desktop\Patagonica\Modelos modificación a contratos
+   Se usan como ejemplos obligatorios de estilo/estructura para que el borrador
+   generado por IA reutilice literalmente las cláusulas fijas (comparecencia,
+   vigencia, autorización de Inversiones de La Patagonia, jurisdicción y
+   domicilio, gastos e impuestos, personerías) en vez de redactarlas de cero. */
+const MODELO_ANEXO_1=`MODIFICACIÓN DE CONTRATO DE SUBARRENDAMIENTO
+DE
+PATAGÓNICA INMOBILIARIA SpA
+A
+LABORATORIO DENTAL Y SERVICIOS ODONTOLÓGICOS ILAB LIMITADA
+
+En Santiago de Chile, a 02 de diciembre de 2024 comparecen don ALEJANDRO ENRIQUE SÁNCHEZ DOBERTI, chileno, casado, ingeniero comercial, cédula nacional de identidad número 7.001.569-2, y don RUDOLF MARCOS MIJAC GYSLING, chileno, casado, arquitecto, cédula nacional de identidad N° 9.562.956-3, ambos en representación de Patagónica Inmobiliaria SpA, sociedad del giro de su denominación, Rol Único Tributario número 96.673.250-4 (en adelante, también "Patagónica Inmobiliaria"), todos domiciliados para estos efectos en Avenida Américo Vespucio número 2.680, piso 12, comuna de Conchalí, Región Metropolitana, en adelante indistintamente la "Subarrendadora"; y don MARCO ANTONIO RÍOS SIERRA, chileno, casado, odontólogo, cédula nacional de identidad número 16.359.854-K y don ALFREDO EYZAGUIRRE PRUDANT, chileno, casado, odontólogo, cédula nacional de identidad número 16.099.294-8, ambos en representación de Laboratorio Dental y Servicios Odontológicos Ilab Limitada, rol único tributario número 76.577.652-K, todos con domicilio para estos efectos en Avenida Américo Vespucio N°2716, comuna de Conchalí, Región Metropolitana, en adelante la "Subarrendataria"; quienes han convenido en la celebración de la siguiente modificación de contrato, en adelante la "Modificación" la que se regirá por las estipulaciones contenidas en el presente instrumento.
+
+PRIMERO: ANTECEDENTES GENERALES.
+
+Uno. Por escritura pública de fecha 20 de junio de 2017, otorgada en la notaría de Santiago de don Mauricio Bertolino Rendic, Patagónica Inmobiliaria S.A. (hoy Patagónica Inmobiliaria SpA), dio en arrendamiento a Laboratorio Dental y Servicios Odontológicos Ilab Limitada, una sección del Lote A-Dos, que corresponde al local ubicado en Avenida Américo Vespucio N° 2716, de una superficie total aproximada de 131 metros cuadrados.
+
+Dos. Por escritura pública de fecha 07 de julio de 2020, otorgada en la notaría de Santiago de don Mauricio Bertolino Rendic, se modificó el contrato en lo relativo a su renta y plazo.
+
+Tres. Por escritura pública de fecha 02 de septiembre de 2022, otorgada en la notaría de Santiago de don Alvaro Gonzalez Salinas, se modificó en lo relativo a la renta y a los servicios de administración.
+
+SEGUNDO: MODIFICACIONES.
+
+Por el presente instrumento las partes, acuerdan realizar la siguiente modificación al Contrato de Arrendamiento, singularizado en la cláusula primero precedente, de acuerdo con las condiciones siguientes, desde el 01 de diciembre de 2024:
+
+Uno. Las partes resuelven modificar la Cláusula Tercero en su punto seis, del Contrato de Arrendamiento, siendo modificada y reemplazada por la siguiente:
+
+"Servicios de Administración de la Propiedad Subarrendada. Las partes acuerdan que los servicios de mantención, seguridad y conservación del "Centro El Cortijo", del cual forma parte el Inmueble, serán gestionados por la Arrendadora o por la empresa que ésta designe al efecto. La Arrendataria, concurrirá mensualmente al pago de dichos servicios y los demás costos de mantención, necesarios para el funcionamiento del "Centro El Cortijo", en adelante los "Servicios de Administración". Los Servicios de Administración desde el 01 de diciembre de 2024 tendrán un valor equivalente al 12% de la renta de Arrendamiento más IVA y deberá ser pagada por la Arrendataria a la Arrendadora o a la empresa que ésta oportunamente designe por escrito e informe previamente a la Arrendataria. Sin perjuicio de lo señalado, las partes reconocen la facultad de la Arrendadora de modificar el monto de los Servicios de Administración y/o los porcentajes o fórmulas que sirvan para su determinación, en cualquier momento durante la vigencia del Contrato, cuando así lo requiera la correcta operación del "Centro El Cortijo", cuyas alzas deberán ser debidamente justificadas y mantener la proporción que para el presente contrato se determinó. Para estos efectos, la Arrendadora, o quien haga de administradora del "Centro El Cortijo", deberá comunicar por escrito a la Arrendataria, cualquier modificación que diga relación con el cobro y/o los porcentajes o fórmulas de cálculo de los Servicios de Administración, todo ello con una anticipación mínima de 30 días a la fecha en que ésta deba comenzar a aplicarse. El pago mensual de estos servicios se realizará en conjunto con el pago de la Renta Mensual."
+
+TERCERO: VIGENCIA DE LAS ESTIPULACIONES DEL CONTRATO.
+Las Partes declaran que las estipulaciones contenidas en el presente instrumento comenzarán a regir a contar del día 01 de diciembre de 2024. Sin perjuicio de lo anterior, producida la entrada en vigor de esta modificación, permanecerá plenamente vigente el Contrato referido en la cláusula primera de este instrumento, en todo aquello que le sea pertinente.
+
+CUARTO: AUTORIZACIÓN.
+
+/Uno/ Autorización. Comparece a este acto INVERSIONES DE LA PATAGONIA SpA., persona jurídica de derecho privado, de giro comercial, con domicilio para estos efectos en calle Avenida Américo Vespucio N° 2.680, piso 12, comuna de Conchalí, Región Metropolitana, Rol Único Tributario N° 76.211.529-8, representada, según se acreditará, por don Alejandro Enrique Sánchez Doberti y por don Rudolf Marcos Mijac Gysling, ambos ya individualizados, y que expone: que en su calidad de Propietaria de la Propiedad Subarrendada, autoriza expresamente la celebración de la presente modificación.
+
+QUINTO: JURISDICCIÓN Y DOMICILIO.
+
+Uno. Jurisdicción. Cualquier duda, diferencia o dificultad que se suscite entre las partes con motivo de la presente modificación de contrato o de sus documentos complementarios, y que se refieran a su interpretación, aplicación, ejecución, cumplimiento, resolución o validez, así como cualquier otra causa relacionada con este contrato, se resolverá por los Tribunales Ordinarios de Justicia, para cuyos efectos las partes se someten expresamente a la jurisdicción y competencia a los de la comuna y ciudad de Santiago.
+
+Dos. Domicilio. Para todos los efectos derivados de la presente Modificación de Contrato las partes fijan su domicilio en la ciudad de Santiago. En caso que cualquiera de las partes cambie durante la vigencia del presente contrato su domicilio indicado en la comparecencia de este instrumento, deberá notificar formalmente y por escrito a la otra parte informando su nuevo domicilio con una anticipación mínima de 30 días a la fecha en que se realice el cambio.
+
+SEXTO: GASTOS E IMPUESTOS.
+
+Serán de cargo de la Subarrendataria los gastos, derechos e impuestos derivados del otorgamiento del presente Contrato, incluyendo los gastos notariales.
+
+PERSONERÍAS.
+
+La personería de don Alejandro Enrique Sánchez Doberti y de don Rudolf Marcos Mijac Gysling para representar a Patagónica Inmobiliaria SpA consta de la escritura pública de fecha 4 de abril de 2014, otorgada en la Notaría de Santiago de don Cosme Fernando Gomilla Gatica.
+
+La personería de don Alejandro Enrique Sánchez Doberti y de don Rudolf Marcos Mijac Gysling para representar a Inversiones de La Patagonia SpA consta de la escritura pública de fecha 12 de diciembre de 2016, otorgada en la Notaría de Santiago de doña Myriam Amigo Arancibia.
+
+La personería de don Marco Antonio Ríos Sierra y don Alfredo Eyzaguirre Prudant, para representar a Laboratorio Dental y Servicios Odontológicos Ilab Limitada, consta en estatuto actualizado de fecha 03 de diciembre de 2024, otorgado por el registro de empresas y sociedades emitido por la subsecretaria de Economía y Empresas de Menor Tamaño.
+
+ALEJANDRO ENRIQUE SÁNCHEZ DOBERTI
+p.p. Patagónica Inmobiliaria SpA.
+p.p. Inversiones de La Patagonia SpA
+RUDOLF MARCOS MIJAC GYSLING
+p.p. Patagónica Inmobiliaria SpA.
+p.p. Inversiones de La Patagonia SpA
+
+MARCO ANTONIO RÍOS SIERRA
+p.p. Laboratorio Dental y Servicios Odontológicos Ilab Limitada
+
+ALFREDO EYZAGUIRRE PRUDANT
+p.p. Laboratorio Dental y Servicios Odontológicos Ilab Limitada`;
+
+const MODELO_ANEXO_2=`MODIFICACIÓN DE CONTRATO DE SUBARRENDAMIENTO
+DE
+PATAGÓNICA INMOBILIARIA SpA
+A
+SOCIEDAD DE ALIMENTOS LEEFOOD SpA
+
+En Santiago de Chile, a 01 de marzo de 2025, comparecen don ALEJANDRO ENRIQUE SÁNCHEZ DOBERTI, chileno, casado, ingeniero comercial, cédula nacional de identidad número 7.001.569-2, y don RUDOLF MARCOS MIJAC GYSLING, chileno, casado, arquitecto, cédula nacional de identidad N° 9.562.956-3, ambos en representación de Patagónica Inmobiliaria SpA, sociedad del giro de su denominación, Rol Único Tributario número 96.673.250-4 (en adelante, también "Patagónica Inmobiliaria"), todos domiciliados para estos efectos en Avenida Américo Vespucio número 2.680, piso 12, comuna de Conchalí, Región Metropolitana, en adelante indistintamente la "Subarrendadora"; y doña Woo Yup Lee, coreana, soltera, factor de comercio, cédula de identidad para extranjeros número 21.962.163-9, en representación de Sociedad De Alimentos Leefood SpA, sociedad comercial, Rol Único Tributario número 76.319.324-1, ambos domiciliados para estos efectos en Avenida Presidente Eduardo Frei Montalva número 6001-51, comuna de Conchalí, Región Metropolitana, en adelante la "Subarrendataria"; quienes han convenido en la celebración de la siguiente modificación de contrato, en adelante la "Modificación" la que se regirá por las estipulaciones contenidas en el presente instrumento.
+
+PRIMERO: ANTECEDENTES GENERALES.
+
+Uno. Por escritura pública de fecha 30 de septiembre de 2021, ante don Alvaro Gonzalez Salinas, abogado, titular de la Notaría de Santiago, bajo el repertorio número 44.179-2021, Patagónica Inmobiliaria SpA, en su calidad de Subarrendador y Sociedad De Alimentos Leefood SpA, en su calidad de Subarrendatario, celebraron un contrato de Subarrendamiento, respecto a una sección del Lote Cinco-A, numerado Avenida Presidente Frei Montalva número 6001, edificio 43, de una superficie total aproximada de 623 metros cuadrados.
+
+SEGUNDO: MODIFICACIONES.
+
+Por el presente instrumento las partes, acuerdan realizar las siguientes modificaciones al Contrato de Subarrendamiento, singularizado en la cláusula primero precedente, de acuerdo con las condiciones siguientes, desde el 01 de marzo de 2025:
+
+Uno. Las partes resuelven modificar la Cláusula Tercero, en su punto número uno y agregar el punto número nueve al final de la cláusula, del Contrato de Subarrendamiento, siendo modificadas por la siguiente:
+
+"Tercero. Renta: Uno. Renta. La renta mensual de subarrendamiento, en adelante la "Renta", en el mes de marzo 2025 será la suma de 77,3 Unidades de Fomento, más el Impuesto al Valor Agregado ("IVA"), en el mes de abril 2025 será la suma de 92,76 Unidades de Fomento, más el Impuesto al Valor Agregado ("IVA"), en el mes de mayo 2025 será la suma de 111,312 Unidades de Fomento, más el Impuesto al Valor Agregado ("IVA) y desde el mes de junio 2025 en adelante será la suma de 124,6 Unidades de Fomento, en adelante "UF", que se pagará en equivalente en pesos, moneda corriente de curso legal a la fecha de pago efectivo, más el Impuesto al Valor Agregado ("IVA"). La Renta comenzará a devengarse a partir del día 01 de marzo de 2025.
+
+Tercero. Renta: Nueve. Servicios de Administración de la Propiedad Subarrendada. Las partes acuerdan que los servicios de mantención, seguridad y conservación del "Centro El Cortijo", del cual forma parte el Inmueble, serán gestionados por la Subarrendadora o por la empresa que ésta designe al efecto. La Subarrendataria, a contar de la fecha de entrega de la Propiedad Subarrendada y durante toda la vigencia del Contrato, concurrirá mensualmente al pago de dichos servicios y los demás costos de mantención, necesarios para el funcionamiento del "Centro El Cortijo", en adelante los "Servicios de Administración". Los Servicios de Administración desde el 01 de marzo de 2025 hasta el 31 de diciembre de 2025 tendrán un valor equivalente al 3% de la renta de Arrendamiento más IVA, desde el 01 de enero de 2026 hasta el 31 de diciembre de 2026 tendrán un valor equivalente al 6% de la renta de Arrendamiento más IVA y desde el 01 de enero de 2027 y durante toda la vigencia restante del contrato tendrán un valor equivalente al 12% de la renta de Arrendamiento más IVA, y deberá ser pagada por la Arrendataria a la Arrendadora o a la empresa que ésta oportunamente designe. Sin perjuicio de lo señalado, las partes reconocen la facultad de la Subarrendadora de modificar el monto de los Servicios de Administración y/o los porcentajes o fórmulas que sirvan para su determinación, en cualquier momento durante la vigencia del Contrato, cuando así lo requiera la correcta operación del "Centro El Cortijo". Para estos efectos, la Subarrendadora, o quien haga de administradora del "Centro El Cortijo", deberá comunicar por escrito a la Subarrendataria, cualquier modificación que diga relación con el cobro y/o los porcentajes o fórmulas de cálculo de los Servicios de Administración, todo ello con una anticipación mínima de 30 días a la fecha en que ésta deba comenzar a aplicarse. El pago mensual de los Servicios de Administración se realizará en conjunto con el pago de la Renta Mensual. Al monto mensual de los Servicios de Administración se adicionará el IVA y cualquier otro impuesto o tasa que corresponda."
+
+TERCERO: VIGENCIA DE LAS ESTIPULACIONES DEL CONTRATO.
+Las Partes declaran que las estipulaciones contenidas en el presente instrumento comenzarán a regir a contar del día 01 de marzo del año 2025. Sin perjuicio de lo anterior, producida la entrada en vigor de esta modificación, permanecerá plenamente vigente el Contrato de fecha 30 de septiembre de 2021, en todo aquello que no haya sido alterado por el presente instrumento.
+
+CUARTO: AUTORIZACIÓN.
+
+/Uno/ Autorización. Comparece a este acto INVERSIONES DE LA PATAGONIA SpA, persona jurídica de derecho privado, de giro comercial, con domicilio para estos efectos en calle Avenida Américo Vespucio N° 2.680, piso 12, comuna de Conchalí, Región Metropolitana, Rol Único Tributario N° 76.211.529-8, representada, según se acreditará, por don Alejandro Enrique Sánchez Doberti y por don Rudolf Marcos Mijac Gysling, ambos ya individualizados, y que expone: que en su calidad de Propietaria de la Propiedad Subarrendada, autoriza expresamente la celebración del presente contrato de subarrendamiento.
+
+QUINTO: JURISDICCIÓN Y DOMICILIO.
+
+Uno. Jurisdicción. Cualquier duda, diferencia o dificultad que se suscite entre las partes con motivo de la presente modificación de contrato o de sus documentos complementarios, y que se refieran a su interpretación, aplicación, ejecución, cumplimiento, resolución o validez, así como cualquier otra causa relacionada con este contrato, se resolverá por los Tribunales Ordinarios de Justicia, para cuyos efectos las partes se someten expresamente a la jurisdicción y competencia a los de la comuna y ciudad de Santiago.
+
+Dos. Domicilio. Para todos los efectos derivados de la presente Modificación de Contrato las partes fijan su domicilio en la ciudad de Santiago. En caso que cualquiera de las partes cambie durante la vigencia del presente contrato su domicilio indicado en la comparecencia de este instrumento, deberá notificar formalmente y por escrito a la otra parte informando su nuevo domicilio con una anticipación mínima de 30 días a la fecha en que se realice el cambio.
+
+SEXTO: GASTOS E IMPUESTOS.
+
+Serán de cargo de la Subarrendataria los gastos, derechos e impuestos derivados del otorgamiento del presente Contrato, incluyendo los gastos notariales.
+
+PERSONERÍAS.
+
+La personería de don Alejandro Enrique Sánchez Doberti y de don Rudolf Marcos Mijac Gysling para representar a Patagónica Inmobiliaria SpA consta de la escritura pública de fecha 4 de abril de 2014, otorgada en la Notaría de Santiago de don Cosme Fernando Gomilla Gatica.
+
+La personería de don Alejandro Enrique Sánchez Doberti y de don Rudolf Marcos Mijac Gysling para representar a Inversiones de La Patagonia SpA consta de la escritura pública de fecha 12 de diciembre de 2016, otorgada en la Notaría de Santiago de doña Myriam Amigo Arancibia.
+
+La personería de doña Woo Yup Lee para representar a Sociedad De Alimentos Leefood SpA, consta de la escritura pública de fecha 10 de agosto de 2017, otorgada en la Notaría de Santiago de don Eduardo Díaz Morello.
+
+Personerías no se insertan por ser conocidas por las partes y por Notario que autoriza.
+
+ALEJANDRO ENRIQUE SÁNCHEZ DOBERTI
+p.p. Patagónica Inmobiliaria SpA.
+p.p. Inversiones de La Patagonia SpA
+RUDOLF MARCOS MIJAC GYSLING
+p.p. Patagónica Inmobiliaria SpA.
+p.p. Inversiones de La Patagonia SpA
+
+WOO YUP LEE
+p.p. Sociedad De Alimentos Leefood SpA`;
+
+const MODELO_ANEXO_3=`MODIFICACIÓN DE CONTRATO DE SUBARRENDAMIENTO
+DE
+PATAGÓNICA INMOBILIARIA SpA
+A
+A 3 D CHILE S.A.
+
+En Santiago de Chile, a 13 de noviembre de 2024, comparecen don ALEJANDRO ENRIQUE SÁNCHEZ DOBERTI, chileno, casado, ingeniero comercial, cédula nacional de identidad número 7.001.569-2, y don RUDOLF MARCOS MIJAC GYSLING, chileno, casado, arquitecto, cédula nacional de identidad N° 9.562.956-3, ambos en representación de Patagónica Inmobiliaria SpA, sociedad del giro de su denominación, Rol Único Tributario número 96.673.250-4 (en adelante, también "Patagónica Inmobiliaria"), todos domiciliados para estos efectos en Avenida Américo Vespucio número 2.680, piso 12, comuna de Conchalí, Región Metropolitana, en adelante indistintamente la "Subarrendadora"; y don PATRICIO RODRÍGUEZ TRONCOSO, chileno, soltero, ingeniero, cédula nacional de identidad número 8.851.413-0 y don ANDRÉS MARIO SUNNAH MAAIAH, chileno, casado, ingeniero en informática, cédula nacional de identidad número 9.733.482-K, ambos en representación de A 3 D Chile S.A., sociedad comercial, Rol Único Tributario número 96.955.880-7, ambos domiciliados para estos efectos en Avenida Presidente Eduardo Frei Montalva número 6001-46, comuna de Conchalí, Región Metropolitana, en adelante la "Subarrendataria"; quienes han convenido en la celebración de la siguiente modificación de contrato, en adelante la "Modificación" la que se regirá por las estipulaciones contenidas en el presente instrumento.
+
+PRIMERO: ANTECEDENTES GENERALES.
+
+Uno. Por escritura pública de fecha 19 de julio de 2001, ante don Samuel Klecky Rapaport, abogado, titular de la Notaría de Santiago, bajo el repertorio número 1377, Patagónica Inmobiliaria S.A. hoy Patagónica Inmobiliaria SpA, en su calidad de Subarrendador y A 3 D Chile S.A., en su calidad de Subarrendatario, celebraron un contrato de Subarrendamiento, respecto a una sección del Lote Cinco-A, numerado Avenida Presidente Frei Montalva número 6001, edificio 46, de una superficie total aproximada de 1.187 metros cuadrados.
+
+SEGUNDO: MODIFICACIONES.
+
+Por el presente instrumento las partes, acuerdan realizar las siguientes modificaciones al Contrato de Subarrendamiento, singularizado en la cláusula primero precedente, de acuerdo con las condiciones siguientes, desde el 01 de febrero de 2025:
+
+Uno. Las partes resuelven modificar la Cláusula Cuarta, del Contrato de Subarrendamiento, siendo modificadas por la siguiente:
+
+"Cuarto. Subarrendamiento: Por el presente instrumento Patagónica Inmobiliaria SpA debidamente representada, da en Subarrendamiento a A 3 D Chile S.A., para quien acepta su representante ya individualizado, una sección del lote Cinco-A numerado Avenida Presidente Eduardo Frei Montalva número seis mil uno, edificio 46, de una superficie total aproximada de 658 metros cuadrados, que corresponde a una oficina de una superficie aproximada de 658 metros cuadrados, equipada con mobiliario suficiente para el desarrollo de actividades comerciales. Los planos de emplazamiento y arquitectura de la propiedad Subarrendada se firman en este acto en conjunto con la modificación de contrato de Subarrendamiento."
+
+Dos. Las partes acuerdan modificar la cláusula Quinta y reemplazarla por la cláusula siguiente:
+
+"Quinto: Renta de Subarrendamiento. /Uno/ Renta. La renta mensual de subarrendamiento, en adelante la "Renta", será la suma de 138,18 Unidades de Fomento, en adelante "UF", que se pagará en equivalente en pesos, moneda corriente de curso legal a la fecha de pago efectivo, más el Impuesto al Valor Agregado ("IVA"). La Renta comenzará a devengarse a partir del día 01 de febrero de 2025. /Dos/ Reajuste automático de la Renta. La Renta de Subarrendamiento aumentará a razón de un cinco por ciento real cada 3 años, de manera que cada 3 años contados desde el día 01 de febrero de 2025, la Renta mensual pactada se ajustará en un cinco por ciento calculado sobre las Unidades de Fomento del canon de arriendo vigente. /Seis/ Servicios de Administración de la Propiedad Subarrendada. Las partes acuerdan que los servicios de mantención, seguridad y conservación del "Centro El Cortijo", del cual forma parte el Inmueble, serán gestionados por la Subarrendadora o por la empresa que ésta designe al efecto. Los Servicios de Administración tienen un valor equivalente al 12% de la renta de arrendamiento más IVA."
+
+Tres. Las partes acuerdan modificar la cláusula Octavo y reemplazarla por la cláusula siguiente:
+
+"Octavo. Plazo: El presente contrato de subarrendamiento comenzará a regir a contar del 01 de febrero de 2025 hasta el día 31 de enero de 2027. El contrato se renovará automáticamente por periodos iguales y sucesivos de 2 años cada uno, salvo que cualquiera de las partes manifestare su voluntad de ponerle término, mediante carta certificada dirigida al domicilio indicado en la comparecencia, con una anticipación mínima de 120 días en cualquier momento a contar del 01 de febrero de 2027."
+
+TERCERO: VIGENCIA DE LAS ESTIPULACIONES DEL CONTRATO.
+Las Partes declaran que las estipulaciones contenidas en el presente instrumento comenzarán a regir a contar del día 01 de febrero del año 2025. Sin perjuicio de lo anterior, producida la entrada en vigor de esta modificación, permanecerá plenamente vigente el Contrato de fecha 19 de julio de 2001, en todo aquello que no haya sido alterado por el presente instrumento.
+
+CUARTO: AUTORIZACIÓN.
+
+/Uno/ Autorización. Comparece a este acto INVERSIONES DE LA PATAGONIA SpA, persona jurídica de derecho privado, de giro comercial, con domicilio para estos efectos en calle Avenida Américo Vespucio N° 2.680, piso 12, comuna de Conchalí, Región Metropolitana, Rol Único Tributario N° 76.211.529-8, representada, según se acreditará, por don Alejandro Enrique Sánchez Doberti y por don Rudolf Marcos Mijac Gysling, ambos ya individualizados, y que expone: que en su calidad de Propietaria de la Propiedad Subarrendada, autoriza expresamente la celebración del presente contrato de subarrendamiento.
+
+QUINTO: JURISDICCIÓN Y DOMICILIO.
+
+Uno. Jurisdicción. Cualquier duda, diferencia o dificultad que se suscite entre las partes con motivo de la presente modificación de contrato o de sus documentos complementarios, y que se refieran a su interpretación, aplicación, ejecución, cumplimiento, resolución o validez, así como cualquier otra causa relacionada con este contrato, se resolverá por los Tribunales Ordinarios de Justicia, para cuyos efectos las partes se someten expresamente a la jurisdicción y competencia a los de la comuna y ciudad de Santiago.
+
+Dos. Domicilio. Para todos los efectos derivados de la presente Modificación de Contrato las partes fijan su domicilio en la ciudad de Santiago. En caso que cualquiera de las partes cambie durante la vigencia del presente contrato su domicilio indicado en la comparecencia de este instrumento, deberá notificar formalmente y por escrito a la otra parte informando su nuevo domicilio con una anticipación mínima de 30 días a la fecha en que se realice el cambio.
+
+SEXTO: GASTOS E IMPUESTOS.
+
+Serán de cargo de la Subarrendataria los gastos, derechos e impuestos derivados del otorgamiento del presente Contrato, incluyendo los gastos notariales.
+
+PERSONERÍAS.
+
+La personería de don Alejandro Enrique Sánchez Doberti y de don Rudolf Marcos Mijac Gysling para representar a Patagónica Inmobiliaria SpA consta de la escritura pública de fecha 4 de abril de 2014, otorgada en la Notaría de Santiago de don Cosme Fernando Gomilla Gatica.
+
+La personería de don Alejandro Enrique Sánchez Doberti y de don Rudolf Marcos Mijac Gysling para representar a Inversiones de La Patagonia SpA consta de la escritura pública de fecha 12 de diciembre de 2016, otorgada en la Notaría de Santiago de doña Myriam Amigo Arancibia.
+
+La personería de don Patricio Rodríguez Troncoso y de don Andrés Sunnah Maaiah para representar a A 3 D Chile S.A. consta de la escritura pública de fecha 30 de enero de 2019, otorgada en la Notaría de Santiago de Nancy de la Fuente.
+
+Personerías no se insertan por ser conocidas por las partes y por Notario que autoriza.
+
+ALEJANDRO ENRIQUE SÁNCHEZ DOBERTI
+p.p. Patagónica Inmobiliaria SpA.
+p.p. Inversiones de La Patagonia SpA
+RUDOLF MARCOS MIJAC GYSLING
+p.p. Patagónica Inmobiliaria SpA.
+p.p. Inversiones de La Patagonia SpA
+
+PATRICIO RODRÍGUEZ TRONCOSO
+p.p. A 3 D CHILE S.A.
+
+ANDRÉS SUNNAH MAAIAH
+p.p. A 3 D CHILE S.A.`;
+
 async function generarAnexo(c, promptUsuario){
   function xe(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
   function pd(v){if(!v||v==="—"||v==="-"||v==="")return null;if(typeof v==="string"&&v.includes("/")){const[d,mm,y]=v.split("/").map(Number);if(!d||!mm||!y)return null;return new Date(y,mm-1,d);}return null;}
@@ -2275,42 +2472,63 @@ async function generarAnexo(c, promptUsuario){
   const contexto=[
     `Arrendataria: ${c.nombre||"[NOMBRE]"}`,
     `RUT Arrendataria: ${c.rut||"[RUT]"}`,
+    `Domicilio del local arrendado: ${c.dir||"[DIRECCIÓN]"}`,
     `Local/Sitio: ${c.sitio||"[LOCAL]"}`,
     `Edificio/Ubicación: ${c.edificio||"[EDIFICIO]"}`,
     `Superficie: ${c.m2?c.m2+" m2":"[SUPERFICIE]"}`,
     `Renta de arrendamiento actual: ${c.ufArr>0?c.ufArr.toFixed(2)+" UF":"[RENTA]"}`,
-    `Servicios de administración actuales: ${c.ufSrv>0?c.ufSrv.toFixed(2)+" UF":"[SERV. ADMIN]"}`,
+    `Servicios de administración actuales: ${c.ufSrv>0?c.ufSrv.toFixed(2)+" UF":"[SERV. ADMIN — este cliente no tiene Servicios de Administración pactados, no menciones esta cláusula salvo que el usuario lo pida]"}`,
     `Inicio del contrato original: ${termInicio?fmtL(termInicio):"[FECHA INICIO]"}`,
-    `Término del contrato original: ${termFin?fmtL(termFin):"[FECHA TÉRMINO]"}`,
-    `Reajuste pactado: ${c.pctReaj&&c.pctReaj!=="-"?c.pctReaj+"% cada "+(c.cadaAnios||1)+" año(s)":"[REAJUSTE]"}`,
-    `Arrendadora: PATAGONICA INMOBILIARIA SpA, RUT 96.673.250-4`,
+    `Término/renovación del ciclo vigente: ${termFin?fmtL(termFin):"[FECHA TÉRMINO]"}`,
+    `Periodicidad de renovación: ${c.renovacion&&c.renovacion!=="-"?c.renovacion:"[PERIODICIDAD]"}`,
+    `Aviso previo para no renovar: ${c.aviso&&c.aviso!=="-"?c.aviso:"[AVISO]"}`,
+    `Reajuste pactado: ${c.pctReaj&&c.pctReaj!=="-"?c.pctReaj+"% cada "+(c.cadaAnios||"[X]")+" año(s)":"[REAJUSTE]"}`,
+    `Arrendadora: PATAGÓNICA INMOBILIARIA SpA, RUT 96.673.250-4`,
   ].join("\n");
 
-  const prompt=`Eres un abogado chileno redactando un ANEXO a un contrato de arrendamiento comercial vigente, para uso interno (borrador a revisar antes de enviar al cliente).
+  const prompt=`Eres el abogado interno de Patagónica Inmobiliaria SpA (arrendadora de locales en el Parque Industrial/Centro Empresas "El Cortijo"). Debes redactar el borrador de un instrumento que modifica o complementa un contrato de arrendamiento/subarrendamiento vigente, para uso interno (a revisar antes de enviar al cliente).
 
-DATOS DEL CONTRATO ORIGINAL VIGENTE:
+Debes seguir ESTRICTAMENTE el estilo, estructura y lenguaje legal de estos 3 ejemplos reales de Patagónica Inmobiliaria (son el molde obligatorio, no un simple ejemplo de tono). NO inventes una estructura distinta. Reutiliza LITERALMENTE, palabra por palabra (cambiando solo lo estrictamente necesario: fechas, nombres, RUT), estos bloques que son fijos en los tres ejemplos:
+- La fórmula de comparecencia de Patagónica Inmobiliaria SpA (siempre los mismos dos representantes: Alejandro Enrique Sánchez Doberti y Rudolf Marcos Mijac Gysling, mismas cédulas, mismo domicilio, mismo RUT de Patagónica).
+- La cláusula "TERCERO: VIGENCIA DE LAS ESTIPULACIONES DEL CONTRATO."
+- La cláusula "CUARTO: AUTORIZACIÓN." (autorización de Inversiones de La Patagonia SpA, RUT 76.211.529-8, mismos representantes).
+- La cláusula "QUINTO: JURISDICCIÓN Y DOMICILIO." completa (Uno. Jurisdicción / Dos. Domicilio).
+- La cláusula "SEXTO: GASTOS E IMPUESTOS." completa.
+- El primer párrafo de PERSONERÍAS (Sánchez Doberti/Mijac Gysling para Patagónica Inmobiliaria SpA e Inversiones de La Patagonia SpA) — fechas y notario exactos.
+
+=== EJEMPLO 1 (Laboratorio Ilab — modificación de Servicios de Administración) ===
+${MODELO_ANEXO_1}
+
+=== EJEMPLO 2 (Sociedad de Alimentos Leefood — modificación de renta y Servicios de Administración) ===
+${MODELO_ANEXO_2}
+
+=== EJEMPLO 3 (A3D Chile — modificación de superficie, renta y plazo) ===
+${MODELO_ANEXO_3}
+
+EXCEPCIÓN DE FORMATO — úsala SOLO cuando lo que pide el usuario sea de otra naturaleza (ej. actualizar la razón social/RUT de la arrendataria tras una transformación societaria, fusión, división o cesión de contrato, y NO una modificación de renta/plazo/superficie/servicios): en ese caso usa el título "ANEXO N°[X] AL CONTRATO DE ARRENDAMIENTO" en vez de "MODIFICACIÓN DE CONTRATO DE...", con esta estructura de cláusulas: PRIMERO: Antecedentes (resume el contrato original, su fecha, notario y objeto) — SEGUNDO: [nombra la naturaleza del cambio societario, ej. "Transformación de la Arrendataria"] (explica el hecho societario y deja constancia de que no implica disolución ni novación de obligaciones, conservando el mismo RUT) — TERCERO: Declaración de vigencia (deja constancia expresa de que el contrato original sigue plenamente vigente en los términos originalmente pactados) — CUARTO: Subsistencia del Contrato — QUINTO: Domicilio y firma. Mantén igual la fórmula de comparecencia estándar de Patagónica Inmobiliaria SpA de los ejemplos.
+
+DATOS DEL CONTRATO Y CLIENTE ACTUAL (fuente: planilla de gestión de Patagónica — pueden estar incompletos):
 ${contexto}
 
-INSTRUCCIÓN DEL USUARIO SOBRE LO QUE DEBE CONTENER ESTE ANEXO:
+INSTRUCCIÓN DEL USUARIO SOBRE LO QUE DEBE CONTENER ESTE DOCUMENTO (usa estos hechos como fuente de verdad por sobre los datos de la planilla si se contradicen):
 """
 ${promptUsuario}
 """
 
-Redacta el texto completo del Anexo en español, con lenguaje legal chileno formal, en Santiago de Chile a la fecha de hoy (${fmtL(hoy)}). El anexo debe:
-- Identificar a las partes (Arrendadora y Arrendataria) y referenciar que modifica/complementa el contrato de arrendamiento original vigente entre ellas.
-- Desarrollar en cláusulas numeradas (PRIMERO, SEGUNDO, etc.) los cambios/adiciones solicitados por el usuario, usando los datos del contrato original como base cuando corresponda.
-- Dejar constancia de que, en todo lo no modificado por este anexo, el contrato original mantiene su plena vigencia.
-- Terminar con un párrafo de cierre y líneas para firma de ambas partes.
-- Usar cifras en UF cuando corresponda a montos, dejando placeholders entre corchetes [ASI] solo si un dato específico no fue proporcionado ni se puede inferir.
+Redacta el texto completo en español, a la fecha de hoy (${fmtL(hoy)}), en Santiago de Chile. Reglas:
+- Sigue exactamente el estilo de numeración de los ejemplos (PRIMERO, SEGUNDO... con sub-puntos "Uno.", "Dos." o "/Uno/", "/Dos/" según el tipo de cláusula, tal como en los ejemplos).
+- Si necesitas un dato específico que no está ni en "DATOS DEL CONTRATO" ni en la instrucción del usuario (ej. notario y N° de repertorio del contrato original o de una modificación previa, nombre/cédula/profesión del representante legal del cliente, fecha y notario de su personería), NO lo inventes: déjalo como placeholder entre corchetes indicando exactamente qué se debe verificar, ej. "[VERIFICAR: notario y N° de repertorio del contrato original]".
+- No agregues explicaciones fuera del documento.
 
 FORMATO DE SALIDA (obligatorio, no agregues explicaciones fuera de este formato):
-- Devuelve solo el texto del anexo, sin comentarios ni markdown de bloques de código.
-- La primera línea debe iniciar con "# " seguido del título del anexo en mayúsculas (ej: "# ANEXO N.1 AL CONTRATO DE ARRENDAMIENTO").
-- Cada encabezado de cláusula debe ir en su propia línea iniciando con "## " (ej: "## PRIMERO: ANTECEDENTES").
+- Devuelve solo el texto del documento, sin comentarios ni markdown de bloques de código.
+- Las líneas del título (pueden ser varias, como en los ejemplos: título / "DE" / arrendadora / "A" / cliente) van cada una en su propia línea iniciando con "# ".
+- Cada encabezado de cláusula (PRIMERO:, SEGUNDO:, etc., y "PERSONERÍAS") va en su propia línea iniciando con "## ".
 - El resto de los párrafos van como líneas de texto normal, sin ningún prefijo.
+- Las líneas de firma (nombre en mayúsculas y líneas "p.p. ...") van al final, cada una en su propia línea, sin prefijo.
 - Separa cada línea/párrafo con un salto de línea simple.`;
 
-  const textoIA=await callClaude(prompt);
+  const textoIA=await callClaude(prompt,6000);
 
   function wp(text,opts){
     opts=opts||{};
@@ -2714,6 +2932,8 @@ function FactxCobrarView({notify}){
         );
       })
     ),
+    /* ── Evolución de la deuda total por corte ── */
+    drvFiles.length>1&&h(EvolucionDeudaChart,{drvFiles:drvFiles,allTot:allTot,parseFCobrar:parseFCobrar}),
     /* Toolbar */
     h("div",{style:{padding:"10px 24px",borderBottom:"1px solid var(--bdr)",background:"var(--surf)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",flexShrink:0}},
       h("input",{type:"text",placeholder:"Buscar cliente o RUT...",value:search,
@@ -2802,6 +3022,72 @@ function FactxCobrarView({notify}){
             );
           }))
         )
+    )
+  );
+}
+
+/* Línea de tiempo con la deuda total de cada archivo "F x Cobrar" cargado,
+   ordenada por fecha de corte (no por orden de carga). */
+function EvolucionDeudaChart({drvFiles,allTot,parseFCobrar}){
+  const [hoverIdx,setHoverIdx]=useState(null);
+  function fmtCLP(v){return"$"+Math.round(v).toLocaleString("es-CL");}
+  function fmtCLPCorto(v){
+    if(v>=1e9)return"$"+(v/1e9).toFixed(1)+"MM";
+    if(v>=1e6)return"$"+(v/1e6).toFixed(0)+"M";
+    if(v>=1e3)return"$"+(v/1e3).toFixed(0)+"k";
+    return"$"+Math.round(v);
+  }
+  function parseFechaCorte(s){
+    const m=String(s||"").match(/(\d{2})-(\d{2})-(\d{4})/);
+    return m?new Date(+m[3],+m[2]-1,+m[1]):null;
+  }
+  const data=drvFiles
+    .map(f=>{const t=allTot[f.id];if(!t)return null;const label=t.date||parseFCobrar(f.name);return{date:parseFechaCorte(label),label,tot:t.tot};})
+    .filter(d=>d&&d.date)
+    .sort((a,b)=>a.date-b.date);
+  if(data.length<2)return null;
+
+  const W=1000,H=220,padL=64,padR=20,padT=18,padB=34;
+  const innerW=W-padL-padR,innerH=H-padT-padB;
+  const maxV=Math.max(...data.map(d=>d.tot));
+  const minV=Math.min(...data.map(d=>d.tot));
+  const range=(maxV-minV)||Math.max(1,maxV*0.1);
+  const vMax=maxV+range*0.15,vMin=Math.max(0,minV-range*0.15);
+  const vRange=(vMax-vMin)||1;
+  const x=i=>padL+(data.length===1?innerW/2:(i/(data.length-1))*innerW);
+  const y=v=>padT+innerH-((v-vMin)/vRange)*innerH;
+  const pathD=data.map((d,i)=>(i===0?"M":"L")+x(i).toFixed(1)+","+y(d.tot).toFixed(1)).join(" ");
+  const areaD=pathD+" L"+x(data.length-1).toFixed(1)+","+(padT+innerH)+" L"+x(0).toFixed(1)+","+(padT+innerH)+" Z";
+  const N_TICKS=4;
+  const ticks=Array.from({length:N_TICKS+1},(_,i)=>vMin+vRange*i/N_TICKS);
+
+  return h("div",{style:{padding:"14px 24px",background:"var(--surf)",borderBottom:"1px solid var(--bdr)",flexShrink:0}},
+    h("div",{style:{fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:".07em",textTransform:"uppercase",marginBottom:8}},"Evolución de deuda total por corte"),
+    h("svg",{viewBox:`0 0 ${W} ${H}`,style:{width:"100%",height:200,display:"block",overflow:"visible"}},
+      ticks.map((v,i)=>h("g",{key:"tick"+i},
+        i>0&&h("line",{x1:padL,x2:W-padR,y1:y(v),y2:y(v),stroke:"var(--bdr)",strokeWidth:1,strokeDasharray:"3,3"}),
+        h("text",{x:padL-8,y:y(v)+3,textAnchor:"end",fontSize:9,fontWeight:600,fill:"var(--amber)",fontFamily:"'DM Mono',monospace"},fmtCLPCorto(v))
+      )),
+      h("line",{x1:padL,x2:W-padR,y1:padT+innerH,y2:padT+innerH,stroke:"var(--bdr)",strokeWidth:1}),
+      h("path",{d:areaD,fill:"var(--red)",opacity:0.08,stroke:"none"}),
+      h("path",{d:pathD,fill:"none",stroke:"var(--red)",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"}),
+      data.map((d,i)=>h("g",{key:i,style:{cursor:"pointer"},
+          onMouseEnter:()=>setHoverIdx(i),onMouseLeave:()=>setHoverIdx(p=>p===i?null:p)},
+        h("circle",{cx:x(i),cy:y(d.tot),r:12,fill:"transparent"}),
+        h("circle",{cx:x(i),cy:y(d.tot),r:hoverIdx===i?5.5:4,fill:"var(--red)",stroke:"var(--surf)",strokeWidth:2}),
+        h("text",{x:x(i),y:H-8,textAnchor:"middle",fontSize:9,fontWeight:hoverIdx===i?700:600,fill:"var(--blue)",fontFamily:"'DM Mono',monospace"},d.label)
+      )),
+      hoverIdx!=null&&(()=>{
+        const d=data[hoverIdx];const cx=x(hoverIdx),cy=y(d.tot);
+        const boxW=120,boxH=36;
+        const bx=Math.min(Math.max(cx-boxW/2,padL),W-padR-boxW);
+        const by=Math.max(cy-boxH-10,2);
+        return h("g",{style:{pointerEvents:"none"}},
+          h("rect",{x:bx,y:by,width:boxW,height:boxH,rx:7,fill:"var(--surf2)",stroke:"var(--bdr)",strokeWidth:1}),
+          h("text",{x:bx+boxW/2,y:by+15,textAnchor:"middle",fontSize:9,fill:"var(--txm)",fontFamily:"'DM Mono',monospace"},d.label),
+          h("text",{x:bx+boxW/2,y:by+29,textAnchor:"middle",fontSize:12,fontWeight:700,fill:"var(--tx)"},fmtCLP(d.tot))
+        );
+      })()
     )
   );
 }
@@ -3059,12 +3345,13 @@ function EstadoPagosView({notify}){
 
     !loading&&!error&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
       h("div",{style:{display:"flex",gap:8,alignItems:"center",padding:"10px 14px",borderBottom:"1px solid var(--bdr)",flexWrap:"wrap"}},
+        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:190}}),
+        h("span",{style:{color:"var(--txd)",fontSize:11}},"·"),
         [{k:"all",l:"Todos"},{k:"pagado",l:"Pagado"},{k:"pendiente",l:"Pendiente"},{k:"aldia",l:"Al día"},{k:"moroso",l:"Moroso"}]
           .map(f=>h("button",{key:f.k,className:`pill${estFilter===f.k?" active":""}`,onClick:()=>setEstFilter(f.k)},f.l)),
         h("span",{style:{color:"var(--txd)",fontSize:11}},"·"),
         [{k:"all",l:"Todos"},{k:"arriendo",l:"Arriendo"},{k:"serv_adm",l:"Serv. Adm."}]
-          .map(f=>h("button",{key:f.k,className:`pill${concFilter===f.k?" active":""}`,onClick:()=>setConcFilter(f.k),style:{fontSize:10}},f.l)),
-        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{marginLeft:"auto",width:190}})
+          .map(f=>h("button",{key:f.k,className:`pill${concFilter===f.k?" active":""}`,onClick:()=>setConcFilter(f.k),style:{fontSize:10}},f.l))
       ),
       h("div",{style:{maxHeight:"calc(100vh - 420px)",minHeight:220,overflowY:"auto",overflowX:"auto"}},
         h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:12}},
@@ -3108,7 +3395,6 @@ function EstadoPagosView({notify}){
    VISTA CONTRATOS
 ═══════════════════════════════════ */
 function ContratosView({dashData,driveLoading}){
-  const [tab,setTab]=useState("contrato");
   const [search,setSearch]=useState("");
   const [borradorLoading,setBorradorLoading]=useState({});
   const [borradorCliente,setBorradorCliente]=useState("");
@@ -3266,6 +3552,92 @@ function ContratosView({dashData,driveLoading}){
     if(!pasoMatch)return h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},fechaTxt);
     return renderPasoDetalle(c,pasoMatch);
   }
+  /* ── Versión en texto plano de renderPasoDetalle/renderAjusteCol/renderRenovacionCol,
+     usada por los export a Excel/PDF (no pueden serializar JSX). ── */
+  function pasoDetalleTexto(c,p){
+    const d=new Date(p.fecha+"T00:00:00");
+    const fechaTxt=`${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+    const ordTxt=p.recurrente?"Recurrente":(["1era","2da","3era","4ta","5ta"][p.ord]||`${p.ord+1}ª`)+" Renov";
+    const fmtUFn=v=>v.toFixed(2).replace(".",",");
+    const base=p.base!=null?p.base:baseUFParaColumna(c,p.ord);
+    let valorTxt="",pctTxt="";
+    if(p.uf!=null){
+      if(base>0){
+        const pct=((p.uf-base)/base)*100;
+        valorTxt=`${fmtUFn(base)} → ${fmtUFn(p.uf)} UF`;
+        pctTxt="("+(pct>=0?"+":"")+fmtUFn(pct)+"%)";
+      }else valorTxt=fmtUFn(p.uf)+" UF";
+    }else if(p.pct!=null){valorTxt="+"+p.pct+"%";}
+    return[ordTxt,fechaTxt,valorTxt,pctTxt].filter(Boolean).join(" ");
+  }
+  function ajusteColTexto(c,idx){
+    const p=eventosPriorizados(c._ajusteItem)[idx];
+    const renovIso=renovacionISO(c);
+    if(p&&renovIso&&p.fecha===renovIso)return"—";
+    if(!p)return"—";
+    return pasoDetalleTexto(c,p);
+  }
+  function renovacionColTexto(c){
+    const d=parseDate(c.termTermino);
+    if(!d)return"—";
+    const d2=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1);
+    const fechaTxt=`${String(d2.getDate()).padStart(2,"0")}/${String(d2.getMonth()+1).padStart(2,"0")}/${d2.getFullYear()}`;
+    const renovIso=renovacionISO(c);
+    const pasoMatch=pasosOrdenadosDe(c._ajusteItem).map((p,i)=>({...p,ord:i})).find(p=>p.fecha===renovIso);
+    if(!pasoMatch)return fechaTxt;
+    return pasoDetalleTexto(c,pasoMatch);
+  }
+  function filaExportPlana(c){
+    const arriendoCLP=ufHoy&&c.ufArr>0?c.ufArr*ufHoy:null;
+    const servAdmCLP=ufHoy&&c.ufSrv>0?c.ufSrv*ufHoy:null;
+    const ufInicioVal=(c._ajusteItem&&c._ajusteItem.ufInicio>0)?c._ajusteItem.ufInicio:(c.ufInicio>0?c.ufInicio:null);
+    const inicioSA=(c._ajusteItem&&c._ajusteItem.inicioSA)||"";
+    const tieneSA=c.ufSrv>0;
+    return{
+      "Sitio":c.sitio||"—","Edif.":c.edificio||"—","Dirección":c.dir||"",
+      "Cliente":c.nombre||"—","RUT":c.rut||"—",
+      "Inicio":c.termContrato||"—","UF Inicio":ufInicioVal!=null?ufInicioVal.toFixed(2):"—",
+      "Período":c.renovacion||"—","%Reaj.":c.pctReaj&&c.pctReaj!=="-"?c.pctReaj+"%":"—",
+      "Ajuste Inter.1":ajusteColTexto(c,0),"Ajuste Inter.2":ajusteColTexto(c,1),
+      "Aviso":c.aviso||"—","Fecha Notif.":fechaNotif(c.termTermino,c.aviso)||"—",
+      "Renovación":renovacionColTexto(c),
+      "M2":c.m2!=null?c.m2:"—","UF x M2":(c.ufArr>0&&c.m2>0)?(c.ufArr/c.m2).toFixed(2):"—",
+      "UF Contrato":c.ufArr>0?c.ufArr.toFixed(2):"—","Arriendo CLP":arriendoCLP!=null?Math.round(arriendoCLP):"—",
+      "Inicio S.A.":tieneSA?(inicioSA||"—"):"NO","Fecha Reaj. S.A.":tieneSA?(c.fechaReajuste||"—"):"—",
+      "Renovación S.A.":tieneSA?(c.cadaAnios||"—"):"—","%Reaj. S.A.":(tieneSA&&c.pctReaj&&c.pctReaj!=="-")?c.pctReaj+"%":"—",
+      "UF S.A.":tieneSA?c.ufSrv.toFixed(2):"—","S.A. CLP":tieneSA&&servAdmCLP!=null?Math.round(servAdmCLP):"—",
+    };
+  }
+  function descargarContratosExcel(){
+    const wb=XLSX.utils.book_new();
+    const ws=XLSX.utils.json_to_sheet(contratosOrdenados.map(filaExportPlana));
+    ws["!cols"]=[{wch:8},{wch:10},{wch:26},{wch:26},{wch:13},{wch:10},{wch:9},{wch:8},{wch:8},{wch:16},{wch:16},{wch:8},{wch:12},{wch:12},{wch:6},{wch:8},{wch:10},{wch:12},{wch:9},{wch:14},{wch:9},{wch:9},{wch:8},{wch:12}];
+    XLSX.utils.book_append_sheet(wb,ws,"Contratos");
+    XLSX.writeFile(wb,"Contratos_Patagonica_"+new Date().toISOString().slice(0,10)+".xlsx");
+  }
+  function descargarContratosPDF(){
+    const{jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:"landscape",unit:"mm",format:"letter"});
+    const cols=["Sitio","Edif.","Dirección","Cliente","RUT","Inicio","UF Inicio","Período","%Reaj.","Aj.Inter.1","Aj.Inter.2","Aviso","F.Notif.","Renovación","M2","UF/m²","UF Contrato","Arriendo CLP","Inicio S.A.","F.Reaj S.A.","Renov S.A.","%Reaj S.A.","UF S.A.","S.A. CLP"];
+    const body=contratosOrdenados.map(c=>{
+      const f=filaExportPlana(c);
+      return[f["Sitio"],f["Edif."],f["Dirección"],f["Cliente"],f["RUT"],f["Inicio"],f["UF Inicio"],f["Período"],f["%Reaj."],f["Ajuste Inter.1"],f["Ajuste Inter.2"],f["Aviso"],f["Fecha Notif."],f["Renovación"],f["M2"],f["UF x M2"],f["UF Contrato"],f["Arriendo CLP"]!=="—"?fmtCLP(f["Arriendo CLP"]):"—",f["Inicio S.A."],f["Fecha Reaj. S.A."],f["Renovación S.A."],f["%Reaj. S.A."],f["UF S.A."],f["S.A. CLP"]!=="—"?fmtCLP(f["S.A. CLP"]):"—"];
+    });
+    doc.setFontSize(11);
+    doc.text("Contratos — Patagónica Inmobiliaria",14,10);
+    doc.autoTable({
+      head:[cols],body,startY:14,theme:"grid",
+      styles:{fontSize:5.2,cellPadding:1,overflow:"linebreak",valign:"middle"},
+      headStyles:{fillColor:[15,92,86],textColor:255,fontSize:5.6,halign:"center"},
+      margin:{left:5,right:5,top:12,bottom:8},
+      tableWidth:"auto",
+      didDrawPage:d=>{
+        doc.setFontSize(7);
+        doc.text("Página "+doc.internal.getNumberOfPages(),doc.internal.pageSize.getWidth()-18,doc.internal.pageSize.getHeight()-4);
+      }
+    });
+    doc.save("Contratos_Patagonica_"+new Date().toISOString().slice(0,10)+".pdf");
+  }
   async function guardarAjuste(){
     if(!ajusteModal||!ajusteDraft)return;
     setAjusteSaving(true);
@@ -3299,21 +3671,11 @@ function ContratosView({dashData,driveLoading}){
     });
   }
   const now=new Date();
-  const currentYear=now.getFullYear();
   function avisoDias(str){if(!str||str==="-"||str==="")return null;const s=str.toLowerCase();const m=s.match(/(\d+)/);if(!m)return null;const n=parseInt(m[1]);if(s.includes("año")||s.includes("ano"))return n*365;if(s.includes("mes"))return n*30;return n;}
   function parseDate(v){if(!v||v==="—"||v==="-"||v==="")return null;if(typeof v==="string"&&v.includes("/")){const[d,mm,y]=v.split("/").map(Number);if(!d||!mm||!y)return null;return new Date(y,mm-1,d);}return null;}
-  function diasDesde(str){const d=parseDate(str);if(!d)return null;return Math.ceil((d-now)/86400000);}
   function urgBg(dias,isReaj){if(dias===null)return{bg:"var(--surf2)",col:"var(--txd)",bdr:"var(--bdr)"};const t1=isReaj?30:90,t2=isReaj?90:180;if(dias<0||dias<=t1)return{bg:"var(--rbg)",col:"var(--red)",bdr:"var(--rdim)"};if(dias<=t2)return{bg:"var(--abg)",col:"var(--amber)",bdr:"var(--adim)"};return{bg:"var(--gbg)",col:"var(--green)",bdr:"var(--gdim)"};}
-  function fechaNotif(termStr,avisoStr){const d=parseDate(termStr);const dias=avisoDias(avisoStr);if(!d||!dias)return null;const n=new Date(d);n.setDate(n.getDate()-dias);return`${String(n.getDate()).padStart(2,"0")}/${String(n.getMonth()+1).padStart(2,"0")}/${n.getFullYear()}`;}
-  /* ¿Sigue facturando en los últimos N meses (incl. el actual)? Si un contrato
-     ya venció en papel pero el cliente sigue siendo facturado, es la mejor
-     señal de que se renovó tácitamente sin objeción — evita falsas alarmas. */
-  function facturaReciente(c,meses){
-    meses=meses||2;
-    const _n=new Date();
-    for(let _i=0;_i<meses;_i++){const _d=new Date(_n.getFullYear(),_n.getMonth()-_i,1);const _k=`${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,"0")}`;if((c.monthly[_k]||0)>0)return true;}
-    return false;
-  }
+  function fechaNotifDate(termStr,avisoStr){const d=parseDate(termStr);const dias=avisoDias(avisoStr);if(!d||!dias)return null;const n=new Date(d);n.setDate(n.getDate()-dias);return n;}
+  function fechaNotif(termStr,avisoStr){const n=fechaNotifDate(termStr,avisoStr);return n?`${String(n.getDate()).padStart(2,"0")}/${String(n.getMonth()+1).padStart(2,"0")}/${n.getFullYear()}`:null;}
   const clients=dashData?dashData.clients:[];
   const contratosList=clients.filter(c=>!search||c.nombre.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(c=>{
     const _ajusteItem=ajustes[ajusteKey(c.rut,c.sitio)];
@@ -3337,6 +3699,12 @@ function ContratosView({dashData,driveLoading}){
       case"ufm2":return(r.ufArr>0&&r.m2>0)?r.ufArr/r.m2:-Infinity;
       case"arriendo":return ufHoy&&r.ufArr>0?r.ufArr*ufHoy:-Infinity;
       case"servadm":return ufHoy&&r.ufSrv>0?r.ufSrv*ufHoy:-Infinity;
+      case"fechanotif":return fechaNotifDate(r.termTermino,r.aviso)||new Date(8640000000000000);
+      case"ufcontrato":return r.ufArr>0?r.ufArr:-Infinity;
+      case"renovacionsa":return r.ufSrv>0?(r.cadaAnios||""):"";
+      case"fechareajsa":return r.ufSrv>0?(parseDate(r.fechaReajuste)||new Date(0)):new Date(0);
+      case"pctreajsa":return(r.ufSrv>0&&r.pctReaj&&r.pctReaj!=="-")?parseFloat(r.pctReaj):-Infinity;
+      case"ufsa":return r.ufSrv>0?r.ufSrv:-Infinity;
       default:return"";
     }
   }
@@ -3348,18 +3716,6 @@ function ContratosView({dashData,driveLoading}){
     else cmp=String(va).localeCompare(String(vb),"es");
     return sortDir==="asc"?cmp:-cmp;
   }):contratosList;
-  const vencimientos=clients.filter(c=>{const d=parseDate(c.termTermino);return d&&d.getFullYear()===currentYear;}).filter(c=>!search||c.nombre.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>(parseDate(a.termTermino)||0)-(parseDate(b.termTermino)||0));
-  const reajustes=clients.filter(c=>{
-    const d=parseDate(c.fechaReajuste);
-    if(!d||(d.getFullYear()!==currentYear&&d.getFullYear()!==currentYear+1))return false;
-    /* Ocultar inactivos: buscar desde el mes actual hacia atrás */
-    const _n=new Date();
-    for(let _i=0;_i<12;_i++){const _d=new Date(_n.getFullYear(),_n.getMonth()-_i,1);const _k=`${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,"0")}`;if((c.monthly[_k]||0)>0)return true;}return false;
-  }).filter(c=>!search||c.nombre.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>(parseDate(a.fechaReajuste)||0)-(parseDate(b.fechaReajuste)||0));
-  const vencPasados=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d<0&&!facturaReciente(c);}).length;
-  const venc30=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d>=0&&d<=30;}).length;
-  const venc90=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d>30&&d<=90;}).length;
-  const vencMas=vencimientos.filter(c=>{const d=diasDesde(c.termTermino);return d!==null&&d>90;}).length;
   if(!dashData)return h("main",{style:{flex:1,padding:"40px",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12}},driveLoading?h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},h("span",{className:"spin",style:{fontSize:18}},"⟳"),"Cargando planilla desde Drive..."):h("div",{style:{fontSize:13,color:"var(--txd)"}},"Sin datos — carga la planilla de facturación"));
   const todosClientes=[...new Map(clients.map(c=>[c.rut,c])).values()].sort((a,b)=>a.nombre.localeCompare(b.nombre));
   const clienteSeleccionado=todosClientes.find(c=>c.rut===borradorCliente)||null;
@@ -3409,6 +3765,25 @@ function ContratosView({dashData,driveLoading}){
           display:"inline-flex",alignItems:"center",gap:6,whiteSpace:"nowrap"}
       },borradorLoading["panel"]?h("span",{className:"spin"},"⟳"):(borradorTipo==="anexo"?"✨":"⬇"),"  "+(borradorTipo==="anexo"?"Generar Anexo":"Descargar Borrador"))
     ),
+    /* ── Descargar/imprimir el cuadro de contratos ── */
+    h("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
+      h("span",{style:{fontSize:10,color:"var(--txd)",letterSpacing:".05em",textTransform:"uppercase",marginRight:2}},"Cuadro de contratos:"),
+      h("button",{onClick:descargarContratosExcel,title:"Descargar el cuadro completo en Excel",
+        style:{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)",fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}
+      },"📊 Excel"),
+      h("button",{onClick:descargarContratosPDF,title:"Descargar el cuadro completo en PDF (hoja carta, columnas ajustadas al ancho)",
+        style:{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)",fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}
+      },"📄 PDF"),
+      h("button",{onClick:()=>{
+          const st=document.createElement("style");
+          st.textContent=`@page{size:letter landscape;margin:10mm;}@media print{#contratos-tabla-imprimir{max-height:none!important;overflow:visible!important;}#contratos-tabla-imprimir table{font-size:6.5px!important;width:100%!important;table-layout:fixed;}#contratos-tabla-imprimir th,#contratos-tabla-imprimir td{padding:2px 3px!important;white-space:normal!important;word-break:break-word;}}`;
+          document.head.appendChild(st);
+          window.print();
+          setTimeout(()=>st.remove(),1000);
+        },title:"Imprimir el cuadro completo (hoja carta, columnas ajustadas al ancho)",
+        style:{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)",fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}
+      },"🖨️ Imprimir")
+    ),
     /* ── Panel subida certificado (solo para nueva-denominacion) ── */
     borradorTipo==="nueva-denominacion"&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--adim)",borderRadius:10,padding:"12px 18px",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}},
       h("span",{style:{fontSize:11,fontWeight:700,color:"var(--amber)",letterSpacing:".06em",whiteSpace:"nowrap"}},"📎 CERTIFICADO DE ESTATUTO ACTUALIZADO"),
@@ -3423,147 +3798,59 @@ function ContratosView({dashData,driveLoading}){
       ),
       certPdf&&h("span",{style:{fontSize:11,color:"var(--green)",fontWeight:600}},"✓ Listo")
     ),
-    h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}},
-      h("div",{style:{display:"flex",gap:6,flexWrap:"wrap"}},
-        h("button",{onClick:()=>setTab("contrato"),className:`pill${tab==="contrato"?" active":""}`},`📄 Contrato (${clients.length})`),
-        h("button",{onClick:()=>setTab("vencimientos"),className:`pill${tab==="vencimientos"?" active":""}`},`📅 Vencimientos ${currentYear} (${vencimientos.length})`),
-        h("button",{onClick:()=>setTab("reajustes"),className:`pill${tab==="reajustes"?" active":""}`},`📈 Reajustes ${currentYear}–${currentYear+1} (${reajustes.length})`)
-      ),
+    h("div",{style:{display:"flex",alignItems:"center"}},
       h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente...",style:{width:200}})
     ),
-    tab==="contrato"&&h("div",{style:{display:"flex",flexDirection:"column",gap:12}},
-      contratosOrdenados.length===0?h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,padding:"40px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin clientes que coincidan con la búsqueda"):
-      h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
-        h("div",{style:{padding:"10px 16px",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
-          h("span",{style:{fontWeight:700,fontSize:12}},"Detalle de Contratos — todos los clientes"),
-          h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},contratosOrdenados.length),
-          h("span",{style:{fontSize:10,color:"var(--txd)",marginLeft:"auto"}},ufHoy?`UF hoy: ${ufHoy.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`:"UF hoy: cargando…"),
-          h("span",{title:"Haz clic en cualquiera de las columnas Ajuste Intermedio para registrar los pasos pactados (ej. renovaciones a UF fija) y/o una regla recurrente (ej. +5% cada 3 años). Se muestran los 2 más próximos; el detalle completo queda en el modal.",style:{fontSize:10,color:"var(--txd)",cursor:"help"}},"ⓘ Ajuste Intermedio es editable")
-        ),
-        h("div",{style:{overflow:"auto",maxHeight:"calc(100vh - 260px)"}},
-          h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
-            h("thead",{style:{position:"sticky",top:0,zIndex:2}},h("tr",{style:{background:"#f0f4f8"}},
-              [["sitio","Sitio"],["cliente","Cliente / RUT"],["edificio","Edificio"],["inicio","Inicio"],["ufinicio","UF Inicio"],["periodo","Periodo"],["pctreaj","% Reaj."],["aviso","Aviso"],["ai1","Ajuste Intermedio 1"],["ai2","Ajuste Intermedio 2"],["termino","Renovación"],["m2","m²"],["ufm2","UF×m²"],["arriendo","Arriendo CLP (actual)"],["iniciosa","Inicio S.A."],["servadm","Serv.Adm. CLP (actual)"]].map(([key,label])=>h("th",{key,onClick:()=>toggleSort(key),style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:sortCol===key?"var(--acc)":"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap",cursor:"pointer",userSelect:"none"}},label.toUpperCase()+sortArrow(key))))),
-            h("tbody",null,contratosOrdenados.map((c,i)=>{
-              const sCol=SITIO_C[c.sitio]||"#888";
-              const arriendoCLP=ufHoy&&c.ufArr>0?c.ufArr*ufHoy:null;
-              const servAdmCLP=ufHoy&&c.ufSrv>0?c.ufSrv*ufHoy:null;
-              const rowKey=c.rut+c.nombre+i;
-              const seleccionada=filaSel===rowKey;
-              const ufInicioVal=(c._ajusteItem&&c._ajusteItem.ufInicio>0)?c._ajusteItem.ufInicio:(c.ufInicio>0?c.ufInicio:null);
-              const inicioSA=(c._ajusteItem&&c._ajusteItem.inicioSA)||"";
-              return h("tr",{key:rowKey,onClick:()=>setFilaSel(k=>k===rowKey?null:rowKey),
-                style:{borderBottom:"1px solid var(--bdr)",cursor:"pointer",
-                  background:seleccionada?"rgba(91,76,219,0.14)":(i%2===0?"var(--surf)":"var(--surf2)"),
-                  boxShadow:seleccionada?"inset 3px 0 0 var(--acc)":"none"}},
-                h("td",{style:{padding:"9px 12px"}},h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},c.sitio||"—")),
-                h("td",{style:{padding:"9px 12px",maxWidth:200}},h("div",{style:{fontWeight:600,fontSize:11,lineHeight:1.3}},c.nombre),h("div",{style:{fontSize:9,color:"var(--txd)",fontFamily:"'DM Mono',monospace",marginTop:2}},c.rut)),
-                h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)"}},c.edificio||"—"),
-                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.termContrato||"—"),
-                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},ufInicioVal!=null?ufInicioVal.toFixed(2):"—"),
-                h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.renovacion||"—"),
-                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.pctReaj&&c.pctReaj!=="-"?c.pctReaj+"%":"—"),
-                h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.aviso||"—"),
-                h("td",{style:{padding:"9px 12px"}},renderAjusteCol(c,0)),
-                h("td",{style:{padding:"9px 12px"}},renderAjusteCol(c,1)),
-                h("td",{style:{padding:"9px 12px"}},renderRenovacionCol(c)),
-                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.m2!=null?c.m2:"—"),
-                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--blue)"}},(c.ufArr>0&&c.m2>0)?(c.ufArr/c.m2).toFixed(2):"—"),
-                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600,color:"var(--tx)"}},fmtCLP(arriendoCLP)),
-                h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},inicioSA||"—"),
-                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600,color:"var(--tx)"}},fmtCLP(servAdmCLP)),
-              );
-            }))
-          )
-        )
-      )
-    ),
-    tab==="vencimientos"&&h("div",{style:{display:"flex",flexDirection:"column",gap:12}},
-      h("div",{style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}},
-        [{lbl:`Ya vencidos en ${currentYear}`,val:vencPasados,col:"var(--red)",sub:"requieren acción"},{lbl:"Próximos 30 días",val:venc30,col:"var(--red)",sub:"urgente — notificar ya"},{lbl:"31 a 90 días",val:venc90,col:"var(--amber)",sub:"atención próxima"},{lbl:"Más de 90 días",val:vencMas,col:"var(--green)",sub:"en plazo"},].map((k,i)=>h("div",{key:i,className:"dash-card",style:{borderLeft:"3px solid "+k.col}},h("div",{className:"dash-card-lbl"},k.lbl),h("div",{style:{fontSize:28,fontWeight:700,fontFamily:"'DM Mono',monospace",color:k.col,lineHeight:1,marginTop:2,letterSpacing:"-1px"}},k.val),h("div",{className:"dash-card-sub"},k.sub)))
+    contratosOrdenados.length===0?h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,padding:"40px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin clientes que coincidan con la búsqueda"):
+    h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
+      h("div",{style:{padding:"10px 16px",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
+        h("span",{style:{fontWeight:700,fontSize:12}},"Detalle de Contratos — todos los clientes"),
+        h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},contratosOrdenados.length),
+        h("span",{style:{fontSize:10,color:"var(--txd)",marginLeft:"auto"}},ufHoy?`UF hoy: ${ufHoy.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`:"UF hoy: cargando…"),
+        h("span",{title:"Haz clic en cualquiera de las columnas Ajuste Intermedio para registrar los pasos pactados (ej. renovaciones a UF fija) y/o una regla recurrente (ej. +5% cada 3 años). Se muestran los 2 más próximos; el detalle completo queda en el modal.",style:{fontSize:10,color:"var(--txd)",cursor:"help"}},"ⓘ Ajuste Intermedio es editable")
       ),
-      vencimientos.length===0?h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,padding:"40px",textAlign:"center",color:"var(--txd)",fontSize:13}},`No hay contratos con término registrado en ${currentYear}`):
-      h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
-        h("div",{style:{padding:"10px 16px",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:8}},
-          h("span",{style:{fontWeight:700,fontSize:12}},"Contratos con Término en "+currentYear),
-          h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},vencimientos.length)
-        ),
-        h("div",{style:{overflowX:"auto",overflowY:"auto",maxHeight:"calc(100vh - 320px)"}},
-          h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
-            h("thead",null,h("tr",{style:{background:"#f0f4f8",position:"sticky",top:0,zIndex:2}},["Sitio","Cliente / RUT","Edificio","Fecha Término","Días Restantes","Aviso previo","Aviso","Fecha Notificación","Serv. Admin.","Estado"].map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap",background:"#f0f4f8"}},col.toUpperCase())))),
-            h("tbody",null,vencimientos.map((c,i)=>{
-              const dias=diasDesde(c.termTermino);
-              const{bg,col,bdr}=urgBg(dias,false);
-              const notif=fechaNotif(c.termTermino,c.aviso);
-              const sCol=SITIO_C[c.sitio]||"#888";
-              const vencido=dias!==null&&dias<0;
-              const vigente=vencido&&facturaReciente(c);
-              return h("tr",{key:c.rut+c.nombre+i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"var(--surf2)"}},
-                h("td",{style:{padding:"9px 12px"}},h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},c.sitio||"—")),
-                h("td",{style:{padding:"9px 12px",maxWidth:200}},h("div",{style:{fontWeight:600,fontSize:11,lineHeight:1.3}},c.nombre),h("div",{style:{fontSize:9,color:"var(--txd)",fontFamily:"'DM Mono',monospace",marginTop:2}},c.rut)),
-                h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)"}},c.edificio||"—"),
-                h("td",{style:{padding:"9px 12px"}},h("span",{title:"Color fijo por mes de vencimiento",style:{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,color:colorPorMesFecha(c.termTermino)||"var(--tx)"}},c.termTermino||"—")),
-                h("td",{style:{padding:"9px 12px"}},dias!==null?h("span",{style:{padding:"2px 8px",borderRadius:10,fontSize:10,fontWeight:700,background:bg,color:col,border:"1px solid "+bdr}},dias<0?"Vencido hace "+Math.abs(dias)+"d":dias===0?"Hoy":dias+"d"):h("span",{style:{color:"var(--txd)"}},"—")),
-                h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.renovacion||"—"),
-                h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.aviso||"—"),
-                h("td",{style:{padding:"9px 12px"}},notif?h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600,color:"var(--accl)",background:"var(--bbg)",padding:"2px 8px",borderRadius:6,border:"1px solid #b5d0f0"}},notif):h("span",{style:{color:"var(--txd)",fontSize:10}},"Sin datos de aviso")),
-                h("td",{style:{padding:"9px 12px",textAlign:"center"}},h("span",{style:{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:8,
-                  background:c.pctAdm>0?"var(--gbg)":"var(--surf2)",
-                  color:c.pctAdm>0?"var(--green)":"var(--txd)",
-                  border:c.pctAdm>0?"1px solid var(--gdim)":"1px solid var(--bdr)"}},c.pctAdm>0?"SI":"NO")),
-                h("td",{style:{padding:"9px 12px",whiteSpace:"nowrap"}},
-                  !vencido?h("span",{style:{color:"var(--txd)",fontSize:10}},"En plazo"):
-                  vigente?h("span",{title:"Venció en papel pero sigue facturando — se renovó tácitamente sin objeción",style:{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:8,background:"var(--gbg)",color:"var(--green)",border:"1px solid var(--gdim)"}},"✓ Vigente"):
-                  h("span",{title:"Venció y no hay facturación reciente — requiere revisión",style:{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:8,background:"var(--rbg)",color:"var(--red)",border:"1px solid var(--rdim)"}},"⚠ Revisar")
-                ),
-              );
-            }))
-          )
-        )
-      )
-    ),
-    tab==="reajustes"&&h("div",{style:{display:"flex",flexDirection:"column",gap:12}},
-      h("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}},
-        [{lbl:`Reajustes ${currentYear}`,val:reajustes.filter(c=>{const d=parseDate(c.fechaReajuste);return d&&d.getFullYear()===currentYear;}).length,col:"var(--accl)",sub:"en el año actual"},{lbl:`Reajustes ${currentYear+1}`,val:reajustes.filter(c=>{const d=parseDate(c.fechaReajuste);return d&&d.getFullYear()===currentYear+1;}).length,col:"var(--blue)",sub:"año siguiente"},{lbl:"Próximos 30 días",val:reajustes.filter(c=>{const d=diasDesde(c.fechaReajuste);return d!==null&&d>=0&&d<=30;}).length,col:"var(--red)",sub:"urgente"},].map((k,i)=>h("div",{key:i,className:"dash-card",style:{borderLeft:"3px solid "+k.col}},h("div",{className:"dash-card-lbl"},k.lbl),h("div",{style:{fontSize:28,fontWeight:700,fontFamily:"'DM Mono',monospace",color:k.col,lineHeight:1,marginTop:2,letterSpacing:"-1px"}},k.val),h("div",{className:"dash-card-sub"},k.sub)))
-      ),
-      reajustes.length===0?h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,padding:"40px",textAlign:"center",color:"var(--txd)",fontSize:13}},`No hay reajustes programados para ${currentYear}–${currentYear+1}`):
-      h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
-        h("div",{style:{padding:"10px 16px",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:8}},
-          h("span",{style:{fontWeight:700,fontSize:12}},"Reajustes "+currentYear+"–"+(currentYear+1)),
-          h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},reajustes.length)
-        ),
-        h("div",{style:{overflowX:"auto"}},
-          h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
-            h("thead",{style:{position:"sticky",top:0,zIndex:2}},h("tr",{style:{background:"#f0f4f8"}},["Sitio","Cliente / RUT","Edificio","Fecha Reajuste","Días Restantes","% Reajuste","Periodicidad","UF Contrato","Últ. UF Planilla"].map(col=>h("th",{key:col,style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap"}},col.toUpperCase())))),
-            h("tbody",null,reajustes.map((c,i)=>{
-              const dias=diasDesde(c.fechaReajuste);
-              const{bg,col,bdr}=urgBg(dias,true);
-              const sCol=SITIO_C[c.sitio]||"#888";
-              const pct=c.pctReaj&&c.pctReaj!=="-"?parseFloat(c.pctReaj):null;
-              /* Última UF: buscar desde el mes actual hacia atrás en c.monthly */
-              const _MES_L2=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-              const _nw=new Date();let _lk=null;
-              for(let _i=0;_i<12;_i++){const _dd=new Date(_nw.getFullYear(),_nw.getMonth()-_i,1);const _k2=`${_dd.getFullYear()}-${String(_dd.getMonth()+1).padStart(2,"0")}`;if((c.monthly[_k2]||0)>0){_lk=_k2;break;}}
-              const lastUF=_lk?(c.monthly[_lk]||0):0;
-              const lastLabel=_lk?(_MES_L2[parseInt(_lk.slice(5,7))-1]+" "+_lk.slice(0,4)):"—";
-              /* Comparación: ¿ya se aplicó el reajuste? */
-              const aplicado=lastUF>0&&c.ufArr>0&&Math.abs(lastUF-c.ufArr)/c.ufArr>0.03;
-              return h("tr",{key:c.rut+c.nombre+i,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"var(--surf2)"}},
-                h("td",{style:{padding:"9px 12px"}},h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},c.sitio||"—")),
-                h("td",{style:{padding:"9px 12px",maxWidth:200}},h("div",{style:{fontWeight:600,fontSize:11,lineHeight:1.3}},c.nombre),h("div",{style:{fontSize:9,color:"var(--txd)",fontFamily:"'DM Mono',monospace",marginTop:2}},c.rut)),
-                h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)"}},c.edificio||"—"),
-                h("td",{style:{padding:"9px 12px"}},h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,color:dias!==null&&dias<0?"var(--red)":dias!==null&&dias<=30?"var(--amber)":"var(--tx)"}},c.fechaReajuste||"—")),
-                h("td",{style:{padding:"9px 12px"}},dias!==null?h("span",{style:{padding:"2px 8px",borderRadius:10,fontSize:10,fontWeight:700,background:bg,color:col,border:"1px solid "+bdr}},dias<0?"Hace "+Math.abs(dias)+"d":dias===0?"Hoy":dias+"d"):h("span",{style:{color:"var(--txd)"}},"—")),
-                h("td",{style:{padding:"9px 12px"}},pct!==null?h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:700,color:"var(--green)",background:"var(--gbg)",border:"1px solid var(--gdim)",padding:"3px 10px",borderRadius:8}},pct.toFixed(1)+"%"):h("span",{style:{color:"var(--txd)"}},"—")),
-                h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.cadaAnios||"—"),
-                h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--blue)",fontWeight:600}},c.ufArr>0?c.ufArr.toFixed(2)+" UF":"—"),
-                h("td",{style:{padding:"9px 12px"}},lastUF>0?h("div",{style:{display:"flex",flexDirection:"column",gap:2}},
-                  h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,color:aplicado?"var(--green)":"var(--amber)"}},lastUF.toFixed(2)+" UF"),
-                  h("span",{style:{fontSize:9,color:"var(--txd)"}},lastLabel+(aplicado?" ✓ ajustado":" ⚠ sin ajustar"))
-                ):h("span",{style:{color:"var(--txd)"}},"—"))
-              );
-            }))
-          )
+      h("div",{id:"contratos-tabla-imprimir",style:{overflow:"auto",maxHeight:"calc(100vh - 260px)"}},
+        h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
+          h("thead",{style:{position:"sticky",top:0,zIndex:2}},h("tr",{style:{background:"#f0f4f8"}},
+            [["sitio","Sitio"],["edificio","Edif."],["cliente","Cliente/RUT"],["inicio","Inicio"],["ufinicio","UF Inicio"],["periodo","Período"],["pctreaj","%Reaj."],["ai1","Ajuste Inter.1"],["ai2","Ajuste Inter.2"],["aviso","Aviso"],["fechanotif","Fecha Notif."],["termino","Renovación"],["m2","M2"],["ufm2","UF x M2"],["ufcontrato","UF Contrato"],["arriendo","Arriendo CLP"],["iniciosa","Inicio S.A."],["fechareajsa","Fecha Reaj. S.A."],["renovacionsa","Renovación S.A."],["pctreajsa","%Reaj. S.A."],["ufsa","UF S.A."],["servadm","S.A. CLP"]].map(([key,label])=>h("th",{key,onClick:()=>toggleSort(key),style:{padding:"8px 12px",textAlign:"left",fontSize:9,fontWeight:700,color:sortCol===key?"var(--acc)":"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",whiteSpace:"nowrap",cursor:"pointer",userSelect:"none"}},label.toUpperCase()+sortArrow(key))))),
+          h("tbody",null,contratosOrdenados.map((c,i)=>{
+            const sCol=SITIO_C[c.sitio]||"#888";
+            const arriendoCLP=ufHoy&&c.ufArr>0?c.ufArr*ufHoy:null;
+            const servAdmCLP=ufHoy&&c.ufSrv>0?c.ufSrv*ufHoy:null;
+            const rowKey=c.rut+c.nombre+i;
+            const seleccionada=filaSel===rowKey;
+            const ufInicioVal=(c._ajusteItem&&c._ajusteItem.ufInicio>0)?c._ajusteItem.ufInicio:(c.ufInicio>0?c.ufInicio:null);
+            const inicioSA=(c._ajusteItem&&c._ajusteItem.inicioSA)||"";
+            const tieneSA=c.ufSrv>0;
+            const notif=fechaNotif(c.termTermino,c.aviso);
+            return h("tr",{key:rowKey,onClick:()=>setFilaSel(k=>k===rowKey?null:rowKey),
+              style:{borderBottom:"1px solid var(--bdr)",cursor:"pointer",
+                background:seleccionada?"rgba(91,76,219,0.14)":(i%2===0?"var(--surf)":"var(--surf2)"),
+                boxShadow:seleccionada?"inset 3px 0 0 var(--acc)":"none"}},
+              h("td",{style:{padding:"9px 12px"}},h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${sCol}18`,color:sCol,border:`1px solid ${sCol}40`}},c.sitio||"—")),
+              h("td",{style:{padding:"9px 12px",maxWidth:200}},h("div",{style:{fontWeight:600,fontSize:10,color:"var(--txm)"}},c.edificio||"—"),c.dir&&h("div",{style:{fontSize:9,color:"var(--txd)",marginTop:2}},c.dir)),
+              h("td",{style:{padding:"9px 12px",maxWidth:200}},h("div",{style:{fontWeight:600,fontSize:11,lineHeight:1.3}},c.nombre),h("div",{style:{fontSize:9,color:"var(--txd)",fontFamily:"'DM Mono',monospace",marginTop:2}},c.rut)),
+              h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.termContrato||"—"),
+              h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},ufInicioVal!=null?ufInicioVal.toFixed(2):"—"),
+              h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.renovacion||"—"),
+              h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.pctReaj&&c.pctReaj!=="-"?c.pctReaj+"%":"—"),
+              h("td",{style:{padding:"9px 12px"}},renderAjusteCol(c,0)),
+              h("td",{style:{padding:"9px 12px"}},renderAjusteCol(c,1)),
+              h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},c.aviso||"—"),
+              h("td",{style:{padding:"9px 12px"}},notif?h("span",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:600,color:"var(--accl)",background:"var(--bbg)",padding:"2px 8px",borderRadius:6,border:"1px solid #b5d0f0"}},notif):h("span",{style:{color:"var(--txd)",fontSize:10}},"—")),
+              h("td",{style:{padding:"9px 12px"}},renderRenovacionCol(c)),
+              h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.m2!=null?c.m2:"—"),
+              h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--blue)"}},(c.ufArr>0&&c.m2>0)?(c.ufArr/c.m2).toFixed(2):"—"),
+              h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--blue)",fontWeight:600}},c.ufArr>0?c.ufArr.toFixed(2)+" UF":"—"),
+              h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600,color:"var(--tx)"}},fmtCLP(arriendoCLP)),
+              h("td",{style:{padding:"9px 12px",fontSize:10,color:tieneSA?"var(--txm)":"var(--txd)",fontFamily:"'DM Mono',monospace"}},tieneSA?(inicioSA||"—"):"NO"),
+              h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},tieneSA?(c.fechaReajuste||"—"):"—"),
+              h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},tieneSA?(c.cadaAnios||"—"):"—"),
+              h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},(tieneSA&&c.pctReaj&&c.pctReaj!=="-")?c.pctReaj+"%":"—"),
+              h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},tieneSA?c.ufSrv.toFixed(2)+" UF":"—"),
+              h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600,color:"var(--tx)"}},tieneSA?fmtCLP(servAdmCLP):"—"),
+            );
+          }))
         )
       )
     ),
@@ -3692,6 +3979,7 @@ function CatastroSitiosView({dashData,driveLoading}){
   return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up epv2"},
     h("div",{style:{padding:"14px 24px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,flexShrink:0,borderBottom:"1px solid var(--bdr)"}},
       h("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
+        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar sitio, edificio, dirección...",style:{width:220}}),
         h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"🗺️ CATASTRO DE SITIOS"),
         h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},filtered.length+" / "+sitios.length),
         h("span",{style:{width:1,height:16,background:"var(--bdr)",display:"inline-block",margin:"0 4px"}}),
@@ -3700,7 +3988,6 @@ function CatastroSitiosView({dashData,driveLoading}){
         h("span",{style:{fontSize:14,fontWeight:700,color:"var(--tx)",marginLeft:6}},ufHoy?"UF hoy: "+ufHoy.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2}):"UF hoy: cargando…")
       ),
       h("div",{style:{display:"flex",alignItems:"center",gap:8}},
-        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar sitio, edificio, dirección...",style:{width:220}}),
         h("button",{
           title:"Exportar a Excel",
           onClick:()=>{
@@ -3973,9 +4260,9 @@ function Torre2680View({dashData,driveLoading}){
   return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up epv2"},
     h("div",{style:{padding:"14px 24px 10px",display:"flex",flexDirection:"column",gap:10,flexShrink:0,borderBottom:"1px solid var(--bdr)"}},
       h("div",{style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
+        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar oficina, cliente...",style:{width:220}}),
         h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"🏢 TORRE 2680 · PROTOTIPO"),
-        h("span",{style:{fontSize:10,color:"var(--acc)",background:"rgba(91,76,219,.12)",border:"1px solid rgba(91,76,219,.3)",padding:"2px 8px",borderRadius:10,fontWeight:700}},"Vista de prueba — no reemplaza El Cortijo"),
-        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar oficina, cliente...",style:{width:220,marginLeft:"auto"}})
+        h("span",{style:{fontSize:10,color:"var(--acc)",background:"rgba(91,76,219,.12)",border:"1px solid rgba(91,76,219,.3)",padding:"2px 8px",borderRadius:10,fontWeight:700}},"Vista de prueba — no reemplaza El Cortijo")
       ),
       !buscando&&h("div",{style:{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}},
         pisos.map(p=>h("button",{key:p,onClick:()=>{setPiso(p);setZoomOficina(null);},style:{
@@ -4309,8 +4596,8 @@ function ElCortijoView({dashData,driveLoading}){
   return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up"},
     h("div",{style:{padding:"10px 20px",borderBottom:"1px solid var(--bdr)",flexShrink:0,background:"var(--surf)",display:"flex",flexDirection:"column",gap:10,flexWrap:"wrap"}},
       h("div",{style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
+        !verPdf&&h("input",{value:search,onChange:e=>{setSearch(e.target.value);setZoomUnidad(null);},placeholder:"Buscar edificio, cliente...",style:{width:220}}),
         h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"🏡 EL CORTIJO — PLANO INTERACTIVO"),
-        !verPdf&&h("input",{value:search,onChange:e=>{setSearch(e.target.value);setZoomUnidad(null);},placeholder:"Buscar edificio, cliente...",style:{width:220,marginLeft:"auto"}}),
         h("button",{onClick:()=>{setVerPdf(v=>!v);setZoomUnidad(null);},style:{
           marginLeft:verPdf?"auto":0,padding:"6px 14px",borderRadius:8,border:"1px solid var(--bdr)",
           background:"var(--surf2)",color:"var(--tx)",fontSize:12,fontWeight:700,cursor:"pointer"
@@ -4703,6 +4990,7 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
     h("div",{style:{padding:"14px 24px 4px",display:"flex",flexDirection:"column",gap:8,flexShrink:0}},bannerAA,bannerEnel),
     h("div",{style:{padding:"14px 24px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,flexShrink:0,borderBottom:"1px solid var(--bdr)"}},
       h("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
+        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente, sitio, RUT...",style:{width:200}}),
         h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em"}},"\uD83D\uDD0C CUENTAS DE SERVICIOS"),
         h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},filtered.length+" / "+clientes.length),
         h("span",{style:{width:1,height:16,background:"var(--bdr)",display:"inline-block",margin:"0 4px"}}),
@@ -4736,7 +5024,6 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
             "⚡ Enel — "+(enelUpdatedAt?"act. "+new Date(enelUpdatedAt).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"}):"sin datos")
           )
         ),
-        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente, sitio, RUT...",style:{width:200}}),
         h("button",{
           title:"Exportar a Excel",
           onClick:()=>{
@@ -5336,6 +5623,8 @@ function HistorialFactView({dashData,driveLoading,notify,planillaFile,marcarPaga
     ),
 
     h("div",{style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",flexShrink:0}},
+      !selClient&&h("input",{value:search,onChange:e=>setSearch(e.target.value),
+        placeholder:"Buscar cliente o RUT...",style:{width:200}}),
       h("div",{style:{fontSize:13,fontWeight:600,color:"var(--txm)",whiteSpace:"nowrap"}},
         "Nubox",
         h("span",{style:{color:"var(--bdr)",margin:"0 6px"}},"|"),
@@ -5356,9 +5645,7 @@ function HistorialFactView({dashData,driveLoading,notify,planillaFile,marcarPaga
         title:"Volver a consultar desde PDF — corrige datos incorrectos",
         style:{marginLeft:"auto",fontSize:11,padding:"4px 10px",borderRadius:7,border:"1px solid var(--bdr)",
           background:"var(--surf2)",color:"var(--txm)",cursor:"pointer",display:"flex",alignItems:"center",gap:4}
-      },h("span",null,"⟳")," Refrescar"),
-      !selClient&&h("input",{value:search,onChange:e=>setSearch(e.target.value),
-        placeholder:"Buscar cliente o RUT...",style:{marginLeft:"auto",width:200}})
+      },h("span",null,"⟳")," Refrescar")
     ),
 
     !selClient&&h("div",{style:{display:"flex",alignItems:"center",gap:10,paddingLeft:2,flexShrink:0,flexWrap:"wrap"}},
@@ -7261,6 +7548,7 @@ function App(){
         dashData&&h("div",{key:"tbl-"+curSitio+"-"+curMes,style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
         /* Barra de controles */
         h("div",{style:{padding:"10px 14px",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",background:"var(--surf)"}},
+          h("input",{value:dashSearch,onChange:e=>setDashSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:180}}),
           h("span",{style:{fontWeight:700,fontSize:12,color:"var(--tx)"}},"Clientes"),
           h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},tblClients.length+" / "+dashData.clients.length),
           h("div",{style:{display:"flex",gap:4,flexWrap:"wrap",marginLeft:4}},
@@ -7279,8 +7567,7 @@ function App(){
             style:{fontSize:11,padding:"4px 8px",borderRadius:7,border:"1px solid var(--bdr)",background:"var(--surf)",color:"var(--tx)",fontFamily:"'DM Mono',monospace",marginLeft:4}},
             tblMesOpts.map(m=>h("option",{key:m.k,value:m.k},m.l))
           ),
-          h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},tblUfLabel),
-          h("input",{value:dashSearch,onChange:e=>setDashSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:180,marginLeft:"auto"}})
+          h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},tblUfLabel)
         ),
         h("div",{className:"dash-client-hdr"},
           ["Sitio","Cliente / RUT","Arriendo CLP","Serv.Adm. CLP","Total CLP","IVA","Término","Antelac.","Aviso","F.Reajuste","% Reaj.","Cada","m²","UF×m²",""].map(col=>h("div",{key:col},col))
@@ -8132,6 +8419,8 @@ function App(){
         ))
       ),
       h("div",{style:{background:"#EAF1FF",borderBottom:"1px solid #D6E4FF",padding:"8px 18px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
+        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:190,fontFamily:"'DM Sans',sans-serif"}}),
+        h("input",{value:searchFactura,onChange:e=>setSearchFactura(e.target.value),placeholder:"N° Factura...",style:{width:130,fontFamily:"'DM Mono',monospace"}}),
         h("select",{
           value:periodo,
           onChange:e=>{const p=e.target.value;if(p!==periodo){periodoActivado.current=false;autoProcesado.current=false;autoNuboxRef.current=false;setPeriodo(p);setZipStatus("idle");setData([]);setSoloPlanilla(false);setPdfMap({});setFiles(f=>({...f,planilla:null}));}},
@@ -8246,9 +8535,7 @@ function App(){
                 fontFamily:"'DM Sans',sans-serif"}
             },savingNros?"⏳ Guardando...":"💾 Guardar nros en planilla ("+_nuevos+")");
           })()
-        ),
-        h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:190,fontFamily:"'DM Sans',sans-serif"}}),
-        h("input",{value:searchFactura,onChange:e=>setSearchFactura(e.target.value),placeholder:"N° Factura...",style:{width:130,fontFamily:"'DM Mono',monospace"}})
+        )
       ),
       h("div",{style:{flex:1,overflowX:"auto",overflowY:"auto"}},
         h("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:940}},
