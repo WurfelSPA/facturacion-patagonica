@@ -8198,7 +8198,7 @@ function App(){
                 "Patagónica Inmobiliaria ",h("span",{style:{color:"var(--txm)",fontWeight:400,fontSize:12}},"<"+REMITENTE+">")
               ),
               h("div",{style:{fontSize:11,color:"var(--txm)",marginTop:2}},"Para  ",h("span",{style:{color:"var(--tx)"}},"bpulgar@patagonica.cl; contabilidad@patagonica.cl")),
-              h("div",{style:{fontSize:11,color:"var(--txm)"}},"CC  ",h("span",{style:{color:"var(--tx)"}},"mmunoz@patagonica.cl; alagies@patagonica.cl"))
+              h("div",{style:{fontSize:11,color:"var(--txm)"}},"CC  ",h("span",{style:{color:"var(--tx)"}},"mmunoz@patagonica.cl"))
             )
           ),
           /* Chip adjunto Excel */
@@ -8243,7 +8243,7 @@ function App(){
             onClick:async()=>{
               if(previewPlanilla.sending)return;
               const TO="bpulgar@patagonica.cl, contabilidad@patagonica.cl";
-              const CC="mmunoz@patagonica.cl, alagies@patagonica.cl";
+              const CC="mmunoz@patagonica.cl";
               setPreviewPlanilla(p=>({...p,sending:true}));
               try{
                 const token=await getToken();

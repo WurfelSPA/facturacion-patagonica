@@ -3,7 +3,7 @@
  *
  * Cron automático:
  *   - Día 24 08:00 AM Chile → recipients=preview  → mmunoz@ (BCC facturacion@)
- *   - Día 26 08:00 AM Chile → recipients=contabilidad → bpulgar@, contabilidad@ (CC mmunoz@, alagies@ / BCC facturacion@)
+ *   - Día 26 08:00 AM Chile → recipients=contabilidad → bpulgar@, contabilidad@ (CC mmunoz@ / BCC facturacion@)
  *
  * Flujo:
  *   1. Obtiene access token de Gmail via refresh token
@@ -343,7 +343,7 @@ export default async function handler(req, res) {
   const TO  = recipients === 'contabilidad'
     ? 'bpulgar@patagonica.cl, contabilidad@patagonica.cl'
     : 'mmunoz@patagonica.cl';
-  const CC  = recipients === 'contabilidad' ? 'mmunoz@patagonica.cl, alagies@patagonica.cl' : '';
+  const CC  = recipients === 'contabilidad' ? 'mmunoz@patagonica.cl' : '';
   const BCC = 'facturacion@patagonica.cl';
 
   try {
