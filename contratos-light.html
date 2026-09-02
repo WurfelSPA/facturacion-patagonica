@@ -163,7 +163,14 @@ function grupoTitulo(txt){return el("div","grupo-titulo",txt);}
 function renderContrato(c,ufHoy){
   main.innerHTML="";
   const card=el("div","card");
-  card.append(el("div","nombre",c.nombre));
+  const nombreEl=el("div","nombre",c.nombre);
+  nombreEl.style.color="var(--acc)";
+  nombreEl.style.textDecoration="underline";
+  nombreEl.style.textUnderlineOffset="3px";
+  nombreEl.style.cursor="pointer";
+  nombreEl.title="Ver PDF del contrato (Drive → Contratos por Cliente)";
+  nombreEl.onclick=()=>window.open("/api/drive-contrato?nombre="+encodeURIComponent(c.nombre)+"&sitio="+encodeURIComponent(c.sitio||"")+"&edificio="+encodeURIComponent(c.edificio||""),"_blank");
+  card.append(nombreEl);
   card.append(el("div","rut","RUT: "+(c.rut||"—")));
 
   card.append(grupoTitulo("Ubicación"));
