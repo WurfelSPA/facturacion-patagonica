@@ -1806,16 +1806,28 @@ function HistPanel({client,anio,setAnio,onClose}){
     )
   );
 }
-function buildResumenHtml(enviados,periodo){
+function buildResumenHtml(enviados,periodo,ufRate){
+  /* MONTO CLP: mismo criterio que buildEmailHtml — preferir el monto REAL de
+     la factura (montoTotal, con IVA) y solo recalcular desde la UF si no hay
+     montoTotal disponible. Se agrega como columna aparte (no reemplaza
+     MONTO, que sigue mostrando la UF/monto plano tal como venía) para poder
+     revisar de un vistazo si algún monto en pesos quedó fuera de rango. */
+  const fmtClp=v=>"$"+Math.round(v).toLocaleString("es-CL");
+  const montoClp=r=>{
+    if(r.montoTotal!=null&&r.montoTotal>0)return fmtClp(r.montoTotal);
+    if(ufRate&&r.ufPlan>0&&r.ufPlan<=500)return fmtClp(r.ufPlan*ufRate);
+    return"—";
+  };
   const filas=enviados.map(r=>`<tr style="border-bottom:1px solid #f0f0f0">
     <td style="padding:8px 12px;font-size:12px;color:#555">${r.sitio}</td>
     <td style="padding:8px 12px;font-size:12px;color:#111;font-weight:500">${r.cliente}</td>
     <td style="padding:8px 12px;font-size:12px;color:#555">${r.concepto}</td>
     <td style="padding:8px 12px;font-size:12px;font-family:monospace;color:#333">${r.factura||"—"}</td>
     <td style="padding:8px 12px;font-size:12px;font-family:monospace;color:#111">${r.ufPlan==null||r.ufPlan===0?"—":r.ufPlan>500?"$"+Math.round(r.ufPlan).toLocaleString("es-CL"):r.ufPlan.toFixed(2)+" UF"}</td>
+    <td style="padding:8px 12px;font-size:12px;font-family:monospace;color:#111;font-weight:600">${montoClp(r)}</td>
     <td style="padding:8px 12px;font-size:12px;color:${r.correo?"#1a5fa8":"#999"}">${r.correo||"—"}</td>
   </tr>`).join("");
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#f4f4f4;font-family:Helvetica,Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:28px 0"><tr><td align="center"><table width="680" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;border:1px solid #e0e0e0;overflow:hidden"><tr><td style="background:#1e3a5f;padding:20px 28px"><div style="font-size:17px;font-weight:700;color:#fff">Resumen de Facturación Enviada</div><div style="font-size:12px;color:#93b5d4;margin-top:4px">Período: ${periodo} · ${enviados.length} correo${enviados.length!==1?"s":""} enviado${enviados.length!==1?"s":""}</div></td></tr><tr><td style="padding:20px 28px"><table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e8e8;border-radius:6px;overflow:hidden"><tr style="background:#f0f4f8"><td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999">SITIO</td><td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999">CLIENTE</td><td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999">CONCEPTO</td><td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999">FACTURA</td><td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999">MONTO</td><td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999">DESTINATARIO</td></tr>${filas}</table></td></tr><tr><td style="background:#f8f8f8;border-top:1px solid #e8e8e8;padding:14px 28px"><p style="font-size:11px;color:#999;margin:0">Resumen generado automáticamente · Patagónica Inmobiliaria SpA · RUT 96.673.250-4</p></td></tr></table></td></tr></table></body></html>`;
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#f4f4f4;font-family:Helvetica,Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:28px 0"><tr><td align="center"><table width="680" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;border:1px solid #e0e0e0;overflow:hidden"><tr><td style="background:#1e3a5f;padding:20px 28px"><div style="font-size:17px;font-weight:700;color:#fff">Resumen de Facturación Enviada</div><div style="font-size:12px;color:#93b5d4;margin-top:4px">Período: ${periodo} · ${enviados.length} correo${enviados.length!==1?"s":""} enviado${enviados.length!==1?"s":""}</div></td></tr><tr><td style="padding:20px 28px"><table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e8e8;border-radius:6px;overflow:hidden"><tr style="background:#f0f4f8"><td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999">SITIO</td><td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999">CLIENTE</td><td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999">CONCEPTO</td><td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999">FACTURA</td><td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999">MONTO</td><td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999">MONTO CLP</td><td style="padding:8px 12px;font-size:10px;font-weight:700;color:#999">DESTINATARIO</td></tr>${filas}</table></td></tr><tr><td style="background:#f8f8f8;border-top:1px solid #e8e8e8;padding:14px 28px"><p style="font-size:11px;color:#999;margin:0">Resumen generado automáticamente · Patagónica Inmobiliaria SpA · RUT 96.673.250-4</p></td></tr></table></td></tr></table></body></html>`;
 }
 function formatRUT(rut){
   if(!rut)return"";
@@ -7242,7 +7254,7 @@ function App(){
           await new Promise(r=>setTimeout(r,400));
         }catch(e){notify("Error en "+row.cliente+": "+e.message,"err");}
       }
-      if(enviados>0){try{const resumenHtml=buildResumenHtml(enviadosOk,periodo);const resSubject="Resumen Facturación "+periodo+" — "+enviados+" correos enviados";await sendGmail(token,"","",REMITENTE,resSubject,resumenHtml,null,null,null,"facturacion@patagonica.cl");}catch(e){console.warn("Error enviando resumen:",e.message);}}
+      if(enviados>0){try{const resumenHtml=buildResumenHtml(enviadosOk,periodo,ufSII);const resSubject="Resumen Facturación "+periodo+" — "+enviados+" correos enviados";await sendGmail(token,"","",REMITENTE,resSubject,resumenHtml,null,null,null,"facturacion@patagonica.cl");}catch(e){console.warn("Error enviando resumen:",e.message);}}
       notify("✓ "+enviados+"/"+pend.length+" correos enviados");
     }catch(e){notify(e.message.includes("popup")?"Autorización cancelada":"Error: "+e.message,"warn");}
   };
