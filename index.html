@@ -3999,7 +3999,13 @@ function wCell(contentXml,opts){
   if(opts.colspan)tcPr.push(`<w:gridSpan w:val="${opts.colspan}"/>`);
   if(opts.margins)tcPr.push(`<w:tcMar><w:top w:w="${opts.margins}" w:type="dxa"/><w:bottom w:w="${opts.margins}" w:type="dxa"/><w:left w:w="${opts.margins}" w:type="dxa"/><w:right w:w="${opts.margins}" w:type="dxa"/></w:tcMar>`);
   if(opts.noBorders)tcPr.push(`<w:tcBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/></w:tcBorders>`);
-  const body=Array.isArray(contentXml)?contentXml.join(""):(typeof contentXml==="string"?wPara(contentXml):contentXml);
+  // Si ya viene un <w:p>/<w:tbl> armado (ej. wCell(wPara(...))), usarlo tal cual:
+  // volver a pasarlo por wPara() lo trataría como texto plano y escaparía los
+  // tags, mostrando el XML crudo como texto visible en el documento.
+  const isBuiltXml=s=>typeof s==="string"&&/^<w:(p|tbl)[ >]/.test(s);
+  const body=Array.isArray(contentXml)
+    ?contentXml.join("")
+    :(isBuiltXml(contentXml)?contentXml:(typeof contentXml==="string"?wPara(contentXml):contentXml));
   return `<w:tc><w:tcPr>${tcPr.join("")}</w:tcPr>${body}</w:tc>`;
 }
 function wRow(cellsXml,opts){opts=opts||{};return `<w:tr>${opts.height?`<w:trPr><w:trHeight w:val="${opts.height}"/></w:trPr>`:""}${cellsXml.join("")}</w:tr>`;}
