@@ -3962,9 +3962,276 @@ function ContratosView({dashData,driveLoading}){
 }
 
 /* ══════════════════════════════════════════════════════════
+   GENERADOR DE COTIZACIONES DE ARRIENDO (.docx)
+   Motor mínimo de Word OOXML a mano (mismo criterio que la construcción
+   manual de XLSX en api/planilla-email.js) — sin librerías, todo cliente.
+══════════════════════════════════════════════════════════ */
+function docxEsc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function wRun(text,opts){
+  opts=opts||{};
+  const p=[];
+  if(opts.b)p.push("<w:b/>");
+  if(opts.i)p.push("<w:i/>");
+  if(opts.color)p.push(`<w:color w:val="${opts.color}"/>`);
+  if(opts.sz)p.push(`<w:sz w:val="${opts.sz*2}"/><w:szCs w:val="${opts.sz*2}"/>`);
+  if(opts.caps)p.push("<w:caps/>");
+  const rPr=p.length?`<w:rPr>${p.join("")}</w:rPr>`:"";
+  const brk=opts.br?"<w:br/>":"";
+  return `<w:r>${rPr}${brk}<w:t xml:space="preserve">${docxEsc(text)}</w:t></w:r>`;
+}
+/* Un párrafo: acepta texto plano (con opts de formato) o un array de w:r ya armados */
+function wPara(content,opts){
+  opts=opts||{};
+  const runsXml=Array.isArray(content)?content.join(""):wRun(content,opts);
+  const pPr=[];
+  if(opts.align)pPr.push(`<w:jc w:val="${opts.align}"/>`);
+  if(opts.spaceBefore!=null||opts.spaceAfter!=null)pPr.push(`<w:spacing${opts.spaceBefore!=null?` w:before="${opts.spaceBefore}"`:""}${opts.spaceAfter!=null?` w:after="${opts.spaceAfter}"`:""}/>`);
+  if(opts.shd)pPr.push(`<w:shd w:val="clear" w:fill="${opts.shd}"/>`);
+  if(opts.borderBottom)pPr.push(`<w:pBdr><w:bottom w:val="single" w:sz="${opts.borderBottom.sz||6}" w:color="${opts.borderBottom.color||"000000"}"/></w:pBdr>`);
+  const pPrXml=pPr.length?`<w:pPr>${pPr.join("")}</w:pPr>`:"";
+  return `<w:p>${pPrXml}${runsXml}</w:p>`;
+}
+function wCell(contentXml,opts){
+  opts=opts||{};
+  const tcPr=[`<w:tcW w:w="${opts.width||2000}" w:type="dxa"/>`];
+  if(opts.shd)tcPr.push(`<w:shd w:val="clear" w:fill="${opts.shd}"/>`);
+  if(opts.vAlign)tcPr.push(`<w:vAlign w:val="${opts.vAlign}"/>`);
+  if(opts.colspan)tcPr.push(`<w:gridSpan w:val="${opts.colspan}"/>`);
+  if(opts.margins)tcPr.push(`<w:tcMar><w:top w:w="${opts.margins}" w:type="dxa"/><w:bottom w:w="${opts.margins}" w:type="dxa"/><w:left w:w="${opts.margins}" w:type="dxa"/><w:right w:w="${opts.margins}" w:type="dxa"/></w:tcMar>`);
+  if(opts.noBorders)tcPr.push(`<w:tcBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/></w:tcBorders>`);
+  const body=Array.isArray(contentXml)?contentXml.join(""):(typeof contentXml==="string"?wPara(contentXml):contentXml);
+  return `<w:tc><w:tcPr>${tcPr.join("")}</w:tcPr>${body}</w:tc>`;
+}
+function wRow(cellsXml,opts){opts=opts||{};return `<w:tr>${opts.height?`<w:trPr><w:trHeight w:val="${opts.height}"/></w:trPr>`:""}${cellsXml.join("")}</w:tr>`;}
+function wTable(rowsXml,colWidths,opts){
+  opts=opts||{};
+  const grid=colWidths.map(w=>`<w:gridCol w:w="${w}"/>`).join("");
+  const bd=opts.noBorders?"":`<w:tblBorders><w:top w:val="single" w:sz="4" w:color="${opts.borderColor||"DDDDDD"}"/><w:left w:val="single" w:sz="4" w:color="${opts.borderColor||"DDDDDD"}"/><w:bottom w:val="single" w:sz="4" w:color="${opts.borderColor||"DDDDDD"}"/><w:right w:val="single" w:sz="4" w:color="${opts.borderColor||"DDDDDD"}"/><w:insideH w:val="single" w:sz="4" w:color="${opts.borderColor||"DDDDDD"}"/><w:insideV w:val="single" w:sz="4" w:color="${opts.borderColor||"DDDDDD"}"/></w:tblBorders>`;
+  return `<w:tbl><w:tblPr><w:tblW w:w="${opts.width||0}" w:type="${opts.width?"dxa":"auto"}"/>${bd}</w:tblPr><w:tblGrid>${grid}</w:tblGrid>${rowsXml.join("")}</w:tbl>`;
+}
+async function buildDocxBlob(bodyXml){
+  const zip=new JSZip();
+  zip.file("[Content_Types].xml",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`);
+  zip.file("_rels/.rels",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
+  const docXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${bodyXml}<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1080" w:right="1080" w:bottom="1080" w:left="1080"/></w:sectPr></w:body></w:document>`;
+  zip.file("word/document.xml",docXml);
+  return await zip.generateAsync({type:"blob",mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+}
+function descargarBlob(blob,filename){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;a.download=filename;document.body.appendChild(a);a.click();
+  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},1500);
+}
+
+/* Deriva Tipo/Numeración a partir de "edificio" (ej. "Edif. 77" → Bodega 77,
+   "T. Of. 44" → Oficina 44, "P. C. L-4" → Local Comercial L-4). Aproximado —
+   ambos campos quedan visibles en el documento para corregir a mano si hace
+   falta, igual que el resto de los datos del cliente. */
+function inferTipoNumeracion(sitio,edificio){
+  const s=(edificio||"").trim();
+  let m;
+  if((m=s.match(/Bodega\s*(\S+)/i)))return{tipo:"Bodega",numeracion:m[1]};
+  if((m=s.match(/T\.?\s*Of\.?\s*(\S+)/i)))return{tipo:"Oficina",numeracion:m[1]};
+  if((m=s.match(/^Of\.?\s*(\S+)/i)))return{tipo:"Oficina",numeracion:m[1]};
+  if((m=s.match(/P\.?\s*C\.?\s*L[\.\-]?\s*(\S+)/i)))return{tipo:"Local Comercial",numeracion:"L"+m[1]};
+  if((m=s.match(/Torre\s*L[\.\-]?\s*(\S+)/i)))return{tipo:"Oficina",numeracion:"L"+m[1]};
+  if(/Estacionamiento/i.test(s))return{tipo:"Estacionamiento",numeracion:(s.match(/\d+/)||[])[0]||"—"};
+  if((m=s.match(/Edif\.?\s*(\S+)/i))){
+    const tipo=(sitio==="5-A"||sitio==="4-A")?"Bodega":"Oficina";
+    return{tipo,numeracion:m[1]};
+  }
+  return{tipo:"Espacio",numeracion:s||"—"};
+}
+function datosSitioParaCotizacion(v){
+  const{tipo,numeracion}=inferTipoNumeracion(v.sitio,v.edificio);
+  const fmtUFn=n=>n.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const arriendoUF=v.arriendoActual!=null?Math.round(v.arriendoActual*100)/100:0;
+  const pctAdmTxt=(v.pctAdm!=null)?(v.pctAdm>0&&v.pctAdm<1?(v.pctAdm*100).toFixed(0)+"%":fmtUFn(v.pctAdm)+" UF"):"—";
+  const servAdmUF=(v.pctAdm!=null&&v.pctAdm>0&&v.pctAdm<1&&arriendoUF)?Math.round(arriendoUF*v.pctAdm*100)/100:(v.pctAdm>=1?v.pctAdm:0);
+  return{
+    sitio:v.sitio||"—",tipo,numeracion,edificio:v.edificio||"",
+    m2:v.m2!=null?v.m2.toLocaleString("es-CL",{minimumFractionDigits:1,maximumFractionDigits:1}):"—",
+    arriendoUF,arriendoTxt:arriendoUF?fmtUFn(arriendoUF):"—",
+    servAdmTxt:pctAdmTxt,servAdmUF,
+    garantiaTxt:arriendoUF?fmtUFn(arriendoUF)+" UF. Un mes de arriendo.":"—",
+    plazoTxt:"3 años renovable.",
+    reajusteTxt:"5% cada 3 años.",
+    fechaTxt:new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"}),
+  };
+}
+
+/* ── Cotización A: estilo clásico (mismo formato que las cotizaciones ya
+   usadas — cajas con borde negro, "PROPUESTA COMERCIAL"). ── */
+function generarCotizacionADocx(v){
+  const d=datosSitioParaCotizacion(v);
+  const filaDato=(label,valor)=>wRow([
+    wCell(wPara(label,{b:true}),{width:3200,noBorders:true,margins:80}),
+    wCell(wPara(valor||"—"),{width:5600,noBorders:true,margins:80}),
+  ]);
+  const cajaDatos=wTable([
+    filaDato("Fecha:",d.fechaTxt),
+    filaDato("Cliente:",""),
+    filaDato("At.:",""),
+    filaDato("Sitio:",d.sitio),
+    filaDato("Tipo:",d.tipo),
+    filaDato("Numeración:",d.numeracion),
+    filaDato("Superficie (m2):",d.m2),
+  ],[3200,5600],{});
+  const cajaValores=wTable([
+    filaDato("Arriendo:",d.arriendoTxt+" UF"),
+    filaDato("Servicio de Administración:",d.servAdmTxt),
+    filaDato("Garantía:",d.garantiaTxt),
+    filaDato("Plazo:",d.plazoTxt),
+    filaDato("Reajuste Arriendo:",d.reajusteTxt),
+  ],[3200,5600],{});
+  const notas=[
+    "1. La presente cotización tiene validez de 7 días y no representa compromiso de arriendo.",
+    "2. El inmueble se entrega en las condiciones actuales y el arrendatario deberá presentar proyecto de arquitectura y diseño para aprobación. Cualquier modificación queda sujeta al acuerdo entre las partes.",
+    "3. El servicio de administración incluye: administración, seguridad perimetral, mantención y conservación de áreas comunes, incluyendo calles, veredas, jardines y estacionamientos, servicios básicos de áreas comunes, impuestos territoriales y en general cualquier gasto común asociado al Centro El Cortijo.",
+  ];
+  const body=[
+    wPara([wRun("EL",{b:true,sz:26,color:"1A1A1A"}),wRun("CORTIJO",{b:true,sz:26,color:"1E5AA8"})],{align:"center",spaceAfter:40}),
+    wPara("PROPUESTA COMERCIAL",{b:true,align:"center",sz:22,spaceAfter:60,borderBottom:{sz:12,color:"1E5AA8"}}),
+    cajaDatos,
+    wPara("",{spaceAfter:120}),
+    cajaValores,
+    wPara("Valores Más IVA",{i:true,sz:16,spaceBefore:60,spaceAfter:200}),
+    ...notas.map(n=>wPara(n,{sz:16,spaceAfter:80})),
+    wPara("",{spaceAfter:300}),
+    wPara("Agradeciendo vuestra atención, le saluda cordialmente",{align:"center",spaceAfter:200}),
+    wPara("Marcela Muñoz",{b:true,align:"center",spaceAfter:20}),
+    wPara("Gerencia Desarrollo El Cortijo",{align:"center"}),
+  ].join("");
+  return buildDocxBlob(body);
+}
+
+/* ── Cotización B: propuesta más moderna (inspirada en modelos SaaS de
+   cotización — barra de estado, bloques PARA/DE, tabla de conceptos con
+   totales, pie oscuro con contacto). ── */
+function generarCotizacionBDocx(v){
+  const d=datosSitioParaCotizacion(v);
+  const servAdmCLPtxt=d.servAdmTxt;
+  const barra=wTable([wRow([
+    wCell(wPara([wRun("● Disponible",{b:true,color:"FFFFFF",sz:18})]),{width:5000,shd:"1E5AA8",noBorders:true,margins:120,vAlign:"center"}),
+    wCell(wPara([wRun("Cotización válida por 7 días",{color:"FFFFFF",sz:16})],{align:"right"}),{width:3800,shd:"1E5AA8",noBorders:true,margins:120,vAlign:"center"}),
+  ])],[5000,3800],{noBorders:true});
+  const encabezado=wTable([wRow([
+    wCell([
+      wPara([wRun("EL",{b:true,sz:30,color:"1A1A1A"}),wRun("CORTIJO",{b:true,sz:30,color:"1E5AA8"})]),
+      wPara("Centro Empresarial El Cortijo",{sz:14,color:"888888"}),
+      wPara("Av. Américo Vespucio 2680, Conchalí, Santiago",{sz:14,color:"888888"}),
+    ],{width:5000,noBorders:true,margins:120}),
+    wCell([
+      wPara("COTIZACIÓN",{align:"right",sz:14,color:"888888"}),
+      wPara("ARRIENDO — "+d.sitio,{align:"right",b:true,sz:22,color:"1E5AA8"}),
+      wPara(d.fechaTxt,{align:"right",sz:14,color:"888888"}),
+    ],{width:3800,noBorders:true,margins:120}),
+  ])],[5000,3800],{noBorders:true});
+  const paraDe=wTable([wRow([
+    wCell([
+      wPara("PARA",{b:true,sz:14,color:"999999"}),
+      wPara("",{spaceAfter:40}),
+      wPara("Cliente:",{b:true,sz:18}),
+      wPara("",{spaceAfter:120}),
+      wPara("At.:",{b:true,sz:18}),
+      wPara("",{spaceAfter:120}),
+    ],{width:4400,shd:"F7F9FC",margins:160}),
+    wCell([
+      wPara("DE",{b:true,sz:14,color:"999999"}),
+      wPara("",{spaceAfter:40}),
+      wPara("Patagónica Inmobiliaria SpA",{b:true,sz:18}),
+      wPara("RUT 96.673.250-4",{sz:16}),
+      wPara("Gerencia Desarrollo El Cortijo",{sz:16}),
+      wPara("Av. Américo Vespucio 2680, Conchalí",{sz:16}),
+    ],{width:4400,shd:"F7F9FC",margins:160}),
+  ])],[4400,4400],{noBorders:true});
+  const meta=wTable([
+    wRow([
+      wCell(wPara("SITIO",{b:true,sz:13,color:"999999"}),{width:2200,shd:"F0F4F8",margins:100}),
+      wCell(wPara("TIPO",{b:true,sz:13,color:"999999"}),{width:2200,shd:"F0F4F8",margins:100}),
+      wCell(wPara("NUMERACIÓN",{b:true,sz:13,color:"999999"}),{width:2200,shd:"F0F4F8",margins:100}),
+      wCell(wPara("SUPERFICIE",{b:true,sz:13,color:"999999"}),{width:2200,shd:"F0F4F8",margins:100}),
+    ]),
+    wRow([
+      wCell(wPara(d.sitio,{b:true}),{width:2200,margins:100}),
+      wCell(wPara(d.tipo,{b:true}),{width:2200,margins:100}),
+      wCell(wPara(d.numeracion,{b:true}),{width:2200,margins:100}),
+      wCell(wPara(d.m2+" m²",{b:true}),{width:2200,margins:100}),
+    ]),
+  ],[2200,2200,2200,2200],{});
+  const totalUF=Math.round((d.arriendoUF+(d.servAdmUF||0))*100)/100;
+  const tablaConceptos=wTable([
+    wRow([
+      wCell(wPara("CONCEPTO",{b:true,sz:13,color:"999999"}),{width:5000,shd:"F8F8F8",margins:100}),
+      wCell(wPara("VALOR",{b:true,sz:13,color:"999999",align:"right"}),{width:3800,shd:"F8F8F8",margins:100}),
+    ]),
+    wRow([
+      wCell(wPara("Arriendo mensual",{b:true}),{width:5000,margins:100}),
+      wCell(wPara(d.arriendoTxt+" UF",{align:"right"}),{width:3800,margins:100}),
+    ]),
+    wRow([
+      wCell(wPara("Servicio de Administración"),{width:5000,margins:100}),
+      wCell(wPara(servAdmCLPtxt,{align:"right"}),{width:3800,margins:100}),
+    ]),
+    wRow([
+      wCell(wPara("Garantía (1 mes de arriendo)"),{width:5000,margins:100}),
+      wCell(wPara(d.garantiaTxt,{align:"right",sz:15}),{width:3800,margins:100}),
+    ]),
+    wRow([
+      wCell(wPara("TOTAL MENSUAL ESTIMADO",{b:true}),{width:5000,shd:"F0F4F8",margins:100}),
+      wCell(wPara(totalUF.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})+" UF + IVA",{b:true,align:"right",color:"1E5AA8"}),{width:3800,shd:"F0F4F8",margins:100}),
+    ]),
+  ],[5000,3800],{});
+  const condiciones=wTable([wRow([
+    wCell([
+      wPara("CONDICIONES",{b:true,sz:14}),
+      wPara("Plazo: "+d.plazoTxt,{sz:16}),
+      wPara("Reajuste de arriendo: "+d.reajusteTxt,{sz:16}),
+      wPara("Valores más IVA. El servicio de administración incluye seguridad perimetral, mantención de áreas comunes, servicios básicos comunes e impuestos territoriales del Centro El Cortijo.",{sz:15,color:"666666"}),
+    ],{width:8800,shd:"FFFBEB",margins:160}),
+  ])],[8800],{noBorders:true});
+  const footer=wTable([wRow([
+    wCell([
+      wPara("¿Tienes preguntas? Contáctanos",{b:true,color:"FFFFFF",sz:16}),
+      wPara("Marcela Muñoz · Gerencia Desarrollo El Cortijo",{color:"CCD6E8",sz:14}),
+    ],{width:5000,shd:"14213D",noBorders:true,margins:160}),
+    wCell([
+      wPara("facturacion@patagonica.cl",{color:"FFFFFF",align:"right",sz:14}),
+    ],{width:3800,shd:"14213D",noBorders:true,margins:160,vAlign:"center"}),
+  ])],[5000,3800],{noBorders:true});
+  const body=[
+    barra,wPara("",{spaceAfter:100}),
+    encabezado,wPara("",{spaceAfter:200}),
+    paraDe,wPara("",{spaceAfter:200}),
+    meta,wPara("",{spaceAfter:200}),
+    tablaConceptos,wPara("",{spaceAfter:200}),
+    condiciones,wPara("",{spaceAfter:300}),
+    footer,
+  ].join("");
+  return buildDocxBlob(body);
+}
+
+async function generarCotizacionesSitio(v,notify){
+  try{
+    const nombreBase=(v.sitio||"")+" "+(v.edificio||"");
+    const slug=s=>s.replace(/[\\/:*?"<>|]/g,"").trim();
+    const[blobA,blobB]=await Promise.all([generarCotizacionADocx(v),generarCotizacionBDocx(v)]);
+    descargarBlob(blobA,`Cotización A - ${slug(nombreBase)}.docx`);
+    setTimeout(()=>descargarBlob(blobB,`Cotización B - ${slug(nombreBase)}.docx`),300);
+    const{numeracion}=inferTipoNumeracion(v.sitio,v.edificio);
+    window.open("/api/drive-plano?sitio="+encodeURIComponent(v.sitio||"")+"&edificio="+encodeURIComponent(v.edificio||"")+"&numeracion="+encodeURIComponent(numeracion||""),"_blank");
+    if(notify)notify("✓ Cotización A y B generadas — revisando plano en Drive","ok");
+  }catch(e){
+    console.error(e);
+    if(notify)notify("Error generando cotización: "+e.message,"err");
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
    CATASTRO DE SITIOS (todos los sitios, ocupados y vacantes)
 ══════════════════════════════════════════════════════════ */
-function CatastroSitiosView({dashData,driveLoading}){
+function CatastroSitiosView({dashData,driveLoading,notify}){
   const [search,setSearch]=useState("");
   const [sortCol,setSortCol]=useState(null);
   const [sortDir,setSortDir]=useState("asc");
@@ -4068,7 +4335,8 @@ function CatastroSitiosView({dashData,driveLoading}){
                       whiteSpace:"nowrap",
                       cursor:"pointer",userSelect:"none"
                     }},col.toUpperCase(),h("span",{style:{opacity:active?1:.4,fontSize:9,marginLeft:3}},active?(sortDir==="asc"?"▲":"▼"):"↕"));
-                  })
+                  }),
+                  h("th",{key:"cotizar",style:{padding:"8px 12px",textAlign:"center",fontSize:9,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"2px solid var(--bdr)",whiteSpace:"nowrap"}},"COTIZAR")
                 )
               ),
               h("tbody",null,
@@ -4123,7 +4391,14 @@ function CatastroSitiosView({dashData,driveLoading}){
                           )
                         :h("span",{style:{color:"var(--bdr)"}},"—")
                     ),
-                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:v.pctAdm!=null?"var(--tx)":"var(--bdr)"}},pctTxt)
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:v.pctAdm!=null?"var(--tx)":"var(--bdr)"}},pctTxt),
+                    h("td",{style:{padding:"9px 12px",textAlign:"center"}},
+                      h("button",{
+                        title:"Generar cotización de arriendo (Word A + B) y abrir el plano del sitio",
+                        onClick:e=>{e.stopPropagation();generarCotizacionesSitio(v,notify);},
+                        style:{background:"none",border:"1px solid var(--bdr)",borderRadius:6,padding:"4px 8px",cursor:"pointer",fontSize:13,lineHeight:1}
+                      },"🏠")
+                    )
                   );
                 })
               )
@@ -8708,7 +8983,7 @@ function App(){
     ,view==="pagos"&&h(EstadoPagosView,{notify})
     ,view==="contratos"&&h(ContratosView,{dashData,driveLoading})
     ,view==="cuentas"&&h(CuentasServiciosView,{dashData,driveLoading,notify})
-    ,view==="vacantes"&&h(CatastroSitiosView,{dashData,driveLoading})
+    ,view==="vacantes"&&h(CatastroSitiosView,{dashData,driveLoading,notify})
     ,view==="cortijo"&&h(ElCortijoView,{dashData,driveLoading})
     ,view==="torre2680"&&h(Torre2680View,{dashData,driveLoading})
     ,view==="historial-fact"&&h(HistorialFactView,{dashData,driveLoading,notify,planillaFile:files.planilla,marcarPagadoSheet})
