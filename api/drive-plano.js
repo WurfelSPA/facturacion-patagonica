@@ -111,11 +111,19 @@ export default async function handler(req, res) {
     function scoreFile(f) {
       const n = norm(f.name.replace(/\.pdf$/i, ""));
       if (!n) return 0;
-      let s = 0;
-      // match exacto del numero como palabra completa dentro del nombre
       const numDigits = (numeracion || "").replace(/[^0-9a-z]/gi, "") || numNorm;
-      if (numDigits && n === norm("edificio" + numDigits)) s += 10;
-      if (numDigits && n.includes(numDigits)) s += 3;
+      // El match del numero/codigo es OBLIGATORIO — sin él no hay puntaje,
+      // aunque la carpeta sea la correcta. Si no, para numeraciones cortas
+      // (ej. "H") cualquier PDF de la carpeta terminaba "ganando" solo por
+      // el bonus de carpeta, sirviendo el plano de OTRO edificio.
+      if (!numDigits) return 0;
+      const exact = n === norm("edificio" + numDigits);
+      // El match por substring solo es seguro para códigos de ≥3 caracteres
+      // (con 1-2 caracteres, "h" o "9" aparecen dentro de casi cualquier
+      // nombre y producen falsos positivos).
+      const substr = numDigits.length >= 3 && n.includes(numDigits);
+      if (!exact && !substr) return 0;
+      let s = exact ? 10 : 3;
       if (folderMatch && f.folder === folderMatch.name) s += 5;
       // preferir nombres cortos (plano general del edificio, no "Piso 2" suelto)
       s -= n.length * 0.01;
