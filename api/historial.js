@@ -227,6 +227,11 @@ function _detectTipoFromNmb(nmb) {
   if (n.includes("serv") && (n.includes("contab") || n.includes("contable"))) return "servCont";
   if (n.includes("asesor")) return "asesoria";
   if (n.includes("arriendo")) return "arriendo";
+  // Cualquier item que no matchee ninguna categoría conocida cae en "otros"
+  // en vez de null — antes esos items (ej. "Instalación Luminaria",
+  // reparaciones puntuales, etc.) quedaban totalmente fuera del historial,
+  // invisibles aunque el cliente los hubiera pagado.
+  if (n.trim()) return "otros";
   return null;
 }
 /** Procesa array de XMLs, filtra por RUT, devuelve {tipo:[{nro,uf,total}]} */
@@ -378,7 +383,7 @@ function _resolveFacturas(multiFacturas, ufArr, ufSrv, siteIdx) {
     }
   }
 
-  const UFExp = { arriendo: ufArr, servAdm: ufSrv, habilitacion: null, servMant: null, servCont: null, asesoria: null };
+  const UFExp = { arriendo: ufArr, servAdm: ufSrv, habilitacion: null, servMant: null, servCont: null, asesoria: null, otros: null };
   const result = {};
   for (const [tipo, candidates] of Object.entries(byTipo)) {
     // Si el sitio no tiene este concepto (UF=0 en planilla), no asignar aunque haya candidatos.
@@ -552,7 +557,7 @@ function detectTipo(text) {
   add("asesoria","Asesorias Proyecto");
   add("asesoria","Asesorías Proyecto");
   add("asesoria","Asesoria Proyecto");
-  if(!hits.length) return null;
+  if(!hits.length) return t.trim() ? "otros" : null;
   hits.sort((a,b)=>a.i-b.i);
   return hits[0].tipo;
 }

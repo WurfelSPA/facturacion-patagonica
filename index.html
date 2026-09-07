@@ -5914,9 +5914,9 @@ function HistorialFactView({dashData,driveLoading,notify,planillaFile,marcarPaga
     setNuboxRefreshing(false);
   };
 
-  const conceptos=["arriendo","servAdm","habilitacion","servMant","servCont","asesoria"];
-  const cLabel={arriendo:"Arriendo",servAdm:"Serv. Admin.",habilitacion:"Habilitación",servMant:"Serv. Mant.",servCont:"Serv. Contables",asesoria:"Asesoría Proyecto"};
-  const cColor={arriendo:"var(--blue)",servAdm:"var(--amber)",habilitacion:"var(--green)",servMant:"var(--accl)",servCont:"#7c5cbf",asesoria:"#2a9d8f"};
+  const conceptos=["arriendo","servAdm","habilitacion","servMant","servCont","asesoria","otros"];
+  const cLabel={arriendo:"Arriendo",servAdm:"Serv. Admin.",habilitacion:"Habilitación",servMant:"Serv. Mant.",servCont:"Serv. Contables",asesoria:"Asesoría Proyecto",otros:"Otros"};
+  const cColor={arriendo:"var(--blue)",servAdm:"var(--amber)",habilitacion:"var(--green)",servMant:"var(--accl)",servCont:"#7c5cbf",asesoria:"#2a9d8f",otros:"#8a8a8a"};
 
   const totalLoading=loadingSet.size;
   const totalPeriods=periodsAvail.length*selGroup.length;
