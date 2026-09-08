@@ -3218,8 +3218,8 @@ function EstadoPagosView({notify}){
   const [concFilter,setConcFilter]=useState("all");
   const [estFilter,setEstFilter]=useState("all");
   const [search,setSearch]=useState("");
-  const [sortCol,setSortCol]=useState("monto");
-  const [sortDir,setSortDir]=useState("desc");
+  const [sortCol,setSortCol]=useState("cliente");
+  const [sortDir,setSortDir]=useState("asc");
   const planillaFileRef=React.useRef(null);
   const moraRef=React.useRef(null);
 
@@ -3301,11 +3301,18 @@ function EstadoPagosView({notify}){
 
   function toggleSort(col){if(sortCol===col)setSortDir(d=>d==="asc"?"desc":"asc");else{setSortCol(col);setSortDir("asc");}}
   function sortArrow(col){if(sortCol!==col)return" ↕";return sortDir==="asc"?" ↑":" ↓";}
+  function facturaDe(r){
+    const raw=r.tipo==="arriendo"?r.nroFactArr:r.nroFactGC;
+    return raw?"F-"+String(raw).replace(/^F(?:EE)?-/i,""):"";
+  }
   function getSortVal(r,col){
     switch(col){
+      case"sitio":return r.sitio||"";
       case"cliente":return r.cliente||"";
       case"rut":return r.rut||"";
       case"tipo":return r.tipo==="arriendo"?"Arriendo":"Serv. Adm.";
+      case"factura":return facturaDe(r);
+      case"uf":return r.uf??-Infinity;
       case"monto":return r.montoClp??-Infinity;
       case"estado":return r.yaPagado?1:0;
       case"dias":return r.dias||0;
@@ -3393,18 +3400,21 @@ function EstadoPagosView({notify}){
       h("div",{style:{maxHeight:"calc(100vh - 420px)",minHeight:220,overflowY:"auto",overflowX:"auto"}},
         h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:12}},
           h("thead",null,h("tr",{style:{background:"var(--surf2)",position:"sticky",top:0,zIndex:2}},
-            [["Cliente","cliente"],["RUT","rut"],["Concepto","tipo"],["Monto","monto"],["Estado","estado"],["Días mora","dias"]].map(([lbl,col])=>
-              h("th",{key:col,onClick:()=>toggleSort(col),style:{padding:"8px 11px",textAlign:(col==="monto"||col==="dias")?"right":"left",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",cursor:"pointer",userSelect:"none",whiteSpace:"nowrap",background:"var(--surf2)"}},
+            [["Sitio","sitio"],["Cliente","cliente"],["RUT","rut"],["Concepto","tipo"],["Factura","factura"],["UF PDF","uf"],["Monto $","monto"],["Estado","estado"],["Días mora","dias"]].map(([lbl,col])=>
+              h("th",{key:col,onClick:()=>toggleSort(col),style:{padding:"8px 11px",textAlign:(col==="uf"||col==="monto"||col==="dias")?"right":"left",fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",borderBottom:"1px solid var(--bdr)",cursor:"pointer",userSelect:"none",whiteSpace:"nowrap",background:"var(--surf2)"}},
                 lbl.toUpperCase(),h("span",{style:{opacity:.5,fontSize:9}},sortArrow(col)))
             )
           )),
           h("tbody",null,
-            loading?h("tr",null,h("td",{colSpan:6,style:{padding:32,textAlign:"center",color:"var(--txd)"}},h("div",{className:"fv2-loading-row"},h("span",{className:"fv2-loader"}),"Cargando..."))):
-            sortedRows.length===0?h("tr",null,h("td",{colSpan:6,style:{padding:32,textAlign:"center",color:"var(--txd)"}},"Sin resultados")):
+            loading?h("tr",null,h("td",{colSpan:9,style:{padding:32,textAlign:"center",color:"var(--txd)"}},h("div",{className:"fv2-loading-row"},h("span",{className:"fv2-loader"}),"Cargando..."))):
+            sortedRows.length===0?h("tr",null,h("td",{colSpan:9,style:{padding:32,textAlign:"center",color:"var(--txd)"}},"Sin resultados")):
             sortedRows.map((r,i)=>h("tr",{key:r.rut+"|"+r.tipo+"|"+i,style:{borderBottom:"1px solid var(--bdr)"}},
+              h("td",{style:{padding:"7px 11px",fontSize:11,color:"var(--txm)",whiteSpace:"nowrap"}},r.sitio||"—"),
               h("td",{style:{padding:"7px 11px",fontWeight:600}},r.cliente),
               h("td",{style:{padding:"7px 11px",fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:"var(--txm)"}},formatRUT(r.rut)),
               h("td",{style:{padding:"7px 11px"}},h("span",{className:r.tipo==="arriendo"?"tag-arr":"tag-srv"},r.tipo==="arriendo"?"Arriendo":"Serv. Adm.")),
+              h("td",{style:{padding:"7px 11px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)",whiteSpace:"nowrap"}},facturaDe(r)||"—"),
+              h("td",{style:{padding:"7px 11px",textAlign:"right",fontFamily:"'DM Mono',monospace",fontSize:11}},r.uf!=null?r.uf.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2}):"—"),
               h("td",{style:{padding:"7px 11px",textAlign:"right",fontFamily:"'DM Mono',monospace"}},r.montoClp!=null?"$"+r.montoClp.toLocaleString("es-CL"):"—"),
               h("td",{style:{padding:"7px 11px"}},
                 h("label",{style:{display:"inline-flex",alignItems:"center",gap:6,cursor:(r.sheetRow&&r.pagadoColLetter)?"pointer":"default"}},
