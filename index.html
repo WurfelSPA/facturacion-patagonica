@@ -4042,13 +4042,17 @@ async function buildDocxBlob(bodyXml,opts){
   const extCT={png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",gif:"image/gif"};
   const exts=[...new Set(images.map(im=>im.filename.split(".").pop().toLowerCase()))];
   const ctImgDefaults=exts.map(e=>`<Default Extension="${e}" ContentType="${extCT[e]||"application/octet-stream"}"/>`).join("");
-  zip.file("[Content_Types].xml",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${ctImgDefaults}<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`);
+  zip.file("[Content_Types].xml",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${ctImgDefaults}<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`);
   zip.file("_rels/.rels",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
-  if(images.length){
-    const imgRels=images.map(im=>`<Relationship Id="${im.rId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${im.filename}"/>`).join("");
-    zip.file("word/_rels/document.xml.rels",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${imgRels}</Relationships>`);
-    for(const im of images)zip.file(`word/media/${im.filename}`,im.base64,{base64:true});
-  }
+  // styles.xml: docDefaults compactos (10pt, sin espacio "after" por
+  // párrafo, interlineado simple). Sin esto Word aplica sus propios
+  // valores por defecto (11pt Calibri + ~8pt de espacio extra por cada
+  // párrafo), que en un documento de ~20 párrafos suman más de una
+  // pulgada de más y corren el contenido a una segunda hoja.
+  zip.file("word/styles.xml",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style></w:styles>`);
+  const imgRels=images.map(im=>`<Relationship Id="${im.rId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${im.filename}"/>`).join("");
+  zip.file("word/_rels/document.xml.rels",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>${imgRels}</Relationships>`);
+  for(const im of images)zip.file(`word/media/${im.filename}`,im.base64,{base64:true});
   const nsExtra=images.length?' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"':"";
   const docXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"${nsExtra}><w:body>${bodyXml}<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1080" w:right="1080" w:bottom="1080" w:left="1080"/></w:sectPr></w:body></w:document>`;
   zip.file("word/document.xml",docXml);
@@ -4103,35 +4107,29 @@ function datosSitioParaCotizacion(v){
 function generarCotizacionADocx(v){
   const d=datosSitioParaCotizacion(v);
   const BORDER={outerOnly:true,borderColor:"000000",borderSz:6};
-  const filaDato=(label,valor)=>wRow([
-    wCell(wPara(label,{b:true}),{width:3200,margins:80}),
-    wCell(wPara(valor||"—"),{width:5600,margins:80}),
+  // gap: espacio antes de la fila (reemplaza filas vacías por spaceBefore
+  // preciso en twips — más compacto que agregar filas en blanco, clave
+  // para que la cotización quepa en una sola hoja carta).
+  const filaDato=(label,valor,gap)=>wRow([
+    wCell(wPara(label,{b:true,spaceBefore:gap||0}),{width:3200,margins:50}),
+    wCell(wPara(valor||"—",{spaceBefore:gap||0}),{width:5600,margins:50}),
   ]);
-  const filaVacia=()=>wRow([
-    wCell(wPara(""),{width:3200,margins:20}),
-    wCell(wPara(""),{width:5600,margins:20}),
-  ],{height:100});
   const cajaDatos=wTable([
     filaDato("Fecha:",d.fechaTxt),
-    filaVacia(),
-    filaDato("Cliente:",""),
+    filaDato("Cliente:","",100),
     filaDato("At.:",""),
-    filaVacia(),
-    filaDato("Sitio:",d.sitio),
+    filaDato("Sitio:",d.sitio,100),
     filaDato("Tipo:",d.tipo),
     filaDato("Numeración:",d.numeracion),
     filaDato("Superficie (m2):",d.m2),
   ],[3200,5600],BORDER);
   const cajaValores=wTable([
     filaDato("Arriendo:",d.arriendoTxt+" UF"),
-    filaVacia(),
-    filaDato("Servicio de Administración:",d.servAdmTxt),
-    filaVacia(),
-    filaVacia(),
-    filaDato("Garantía:",d.garantiaTxt),
+    filaDato("Servicio de Administración:",d.servAdmTxt,100),
+    filaDato("Garantía:",d.garantiaTxt,180),
     filaDato("Plazo:",d.plazoTxt),
     filaDato("Reajuste Arriendo:",d.reajusteTxt),
-    wRow([wCell(wPara("Valores Más IVA",{sz:15}),{width:8800,colspan:2,margins:80})]),
+    wRow([wCell(wPara("Valores Más IVA",{sz:8,spaceBefore:80}),{width:8800,colspan:2,margins:50})]),
   ],[3200,5600],BORDER);
   const notas=[
     "1. La presente cotización tiene validez de 7 días y no representa compromiso de arriendo.",
@@ -4139,18 +4137,18 @@ function generarCotizacionADocx(v){
     "3. El servicio de administración incluye: administración, seguridad perimetral, mantención y conservación de áreas comunes, incluyendo calles, veredas, jardines y estacionamientos, servicios básicos de áreas comunes, impuestos territoriales y en general cualquier gasto común asociado al Centro El Cortijo.",
   ];
   const cajaNotas=wTable([
-    wRow([wCell(notas.map(n=>wPara(n,{sz:14})),{width:8800,margins:100})]),
+    wRow([wCell(notas.map(n=>wPara(n,{sz:7})),{width:8800,margins:70})]),
   ],[8800],BORDER);
   const body=[
     wImageInline("rIdLogo",LOGO_EL_CORTIJO_W_EMU,LOGO_EL_CORTIJO_H_EMU,{align:"center"}),
-    wPara("PROPUESTA COMERCIAL",{b:true,align:"center",sz:20,spaceBefore:40,spaceAfter:120,borderBottom:{sz:12,color:"000000"}}),
+    wPara("PROPUESTA COMERCIAL",{b:true,align:"center",sz:12,spaceBefore:40,spaceAfter:100,borderBottom:{sz:12,color:"000000"}}),
     cajaDatos,
-    wPara("",{spaceAfter:120}),
+    wPara("",{spaceAfter:80}),
     cajaValores,
-    wPara("",{spaceAfter:120}),
+    wPara("",{spaceAfter:80}),
     cajaNotas,
-    wPara("",{spaceAfter:300}),
-    wPara("Agradeciendo vuestra atención, le saluda cordialmente",{align:"center",spaceAfter:200}),
+    wPara("",{spaceAfter:160}),
+    wPara("Agradeciendo vuestra atención, le saluda cordialmente",{align:"center",spaceAfter:120}),
     wPara("Marcela Muñoz",{b:true,u:true,align:"center",spaceAfter:20}),
     wPara("Gerencia Desarrollo El Cortijo",{align:"center"}),
   ].join("");
@@ -4164,100 +4162,96 @@ function generarCotizacionBDocx(v){
   const d=datosSitioParaCotizacion(v);
   const servAdmCLPtxt=d.servAdmTxt;
   const barra=wTable([wRow([
-    wCell(wPara([wRun("● Disponible",{b:true,color:"FFFFFF",sz:18})]),{width:5000,shd:"1E5AA8",noBorders:true,margins:120,vAlign:"center"}),
-    wCell(wPara([wRun("Cotización válida por 7 días",{color:"FFFFFF",sz:16})],{align:"right"}),{width:3800,shd:"1E5AA8",noBorders:true,margins:120,vAlign:"center"}),
+    wCell(wPara([wRun("● Disponible",{b:true,color:"FFFFFF",sz:9})]),{width:5000,shd:"1E5AA8",noBorders:true,margins:70,vAlign:"center"}),
+    wCell(wPara([wRun("Cotización válida por 7 días",{color:"FFFFFF",sz:8})],{align:"right"}),{width:3800,shd:"1E5AA8",noBorders:true,margins:70,vAlign:"center"}),
   ])],[5000,3800],{noBorders:true});
   const encabezado=wTable([wRow([
     wCell([
       wImageInline("rIdLogo",LOGO_EL_CORTIJO_W_EMU_SM,LOGO_EL_CORTIJO_H_EMU_SM,{align:"left"}),
-      wPara("Centro Empresarial El Cortijo",{sz:14,color:"888888"}),
-      wPara("Av. Américo Vespucio 2680, Conchalí, Santiago",{sz:14,color:"888888"}),
-    ],{width:5000,noBorders:true,margins:120}),
+      wPara("Centro Empresarial El Cortijo",{sz:7,color:"888888"}),
+      wPara("Av. Américo Vespucio 2680, Conchalí, Santiago",{sz:7,color:"888888"}),
+    ],{width:5000,noBorders:true,margins:80}),
     wCell([
-      wPara("COTIZACIÓN",{align:"right",sz:14,color:"888888"}),
-      wPara("ARRIENDO — "+d.sitio,{align:"right",b:true,sz:22,color:"1E5AA8"}),
-      wPara(d.fechaTxt,{align:"right",sz:14,color:"888888"}),
-    ],{width:3800,noBorders:true,margins:120}),
+      wPara("COTIZACIÓN",{align:"right",sz:7,color:"888888"}),
+      wPara("ARRIENDO — "+d.sitio,{align:"right",b:true,sz:13,color:"1E5AA8"}),
+      wPara(d.fechaTxt,{align:"right",sz:7,color:"888888"}),
+    ],{width:3800,noBorders:true,margins:80}),
   ])],[5000,3800],{noBorders:true});
   const paraDe=wTable([wRow([
     wCell([
-      wPara("PARA",{b:true,sz:14,color:"999999"}),
-      wPara("",{spaceAfter:40}),
-      wPara("Cliente:",{b:true,sz:18}),
-      wPara("",{spaceAfter:120}),
-      wPara("At.:",{b:true,sz:18}),
-      wPara("",{spaceAfter:120}),
-    ],{width:4400,shd:"F7F9FC",margins:160}),
+      wPara("PARA",{b:true,sz:7,color:"999999"}),
+      wPara("Cliente:",{b:true,sz:9,spaceBefore:40}),
+      wPara("At.:",{b:true,sz:9,spaceBefore:60}),
+    ],{width:4400,shd:"F7F9FC",margins:80}),
     wCell([
-      wPara("DE",{b:true,sz:14,color:"999999"}),
-      wPara("",{spaceAfter:40}),
-      wPara("Patagónica Inmobiliaria SpA",{b:true,sz:18}),
-      wPara("RUT 96.673.250-4",{sz:16}),
-      wPara("Gerencia Desarrollo El Cortijo",{sz:16}),
-      wPara("Av. Américo Vespucio 2680, Conchalí",{sz:16}),
-    ],{width:4400,shd:"F7F9FC",margins:160}),
+      wPara("DE",{b:true,sz:7,color:"999999"}),
+      wPara("Patagónica Inmobiliaria SpA",{b:true,sz:9,spaceBefore:40}),
+      wPara("RUT 96.673.250-4",{sz:8}),
+      wPara("Gerencia Desarrollo El Cortijo",{sz:8}),
+      wPara("Av. Américo Vespucio 2680, Conchalí",{sz:8}),
+    ],{width:4400,shd:"F7F9FC",margins:80}),
   ])],[4400,4400],{noBorders:true});
   const meta=wTable([
     wRow([
-      wCell(wPara("SITIO",{b:true,sz:13,color:"999999"}),{width:2200,shd:"F0F4F8",margins:100}),
-      wCell(wPara("TIPO",{b:true,sz:13,color:"999999"}),{width:2200,shd:"F0F4F8",margins:100}),
-      wCell(wPara("NUMERACIÓN",{b:true,sz:13,color:"999999"}),{width:2200,shd:"F0F4F8",margins:100}),
-      wCell(wPara("SUPERFICIE",{b:true,sz:13,color:"999999"}),{width:2200,shd:"F0F4F8",margins:100}),
+      wCell(wPara("SITIO",{b:true,sz:7,color:"999999"}),{width:2200,shd:"F0F4F8",margins:70}),
+      wCell(wPara("TIPO",{b:true,sz:7,color:"999999"}),{width:2200,shd:"F0F4F8",margins:70}),
+      wCell(wPara("NUMERACIÓN",{b:true,sz:7,color:"999999"}),{width:2200,shd:"F0F4F8",margins:70}),
+      wCell(wPara("SUPERFICIE",{b:true,sz:7,color:"999999"}),{width:2200,shd:"F0F4F8",margins:70}),
     ]),
     wRow([
-      wCell(wPara(d.sitio,{b:true}),{width:2200,margins:100}),
-      wCell(wPara(d.tipo,{b:true}),{width:2200,margins:100}),
-      wCell(wPara(d.numeracion,{b:true}),{width:2200,margins:100}),
-      wCell(wPara(d.m2+" m²",{b:true}),{width:2200,margins:100}),
+      wCell(wPara(d.sitio,{b:true}),{width:2200,margins:70}),
+      wCell(wPara(d.tipo,{b:true}),{width:2200,margins:70}),
+      wCell(wPara(d.numeracion,{b:true}),{width:2200,margins:70}),
+      wCell(wPara(d.m2+" m²",{b:true}),{width:2200,margins:70}),
     ]),
   ],[2200,2200,2200,2200],{});
   const totalUF=Math.round((d.arriendoUF+(d.servAdmUF||0))*100)/100;
   const tablaConceptos=wTable([
     wRow([
-      wCell(wPara("CONCEPTO",{b:true,sz:13,color:"999999"}),{width:5000,shd:"F8F8F8",margins:100}),
-      wCell(wPara("VALOR",{b:true,sz:13,color:"999999",align:"right"}),{width:3800,shd:"F8F8F8",margins:100}),
+      wCell(wPara("CONCEPTO",{b:true,sz:7,color:"999999"}),{width:5000,shd:"F8F8F8",margins:70}),
+      wCell(wPara("VALOR",{b:true,sz:7,color:"999999",align:"right"}),{width:3800,shd:"F8F8F8",margins:70}),
     ]),
     wRow([
-      wCell(wPara("Arriendo mensual",{b:true}),{width:5000,margins:100}),
-      wCell(wPara(d.arriendoTxt+" UF",{align:"right"}),{width:3800,margins:100}),
+      wCell(wPara("Arriendo mensual",{b:true}),{width:5000,margins:70}),
+      wCell(wPara(d.arriendoTxt+" UF",{align:"right"}),{width:3800,margins:70}),
     ]),
     wRow([
-      wCell(wPara("Servicio de Administración"),{width:5000,margins:100}),
-      wCell(wPara(servAdmCLPtxt,{align:"right"}),{width:3800,margins:100}),
+      wCell(wPara("Servicio de Administración"),{width:5000,margins:70}),
+      wCell(wPara(servAdmCLPtxt,{align:"right"}),{width:3800,margins:70}),
     ]),
     wRow([
-      wCell(wPara("Garantía (1 mes de arriendo)"),{width:5000,margins:100}),
-      wCell(wPara(d.garantiaTxt,{align:"right",sz:15}),{width:3800,margins:100}),
+      wCell(wPara("Garantía (1 mes de arriendo)"),{width:5000,margins:70}),
+      wCell(wPara(d.garantiaTxt,{align:"right"}),{width:3800,margins:70}),
     ]),
     wRow([
-      wCell(wPara("TOTAL MENSUAL ESTIMADO",{b:true}),{width:5000,shd:"F0F4F8",margins:100}),
-      wCell(wPara(totalUF.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})+" UF + IVA",{b:true,align:"right",color:"1E5AA8"}),{width:3800,shd:"F0F4F8",margins:100}),
+      wCell(wPara("TOTAL MENSUAL ESTIMADO",{b:true}),{width:5000,shd:"F0F4F8",margins:70}),
+      wCell(wPara(totalUF.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})+" UF + IVA",{b:true,align:"right",color:"1E5AA8"}),{width:3800,shd:"F0F4F8",margins:70}),
     ]),
   ],[5000,3800],{});
   const condiciones=wTable([wRow([
     wCell([
-      wPara("CONDICIONES",{b:true,sz:14}),
-      wPara("Plazo: "+d.plazoTxt,{sz:16}),
-      wPara("Reajuste de arriendo: "+d.reajusteTxt,{sz:16}),
-      wPara("Valores más IVA. El servicio de administración incluye seguridad perimetral, mantención de áreas comunes, servicios básicos comunes e impuestos territoriales del Centro El Cortijo.",{sz:15,color:"666666"}),
-    ],{width:8800,shd:"FFFBEB",margins:160}),
+      wPara("CONDICIONES",{b:true,sz:7}),
+      wPara("Plazo: "+d.plazoTxt,{sz:8}),
+      wPara("Reajuste de arriendo: "+d.reajusteTxt,{sz:8}),
+      wPara("Valores más IVA. El servicio de administración incluye seguridad perimetral, mantención de áreas comunes, servicios básicos comunes e impuestos territoriales del Centro El Cortijo.",{sz:7,color:"666666"}),
+    ],{width:8800,shd:"FFFBEB",margins:80}),
   ])],[8800],{noBorders:true});
   const footer=wTable([wRow([
     wCell([
-      wPara("¿Tienes preguntas? Contáctanos",{b:true,color:"FFFFFF",sz:16}),
-      wPara("Marcela Muñoz · Gerencia Desarrollo El Cortijo",{color:"CCD6E8",sz:14}),
-    ],{width:5000,shd:"14213D",noBorders:true,margins:160}),
+      wPara("¿Tienes preguntas? Contáctanos",{b:true,color:"FFFFFF",sz:8}),
+      wPara("Marcela Muñoz · Gerencia Desarrollo El Cortijo",{color:"CCD6E8",sz:7}),
+    ],{width:5000,shd:"14213D",noBorders:true,margins:80}),
     wCell([
-      wPara("facturacion@patagonica.cl",{color:"FFFFFF",align:"right",sz:14}),
-    ],{width:3800,shd:"14213D",noBorders:true,margins:160,vAlign:"center"}),
+      wPara("facturacion@patagonica.cl",{color:"FFFFFF",align:"right",sz:7}),
+    ],{width:3800,shd:"14213D",noBorders:true,margins:80,vAlign:"center"}),
   ])],[5000,3800],{noBorders:true});
   const body=[
-    barra,wPara("",{spaceAfter:100}),
-    encabezado,wPara("",{spaceAfter:200}),
-    paraDe,wPara("",{spaceAfter:200}),
-    meta,wPara("",{spaceAfter:200}),
-    tablaConceptos,wPara("",{spaceAfter:200}),
-    condiciones,wPara("",{spaceAfter:300}),
+    barra,wPara("",{spaceAfter:60}),
+    encabezado,wPara("",{spaceAfter:100}),
+    paraDe,wPara("",{spaceAfter:100}),
+    meta,wPara("",{spaceAfter:100}),
+    tablaConceptos,wPara("",{spaceAfter:100}),
+    condiciones,wPara("",{spaceAfter:140}),
     footer,
   ].join("");
   return buildDocxBlob(body,{images:[{rId:"rIdLogo",filename:"logo-el-cortijo.png",base64:LOGO_EL_CORTIJO_PNG_B64}]});
