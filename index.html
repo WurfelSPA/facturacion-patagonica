@@ -4097,24 +4097,26 @@ function inferTipoNumeracion(sitio,edificio){
   }
   return{tipo:"Espacio",numeracion:s||"—"};
 }
-/* Descarga el plano de planta de una unidad puntual (El Cortijo / Torre 2680)
-   desde Drive vía /api/drive-plano — mismo endpoint que usa la cotización
-   de arriendo en Catastro de Sitios. */
-async function descargarPlanoUnidad(sitio,edificio,notify){
+/* Busca el plano de planta de una unidad puntual (El Cortijo / Torre 2680)
+   en Drive vía /api/drive-plano — mismo endpoint que usa la cotización de
+   arriendo en Catastro de Sitios. Devuelve {url,nombre} para previsualizar
+   (el usuario decide si lo descarga desde ahí) o null si no se encontró
+   (ya notifica el error). */
+async function fetchPlanoUnidad(sitio,edificio,notify){
   try{
     const{numeracion}=inferTipoNumeracion(sitio,edificio);
     const r=await fetch("/api/drive-plano?sitio="+encodeURIComponent(sitio||"")+"&edificio="+encodeURIComponent(edificio||"")+"&numeracion="+encodeURIComponent(numeracion||""));
     if(!r.ok){
       const j=await r.json().catch(()=>({}));
       notify?.(j.error||"No se encontró el plano en Drive","err");
-      return;
+      return null;
     }
     const blob=await r.blob();
     const slug=s=>(s||"").replace(/[\\/:*?"<>|]/g,"").trim();
-    descargarBlob(blob,`Plano - ${slug(edificio)}.pdf`);
-    notify?.("✓ Plano descargado","ok");
+    return{url:URL.createObjectURL(blob),nombre:`Plano - ${slug(edificio)}.pdf`};
   }catch(e){
-    notify?.("Error descargando plano: "+e.message,"err");
+    notify?.("Error obteniendo plano: "+e.message,"err");
+    return null;
   }
 }
 function datosSitioParaCotizacion(v){
@@ -4624,6 +4626,7 @@ function pisoLabel(p){return p===1?"Nivel 1":"Piso "+p;}
 function unidadLabel(p,num){return p===1?"Local "+num.replace(/^L/,""):"Oficina "+num;}
 function Torre2680View({dashData,driveLoading,notify}){
   const [descargandoPlano,setDescargandoPlano]=useState(false);
+  const [planoPreview,setPlanoPreview]=useState(null); /* {url,nombre} */
   const pisos=Object.keys(TORRE2680_FICHAS).map(Number).sort((a,b)=>a-b);
   const [piso,setPiso]=useState(pisos[0]);
   const [search,setSearch]=useState("");
@@ -4750,10 +4753,11 @@ function Torre2680View({dashData,driveLoading,notify}){
                     disabled:descargandoPlano,
                     onClick:async()=>{
                       setDescargandoPlano(true);
-                      await descargarPlanoUnidad("Torre 2680",zoomData.edif,notify);
+                      const p=await fetchPlanoUnidad("Torre 2680",zoomData.edif,notify);
                       setDescargandoPlano(false);
+                      if(p)setPlanoPreview(p);
                     },
-                    title:"Descargar plano de planta",
+                    title:"Ver plano de planta",
                     style:{fontSize:16,padding:"4px 8px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf2)",cursor:descargandoPlano?"default":"pointer",opacity:descargandoPlano?.5:1,flexShrink:0}
                   },descargandoPlano?"⏳":"📐")
                 ),
@@ -4816,6 +4820,14 @@ function Torre2680View({dashData,driveLoading,notify}){
               o.nota&&h("div",{style:{fontSize:10,color:"var(--txd)",marginTop:6,fontStyle:"italic",borderTop:"1px solid var(--bdr)",paddingTop:6}},o.nota)
             );
           })
+    ),
+    planoPreview&&h("div",{style:{position:"fixed",inset:0,background:"rgba(0,0,0,.7)",zIndex:2000,display:"flex",flexDirection:"column"}},
+      h("div",{style:{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",background:"#1a1a2e"}},
+        h("span",{style:{color:"#fff",fontSize:13,fontWeight:600,flex:1}},"📐 "+planoPreview.nombre),
+        h("a",{href:planoPreview.url,download:planoPreview.nombre,style:{background:"var(--acc)",color:"#fff",textDecoration:"none",borderRadius:6,padding:"4px 12px",fontSize:12,fontWeight:600}},"⬇ Descargar"),
+        h("button",{onClick:()=>{URL.revokeObjectURL(planoPreview.url);setPlanoPreview(null);},style:{background:"rgba(255,255,255,.15)",border:"none",color:"#fff",borderRadius:6,padding:"4px 12px",cursor:"pointer",fontSize:12}},"✕ Cerrar")
+      ),
+      h("iframe",{src:planoPreview.url,style:{flex:1,border:"none",background:"#fff"}})
     )
   );
 }
@@ -4977,6 +4989,7 @@ const CORTIJO_ZONAS=[
 ];
 function ElCortijoView({dashData,driveLoading,notify}){
   const [descargandoPlano,setDescargandoPlano]=useState(false);
+  const [planoPreview,setPlanoPreview]=useState(null); /* {url,nombre} */
   const [zoomUnidad,setZoomUnidad]=useState(null);
   const [sector,setSector]=useState(null); /* null = plano general | "a2"|"a2locales"|"4a"|"b"|"5a" */
   const [search,setSearch]=useState("");
@@ -5180,10 +5193,11 @@ function ElCortijoView({dashData,driveLoading,notify}){
                     disabled:descargandoPlano,
                     onClick:async()=>{
                       setDescargandoPlano(true);
-                      await descargarPlanoUnidad(CORTIJO_SECTOR_SITIO[sector]||"",zoomData.edif,notify);
+                      const p=await fetchPlanoUnidad(CORTIJO_SECTOR_SITIO[sector]||"",zoomData.edif,notify);
                       setDescargandoPlano(false);
+                      if(p)setPlanoPreview(p);
                     },
-                    title:"Descargar plano de planta",
+                    title:"Ver plano de planta",
                     style:{fontSize:16,padding:"4px 8px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf2)",cursor:descargandoPlano?"default":"pointer",opacity:descargandoPlano?.5:1,flexShrink:0}
                   },descargandoPlano?"⏳":"📐")
                 ),
@@ -5214,7 +5228,15 @@ function ElCortijoView({dashData,driveLoading,notify}){
                 zoomData.nota&&h("div",{style:{fontSize:11,color:"var(--txd)",fontStyle:"italic",borderTop:"1px solid var(--bdr)",paddingTop:10}},zoomData.nota)
               )
             )
-          )
+          ),
+    planoPreview&&h("div",{style:{position:"fixed",inset:0,background:"rgba(0,0,0,.7)",zIndex:2000,display:"flex",flexDirection:"column"}},
+      h("div",{style:{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",background:"#1a1a2e"}},
+        h("span",{style:{color:"#fff",fontSize:13,fontWeight:600,flex:1}},"📐 "+planoPreview.nombre),
+        h("a",{href:planoPreview.url,download:planoPreview.nombre,style:{background:"var(--acc)",color:"#fff",textDecoration:"none",borderRadius:6,padding:"4px 12px",fontSize:12,fontWeight:600}},"⬇ Descargar"),
+        h("button",{onClick:()=>{URL.revokeObjectURL(planoPreview.url);setPlanoPreview(null);},style:{background:"rgba(255,255,255,.15)",border:"none",color:"#fff",borderRadius:6,padding:"4px 12px",cursor:"pointer",fontSize:12}},"✕ Cerrar")
+      ),
+      h("iframe",{src:planoPreview.url,style:{flex:1,border:"none",background:"#fff"}})
+    )
   );
 }
 
