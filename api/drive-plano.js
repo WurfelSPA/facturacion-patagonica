@@ -69,8 +69,12 @@ function norm(s) {
 // Así "edificio61"→"61", "oficina23"→"23", "pcl4a"→"4a", sin necesidad de
 // conocer de antemano qué prefijo usa cada carpeta.
 function extractCode(normalizedStr) {
-  const m = (normalizedStr || "").match(/(\d+[a-z]*)$/);
-  return m ? m[1] : (normalizedStr || "");
+  const s = normalizedStr || "";
+  const m = s.match(/(\d+[a-z]*)$/);
+  if (m) return m[1];
+  // Sin dígitos (ej. "edifh" cuando no llegó una numeracion ya separada del
+  // texto descriptivo): quitar palabras conocidas y devolver el resto.
+  return s.replace(/^(edificio|edif|oficina|bodega|local|pcl)/, "") || s;
 }
 
 // Cache en memoria del árbol completo (carpeta Planos + subcarpetas) — TTL 1h.
@@ -110,12 +114,18 @@ export default async function handler(req, res) {
     const { subfolders, files } = await loadTree(token);
 
     // Preferir archivos dentro de la carpeta "Lote {sitio}" (o "Lota", typo real
-    // que existe en Drive) si existe una que matchee el sitio.
+    // que existe en Drive) si existe una que matchee el sitio. El Sitio A-2
+    // tiene DOS carpetas ("Lote A-2" para edificios y "Lota A-2 Locales" para
+    // los P.C.L.) — el orden en que Drive las lista no está garantizado, así
+    // que no basta con tomar la primera que matchee el sitio: hay que
+    // desambiguar según si la consulta es o no un local comercial.
     const sitioNorm = norm(sitio);
-    const folderMatch = subfolders.find(f => {
+    const sitioFolders = subfolders.filter(f => {
       const n = norm(f.name);
       return sitioNorm && (n.includes("lote" + sitioNorm) || n.includes("lota" + sitioNorm) || n === "lote" + sitioNorm);
     });
+    const wantsLocal = /pcl|local/.test(norm(edificio));
+    const folderMatch = sitioFolders.find(f => wantsLocal === /locales/.test(norm(f.name))) || sitioFolders[0];
     const numNorm = norm(numeracion || edificio);
 
     const queryCode = extractCode((numeracion || "").replace(/[^0-9a-z]/gi, "").toLowerCase() || numNorm);
