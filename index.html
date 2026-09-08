@@ -4084,6 +4084,26 @@ function inferTipoNumeracion(sitio,edificio){
   }
   return{tipo:"Espacio",numeracion:s||"—"};
 }
+/* Descarga el plano de planta de una unidad puntual (El Cortijo / Torre 2680)
+   desde Drive vía /api/drive-plano — mismo endpoint que usa la cotización
+   de arriendo en Catastro de Sitios. */
+async function descargarPlanoUnidad(sitio,edificio,notify){
+  try{
+    const{numeracion}=inferTipoNumeracion(sitio,edificio);
+    const r=await fetch("/api/drive-plano?sitio="+encodeURIComponent(sitio||"")+"&edificio="+encodeURIComponent(edificio||"")+"&numeracion="+encodeURIComponent(numeracion||""));
+    if(!r.ok){
+      const j=await r.json().catch(()=>({}));
+      notify?.(j.error||"No se encontró el plano en Drive","err");
+      return;
+    }
+    const blob=await r.blob();
+    const slug=s=>(s||"").replace(/[\\/:*?"<>|]/g,"").trim();
+    descargarBlob(blob,`Plano - ${slug(edificio)}.pdf`);
+    notify?.("✓ Plano descargado","ok");
+  }catch(e){
+    notify?.("Error descargando plano: "+e.message,"err");
+  }
+}
 function datosSitioParaCotizacion(v){
   const{tipo,numeracion}=inferTipoNumeracion(v.sitio,v.edificio);
   const fmtUFn=n=>n.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -4589,7 +4609,8 @@ const PISO_HOTSPOTS={
 function pisoImg(p){return p===1?"/torre2680-nivel1.png":"/torre2680-piso"+p+".png";}
 function pisoLabel(p){return p===1?"Nivel 1":"Piso "+p;}
 function unidadLabel(p,num){return p===1?"Local "+num.replace(/^L/,""):"Oficina "+num;}
-function Torre2680View({dashData,driveLoading}){
+function Torre2680View({dashData,driveLoading,notify}){
+  const [descargandoPlano,setDescargandoPlano]=useState(false);
   const pisos=Object.keys(TORRE2680_FICHAS).map(Number).sort((a,b)=>a-b);
   const [piso,setPiso]=useState(pisos[0]);
   const [search,setSearch]=useState("");
@@ -4710,7 +4731,19 @@ function Torre2680View({dashData,driveLoading}){
               ),
               zoomData&&h("div",{style:{padding:20,display:"flex",flexDirection:"column",gap:10,minWidth:320,overflowY:"auto"}},
                 h("button",{onClick:()=>setZoomOficina(null),style:{alignSelf:"flex-start",fontSize:11,color:"var(--acc)",background:"none",border:"none",cursor:"pointer",padding:0,marginBottom:4}},"← Volver a la lista"),
-                h("div",{style:{fontSize:20,fontWeight:700,color:"var(--tx)"}},unidadLabel(piso,zoomData.num)),
+                h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}},
+                  h("div",{style:{fontSize:20,fontWeight:700,color:"var(--tx)"}},unidadLabel(piso,zoomData.num)),
+                  zoomData.edif&&h("button",{
+                    disabled:descargandoPlano,
+                    onClick:async()=>{
+                      setDescargandoPlano(true);
+                      await descargarPlanoUnidad("Torre 2680",zoomData.edif,notify);
+                      setDescargandoPlano(false);
+                    },
+                    title:"Descargar plano de planta",
+                    style:{fontSize:16,padding:"4px 8px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf2)",cursor:descargandoPlano?"default":"pointer",opacity:descargandoPlano?.5:1,flexShrink:0}
+                  },descargandoPlano?"⏳":"📐")
+                ),
                 h("div",{style:{fontSize:14,fontWeight:600,color:esVacanteZ?"var(--amber)":"var(--tx)"}},zoomPl?(esVacanteZ?"VACANTE":zoomPl.nombre):"Sin datos de Planilla"),
                 zoomPl?.rut&&h("div",{style:{fontSize:11,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},"RUT: "+formatRUT(zoomPl.rut)),
                 zoomPl&&!esVacanteZ&&(()=>{
@@ -4879,6 +4912,9 @@ const CORTIJO_4A=[
   {edif:"Edif. 85 B",m2:345,x:18,y:5,w:5,h:8,nota:"Ficha \"Edificio 85 B Piso 1.pdf\": 133+212 (N1) — la ficha menciona un Nivel 2 (hall+70,30) no incluido en este total, a verificar"},
 ];
 const CORTIJO_TODAS={a2:CORTIJO_A2,a2locales:CORTIJO_A2LOCALES,b:CORTIJO_B,"4a":CORTIJO_4A};
+/* Sitio real (convención Planilla/Drive) de cada sector, para pedir el
+   plano de una unidad puntual a /api/drive-plano. */
+const CORTIJO_SECTOR_SITIO={a2:"A-2",a2locales:"A-2","4a":"4-A",b:"B"};
 /* Zonas clickeables del plano general (cortijo-emplazamiento.png) que
    navegan al sub-plano de cada sector. Coordenadas aproximadas sobre los
    deslindes gruesos del plano de emplazamiento general (El Cortijo 2026.pdf,
@@ -4892,7 +4928,8 @@ const CORTIJO_ZONAS=[
   {id:"4a",label:"Sitio 4-A",x:22.75,y:57.7,w:61.75,h:18.6},
   {id:"5a",label:"Sitio 5-A",x:22.75,y:76.3,w:61.75,h:21.7},
 ];
-function ElCortijoView({dashData,driveLoading}){
+function ElCortijoView({dashData,driveLoading,notify}){
+  const [descargandoPlano,setDescargandoPlano]=useState(false);
   const [zoomUnidad,setZoomUnidad]=useState(null);
   const [sector,setSector]=useState(null); /* null = plano general | "a2"|"a2locales"|"4a"|"b"|"5a" */
   const [search,setSearch]=useState("");
@@ -5096,7 +5133,19 @@ function ElCortijoView({dashData,driveLoading}){
               ),
               zoomData&&h("div",{style:{padding:20,display:"flex",flexDirection:"column",gap:10,minWidth:320,overflowY:"auto"}},
                 h("button",{onClick:()=>setZoomUnidad(null),style:{alignSelf:"flex-start",fontSize:11,color:"var(--acc)",background:"none",border:"none",cursor:"pointer",padding:0,marginBottom:4}},"← Volver a la lista"),
-                h("div",{style:{fontSize:20,fontWeight:700,color:"var(--tx)"}},zoomData.edif),
+                h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}},
+                  h("div",{style:{fontSize:20,fontWeight:700,color:"var(--tx)"}},zoomData.edif),
+                  h("button",{
+                    disabled:descargandoPlano,
+                    onClick:async()=>{
+                      setDescargandoPlano(true);
+                      await descargarPlanoUnidad(CORTIJO_SECTOR_SITIO[sector]||"",zoomData.edif,notify);
+                      setDescargandoPlano(false);
+                    },
+                    title:"Descargar plano de planta",
+                    style:{fontSize:16,padding:"4px 8px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf2)",cursor:descargandoPlano?"default":"pointer",opacity:descargandoPlano?.5:1,flexShrink:0}
+                  },descargandoPlano?"⏳":"📐")
+                ),
                 zoomPl?.dir&&h("div",{style:{fontSize:11,color:"var(--txd)"}},zoomPl.dir),
                 h("div",{style:{fontSize:14,fontWeight:600,color:esVacanteZ?"var(--amber)":"var(--tx)"}},zoomPl?(esVacanteZ?"VACANTE":zoomPl.nombre):"Sin datos de Planilla"),
                 zoomPl?.rut&&h("div",{style:{fontSize:11,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},"RUT: "+formatRUT(zoomPl.rut)),
@@ -9079,8 +9128,8 @@ function App(){
     ,view==="contratos"&&h(ContratosView,{dashData,driveLoading})
     ,view==="cuentas"&&h(CuentasServiciosView,{dashData,driveLoading,notify})
     ,view==="vacantes"&&h(CatastroSitiosView,{dashData,driveLoading,notify})
-    ,view==="cortijo"&&h(ElCortijoView,{dashData,driveLoading})
-    ,view==="torre2680"&&h(Torre2680View,{dashData,driveLoading})
+    ,view==="cortijo"&&h(ElCortijoView,{dashData,driveLoading,notify})
+    ,view==="torre2680"&&h(Torre2680View,{dashData,driveLoading,notify})
     ,view==="historial-fact"&&h(HistorialFactView,{dashData,driveLoading,notify,planillaFile:files.planilla,marcarPagadoSheet})
   ));
 }

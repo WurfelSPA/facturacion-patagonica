@@ -63,6 +63,16 @@ function norm(s) {
   return (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
 }
 
+// Extrae el código final (dígitos + sufijo de letras opcional) de un string ya
+// normalizado, ignorando la palabra descriptiva que lo antecede — "Edificio",
+// "Oficina", "Bodega", "P.C.L", etc. según la carpeta/convención de nombres.
+// Así "edificio61"→"61", "oficina23"→"23", "pcl4a"→"4a", sin necesidad de
+// conocer de antemano qué prefijo usa cada carpeta.
+function extractCode(normalizedStr) {
+  const m = (normalizedStr || "").match(/(\d+[a-z]*)$/);
+  return m ? m[1] : (normalizedStr || "");
+}
+
 // Cache en memoria del árbol completo (carpeta Planos + subcarpetas) — TTL 1h.
 let _cache = null, _cacheTs = 0;
 const TTL = 3600 * 1000;
@@ -108,22 +118,35 @@ export default async function handler(req, res) {
     });
     const numNorm = norm(numeracion || edificio);
 
+    const queryCode = extractCode((numeracion || "").replace(/[^0-9a-z]/gi, "").toLowerCase() || numNorm);
+
     function scoreFile(f) {
       const n = norm(f.name.replace(/\.pdf$/i, ""));
       if (!n) return 0;
-      const numDigits = (numeracion || "").replace(/[^0-9a-z]/gi, "") || numNorm;
-      // El match del numero/codigo es OBLIGATORIO — sin él no hay puntaje,
-      // aunque la carpeta sea la correcta. Si no, para numeraciones cortas
-      // (ej. "H") cualquier PDF de la carpeta terminaba "ganando" solo por
-      // el bonus de carpeta, sirviendo el plano de OTRO edificio.
-      if (!numDigits) return 0;
-      const exact = n === norm("edificio" + numDigits);
+      // El match del código es OBLIGATORIO — sin él no hay puntaje, aunque
+      // la carpeta sea la correcta. Si no, para códigos cortos (ej. "H")
+      // cualquier PDF de la carpeta terminaba "ganando" solo por el bonus
+      // de carpeta, sirviendo el plano de OTRO edificio.
+      if (!queryCode) return 0;
+      const fileCode = extractCode(n);
+      if (!fileCode) return 0;
+      // Comparar solo el código final (dígitos+letras), no el nombre completo:
+      // cada carpeta usa una palabra distinta ("Edificio", "Oficina", "P.C.L")
+      // que no tiene por qué coincidir con la de la consulta.
+      const exact = fileCode === queryCode;
       // El match por substring solo es seguro para códigos de ≥3 caracteres
       // (con 1-2 caracteres, "h" o "9" aparecen dentro de casi cualquier
-      // nombre y producen falsos positivos).
-      const substr = numDigits.length >= 3 && n.includes(numDigits);
-      if (!exact && !substr) return 0;
-      let s = exact ? 10 : 3;
+      // código y producen falsos positivos).
+      const substr = queryCode.length >= 3 && fileCode.includes(queryCode);
+      // Caso "Edif. B/C/D..." (Sitio B): la Planilla solo registra la letra,
+      // pero el archivo real lleva el rol completo ("Edificio 2758-C.pdf").
+      // Si la consulta es puramente alfabética y corta, comparar solo el
+      // sufijo de letras del código del archivo (sin los dígitos que lo
+      // anteceden) — "c" (consulta) vs "2758c"→"c" (archivo).
+      const queryIsLetterOnly = /^[a-z]+$/.test(queryCode);
+      const letterMatch = queryIsLetterOnly && queryCode.length <= 2 && fileCode.replace(/^\d+/, "") === queryCode;
+      if (!exact && !substr && !letterMatch) return 0;
+      let s = exact ? 10 : (letterMatch ? 6 : 3);
       if (folderMatch && f.folder === folderMatch.name) s += 5;
       // preferir nombres cortos (plano general del edificio, no "Piso 2" suelto)
       s -= n.length * 0.01;
