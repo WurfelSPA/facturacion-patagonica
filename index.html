@@ -4082,7 +4082,10 @@ function descargarBlob(blob,filename){
 function inferTipoNumeracion(sitio,edificio){
   const s=(edificio||"").trim();
   let m;
-  if((m=s.match(/Bodega\s*(\S+)/i)))return{tipo:"Bodega",numeracion:m[1]};
+  // [\w-]+ (no \S+): evita que "Edif. 31 (Bodega)" — sufijo real de la
+  // Planilla en Sitio 5-A cuando el mismo edificio se arrienda como bodega —
+  // matchee acá y capture el paréntesis de cierre ")" como numeración.
+  if((m=s.match(/Bodega\s*([\w-]+)/i)))return{tipo:"Bodega",numeracion:m[1]};
   if((m=s.match(/T\.?\s*Of\.?\s*(\S+)/i)))return{tipo:"Oficina",numeracion:m[1]};
   if((m=s.match(/^Of\.?\s*(\S+)/i)))return{tipo:"Oficina",numeracion:m[1]};
   if((m=s.match(/P\.?\s*C\.?\s*L[\.\-]?\s*(\S+)/i)))return{tipo:"Local Comercial",numeracion:"L"+m[1]};
