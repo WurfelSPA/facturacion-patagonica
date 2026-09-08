@@ -4843,6 +4843,7 @@ const CORTIJO_IMG={
   a2locales:"/cortijo-a2locales.png",
   "4a":"/cortijo-4a.png",
   b:"/cortijo-sitiob.png",
+  "5a":"/cortijo-5a.png",
 };
 /* Sitio A-2 — carpeta "Lote A-2" (edificios). */
 const CORTIJO_A2=[
@@ -4921,10 +4922,43 @@ const CORTIJO_4A=[
   {edif:"Edif. 85 AA",m2:null,x:29,y:5,w:5,h:8,nota:"Sin ficha propia entre los archivos entregados"},
   {edif:"Edif. 85 B",m2:345,x:18,y:5,w:5,h:8,nota:"Ficha \"Edificio 85 B Piso 1.pdf\": 133+212 (N1) — la ficha menciona un Nivel 2 (hall+70,30) no incluido en este total, a verificar"},
 ];
-const CORTIJO_TODAS={a2:CORTIJO_A2,a2locales:CORTIJO_A2LOCALES,b:CORTIJO_B,"4a":CORTIJO_4A};
+/* Sitio 5-A (Rol 6149-25) — carpeta "Lote 5-A" (agregada 08-09-2026).
+   Es una franja en "L": la fila angosta de Edif.71-77 arriba (junto al
+   deslinde de Sitio 4-A) más la columna 66-70 a su derecha, y la fila
+   Edif.31-47 abajo. Edif strings verificados contra la columna Edificios
+   de la Planilla (RUT/cliente real por fila) para que matchPlanilla
+   funcione igual que en los demás sectores. */
+const CORTIJO_5A=[
+  {edif:"Edif. 31 (Bodega)",m2:3250,x:5,y:74,w:9,h:20,nota:"1.875 bodega + 808 + 567 oficina (2 niveles)"},
+  {edif:"Edif. 32",m2:491,x:16,y:68,w:6,h:8,nota:"366 (N1) + 125 (N2) oficina"},
+  {edif:"Edif. 33",m2:193,x:21,y:68,w:6,h:8},
+  {edif:"Edif. 34",m2:325,x:26,y:66,w:3,h:10,nota:"259 (N1) + 66 (N2) oficina"},
+  {edif:"Edif. 35",m2:2978,x:27,y:80,w:9,h:14,nota:"155 oficina + 2.668 bodega (N1) + 155 oficina (N2)"},
+  {edif:"Edif. 43",m2:623,x:38,y:87,w:7,h:9,nota:"574 bodega + 49 oficina"},
+  {edif:"Edif. 44",m2:1052,x:44,y:87,w:6,h:9,nota:"156+161 oficina (2 niveles) + 735 bodega"},
+  {edif:"Edif. 45",m2:1047,x:49,y:87,w:7,h:9,nota:"72+120 oficina (2 niveles) + 799+56 bodega — cifra a verificar"},
+  {edif:"Edif. 46",m2:null,x:55,y:78,w:6,h:8,nota:"Sin ficha propia entre los archivos entregados — la única ficha \"Bodega 46\" corresponde a la otra fila de la Planilla (Edif. 46 (Bodega))"},
+  {edif:"Edif. 46 (Bodega)",m2:77,x:55,y:87,w:6,h:9},
+  {edif:"Edif. 47",m2:null,x:60,y:87,w:3,h:11,nota:"Sin ficha propia entre los archivos entregados"},
+  {edif:"Edif. 66",m2:1770,x:72,y:88,w:17,h:9,nota:"1.204 bodega + 312+254 oficina"},
+  {edif:"Edif. 66 A",m2:1396,x:72,y:77,w:17,h:9,nota:"Bodega, N1 único"},
+  {edif:"Edif. 67",m2:2003,x:72,y:66,w:16,h:11,nota:"1.175+30 bodega + 447+351 oficina"},
+  {edif:"Edif. 68",m2:2304,x:72,y:53,w:16,h:12,nota:"1.730 bodega + 292+282 oficina (2 niveles)"},
+  {edif:"Edif. 69",m2:1735,x:72,y:38,w:16,h:12,nota:"1.420 bodega + 315 oficina"},
+  {edif:"Edif. 70",m2:2250,x:72,y:25,w:16,h:12,nota:"125 oficina (N1) + 2.000 bodega + 125 oficina (N2)"},
+  {edif:"Edif. 71",m2:590,x:71,y:10,w:4,h:10,nota:"228 bodega + 126+236 oficina"},
+  {edif:"Edif. 71-B",m2:null,x:68,y:19,w:7,h:5,nota:"Sin ficha propia entre los archivos entregados y sin fila propia en la Planilla"},
+  {edif:"Edif. 72",m2:280,x:74.5,y:12,w:4,h:9,nota:"40+40 oficina (2 niveles) + 200 bodega"},
+  {edif:"Edif. 73",m2:270,x:77.5,y:12,w:4,h:9,nota:"30+30 oficina (2 niveles) + 210 bodega"},
+  {edif:"Edif. 74",m2:270,x:80.5,y:12,w:4,h:9,nota:"30+30 oficina (2 niveles) + 210 bodega"},
+  {edif:"Edif. 75",m2:270,x:83.5,y:12,w:4,h:9,nota:"30+30 oficina (2 niveles) + 210 bodega"},
+  {edif:"Edif. 76",m2:421,x:86,y:12,w:4,h:9,nota:"60+60 oficina (2 niveles) + 301 bodega"},
+  {edif:"Edif. 77",m2:null,x:89.5,y:12,w:5,h:7,nota:"Sin ficha propia entre los archivos entregados"},
+];
+const CORTIJO_TODAS={a2:CORTIJO_A2,a2locales:CORTIJO_A2LOCALES,b:CORTIJO_B,"4a":CORTIJO_4A,"5a":CORTIJO_5A};
 /* Sitio real (convención Planilla/Drive) de cada sector, para pedir el
    plano de una unidad puntual a /api/drive-plano. */
-const CORTIJO_SECTOR_SITIO={a2:"A-2",a2locales:"A-2","4a":"4-A",b:"B"};
+const CORTIJO_SECTOR_SITIO={a2:"A-2",a2locales:"A-2","4a":"4-A",b:"B","5a":"5-A"};
 /* Zonas clickeables del plano general (cortijo-emplazamiento.png) que
    navegan al sub-plano de cada sector. Coordenadas aproximadas sobre los
    deslindes gruesos del plano de emplazamiento general (El Cortijo 2026.pdf,
@@ -5069,13 +5103,7 @@ function ElCortijoView({dashData,driveLoading,notify}){
                   );
                 })
           )
-        :sector==="5a"
-          ?h("div",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:10,color:"var(--txd)",fontSize:13,padding:24,textAlign:"center"}},
-              h("div",{style:{fontSize:32}},"🚧"),
-              h("div",null,"Aún no hay planos cargados para el Sitio 5-A."),
-              h("div",{style:{fontSize:11}},"Cuando los compartas, los agrego igual que los demás sectores.")
-            )
-          :h("div",{style:{flex:1,display:"flex",overflow:"hidden",position:"relative",background:"var(--bg)"}},
+        :h("div",{style:{flex:1,display:"flex",overflow:"hidden",position:"relative",background:"var(--bg)"}},
             h("div",{style:{flex:1,overflow:"hidden",position:"relative",display:"flex",alignItems:"center",justifyContent:"center",padding:24}},
               !dashData
                 ?h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},
