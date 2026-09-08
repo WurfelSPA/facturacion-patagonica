@@ -6857,6 +6857,8 @@ function App(){
   const [dashSearch,setDashSearch]=useState("");
   const [dashSitio,setDashSitio]=useState("all");
   const [dashMes,setDashMes]=useState("current"); /* "current" = UF actual, o "YYYY-MM" */
+  const [dashSortCol,setDashSortCol]=useState(null);
+  const [dashSortDir,setDashSortDir]=useState("asc");
 
   /* CAMBIO 1: estado para UF y conversión a CLP */
   const [ufActual,setUfActual]=useState(null);
@@ -7811,11 +7813,39 @@ function App(){
     const tblMesOpts=[{k:"current",l:"Mes actual"},...Object.entries(dashData?dashData.monthTotals:{}).filter(([,v])=>v.arr>0).sort((a,b)=>b[0].localeCompare(a[0])).map(([k,v])=>({k,l:v.label}))];
     const tblUf=curMes==="current"?ufRef:(monthlyUF[curMes]||ufRef);
     if(dashData&&curMes!=="current"&&!monthlyUF[curMes]){const[yr,mo]=curMes.split("-").map(Number);getUFForMonth(yr,mo).then(v=>{if(v)setMonthlyUF(p=>({...p,[curMes]:v}));});}
-    const tblClients=dashData?dashData.clients.filter(c=>{
+    const tblClientsUnsorted=dashData?dashData.clients.filter(c=>{
       const ms=!curSearch||c.nombre.toLowerCase().includes(curSearch.toLowerCase())||c.rut.includes(curSearch);
       const msite=curSitio==="all"||(c.sitio||"").trim()===(curSitio||"").trim();
       return ms&&msite;
     }):[];
+    /* Encabezados ordenables — cada uno mapea a un valor comparable del cliente
+       (usa tblUf para los montos en CLP, calculados igual que en las filas). */
+    const SORT_GETTERS={
+      "Sitio":c=>c.sitio||"",
+      "Cliente / RUT":c=>c.nombre||"",
+      "Arriendo CLP":c=>c.ufArr>0?c.ufArr*tblUf:null,
+      "Serv.Adm. CLP":c=>c.ufSrv>0?c.ufSrv*tblUf:null,
+      "Total CLP":c=>c.ufTotal>0?c.ufTotal*tblUf:null,
+      "IVA":c=>c.afecto||"",
+      "Término":c=>c.termContrato||"",
+      "Antelac.":c=>c.renovacion||"",
+      "Aviso":c=>c.aviso||"",
+      "F.Reajuste":c=>c.fechaReajuste||"",
+      "% Reaj.":c=>c.pctReaj||"",
+      "Cada":c=>c.cadaAnios!=null?c.cadaAnios:null,
+      "m²":c=>c.m2!=null?c.m2:null,
+      "UF×m²":c=>(c.ufM2!=null&&c.m2>0)?c.ufM2/c.m2:null,
+    };
+    const tblClients=(dashSortCol&&SORT_GETTERS[dashSortCol])?
+      [...tblClientsUnsorted].sort((a,b)=>{
+        const va=SORT_GETTERS[dashSortCol](a),vb=SORT_GETTERS[dashSortCol](b);
+        const an=va==null||va==="",bn=vb==null||vb==="";
+        if(an&&bn)return 0;
+        if(an)return 1; // vacíos siempre al final, sea cual sea la dirección
+        if(bn)return -1;
+        const cmp=(typeof va==="number"&&typeof vb==="number")?va-vb:String(va).localeCompare(String(vb),"es",{numeric:true,sensitivity:"base"});
+        return dashSortDir==="desc"?-cmp:cmp;
+      }):tblClientsUnsorted;
     const tblUfLabel=curMes==="current"?`UF hoy: ${tblUf.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`:`UF ${tblMesOpts.find(m=>m.k===dashMes)?.l||""}: ${tblUf.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 
     const tickerItems=[
@@ -7939,7 +7969,19 @@ function App(){
           h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},tblUfLabel)
         ),
         h("div",{className:"dash-client-hdr"},
-          ["Sitio","Cliente / RUT","Arriendo CLP","Serv.Adm. CLP","Total CLP","IVA","Término","Antelac.","Aviso","F.Reajuste","% Reaj.","Cada","m²","UF×m²",""].map(col=>h("div",{key:col},col))
+          ["Sitio","Cliente / RUT","Arriendo CLP","Serv.Adm. CLP","Total CLP","IVA","Término","Antelac.","Aviso","F.Reajuste","% Reaj.","Cada","m²","UF×m²",""].map(col=>{
+            const sortable=!!SORT_GETTERS[col];
+            const active=dashSortCol===col;
+            return h("div",{
+              key:col,
+              onClick:sortable?()=>{
+                if(dashSortCol===col)setDashSortDir(d=>d==="asc"?"desc":"asc");
+                else{setDashSortCol(col);setDashSortDir("asc");}
+              }:undefined,
+              title:sortable?"Ordenar por "+col:undefined,
+              style:{display:"flex",alignItems:"center",gap:3,cursor:sortable?"pointer":"default",userSelect:"none",color:active?"var(--tx)":undefined}
+            },col,sortable&&h("span",{style:{fontSize:8,opacity:active?1:.3}},active?(dashSortDir==="asc"?"▲":"▼"):"⇅"));
+          })
         ),
         h("div",{key:"rows-"+curSitio+"-"+tblClients.length,style:{maxHeight:"calc(100vh - 320px)",overflowY:"auto",overflowX:"auto"}},
           tblClients.length===0?
