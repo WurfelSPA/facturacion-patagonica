@@ -749,6 +749,18 @@ async function parsePlanillaParaDashboard(file){
     }
   }
   const SKIP=/^(Total|Area|Arrendado|En negociación|Para confirmar|#|\d+$)/;
+  /* Superficie por tipo/piso (cols AJ-AP) — mismo bloque que "m2. Totales"
+     (col AQ, ya leído como m2) pero desglosado, para comparar contra el
+     Cuadro Superficies de la ficha de cada sitio. */
+  function numN(v){return v!=null&&v!==""?Number(v):null;}
+  function surfPlanilla(row){
+    return{
+      locP1:numN(row[35]),locP2:numN(row[36]),           /* Col AJ/AK: Locales Comerc. Piso 1/2 */
+      oficP1:numN(row[37]),oficP2:numN(row[38]),          /* Col AL/AM: Oficina m2. Piso 1/2 */
+      bodP1:numN(row[39]),bodP2:numN(row[40]),            /* Col AN/AO: Bodega m2. Piso 1/2 */
+      totalConstruido:numN(row[41]),                       /* Col AP: Total m2. Construidos */
+    };
+  }
   const clients=[];
   const vacantes=[];
   for(let ri=4;ri<raw.length;ri++){
@@ -773,6 +785,7 @@ async function parsePlanillaParaDashboard(file){
       }
       vacantes.push({ri,isVacante:true,nombre:"VACANTE",rut:"",sitio:String(row[7]||"").replace(/\s+/g," ").trim(),edificio:String(row[8]||"").trim(),dir:String(row[10]||"").trim(),
         m2:row[42]!=null&&row[42]!==""?Number(row[42]):null,        /* Col AQ: Metros cuadrados */
+        ...surfPlanilla(row),
         ufM2:row[47]!=null&&row[47]!==""?Number(row[47]):null,      /* Col AV: UF x m2 */
         pctAdm:row[51]!=null&&row[51]!==""?Number(row[51]):null,    /* Col AZ: % Arriendo (Serv. Admin.) */
         arriendoActual:vArriendoVal,mesActual:vArriendoLabel,servAdminActual:0,
@@ -833,6 +846,7 @@ async function parsePlanillaParaDashboard(file){
       pctReaj:row[53]!=null?String(row[53]):"",            /* Col BB: % Reajuste */
       cadaAnios:row[54]!=null?String(row[54]).trim():"",   /* Col BC: Cada cuántos años */
       m2:row[42]!=null&&row[42]!==""?Number(row[42]):null,   /* Col AQ: Metros cuadrados */
+      ...surfPlanilla(row),
       ufM2:row[47]!=null&&row[47]!==""?Number(row[47]):null, /* Col AV: UF x m2 (tarifa pactada al inicio) */
       arriendoActual,servAdminActual,mesActual:currentMonthLabel, /* Tarifa real vigente, último mes facturado */
       hist:(()=>{
@@ -4942,35 +4956,87 @@ const CORTIJO_4A=[
    deslinde de Sitio 4-A) más la columna 66-70 a su derecha, y la fila
    Edif.31-47 abajo. Edif strings verificados contra la columna Edificios
    de la Planilla (RUT/cliente real por fila) para que matchPlanilla
-   funcione igual que en los demás sectores. */
+   funcione igual que en los demás sectores.
+   oficN1/oficN2/bodN1/bodN2: leídos directamente del recuadro "Cuadro
+   Superficies" de cada ficha (no del texto libre del "Diagrama
+   Superficies", que puede traer cifras distintas/engañosas — verificado
+   a ojo contra el PDF de cada edificio, 09-09-2026). */
 const CORTIJO_5A=[
-  {edif:"Edif. 31 (Bodega)",m2:3250,x:5,y:74,w:9,h:20,nota:"1.875 bodega + 808 + 567 oficina (2 niveles)"},
-  {edif:"Edif. 32",m2:491,x:16,y:68,w:6,h:8,nota:"366 (N1) + 125 (N2) oficina"},
-  {edif:"Edif. 33",m2:193,x:21,y:68,w:6,h:8},
-  {edif:"Edif. 34",m2:325,x:26,y:66,w:3,h:10,nota:"259 (N1) + 66 (N2) oficina"},
-  {edif:"Edif. 35",m2:2978,x:27,y:80,w:9,h:14,nota:"155 oficina + 2.668 bodega (N1) + 155 oficina (N2)"},
-  {edif:"Edif. 43",m2:623,x:38,y:87,w:7,h:9,nota:"574 bodega + 49 oficina"},
-  {edif:"Edif. 44",m2:1052,x:44,y:87,w:6,h:9,nota:"156+161 oficina (2 niveles) + 735 bodega"},
-  {edif:"Edif. 45",m2:1047,x:49,y:87,w:7,h:9,nota:"72+120 oficina (2 niveles) + 799+56 bodega — cifra a verificar"},
+  {edif:"Edif. 31 (Bodega)",oficN1:808,oficN2:567,bodN1:1875,bodN2:0,x:5,y:74,w:9,h:20},
+  {edif:"Edif. 32",oficN1:125,oficN2:366,bodN1:0,bodN2:0,x:16,y:68,w:6,h:8},
+  {edif:"Edif. 33",oficN1:193,oficN2:0,bodN1:0,bodN2:0,x:21,y:68,w:6,h:8},
+  {edif:"Edif. 34",oficN1:66,oficN2:259,bodN1:0,bodN2:0,x:26,y:66,w:3,h:10},
+  {edif:"Edif. 35",oficN1:155,oficN2:155,bodN1:2668,bodN2:0,x:27,y:80,w:9,h:14},
+  {edif:"Edif. 43",oficN1:49,oficN2:0,bodN1:574,bodN2:0,x:38,y:87,w:7,h:9},
+  {edif:"Edif. 44",oficN1:161,oficN2:156,bodN1:735,bodN2:0,x:44,y:87,w:6,h:9},
+  {edif:"Edif. 45",oficN1:128,oficN2:72,bodN1:799,bodN2:56,x:49,y:87,w:7,h:9},
   {edif:"Edif. 46",m2:null,x:55,y:78,w:6,h:8,nota:"Sin ficha propia entre los archivos entregados — la única ficha \"Bodega 46\" corresponde a la otra fila de la Planilla (Edif. 46 (Bodega))"},
-  {edif:"Edif. 46 (Bodega)",m2:77,x:55,y:87,w:6,h:9},
+  {edif:"Edif. 46 (Bodega)",oficN1:0,oficN2:0,bodN1:77,bodN2:0,x:55,y:87,w:6,h:9,nota:"Ficha dice \"Bodega + Baño\", Nivel 1 único"},
   {edif:"Edif. 47",m2:null,x:60,y:87,w:3,h:11,nota:"Sin ficha propia entre los archivos entregados"},
-  {edif:"Edif. 66",m2:1770,x:72,y:88,w:17,h:9,nota:"1.204 bodega + 312+254 oficina"},
-  {edif:"Edif. 66 A",m2:1396,x:72,y:77,w:17,h:9,nota:"Bodega, N1 único"},
-  {edif:"Edif. 67",m2:2003,x:72,y:66,w:16,h:11,nota:"1.175+30 bodega + 447+351 oficina"},
-  {edif:"Edif. 68",m2:2304,x:72,y:53,w:16,h:12,nota:"1.730 bodega + 292+282 oficina (2 niveles)"},
-  {edif:"Edif. 69",m2:1735,x:72,y:38,w:16,h:12,nota:"1.420 bodega + 315 oficina"},
-  {edif:"Edif. 70",m2:2250,x:72,y:25,w:16,h:12,nota:"125 oficina (N1) + 2.000 bodega + 125 oficina (N2)"},
-  {edif:"Edif. 71",m2:590,x:71,y:10,w:4,h:10,nota:"228 bodega + 126+236 oficina"},
+  {edif:"Edif. 66",oficN1:312,oficN2:254,bodN1:1204,bodN2:0,x:72,y:88,w:17,h:9},
+  {edif:"Edif. 66 A",oficN1:251,oficN2:0,bodN1:1145,bodN2:0,x:72,y:77,w:17,h:9},
+  {edif:"Edif. 67",oficN1:447,oficN2:351,bodN1:1175,bodN2:30,x:72,y:66,w:16,h:11},
+  {edif:"Edif. 68",oficN1:292,oficN2:282,bodN1:1730,bodN2:0,x:72,y:53,w:16,h:12},
+  {edif:"Edif. 69",oficN1:315,oficN2:0,bodN1:1420,bodN2:0,x:72,y:38,w:16,h:12},
+  {edif:"Edif. 70",oficN1:125,oficN2:125,bodN1:2000,bodN2:0,x:72,y:25,w:16,h:12},
+  {edif:"Edif. 71",oficN1:228,oficN2:236,bodN1:126,bodN2:0,x:71,y:10,w:4,h:10},
   {edif:"Edif. 71-B",m2:null,x:68,y:19,w:7,h:5,nota:"Sin ficha propia entre los archivos entregados y sin fila propia en la Planilla"},
-  {edif:"Edif. 72",m2:280,x:74.5,y:12,w:4,h:9,nota:"40+40 oficina (2 niveles) + 200 bodega"},
-  {edif:"Edif. 73",m2:270,x:77.5,y:12,w:4,h:9,nota:"30+30 oficina (2 niveles) + 210 bodega"},
-  {edif:"Edif. 74",m2:270,x:80.5,y:12,w:4,h:9,nota:"30+30 oficina (2 niveles) + 210 bodega"},
-  {edif:"Edif. 75",m2:270,x:83.5,y:12,w:4,h:9,nota:"30+30 oficina (2 niveles) + 210 bodega"},
-  {edif:"Edif. 76",m2:421,x:86,y:12,w:4,h:9,nota:"60+60 oficina (2 niveles) + 301 bodega"},
+  {edif:"Edif. 72",oficN1:40,oficN2:40,bodN1:200,bodN2:0,x:74.5,y:12,w:4,h:9},
+  {edif:"Edif. 73",oficN1:30,oficN2:30,bodN1:210,bodN2:0,x:77.5,y:12,w:4,h:9},
+  {edif:"Edif. 74",oficN1:30,oficN2:30,bodN1:210,bodN2:0,x:80.5,y:12,w:4,h:9},
+  {edif:"Edif. 75",oficN1:30,oficN2:30,bodN1:210,bodN2:0,x:83.5,y:12,w:4,h:9},
+  {edif:"Edif. 76",oficN1:60,oficN2:60,bodN1:301,bodN2:0,x:86,y:12,w:4,h:9},
   {edif:"Edif. 77",m2:null,x:89.5,y:12,w:5,h:7,nota:"Sin ficha propia entre los archivos entregados"},
 ];
 const CORTIJO_TODAS={a2:CORTIJO_A2,a2locales:CORTIJO_A2LOCALES,b:CORTIJO_B,"4a":CORTIJO_4A,"5a":CORTIJO_5A};
+/* Total m² de una unidad del catastro: si tiene desglose de Cuadro
+   Superficies (oficN1/oficN2/bodN1/bodN2 — hoy solo Sitio 5-A) lo suma;
+   si no, usa el m2 plano heredado de los demás sectores. */
+function fichaM2(u){
+  if(!u)return null;
+  if(u.oficN1!=null)return(u.oficN1||0)+(u.oficN2||0)+(u.bodN1||0)+(u.bodN2||0);
+  return u.m2!=null?u.m2:null;
+}
+/* Exporta a CSV la comparación Ficha (Cuadro Superficies) vs. Planilla
+   (Superficie Validada) de todas las unidades de un sector — para revisar
+   fuera de la app y ajustar donde corresponda (Planilla o planos). */
+function exportarSuperficiesCSV(sectorLabel,unidades,matchPlanilla,notify){
+  const esc=v=>{const s=String(v==null?"":v);return/[";\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+  const header=["Edificio","Cliente","RUT","Ficha Oficina N1","Ficha Oficina N2","Ficha Bodega N1","Ficha Bodega N2","Ficha Total m2","Planilla Locales Piso1","Planilla Locales Piso2","Planilla Oficina Piso1","Planilla Oficina Piso2","Planilla Bodega Piso1","Planilla Bodega Piso2","Planilla Total Construido","Planilla m2 Totales","Diferencia m2","Nota"];
+  const rows=unidades.map(u=>{
+    const pl=matchPlanilla(u.edif);
+    const uM2=fichaM2(u);
+    const plM2=pl?.m2;
+    const dif=(uM2!=null&&plM2!=null)?Math.round((uM2-plM2)*100)/100:"";
+    return[u.edif,pl?(pl.isVacante?"VACANTE":pl.nombre):"",pl?.rut||"",u.oficN1??"",u.oficN2??"",u.bodN1??"",u.bodN2??"",uM2??"",pl?.locP1??"",pl?.locP2??"",pl?.oficP1??"",pl?.oficP2??"",pl?.bodP1??"",pl?.bodP2??"",pl?.totalConstruido??"",plM2??"",dif,u.nota||""];
+  });
+  const csv=[header,...rows].map(r=>r.map(esc).join(";")).join("\r\n");
+  const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
+  descargarBlob(blob,`Superficies ${sectorLabel} - ficha vs planilla.csv`);
+  notify?.("✓ CSV descargado — "+unidades.length+" unidades","ok");
+}
+/* Mini-tabla de superficie por tipo × columna (N1/N2 de la ficha, o Piso1/Piso2
+   de la Planilla) — mismo formato en ambos segmentos para comparar a simple vista. */
+function TablaSuperficie({title,accent,colLabels,rows,totalLabel,total}){
+  const[c1,c2]=colLabels||["N1","N2"];
+  return h("div",{style:{border:"1px solid var(--bdr)",borderRadius:8,overflow:"hidden"}},
+    h("div",{style:{padding:"6px 10px",background:"var(--surf2)",fontSize:11,fontWeight:700,color:accent||"var(--tx)"}},title),
+    h("div",{style:{display:"grid",gridTemplateColumns:"1fr 56px 56px 64px",fontSize:11,alignItems:"center"}},
+      h("div",{style:{padding:"3px 10px"}}),
+      h("div",{style:{padding:"3px 4px",fontWeight:700,color:"var(--txd)",textAlign:"right"}},c1),
+      h("div",{style:{padding:"3px 4px",fontWeight:700,color:"var(--txd)",textAlign:"right"}},c2),
+      h("div",{style:{padding:"3px 10px",fontWeight:700,color:"var(--txd)",textAlign:"right"}},"Total"),
+      ...rows.flatMap(r=>[
+        h("div",{key:r.label+"l",style:{padding:"3px 10px",color:"var(--tx)"}},r.label),
+        h("div",{key:r.label+"1",style:{padding:"3px 4px",textAlign:"right",fontFamily:"'DM Mono',monospace"}},r.v1!=null?r.v1:"—"),
+        h("div",{key:r.label+"2",style:{padding:"3px 4px",textAlign:"right",fontFamily:"'DM Mono',monospace"}},r.v2!=null?r.v2:"—"),
+        h("div",{key:r.label+"t",style:{padding:"3px 10px",textAlign:"right",fontFamily:"'DM Mono',monospace",fontWeight:600}},r.total!=null?r.total:"—"),
+      ]),
+      h("div",{style:{gridColumn:"1/4",padding:"4px 10px",fontWeight:700,borderTop:"1px solid var(--bdr)"}},totalLabel||"TOTAL"),
+      h("div",{style:{padding:"4px 10px",textAlign:"right",fontWeight:700,fontFamily:"'DM Mono',monospace",borderTop:"1px solid var(--bdr)"}},total!=null?total:"—"),
+    )
+  );
+}
 /* Sitio real (convención Planilla/Drive) de cada sector, para pedir el
    plano de una unidad puntual a /api/drive-plano. */
 const CORTIJO_SECTOR_SITIO={a2:"A-2",a2locales:"A-2","4a":"4-A",b:"B","5a":"5-A"};
@@ -5057,7 +5123,8 @@ function ElCortijoView({dashData,driveLoading,notify}){
   const cx=zoomData?zoomData.x+zoomData.w/2:50, cy=zoomData?zoomData.y+zoomData.h/2:50;
   const esVacanteZ=zoomPl?.isVacante;
   const m2PlanillaZ=zoomPl?.m2;
-  const discZ=zoomData&&zoomData.m2!=null&&m2PlanillaZ!=null&&Math.abs(zoomData.m2-m2PlanillaZ)>1;
+  const zoomDataM2=fichaM2(zoomData);
+  const discZ=zoomData&&zoomDataM2!=null&&m2PlanillaZ!=null&&Math.abs(zoomDataM2-m2PlanillaZ)>1;
 
   return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up"},
     h("div",{style:{padding:"10px 20px",borderBottom:"1px solid var(--bdr)",flexShrink:0,background:"var(--surf)",display:"flex",flexDirection:"column",gap:10,flexWrap:"wrap"}},
@@ -5069,12 +5136,17 @@ function ElCortijoView({dashData,driveLoading,notify}){
           background:"var(--surf2)",color:"var(--tx)",fontSize:12,fontWeight:700,cursor:"pointer"
         }},verPdf?"🗺️ Ver plano interactivo":"📄 Ver PDF original")
       ),
-      !verPdf&&!buscando&&h("div",{style:{display:"flex",gap:6,flexWrap:"wrap"}},
+      !verPdf&&!buscando&&h("div",{style:{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}},
         CORTIJO_SECTORES.map(s=>h("button",{key:String(s.id),onClick:()=>{setSector(s.id);setZoomUnidad(null);},style:{
           padding:"6px 14px",borderRadius:8,border:sector===s.id?"1px solid var(--acc)":"1px solid var(--bdr)",
           background:sector===s.id?"var(--acc)":"var(--surf2)",color:sector===s.id?"#fff":"var(--tx)",
           fontSize:12,fontWeight:700,cursor:"pointer"
-        }},s.label))
+        }},s.label)),
+        sector&&activeUnidades.length>0&&h("button",{
+          onClick:()=>exportarSuperficiesCSV(CORTIJO_SECTORES.find(s=>s.id===sector)?.label||sector,activeUnidades,matchPlanilla,notify),
+          title:"Descargar CSV con la comparación Ficha vs. Planilla de este sector",
+          style:{marginLeft:"auto",padding:"6px 14px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6}
+        },"⬇ Exportar superficies")
       )
     ),
     verPdf
@@ -5096,7 +5168,8 @@ function ElCortijoView({dashData,driveLoading,notify}){
                   const pl=matchPlanilla(u.edif);
                   const esVacante=pl?.isVacante;
                   const m2Planilla=pl?.m2;
-                  const hayDiscrepancia=u.m2!=null&&m2Planilla!=null&&Math.abs(u.m2-m2Planilla)>1;
+                  const uM2=fichaM2(u);
+                  const hayDiscrepancia=uM2!=null&&m2Planilla!=null&&Math.abs(uM2-m2Planilla)>1;
                   return h("div",{key:u.edif+"-"+i,style:{
                     border:"1px solid var(--bdr)",borderRadius:10,padding:14,background:"var(--surf)",
                     borderLeft:hayDiscrepancia?"4px solid var(--red)":esVacante?"4px solid var(--amber)":"4px solid var(--green)"
@@ -5107,14 +5180,14 @@ function ElCortijoView({dashData,driveLoading,notify}){
                       pl?(esVacante?"VACANTE":pl.nombre):"Sin datos de Planilla"
                     ),
                     h("div",{style:{display:"flex",gap:10,fontSize:11,color:"var(--txm)",marginBottom:6,flexWrap:"wrap"}},
-                      h("span",null,"m² ficha: ",h("b",{style:{color:"var(--tx)"}},u.m2!=null?u.m2:"—")),
+                      h("span",null,"m² ficha: ",h("b",{style:{color:"var(--tx)"}},uM2!=null?uM2:"—")),
                       h("span",null,"m² planilla: ",h("b",{style:{color:hayDiscrepancia?"var(--red)":"var(--tx)"}},m2Planilla!=null?m2Planilla:"—")),
                     ),
                     (pl?.idAgua||pl?.idEnel)&&h("div",{style:{display:"flex",gap:6,fontSize:10,marginBottom:6,flexWrap:"wrap"}},
                       pl.idAgua&&h("span",{style:{color:"#38BDF8",background:"rgba(56,189,248,.1)",padding:"2px 7px",borderRadius:6}},"💧 AA "+pl.idAgua),
                       pl.idEnel&&h("span",{style:{color:"#34D399",background:"rgba(52,211,153,.1)",padding:"2px 7px",borderRadius:6}},"⚡ Enel "+pl.idEnel),
                     ),
-                    hayDiscrepancia&&h("div",{style:{fontSize:10,color:"var(--red)",fontWeight:600,marginTop:4}},"⚠ Diferencia de "+Math.abs(u.m2-m2Planilla).toFixed(2)+" m² vs. la Planilla"),
+                    hayDiscrepancia&&h("div",{style:{fontSize:10,color:"var(--red)",fontWeight:600,marginTop:4}},"⚠ Diferencia de "+Math.abs(uM2-m2Planilla).toFixed(2)+" m² vs. la Planilla"),
                     u.nota&&h("div",{style:{fontSize:10,color:"var(--txd)",marginTop:6,fontStyle:"italic",borderTop:"1px solid var(--bdr)",paddingTop:6}},u.nota)
                   );
                 })
@@ -5143,7 +5216,7 @@ function ElCortijoView({dashData,driveLoading,notify}){
                       :activeUnidades.map(u=>{
                       const pl=matchPlanilla(u.edif);
                       const vac=pl?.isVacante;
-                      const disc=u.m2!=null&&pl?.m2!=null&&Math.abs(u.m2-pl.m2)>1;
+                      const disc=fichaM2(u)!=null&&pl?.m2!=null&&Math.abs(fichaM2(u)-pl.m2)>1;
                       const activo=zoomUnidad===u.edif;
                       return h("div",{
                         key:u.edif,
@@ -5216,10 +5289,21 @@ function ElCortijoView({dashData,driveLoading,notify}){
                     h("div",null,"% Arriendo: ",h("b",{style:{color:"var(--tx)"}},fmtPct(zoomPl.pctAdm)))
                   );
                 })(),
-                h("div",{style:{display:"flex",flexDirection:"column",gap:6,fontSize:12,color:"var(--txm)",borderTop:"1px solid var(--bdr)",paddingTop:10}},
-                  h("div",null,"m² ficha: ",h("b",{style:{color:"var(--tx)"}},zoomData.m2!=null?zoomData.m2:"—")),
-                  h("div",null,"m² planilla: ",h("b",{style:{color:discZ?"var(--red)":"var(--tx)"}},m2PlanillaZ!=null?m2PlanillaZ:"—")),
-                  discZ&&h("div",{style:{color:"var(--red)",fontWeight:600}},"⚠ Diferencia de "+Math.abs(zoomData.m2-m2PlanillaZ).toFixed(2)+" m²")
+                h("div",{style:{display:"flex",flexDirection:"column",gap:8,borderTop:"1px solid var(--bdr)",paddingTop:10}},
+                  zoomData.oficN1!=null
+                    ?h(TablaSuperficie,{title:"📋 FICHA — Cuadro Superficies",accent:"var(--blue)",colLabels:["N1","N2"],rows:[
+                        {label:"Oficina",v1:zoomData.oficN1,v2:zoomData.oficN2,total:(zoomData.oficN1||0)+(zoomData.oficN2||0)},
+                        {label:"Bodega",v1:zoomData.bodN1,v2:zoomData.bodN2,total:(zoomData.bodN1||0)+(zoomData.bodN2||0)},
+                      ],total:zoomDataM2})
+                    :h("div",{style:{fontSize:12,color:"var(--txm)"}},"m² ficha: ",h("b",{style:{color:"var(--tx)"}},zoomDataM2!=null?zoomDataM2:"—")),
+                  (zoomPl&&(zoomPl.oficP1!=null||zoomPl.bodP1!=null||zoomPl.locP1!=null))
+                    ?h(TablaSuperficie,{title:"🗂 PLANILLA — Superficie Validada",accent:"var(--green)",colLabels:["Piso 1","Piso 2"],rows:[
+                        {label:"Locales",v1:zoomPl.locP1,v2:zoomPl.locP2,total:(zoomPl.locP1||0)+(zoomPl.locP2||0)},
+                        {label:"Oficina",v1:zoomPl.oficP1,v2:zoomPl.oficP2,total:(zoomPl.oficP1||0)+(zoomPl.oficP2||0)},
+                        {label:"Bodega",v1:zoomPl.bodP1,v2:zoomPl.bodP2,total:(zoomPl.bodP1||0)+(zoomPl.bodP2||0)},
+                      ],totalLabel:"TOTAL m² CONSTRUIDOS",total:zoomPl.totalConstruido})
+                    :h("div",{style:{fontSize:12,color:"var(--txm)"}},"m² planilla: ",h("b",{style:{color:discZ?"var(--red)":"var(--tx)"}},m2PlanillaZ!=null?m2PlanillaZ:"—")),
+                  discZ&&h("div",{style:{fontSize:11,color:"var(--red)",fontWeight:600}},"⚠ Diferencia de "+Math.abs(zoomDataM2-m2PlanillaZ).toFixed(2)+" m² (ficha vs. m² totales Planilla)")
                 ),
                 (zoomPl?.idAgua||zoomPl?.idEnel)&&h("div",{style:{display:"flex",gap:6,flexWrap:"wrap"}},
                   zoomPl.idAgua&&h("span",{style:{fontSize:10,color:"#38BDF8",background:"rgba(56,189,248,.1)",padding:"3px 8px",borderRadius:6}},"💧 AA "+zoomPl.idAgua),
