@@ -4133,16 +4133,102 @@ async function fetchPlanoUnidad(sitio,edificio,notify){
     return null;
   }
 }
+/* ── Tabla de tarifas de arriendo (UF/m² mensual) — foto "Tabla Tarifas
+   para Arriendos" (Desktop/Patagonica/El Cortijo_Planos y Fichas, sep-2026),
+   usada para sugerir un valor de arriendo en la cotización de un sitio
+   VACANTE cuando se cuenta con el desglose estructurado de m² de la ficha
+   (oficN1/oficN2/bodN1/bodN2 — Cuadro Superficies), no solo el m² total.
+   Si el sitio no tiene ese desglose, o su m² cae fuera de los rangos
+   fotografiados, no se calcula nada y se sigue usando el último arriendo
+   facturado (comportamiento previo) como respaldo. */
+const TARIFA_BODEGA=[{max:1000,rate:.22},{min:1000,max:2500,rate:.20},{min:2500,rate:.16}];
+const TARIFA_OFICINA_CORTIJO=[{max:100,rate:.30},{min:100,max:500,rate:.25},{min:500,rate:.21}];
+const TARIFA_OFICINA_2DO_PISO=.22; /* fila "Segundo Piso" — flat, reemplaza el rango por tamaño */
+const TARIFA_OFICINA_TORRE=[{max:50,rate:.45},{min:50,max:100,rate:.40},{min:100,max:150,rate:.35},{min:150,max:300,rate:.30}];
+const TARIFA_LOCAL=[{min:100,max:150,rate:.75},{min:150,max:300,rate:.65},{min:300,max:500,rate:.60},{min:1000,rate:.25},{min:3000,rate:.20}];
+function tarifaBracket(brackets,m2){
+  const b=brackets.find(b=>m2>=(b.min||0)&&(b.max==null||m2<b.max));
+  return b?b.rate:null;
+}
+/* Sector de la tabla según el prefijo del edificio — mismo criterio que ya
+   usan CORTIJO_SECTOR_SITIO/TORRE2680_FICHAS: "T. Of./T. Piso" = Oficinas
+   Torre, "P.C.L" = Locales Comerciales, "Edif." = Bodegas con Oficinas. */
+function sectorTarifario(edificio){
+  const s=edificio||"";
+  if(/^T\.?\s*(Of|Piso)/i.test(s))return"torre";
+  if(/^P\.?\s*C\.?\s*L/i.test(s))return"locales";
+  if(/^Edif\.?/i.test(s))return"bodegasOficinas";
+  return null;
+}
+/* Busca la ficha estructurada (Cuadro Superficies) de un edificio de la
+   Planilla en El Cortijo o Torre 2680 — mismo match por nombre exacto de
+   edificio que usan ElCortijoView/Torre2680View. */
+function matchFichaComplejo(edificio){
+  if(!edificio)return null;
+  for(const arr of Object.values(CORTIJO_TODAS)){
+    const u=arr.find(u=>u.edif===edificio);
+    if(u)return u;
+  }
+  for(const arr of Object.values(TORRE2680_FICHAS)){
+    const u=arr.find(u=>u.edif===edificio);
+    if(u)return u;
+  }
+  return null;
+}
+/* Arriendo sugerido (UF) según la tabla de tarifas, a partir del desglose
+   de m² de la ficha — null si no aplica (sin ficha, sin desglose
+   oficina/bodega real, o m² fuera de los rangos de la tabla). */
+function calcularArriendoTarifa(edificio){
+  const sector=sectorTarifario(edificio);
+  const ficha=matchFichaComplejo(edificio);
+  if(!sector||!ficha)return null;
+  const detalle=[];
+  let total=0;
+  if(sector==="torre"){
+    const ofic=(ficha.oficN1||0)+(ficha.oficN2||0);
+    if(!ofic)return null;
+    const r=tarifaBracket(TARIFA_OFICINA_TORRE,ofic);
+    if(r==null)return null;
+    total=ofic*r;detalle.push({tipo:"Oficina",m2:ofic,rate:r});
+  }else if(sector==="locales"){
+    const m2=ficha.m2!=null?ficha.m2:null;
+    if(!m2)return null;
+    const r=tarifaBracket(TARIFA_LOCAL,m2);
+    if(r==null)return null;
+    total=m2*r;detalle.push({tipo:"Local comercial",m2,rate:r});
+  }else if(sector==="bodegasOficinas"){
+    if(ficha.oficN1==null)return null; /* solo m2 plano, sin desglose real — no aplica */
+    const oficP1=ficha.oficN1||0,oficP2=ficha.oficN2||0,bodTotal=(ficha.bodN1||0)+(ficha.bodN2||0);
+    if(oficP1>0){
+      const r=tarifaBracket(TARIFA_OFICINA_CORTIJO,oficP1+oficP2);
+      if(r!=null){total+=oficP1*r;detalle.push({tipo:"Oficina 1er piso",m2:oficP1,rate:r});}
+    }
+    if(oficP2>0){total+=oficP2*TARIFA_OFICINA_2DO_PISO;detalle.push({tipo:"Oficina 2do piso",m2:oficP2,rate:TARIFA_OFICINA_2DO_PISO});}
+    if(bodTotal>0){
+      const r=tarifaBracket(TARIFA_BODEGA,bodTotal);
+      if(r!=null){total+=bodTotal*r;detalle.push({tipo:"Bodega",m2:bodTotal,rate:r});}
+    }
+    if(!detalle.length)return null;
+  }
+  return{uf:Math.round(total*100)/100,detalle};
+}
 function datosSitioParaCotizacion(v){
   const{tipo,numeracion}=inferTipoNumeracion(v.sitio,v.edificio);
   const fmtUFn=n=>n.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2});
-  const arriendoUF=v.arriendoActual!=null?Math.round(v.arriendoActual*100)/100:0;
+  /* Sitios vacantes: si hay ficha con desglose completo de m², se prioriza
+     el valor calculado con la tabla de tarifas (precio de lista para
+     ofrecer) por sobre el último arriendo histórico facturado. Sitios
+     ocupados siguen usando el arriendo real vigente, sin cambios. */
+  const tarifaTabla=v.isVacante?calcularArriendoTarifa(v.edificio):null;
+  const arriendoUF=tarifaTabla?tarifaTabla.uf:(v.arriendoActual!=null?Math.round(v.arriendoActual*100)/100:0);
+  const esTarifaReferencial=!!tarifaTabla;
   const pctAdmTxt=(v.pctAdm!=null)?(v.pctAdm>0&&v.pctAdm<1?(v.pctAdm*100).toFixed(0)+"%":fmtUFn(v.pctAdm)+" UF"):"—";
   const servAdmUF=(v.pctAdm!=null&&v.pctAdm>0&&v.pctAdm<1&&arriendoUF)?Math.round(arriendoUF*v.pctAdm*100)/100:(v.pctAdm>=1?v.pctAdm:0);
   return{
     sitio:v.sitio||"—",tipo,numeracion,edificio:v.edificio||"",
     m2:v.m2!=null?v.m2.toLocaleString("es-CL",{minimumFractionDigits:1,maximumFractionDigits:1}):"—",
     arriendoUF,arriendoTxt:arriendoUF?fmtUFn(arriendoUF):"—",
+    esTarifaReferencial,
     servAdmTxt:pctAdmTxt,servAdmUF,
     garantiaTxt:arriendoUF?fmtUFn(arriendoUF)+" UF. Un mes de arriendo.":"—",
     plazoTxt:"3 años renovable.",
@@ -4184,6 +4270,7 @@ function generarCotizacionADocx(v){
     "1. La presente cotización tiene validez de 7 días y no representa compromiso de arriendo.",
     "2. El inmueble se entrega en las condiciones actuales y el arrendatario deberá presentar proyecto de arquitectura y diseño para aprobación. Cualquier modificación queda sujeta al acuerdo entre las partes.",
     "3. El servicio de administración incluye: administración, seguridad perimetral, mantención y conservación de áreas comunes, incluyendo calles, veredas, jardines y estacionamientos, servicios básicos de áreas comunes, impuestos territoriales y en general cualquier gasto común asociado al Centro El Cortijo.",
+    ...(d.esTarifaReferencial?["4. El valor de arriendo indicado es referencial, calculado según la tabla de tarifas vigente para este tipo de espacio y superficie; queda sujeto a evaluación y confirmación final."]:[]),
   ];
   const cajaNotas=wTable([
     wRow([wCell(notas.map(n=>wPara(n,{sz:7})),{width:8800,margins:70})]),
@@ -4283,6 +4370,7 @@ function generarCotizacionBDocx(v){
       wPara("Plazo: "+d.plazoTxt,{sz:8}),
       wPara("Reajuste de arriendo: "+d.reajusteTxt,{sz:8}),
       wPara("Valores más IVA. El servicio de administración incluye seguridad perimetral, mantención de áreas comunes, servicios básicos comunes e impuestos territoriales del Centro El Cortijo.",{sz:7,color:"666666"}),
+      ...(d.esTarifaReferencial?[wPara("Arriendo referencial según tabla de tarifas vigente para este tipo de espacio y superficie; sujeto a evaluación y confirmación final.",{sz:7,color:"666666"})]:[]),
     ],{width:8800,shd:"FFFBEB",margins:80}),
   ])],[8800],{noBorders:true});
   const footer=wTable([wRow([
@@ -4323,7 +4411,9 @@ async function generarCotizacionesSitio(v,notify){
         planoOk=true;
       }
     }catch(e){/* plano no encontrado — no bloquea la descarga de las cotizaciones */}
-    if(notify)notify(planoOk?"✓ Cotización A, B y plano descargados":"✓ Cotización A y B descargadas — no se encontró el plano en Drive","ok");
+    const tarifaRef=datosSitioParaCotizacion(v).esTarifaReferencial;
+    const sufijoTarifa=tarifaRef?" — arriendo calculado según tabla de tarifas":"";
+    if(notify)notify((planoOk?"✓ Cotización A, B y plano descargados":"✓ Cotización A y B descargadas — no se encontró el plano en Drive")+sufijoTarifa,"ok");
   }catch(e){
     console.error(e);
     if(notify)notify("Error generando cotización: "+e.message,"err");
