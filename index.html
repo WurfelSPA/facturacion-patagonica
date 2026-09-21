@@ -1011,8 +1011,13 @@ async function procesarPlanillaFacturacion(file,periodo){
     const _nfArr=row[colGS+1];const nroFactArr=(typeof _nfArr==="number"&&_nfArr>0)?String(Math.round(_nfArr)):(typeof _nfArr==="string"&&_nfArr.trim())?_nfArr.trim():null;
     const _nfGC=colGT>0?row[colGT+1]:null;const nroFactGC=(typeof _nfGC==="number"&&_nfGC>0)?String(Math.round(_nfGC)):(typeof _nfGC==="string"&&_nfGC.trim())?_nfGC.trim():null;
     const m2Billing=row[42]!=null&&row[42]!==""?Number(row[42]):null; /* Col AQ: m² */
+    /* Sitio B: Col F trae "SÁNCHEZ" (sociedad que factura el Arriendo de ese edificio),
+       pero los Servicios Administrativos de esos mismos clientes los factura PISA.
+       Mismo caso especial que getEstado() (sitio==="B"&&concepto==="Arriendo"→"sanchez"),
+       replicado acá para que Estado de Pagos (filtro sociedad==="PISA") no descarte su GC. */
+    const sociedadServAdm=(sito==="B")?"PISA":sociedad;
     if(ufGS!=null&&ufGS>0)clientes.push({sitio:sito,edificio:edif,cliente:sName,sociedad,afecto,tipo:"arriendo",uf:Math.round(ufGS*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado:yaPagadoArr,sheetRow,sentColLetter,pagadoColLetter:pagadoArrColLetter,nroFactArrColLetter,nroFactGCColLetter,nroFactArr,nroFactGC,m2:m2Billing});
-    if(ufGT!=null&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,edificio:edif,cliente:sName,sociedad,afecto,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado:yaPagadoGC,sheetRow,sentColLetter,pagadoColLetter:pagadoGCColLetter,nroFactArrColLetter,nroFactGCColLetter,nroFactArr,nroFactGC,m2:m2Billing});
+    if(ufGT!=null&&ufGT>0&&ufGT<=999999)clientes.push({sitio:sito,edificio:edif,cliente:sName,sociedad:sociedadServAdm,afecto,tipo:"serv_adm",uf:Math.round(ufGT*10000)/10000,email:emailBilling,rut:rutBilling,yaEnviado,yaPagado:yaPagadoGC,sheetRow,sentColLetter,pagadoColLetter:pagadoGCColLetter,nroFactArrColLetter,nroFactGCColLetter,nroFactArr,nroFactGC,m2:m2Billing});
   }
   return clientes;
 }
