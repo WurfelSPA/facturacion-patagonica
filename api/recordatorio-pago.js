@@ -127,6 +127,7 @@ function parseFacturasPorCobrarBase(values) {
   const hdr = values[0].map(h => String(h || '').toLowerCase().replace(/[\r\n\s_]/g, ''));
   function fi(tests) { for (let i = 0; i < hdr.length; i++) for (const t of tests) if (hdr[i].includes(t)) return i; return -1; }
   const iFecha = fi(['fecha']) >= 0 ? fi(['fecha']) : 1;
+  const iTipo = fi(['tipo']) >= 0 ? fi(['tipo']) : 2;
   const iCod = fi(['cod']) >= 0 ? fi(['cod']) : 3;
   const iCliente = fi(['cliente']) >= 0 ? fi(['cliente']) : 4;
   const iFolio = fi(['folio']) >= 0 ? fi(['folio']) : 8;
@@ -136,7 +137,7 @@ function parseFacturasPorCobrarBase(values) {
   return values.slice(1)
     .filter(r => r.length > 4 && String(r[iCliente] || '').trim() !== '' && String(r[iCliente] || '').trim() !== 'Cliente')
     .map(r => ({
-      fecha: fmtFechaCobrar(r[iFecha]), folio: String(r[iFolio] || '').trim(),
+      fecha: fmtFechaCobrar(r[iFecha]), tipo: String(r[iTipo] || '').trim(), folio: String(r[iFolio] || '').trim(),
       rut: String(r[iCod] || '').trim(), cliente: String(r[iCliente] || '').trim(),
       monto: n(r[iMonto]), sdoVencido: n(r[iSdo]),
     }))
@@ -163,7 +164,10 @@ async function obtenerDeudaPorCliente(saToken) {
     if (!key) continue;
     if (!porRut[key]) porRut[key] = { total: 0, nombre: r.cliente, facturas: [] };
     porRut[key].total += r.monto;
-    if (r.monto > 0) porRut[key].facturas.push({ fecha: r.fecha, folio: r.folio, monto: r.monto });
+    /* Solo documentos reales (tipo "Fact_Bol") van al detalle del correo — "Movto"
+       son traspasos contables (Cierre/Apertura de año) que se anulan entre sí y no
+       son deuda real, aunque sí deben sumarse al total (igual que en FactxCobrarView). */
+    if (r.tipo === 'Fact_Bol' && r.monto > 0) porRut[key].facturas.push({ fecha: r.fecha, folio: r.folio, monto: r.monto });
   }
   for (const key of Object.keys(porRut)) {
     porRut[key].facturas.sort((a, b) => a.fecha.split('-').reverse().join('').localeCompare(b.fecha.split('-').reverse().join('')));
