@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updatedAt": "2026-09-23T11:45:11.256Z",
+  "updatedAt": "2026-09-23T11:46:01.553Z",
   "source": "n8n",
   "accounts": {
     "672977-0": {
@@ -213,9 +213,8 @@
       "nombre": null
     },
     "1534325-7": {
-      "deuda": "$0",
-      "vencimiento": null,
-      "nombre": null
+      "deuda": null,
+      "error": "Timeout of 15,000ms reached waiting for page navigation (requestId: 59278390-0729-4564-b276-1fb97197ccf0)"
     },
     "1534326-5": {
       "deuda": "$0",
