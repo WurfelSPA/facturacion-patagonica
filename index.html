@@ -4732,6 +4732,14 @@ const PISO_HOTSPOTS={
   ],
 };
 function pisoImg(p){return p===1?"/torre2680-nivel1.png":"/torre2680-piso"+p+".png";}
+/* Abre una pestaña nueva con solo la imagen y dispara la impresión apenas
+   termina de cargar (evita imprimir la app completa con window.print()). */
+function imprimirImagen(url,titulo){
+  const w=window.open("","_blank");
+  if(!w)return;
+  w.document.write(`<!DOCTYPE html><html><head><title>${titulo}</title><style>body{margin:0;display:flex;align-items:center;justify-content:center}img{max-width:100%;height:auto}</style></head><body><img src="${url}" onload="window.print()"></body></html>`);
+  w.document.close();
+}
 function pisoLabel(p){return p===1?"Nivel 1":"Piso "+p;}
 function unidadLabel(p,num){return p===1?"Local "+num.replace(/^L/,""):"Oficina "+num;}
 function Torre2680View({dashData,driveLoading,notify}){
@@ -5466,6 +5474,7 @@ function ElCortijoView({dashData,driveLoading,notify}){
 ══════════════════════════════════════════════════════════ */
 function CuentasServiciosView({dashData,driveLoading,notify}){
   const [search,setSearch]=useState("");
+  const [mapaAAOpen,setMapaAAOpen]=useState(false);
   const [aaData,setAaData]=useState({});
   const [editingAA,setEditingAA]=useState(null); /* idAgua actualmente en edición */
   const [editVal,setEditVal]=useState("");
@@ -5744,7 +5753,7 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
         h("button",{onClick:actualizarEnel,disabled:enelRefreshing,title:"La sesi\u00F3n de Enel debe estar iniciada",style:{fontSize:10,padding:"2px 8px",borderRadius:6,border:"1px solid "+ENEL_GRN,background:"transparent",color:ENEL_GRN,cursor:enelRefreshing?"wait":"pointer",opacity:enelRefreshing?0.6:1,display:"flex",alignItems:"center",gap:4}},enelRefreshing?h("span",{className:"spin"},"\u27F3"):"\u27F3","Actualizar")
       ),
       h("div",{style:{display:"flex",alignItems:"center",gap:8}},
-        h("button",{onClick:()=>window.open("/cortijo-aa.png","_blank"),title:"Abrir mapa de ubicaciones de medidores de Aguas Andinas",style:{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,border:"1px solid "+AA_BLUE,background:"transparent",color:AA_BLUE,fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}},"💧 Ubicaciones AA"),
+        h("button",{onClick:()=>setMapaAAOpen(true),title:"Abrir mapa de ubicaciones de medidores de Aguas Andinas",style:{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,border:"1px solid "+AA_BLUE,background:"transparent",color:AA_BLUE,fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}},"💧 Ubicaciones AA"),
         h("div",{style:{display:"flex",flexDirection:"column",gap:2,alignItems:"flex-end",marginRight:4}},
           h("span",{style:{fontSize:9,color:AA_BLUE,whiteSpace:"nowrap",fontWeight:500},title:"Deuda AA: actualizada automáticamente cada día a las 6:00 AM"},
             "💧 AA — "+(aaUpdatedAt?"act. "+new Date(aaUpdatedAt).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"}):"sin datos")
@@ -5923,6 +5932,19 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
                 })()
               )
             )
+    ),
+    /* Modal: mapa de ubicaciones AA (descargar/imprimir) */
+    mapaAAOpen&&h("div",{onClick:e=>{if(e.target===e.currentTarget)setMapaAAOpen(false);},
+      style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:9998,display:"flex",flexDirection:"column",padding:20}},
+      h("div",{style:{display:"flex",alignItems:"center",gap:10,padding:"10px 4px",flexShrink:0}},
+        h("span",{style:{color:"#fff",fontSize:13,fontWeight:600,flex:1}},"💧 Ubicaciones AA"),
+        h("a",{href:"/cortijo-aa.png",download:"Ubicaciones-AA.png",style:{background:"var(--acc)",color:"#fff",textDecoration:"none",borderRadius:6,padding:"5px 12px",fontSize:12,fontWeight:600,display:"flex",alignItems:"center",gap:5}},"⬇ Descargar"),
+        h("button",{onClick:()=>imprimirImagen("/cortijo-aa.png","Ubicaciones AA"),style:{background:"rgba(255,255,255,.15)",border:"none",color:"#fff",borderRadius:6,padding:"5px 12px",cursor:"pointer",fontSize:12,fontWeight:600,display:"flex",alignItems:"center",gap:5}},"🖨️ Imprimir"),
+        h("button",{onClick:()=>setMapaAAOpen(false),style:{background:"rgba(255,255,255,.15)",border:"none",color:"#fff",borderRadius:6,padding:"5px 12px",cursor:"pointer",fontSize:12}},"✕ Cerrar")
+      ),
+      h("div",{style:{flex:1,overflow:"auto",display:"flex",alignItems:"center",justifyContent:"center"}},
+        h("img",{src:"/cortijo-aa.png",style:{maxWidth:"100%",maxHeight:"100%",background:"#fff",borderRadius:4}})
+      )
     ),
     /* Modal progreso: ver boleta AA */
     boletaLoadingId&&h("div",{style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}},
