@@ -1,5 +1,6 @@
 const N8N_WEBHOOK_URL_AA = 'https://wurfel.app.n8n.cloud/webhook/aa-import-session-v2';
 const N8N_WEBHOOK_URL_ENEL = 'https://wurfel.app.n8n.cloud/webhook/enel-import-session';
+const N8N_WEBHOOK_URL_AA_BOLETA = 'https://wurfel.app.n8n.cloud/webhook/aa-ver-boleta';
 
 // Endpoint temporal en Vercel: usa las mismas cookies para leer "Mis Consumos"
 // directamente vía Browserless, sin depender del flujo de n8n.
@@ -30,7 +31,7 @@ function toPuppeteerCookie(c) {
   return out;
 }
 
-async function exportarSesion({ dominioFiltro, criticas, webhookUrl, urlParaCriticas, extraWebhookUrl }) {
+async function obtenerCookies({ dominioFiltro, criticas, urlParaCriticas }) {
   // getAll({}) trae la mayoría, pero por una rareza de la API de Chrome a veces
   // omite algunas cookies críticas aunque SÍ existen (confirmado con
   // chrome.cookies.get() por nombre exacto). Se combinan ambos resultados.
@@ -43,11 +44,16 @@ async function exportarSesion({ dominioFiltro, criticas, webhookUrl, urlParaCrit
     if (c) cookies.push(c);
   }
 
-  if (!cookies.length) {
+  if (!cookies.length) return null;
+  return cookies.map(toPuppeteerCookie);
+}
+
+async function exportarSesion({ dominioFiltro, criticas, webhookUrl, urlParaCriticas, extraWebhookUrl }) {
+  const puppeteerCookies = await obtenerCookies({ dominioFiltro, criticas, urlParaCriticas });
+  if (!puppeteerCookies) {
     return { ok: false, error: `No se encontraron cookies. ¿Estás logueado en ${dominioFiltro}?` };
   }
-
-  const puppeteerCookies = cookies.map(toPuppeteerCookie);
+  const cookies = puppeteerCookies;
 
   // Se esperan AMBAS peticiones (Promise.allSettled) antes de responder al
   // popup: si el service worker se apaga tras la primera en resolver, la otra
@@ -102,6 +108,37 @@ function exportarSesionEnel() {
   });
 }
 
+// A diferencia de exportarSesionAA (fire-and-forget: solo confirma que las
+// cookies llegaron), acá SÍ se espera la respuesta completa del workflow de
+// n8n: éste hace el scraping de esa cuenta puntual en Browserless y devuelve
+// {ok, boletaUrl, deuda, nombre} recién cuando termina (puede tardar
+// bastante, ver comentario de VERCEL_ENEL_IMPORT_URL más arriba sobre por
+// qué el service worker no debe apagarse a mitad de camino).
+async function verBoletaAA(idAgua) {
+  const cookies = await obtenerCookies({
+    dominioFiltro: 'aguasandinas',
+    criticas: ['JSESSIONID', 'reese84'],
+    urlParaCriticas: 'https://www.aguasandinas.cl/'
+  });
+  if (!cookies) {
+    return { ok: false, error: '¿Estás logueado en aguasandinas.cl? No se encontraron cookies.' };
+  }
+  try {
+    const resp = await fetch(N8N_WEBHOOK_URL_AA_BOLETA, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cookies, idAgua })
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      return { ok: false, error: data.error || ('n8n respondió con error ' + resp.status) };
+    }
+    return data;
+  } catch (e) {
+    return { ok: false, error: 'No se pudo conectar a n8n: ' + e.message };
+  }
+}
+
 function manejarMensaje(msg, sender, sendResponse) {
   if (msg && msg.action === 'exportarSesionAA') {
     exportarSesionAA().then(sendResponse).catch(e => sendResponse({ ok: false, error: e.message }));
@@ -109,6 +146,10 @@ function manejarMensaje(msg, sender, sendResponse) {
   }
   if (msg && msg.action === 'exportarSesionEnel') {
     exportarSesionEnel().then(sendResponse).catch(e => sendResponse({ ok: false, error: e.message }));
+    return true; // respuesta async
+  }
+  if (msg && msg.action === 'verBoletaAA') {
+    verBoletaAA(msg.idAgua).then(sendResponse).catch(e => sendResponse({ ok: false, error: e.message }));
     return true; // respuesta async
   }
 }

@@ -5528,6 +5528,26 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
     }catch(e){notify?.("Error al actualizar Enel: "+e.message,"err");}
     setEnelRefreshing(false);
   },[enelRefreshing,notify]);
+  const [boletaLoadingId,setBoletaLoadingId]=useState(null);
+  const verBoletaAA=useCallback(async(idAgua)=>{
+    if(boletaLoadingId)return;
+    setBoletaLoadingId(idAgua);
+    try{
+      if(!window.chrome||!chrome.runtime||!chrome.runtime.sendMessage){
+        throw new Error("Instala la extensión de Chrome AA Session Exporter y ten la sesión de aguasandinas.cl iniciada");
+      }
+      notify?.("⟳ Buscando boleta de "+idAgua+"... puede tardar hasta 1 minuto","ok");
+      const resp=await new Promise((resolve,reject)=>{
+        chrome.runtime.sendMessage(AA_EXTENSION_ID,{action:"verBoletaAA",idAgua},(r)=>{
+          if(chrome.runtime.lastError)reject(new Error(chrome.runtime.lastError.message));
+          else resolve(r);
+        });
+      });
+      if(!resp||!resp.ok||!resp.boletaUrl)throw new Error((resp&&resp.error)||"No se encontró boleta disponible");
+      window.open(resp.boletaUrl,"_blank");
+    }catch(e){notify?.("Error al buscar boleta AA: "+e.message,"err");}
+    setBoletaLoadingId(null);
+  },[boletaLoadingId,notify]);
   const [sortDir,setSortDir]=useState('asc');
 
   /* Fetch automático del caché de deudas AA (actualizado diariamente a las 6am) */
@@ -5817,7 +5837,14 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
                         :c.nombre
                     ),
                     h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",maxWidth:220}},c.dir||"\u2014"),
-                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:c.idAgua?AA_BLUE:"var(--bdr)",borderLeft:`2px solid ${AA_BLUE}25`,background:c.idAgua?`${AA_BLUE}06`:"transparent"}},c.idAgua||"\u2014"),
+                    h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,borderLeft:`2px solid ${AA_BLUE}25`,background:c.idAgua?`${AA_BLUE}06`:"transparent"}},
+                      c.idAgua
+                        ?h("button",{onClick:()=>verBoletaAA(c.idAgua),disabled:boletaLoadingId===c.idAgua,
+                            title:"Ver \u00faltima boleta (requiere sesi\u00f3n de aguasandinas.cl abierta)",
+                            style:{background:"none",border:"none",padding:0,cursor:boletaLoadingId===c.idAgua?"wait":"pointer",color:AA_BLUE,fontFamily:"inherit",fontSize:"inherit",textDecoration:"underline",textUnderlineOffset:2}},
+                            boletaLoadingId===c.idAgua?"\u00b7\u00b7\u00b7":c.idAgua)
+                        :h("span",{style:{color:"var(--bdr)"}},"\u2014")
+                    ),
                     h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:c.medAgua?AA_BLUE:"var(--bdr)",background:c.medAgua?`${AA_BLUE}06`:"transparent"}},c.medAgua||"\u2014"),
                     h("td",{style:{padding:"9px 12px",fontSize:10,fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap",background:c.idAgua?`${AA_BLUE}06`:"transparent"}},
                       !c.idAgua
