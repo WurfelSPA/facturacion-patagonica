@@ -6,7 +6,7 @@
 :: Ejecutar cuando aa-scraper.js avise que la sesion expiro.
 :: --------------------------------------------------------------------
 
-cd /d C:\Users\amelendez\Documents\GitHub\facturacion-patagonica
+cd /d "C:\Users\ALEX MELENDEZ\Documents\GitHub\facturacion-patagonica"
 
 node scripts/aa-login-manual.mjs
 

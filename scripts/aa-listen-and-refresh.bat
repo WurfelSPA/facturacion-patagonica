@@ -7,7 +7,7 @@
 :: Se encarga solo del resto: guarda sesion, corre el scraper, sube cambios.
 :: --------------------------------------------------------------------
 
-cd /d C:\Users\amelendez\Documents\GitHub\facturacion-patagonica
+cd /d "C:\Users\ALEX MELENDEZ\Documents\GitHub\facturacion-patagonica"
 
 node scripts/aa-listen-and-refresh.mjs
 

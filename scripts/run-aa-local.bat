@@ -5,7 +5,11 @@
 :: Configurar en Task Scheduler para correr diariamente a las 6:00 AM.
 :: --------------------------------------------------------------------
 
-cd /d C:\Users\amelendez\Documents\GitHub\facturacion-patagonica
+cd /d "C:\Users\ALEX MELENDEZ\Documents\GitHub\facturacion-patagonica"
+
+:: git no esta en el PATH del sistema en este equipo -- se usa el git
+:: embebido en GitHub Desktop.
+set GIT="C:\Users\ALEX MELENDEZ\AppData\Local\GitHubDesktop\app-3.6.5\resources\app\git\cmd\git.exe"
 
 :: Ya no requiere credenciales: reutiliza la sesion guardada en
 :: scripts\aa-session.json (generada por aa-login-manual.bat). Si el
@@ -16,9 +20,9 @@ node scripts/aa-scraper.js
 
 if %errorlevel% equ 0 (
     echo [OK] Scraper completado. Haciendo push...
-    git add aa-cache.json
-    git diff --staged --quiet && echo [OK] Sin cambios || git commit -m "chore: actualizar cache AA %date%"
-    git push
+    %GIT% add aa-cache.json
+    %GIT% diff --staged --quiet && echo [OK] Sin cambios || %GIT% commit -m "chore: actualizar cache AA %date%"
+    %GIT% push
     echo [OK] Push completado.
 ) else (
     echo [ERROR] El scraper fallo. Revisar logs.
