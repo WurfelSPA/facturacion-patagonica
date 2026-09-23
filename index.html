@@ -5932,6 +5932,9 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
         h("div",{style:{marginTop:14,height:4,borderRadius:2,background:"var(--surf2)",overflow:"hidden"}},
           h("div",{style:{height:"100%",width:Math.min(100,boletaElapsed/60*100)+"%",background:`linear-gradient(90deg,${AA_BLUE},var(--acc2))`,transition:"width 1s linear"}})
         ),
+        h("div",{style:{marginTop:14,padding:"9px 12px",borderRadius:9,background:"var(--abg)",border:"1px solid var(--adim)",color:"var(--amber)",fontSize:11,textAlign:"left",lineHeight:1.4}},
+          "⚠ Requiere tener la sesión de ",h("b",null,"aguasandinas.cl"),' iniciada en una pestaña de este navegador. Si falla, abrí una pestaña, iniciá sesión y volvé a intentar.'
+        ),
         h("button",{onClick:()=>setBoletaLoadingId(null),style:{marginTop:16,background:"none",border:"none",color:"var(--txm)",fontSize:11,cursor:"pointer",textDecoration:"underline"}},"Cancelar")
       )
     )
