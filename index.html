@@ -5529,6 +5529,13 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
     setEnelRefreshing(false);
   },[enelRefreshing,notify]);
   const [boletaLoadingId,setBoletaLoadingId]=useState(null);
+  const [boletaElapsed,setBoletaElapsed]=useState(0);
+  React.useEffect(()=>{
+    if(!boletaLoadingId)return;
+    setBoletaElapsed(0);
+    const t=setInterval(()=>setBoletaElapsed(s=>s+1),1000);
+    return ()=>clearInterval(t);
+  },[boletaLoadingId]);
   const verBoletaAA=useCallback(async(idAgua)=>{
     if(boletaLoadingId)return;
     setBoletaLoadingId(idAgua);
@@ -5536,7 +5543,6 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
       if(!window.chrome||!chrome.runtime||!chrome.runtime.sendMessage){
         throw new Error("Instala la extensión de Chrome AA Session Exporter y ten la sesión de aguasandinas.cl iniciada");
       }
-      notify?.("⟳ Buscando boleta de "+idAgua+"... puede tardar hasta 1 minuto","ok");
       const resp=await new Promise((resolve,reject)=>{
         chrome.runtime.sendMessage(AA_EXTENSION_ID,{action:"verBoletaAA",idAgua},(r)=>{
           if(chrome.runtime.lastError)reject(new Error(chrome.runtime.lastError.message));
@@ -5916,6 +5922,18 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
                 })()
               )
             )
+    ),
+    /* Modal progreso: ver boleta AA */
+    boletaLoadingId&&h("div",{style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}},
+      h("div",{style:{background:"var(--surf)",borderRadius:16,boxShadow:"0 8px 40px rgba(0,0,0,0.25)",maxWidth:340,width:"100%",padding:"28px 30px",textAlign:"center"}},
+        h("span",{className:"fv2-loader",style:{width:30,height:30,fontSize:30,marginBottom:14}}),
+        h("div",{style:{fontSize:13,fontWeight:700,color:"var(--tx)",marginBottom:6}},"Buscando boleta de "+boletaLoadingId),
+        h("div",{style:{fontSize:11,color:"var(--txm)"}},"Puede tardar hasta 1 minuto — "+boletaElapsed+"s"),
+        h("div",{style:{marginTop:14,height:4,borderRadius:2,background:"var(--surf2)",overflow:"hidden"}},
+          h("div",{style:{height:"100%",width:Math.min(100,boletaElapsed/60*100)+"%",background:`linear-gradient(90deg,${AA_BLUE},var(--acc2))`,transition:"width 1s linear"}})
+        ),
+        h("button",{onClick:()=>setBoletaLoadingId(null),style:{marginTop:16,background:"none",border:"none",color:"var(--txm)",fontSize:11,cursor:"pointer",textDecoration:"underline"}},"Cancelar")
+      )
     )
   );
 }
