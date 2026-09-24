@@ -3,7 +3,7 @@
  *
  * Cron automático:
  *   - Día 24 08:00 AM Chile → recipients=preview  → mmunoz@ (BCC facturacion@)
- *   - Día 26 08:00 AM Chile → recipients=contabilidad → bpulgar@, contabilidad@ (CC mmunoz@ / BCC facturacion@)
+ *   - Día 28 08:00 AM Chile → recipients=contabilidad → bpulgar@, contabilidad@ (CC mmunoz@ / BCC facturacion@)
  *
  * Flujo:
  *   1. Obtiene access token de Gmail via refresh token
