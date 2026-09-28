@@ -3741,6 +3741,26 @@ function ContratosView({dashData,driveLoading}){
   function avisoDias(str){if(!str||str==="-"||str==="")return null;const s=str.toLowerCase();const m=s.match(/(\d+)/);if(!m)return null;const n=parseInt(m[1]);if(s.includes("año")||s.includes("ano"))return n*365;if(s.includes("mes"))return n*30;return n;}
   function parseDate(v){if(!v||v==="—"||v==="-"||v==="")return null;if(typeof v==="string"&&v.includes("/")){const[d,mm,y]=v.split("/").map(Number);if(!d||!mm||!y)return null;return new Date(y,mm-1,d);}return null;}
   function urgBg(dias,isReaj){if(dias===null)return{bg:"var(--surf2)",col:"var(--txd)",bdr:"var(--bdr)"};const t1=isReaj?30:90,t2=isReaj?90:180;if(dias<0||dias<=t1)return{bg:"var(--rbg)",col:"var(--red)",bdr:"var(--rdim)"};if(dias<=t2)return{bg:"var(--abg)",col:"var(--amber)",bdr:"var(--adim)"};return{bg:"var(--gbg)",col:"var(--green)",bdr:"var(--gdim)"};}
+  /* Resaltado "pendiente de aplicar este año" para UF Contrato / UF S.A.:
+     marca si hay un paso (arriendo, campo "pasos") o escalon de Serv.Adm.
+     (campo "saEscalones") fechado en el año en curso -- ya haya pasado o
+     falte poco -- sin importar si ya se aplicó en la Planilla o no (es un
+     aviso para revisar a mano, no una verificación contra el valor real).
+     Se limita al año en curso a propósito: casi todo contrato tiene ALGÚN
+     reajuste futuro eventualmente, así que resaltar años venideros pintaría
+     la tabla entera de amarillo. */
+  const ANIO_RESALTADO=new Date().getFullYear();
+  function tienePendienteEsteAnio(item,campo){
+    if(!item)return false;
+    const lista=item[campo]||[];
+    if(lista.some(p=>p.fecha&&new Date(p.fecha+"T00:00:00").getFullYear()===ANIO_RESALTADO))return true;
+    if(campo==="pasos"&&item.recurrente&&item.recurrente.desde&&item.recurrente.cadaAnios){
+      const desdeAnio=new Date(item.recurrente.desde+"T00:00:00").getFullYear();
+      const cada=Number(item.recurrente.cadaAnios)||0;
+      if(cada>0&&ANIO_RESALTADO>=desdeAnio&&(ANIO_RESALTADO-desdeAnio)%cada===0)return true;
+    }
+    return false;
+  }
   function fechaNotifDate(termStr,avisoStr){const d=parseDate(termStr);const dias=avisoDias(avisoStr);if(!d||!dias)return null;const n=new Date(d);n.setDate(n.getDate()-dias);return n;}
   function fechaNotif(termStr,avisoStr){const n=fechaNotifDate(termStr,avisoStr);return n?`${String(n.getDate()).padStart(2,"0")}/${String(n.getMonth()+1).padStart(2,"0")}/${n.getFullYear()}`:null;}
   const clients=dashData?dashData.clients:[];
@@ -3890,6 +3910,8 @@ function ContratosView({dashData,driveLoading}){
             const inicioSA=(c._ajusteItem&&c._ajusteItem.inicioSA)||"";
             const tieneSA=c.ufSrv>0;
             const notif=fechaNotif(c.termTermino,c.aviso);
+            const pendienteArriendo=tienePendienteEsteAnio(c._ajusteItem,"pasos");
+            const pendienteSA=tienePendienteEsteAnio(c._ajusteItem,"saEscalones");
             return h("tr",{key:rowKey,onClick:()=>setFilaSel(k=>k===rowKey?null:rowKey),
               style:{borderBottom:"1px solid var(--bdr)",cursor:"pointer",
                 background:seleccionada?"rgba(91,76,219,0.14)":(i%2===0?"var(--surf)":"var(--surf2)"),
@@ -3912,13 +3934,13 @@ function ContratosView({dashData,driveLoading}){
               h("td",{style:{padding:"9px 12px"}},renderRenovacionCol(c)),
               h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.m2!=null?c.m2:"—"),
               h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--blue)"}},(c.ufArr>0&&c.m2>0)?(c.ufArr/c.m2).toFixed(2):"—"),
-              h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--blue)",fontWeight:600}},c.ufArr>0?c.ufArr.toFixed(2)+" UF":"—"),
+              h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--blue)",fontWeight:600,background:pendienteArriendo?"var(--abg)":undefined},title:pendienteArriendo?`Tiene un paso o reajuste de arriendo fechado en ${ANIO_RESALTADO} — revisar si ya se aplicó`:undefined},c.ufArr>0?c.ufArr.toFixed(2)+" UF":"—"),
               h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600,color:"var(--tx)"}},fmtCLP(arriendoCLP)),
               h("td",{style:{padding:"9px 12px",fontSize:10,color:tieneSA?"var(--txm)":"var(--txd)",fontFamily:"'DM Mono',monospace"}},tieneSA?(inicioSA||"—"):"NO"),
               h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},tieneSA?(c.fechaReajuste||"—"):"—"),
               h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},tieneSA?(c.cadaAnios||"—"):"—"),
               h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},(tieneSA&&c.pctReaj&&c.pctReaj!=="-")?c.pctReaj+"%":"—"),
-              h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},tieneSA?c.ufSrv.toFixed(2)+" UF":"—"),
+              h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)",background:pendienteSA?"var(--abg)":undefined},title:pendienteSA?`Tiene un escalon de Serv. Adm. fechado en ${ANIO_RESALTADO} — revisar si ya se aplicó`:undefined},tieneSA?c.ufSrv.toFixed(2)+" UF":"—"),
               h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600,color:"var(--tx)"}},tieneSA?fmtCLP(servAdmCLP):"—"),
             );
           }))

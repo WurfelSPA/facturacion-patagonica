@@ -137,7 +137,14 @@
         }
       ],
       "notas": "Ctto. Ingersoll 5A B-67 del 05-05-2025.pdf + Anexo Memo Comercial 12-06-2025. IMPORTANTE: % escala por anio de contrato: 3% anio1, 5% anio2, 7% anio3, 10% anio4, 12% anio5 - la planilla trae flat 6%, revisar segun el anio en que estemos. Entrega atrasada por habilitacion (original 30/07/2025 -> real 01/10/2025).",
-      "inicioSA": "01/10/2025"
+      "inicioSA": "01/10/2025",
+      "saEscalones": [
+        {"fecha": "2025-10-01", "pct": 3},
+        {"fecha": "2026-10-01", "pct": 5},
+        {"fecha": "2027-10-01", "pct": 7},
+        {"fecha": "2028-10-01", "pct": 10},
+        {"fecha": "2029-10-01", "pct": 12}
+      ]
     },
     "99.517.650-5|5-A": {
       "pasos": [
@@ -179,13 +186,21 @@
     },
     "78.371.217-2|5-A": {
       "pasos": [],
-      "notas": "Contrato 5A Edf77 2R Spa Ltda.pdf (firmado 15-04-2026). Clausula Sexta: Servicios de Administracion corren a contar de la fecha de entrega de la Propiedad Arrendada; Clausula Septima fija esa entrega en 02-05-2026. OJO: % Serv.Adm. escalona 6% meses 1-6, 9% meses 7-12, 12% desde la renovacion -- la Planilla solo trae el 6% fijo.",
-      "inicioSA": "02/05/2026"
+      "notas": "Contrato 5A Edf77 2R Spa Ltda.pdf (firmado 15-04-2026). Clausula Sexta: Servicios de Administracion corren a contar de la fecha de entrega de la Propiedad Arrendada; Clausula Septima fija esa entrega en 02-05-2026. OJO: % Serv.Adm. escalona 6% meses 1-6, 9% meses 7-12, 12% desde la renovacion -- la Planilla solo trae el 6% fijo. 12% desde la renovacion: fecha exacta no determinada, no incluida en saEscalones.",
+      "inicioSA": "02/05/2026",
+      "saEscalones": [
+        {"fecha": "2026-05-02", "pct": 6},
+        {"fecha": "2026-11-02", "pct": 9}
+      ]
     },
     "78.371.217-2|A-2": {
       "pasos": [],
       "notas": "Mismo contrato que el sitio 5-A (Contrato 5A Edf77 2R Spa Ltda.pdf, firmado 15-04-2026) -- cubre ambos inmuebles (PCL 4A y EDF 77) con la misma fecha de entrega 02-05-2026. % Serv.Adm. escalona 6%->9%->12%, ver notas del sitio 5-A.",
-      "inicioSA": "02/05/2026"
+      "inicioSA": "02/05/2026",
+      "saEscalones": [
+        {"fecha": "2026-05-02", "pct": 6},
+        {"fecha": "2026-11-02", "pct": 9}
+      ]
     },
     "79.913.320-2|5-A": {
       "pasos": [],
@@ -275,12 +290,22 @@
     "78.064.534-2|5-A": {
       "pasos": [],
       "notas": "CONTRATO DE SUBARRENDAMIENTO A GRUPO DROP.pdf. IMPORTANTE: % escala 3% meses1-3, 6% meses4-6, 9% meses7-9, 12% desde mes10 (contado desde 01/12/2024) - deberia estar en 12% ya. La planilla trae flat, revisar.",
-      "inicioSA": "01/12/2024"
+      "inicioSA": "01/12/2024",
+      "saEscalones": [
+        {"fecha": "2024-12-01", "pct": 3},
+        {"fecha": "2025-03-01", "pct": 6},
+        {"fecha": "2025-06-01", "pct": 9},
+        {"fecha": "2025-09-01", "pct": 12}
+      ]
     },
     "76.016.809-2|A-2": {
       "pasos": [],
       "notas": "Ctto. Unex-061124 a notaria Modificacion.pdf. IMPORTANTE: % escala 6% (01/11/2024 a 31/10/2026), 12% desde 01/11/2026 - la planilla trae flat, actualizar en noviembre 2026. Contrato original 2008 no tenia SA (no verificado al 100%).",
-      "inicioSA": "01/11/2024"
+      "inicioSA": "01/11/2024",
+      "saEscalones": [
+        {"fecha": "2024-11-01", "pct": 6},
+        {"fecha": "2026-11-01", "pct": 12}
+      ]
     },
     "78.366.970-6|4-A": {
       "pasos": [],
