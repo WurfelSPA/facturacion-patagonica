@@ -56,13 +56,19 @@
         {
           "fecha": "2018-07-01",
           "uf": 100
+        },
+        {
+          "fecha": "2026-07-01",
+          "uf": 110.25,
+          "aplicado": true
         }
       ],
       "recurrente": {
         "pct": 5,
         "cadaAnios": 5,
         "desde": "2021-07-01"
-      }
+      },
+      "notas": "Ctto.CC 18 A2TL3 090516.pdf (Caja de Compensacion de Asignacion Familiar 18 de Septiembre). Confirmado por el usuario 2026-09: paso 2026-07-01 (105->110,25 UF) ya aplicado en la Planilla."
     },
     "97.006.000-6|D-2": {
       "pasos": [
@@ -113,13 +119,19 @@
         {
           "fecha": "2013-01-01",
           "uf": 176.96
+        },
+        {
+          "fecha": "2026-07-01",
+          "uf": 218.20,
+          "aplicado": true
         }
       ],
       "recurrente": {
         "pct": 5,
         "cadaAnios": 3,
         "desde": "2011-03-01"
-      }
+      },
+      "notas": "Ctto.Voith Turbo A2E6A 140311.pdf. Confirmado por el usuario 2026-09: aumento aplicado en agosto 2026, efectivo desde julio 2026, de 207,81 a 218,20 UF (+5%, correcto). OJO: el valor real previo (207,81 UF) no coincide con la cadena teorica de +5% cada 3 anios desde 176,96 UF (2013) que da ~215,10 UF para 2023 -- algun ciclo intermedio no siguio ese calculo exacto, no confiar en la cadena teorica para proyectar el proximo ciclo (~2029), verificar contra el valor real vigente en ese momento. Ademas el contrato (clausula Tercera) ancla los ciclos al 1 de marzo, pero en la practica se aplico en julio -- revisar si hay un acuerdo posterior que cambio el ancla."
     },
     "96.885.670-7|5-A": {
       "pasos": [
@@ -289,13 +301,13 @@
     },
     "78.064.534-2|5-A": {
       "pasos": [],
-      "notas": "CONTRATO DE SUBARRENDAMIENTO A GRUPO DROP.pdf. IMPORTANTE: % escala 3% meses1-3, 6% meses4-6, 9% meses7-9, 12% desde mes10 (contado desde 01/12/2024) - deberia estar en 12% ya. La planilla trae flat, revisar.",
+      "notas": "Nuevo Ctto. Subarrendamiento Patagonica Inmobiliaria SpA a Grupo Drop SpA, firmado 01-12-2024 (reemplaza el contrato anterior, mismo escalonamiento). Confirmado por el usuario 2026-09: arriendo actual 64,68 UF, Serv.Adm. actual 7,76 UF = 12% exacto (64,68*0,12=7,7616) -- ya esta correctamente en el tramo final, no pendiente.",
       "inicioSA": "01/12/2024",
       "saEscalones": [
-        {"fecha": "2024-12-01", "pct": 3},
-        {"fecha": "2025-03-01", "pct": 6},
-        {"fecha": "2025-06-01", "pct": 9},
-        {"fecha": "2025-09-01", "pct": 12}
+        {"fecha": "2024-12-01", "pct": 3, "aplicado": true},
+        {"fecha": "2025-03-01", "pct": 6, "aplicado": true},
+        {"fecha": "2025-06-01", "pct": 9, "aplicado": true},
+        {"fecha": "2025-09-01", "pct": 12, "aplicado": true}
       ]
     },
     "76.016.809-2|A-2": {
