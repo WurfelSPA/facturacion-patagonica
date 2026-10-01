@@ -67,6 +67,30 @@
       "sitio": "A-2",
       "termino": "31/12/2026",
       "notificadoEn": "2026-09-01T13:00:24.132Z"
+    },
+    "780572507|4-A|Edif. 64|2027-02-28": {
+      "nombre": "Industria YKK Chile LTDA",
+      "sitio": "4-A",
+      "termino": "28/02/2027",
+      "notificadoEn": "2026-10-01T13:00:10.879Z"
+    },
+    "995760800|4-A|Edif. 65|2027-01-31": {
+      "nombre": "Olympus Corporation Chile Spa",
+      "sitio": "4-A",
+      "termino": "31/01/2027",
+      "notificadoEn": "2026-10-01T13:00:11.175Z"
+    },
+    "619810600|A-2|T. Piso 7|2027-02-28": {
+      "nombre": "Servicio Local de Educación Pública de los Libertadores",
+      "sitio": "A-2",
+      "termino": "28/02/2027",
+      "notificadoEn": "2026-10-01T13:00:11.463Z"
+    },
+    "818268009|A-2|Torre L-2|2027-02-28": {
+      "nombre": "Caja de Compensación de Asignación Familiar De Los Andes",
+      "sitio": "A-2",
+      "termino": "28/02/2027",
+      "notificadoEn": "2026-10-01T13:00:11.840Z"
     }
   }
 }
