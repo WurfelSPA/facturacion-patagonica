@@ -7501,6 +7501,7 @@ function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlo
     ),
     h("div",{className:"user-menu",style:{position:"relative"}},
   userMenuOpen && h("div",{className:"user-dropdown open"},
+    currentUser&&currentUser.email==="amelendez@patagonica.cl"&&h("button",{onClick:function(){setUserMenuOpen(false);setView("admin");}},"🛡️  Administrador"),
     h("button",{onClick:function(){setUserMenuOpen(false);onChangePwd();}},"🔑  Cambiar contraseña"),
     h("button",{className:"danger",onClick:function(){window.location.href='/api/auth?action=logout';}},"→  Cerrar sesión")
   ),
@@ -7512,6 +7513,157 @@ function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlo
     )
   )
 )
+  );
+}
+
+/* ═══════════════════════════════════
+   ADMINISTRADOR — gestión de usuarios de la app (solo visible para
+   amelendez@patagonica.cl, protegido también en el backend por cookie+email)
+═══════════════════════════════════ */
+function AdminUsuariosView({notify}){
+  const [users,setUsers]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState(null);
+  const [search,setSearch]=useState("");
+  const [modal,setModal]=useState(null); /* {mode:"new"|"edit"|"pwd", user?} */
+  const [saving,setSaving]=useState(false);
+
+  function cargar(){
+    setLoading(true);setError(null);
+    fetch("/api/auth?action=admin-list-users")
+      .then(r=>r.json())
+      .then(d=>{if(!d.ok)throw new Error(d.error||"Error");setUsers(d.users);setLoading(false);})
+      .catch(e=>{setError(e.message);setLoading(false);});
+  }
+  useEffect(()=>{cargar();},[]);
+
+  const filtered=users.filter(u=>{
+    const q=search.trim().toLowerCase();
+    if(!q)return true;
+    return u.nombre.toLowerCase().includes(q)||u.apellido.toLowerCase().includes(q)||u.email.toLowerCase().includes(q);
+  });
+
+  function eliminar(u){
+    if(!window.confirm(`¿Eliminar a ${u.nombre} ${u.apellido} (${u.email})? Esta acción no se puede deshacer.`))return;
+    fetch("/api/auth?action=admin-delete-user",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:u.email})})
+      .then(r=>r.json())
+      .then(d=>{
+        if(!d.ok){notify(d.error||"Error al eliminar","err");return;}
+        notify("Usuario eliminado","ok");
+        cargar();
+      })
+      .catch(e=>notify(e.message,"err"));
+  }
+
+  return h("main",{style:{flex:1,overflowY:"auto",padding:"22px 28px",display:"flex",flexDirection:"column",gap:16},className:"fade-up epv2"},
+    h("div",{className:"dash-card",style:{display:"flex",flexDirection:"column",gap:16}},
+      h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}},
+        h("div",{style:{fontWeight:700,fontSize:15,color:"var(--tx)"}},"Administración de Usuarios"),
+        h("button",{onClick:()=>setModal({mode:"new"}),
+          style:{padding:"8px 16px",background:"var(--acc)",color:"#fff",border:"none",borderRadius:9,fontSize:12,fontWeight:700,cursor:"pointer"}},"+ Nuevo Usuario")
+      ),
+      h("input",{type:"text",placeholder:"Buscar por nombre, apellido o usuario...",value:search,onChange:e=>setSearch(e.target.value),
+        style:{padding:"8px 12px",border:"1px solid var(--bdr)",borderRadius:8,fontSize:12,background:"var(--surf2)",color:"var(--tx)",outline:"none"}}),
+
+      loading&&h("div",{style:{textAlign:"center",padding:"30px 0",color:"var(--txm)"}},h("span",{className:"fv2-loader",style:{width:20,height:20,fontSize:20,marginRight:8}}),"Cargando usuarios..."),
+      error&&h("div",{style:{background:"var(--rbg)",border:"1px solid var(--rdim)",borderRadius:8,padding:"10px 14px",color:"var(--red)",fontSize:12}},"⚠️ "+error),
+
+      !loading&&!error&&h("div",{style:{overflowX:"auto"}},
+        h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:12}},
+          h("thead",null,
+            h("tr",{style:{background:"var(--surf2)"}},
+              ["Nombre","Apellido","Usuario","Contraseña",""].map(lbl=>
+                h("th",{key:lbl,style:{padding:"9px 14px",textAlign:"left",fontWeight:700,color:"var(--txm)",borderBottom:"2px solid var(--bdr)",fontSize:10,letterSpacing:".06em",textTransform:"uppercase",whiteSpace:"nowrap"}},lbl)
+              )
+            )
+          ),
+          h("tbody",null,
+            filtered.length===0
+              ?h("tr",null,h("td",{colSpan:5,style:{padding:"30px",textAlign:"center",color:"var(--txd)"}},"Sin usuarios"))
+              :filtered.map((u,i)=>h("tr",{key:u.email,style:{borderBottom:"1px solid var(--bdr)",background:i%2===0?"var(--surf)":"var(--surf2)"}},
+                h("td",{style:{padding:"10px 14px",color:"var(--tx)",fontWeight:600}},u.nombre||"—"),
+                h("td",{style:{padding:"10px 14px",color:"var(--tx)"}},u.apellido||"—"),
+                h("td",{style:{padding:"10px 14px",color:"var(--txm)",fontFamily:"'JetBrains Mono',monospace",fontSize:11}},u.email),
+                h("td",{style:{padding:"10px 14px"}},
+                  h("button",{onClick:()=>setModal({mode:"pwd",user:u}),
+                    style:{fontSize:10,fontWeight:700,padding:"3px 10px",borderRadius:20,background:"var(--gbg)",color:"var(--green)",border:"1px solid var(--gdim)",cursor:"pointer"}},"🔑 Cambiar")
+                ),
+                h("td",{style:{padding:"10px 14px",textAlign:"right",whiteSpace:"nowrap"}},
+                  h("button",{onClick:()=>setModal({mode:"edit",user:u}),title:"Editar nombre",
+                    style:{background:"none",border:"none",cursor:"pointer",fontSize:13,marginRight:10,color:"var(--txm)"}},"✏️"),
+                  u.email!=="amelendez@patagonica.cl"&&h("button",{onClick:()=>eliminar(u),title:"Eliminar usuario",
+                    style:{background:"none",border:"none",cursor:"pointer",fontSize:13,color:"var(--red)"}},"🗑️")
+                )
+              ))
+          )
+        )
+      )
+    ),
+    modal&&h(AdminUsuarioModal,{modal,saving,setSaving,onClose:()=>setModal(null),onSaved:()=>{setModal(null);cargar();},notify})
+  );
+}
+
+function AdminUsuarioModal({modal,saving,setSaving,onClose,onSaved,notify}){
+  const esNuevo=modal.mode==="new";
+  const esPwd=modal.mode==="pwd";
+  const [nombre,setNombre]=useState(modal.user?.nombre||"");
+  const [apellido,setApellido]=useState(modal.user?.apellido||"");
+  const [email,setEmail]=useState(modal.user?.email||"");
+  const [password,setPassword]=useState("");
+  const [err,setErr]=useState("");
+
+  function guardar(){
+    setErr("");
+    if(!esPwd&&(!nombre.trim()||!email.trim())){setErr("Nombre y usuario son requeridos");return;}
+    if((esNuevo||esPwd)&&password.trim().length<6){setErr("La contraseña debe tener al menos 6 caracteres");return;}
+    if(!esNuevo&&!esPwd&&password.trim().length>0&&password.trim().length<6){setErr("La contraseña debe tener al menos 6 caracteres");return;}
+    setSaving(true);
+    const body=esPwd
+      ?{email:modal.user.email,nombre:modal.user.nombre,apellido:modal.user.apellido,password}
+      :{email,nombre,apellido,password};
+    fetch("/api/auth?action=admin-upsert-user",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
+      .then(r=>r.json())
+      .then(d=>{
+        setSaving(false);
+        if(!d.ok){setErr(d.error||"Error al guardar");return;}
+        notify(esPwd?"Contraseña actualizada":esNuevo?"Usuario creado":"Usuario actualizado","ok");
+        onSaved();
+      })
+      .catch(e=>{setSaving(false);setErr(e.message);});
+  }
+
+  const inp={width:"100%",padding:"9px 12px",border:"1px solid var(--bdr)",borderRadius:8,fontSize:13,background:"var(--surf2)",color:"var(--tx)",outline:"none",marginBottom:12};
+  const lbl={fontSize:11,fontWeight:700,color:"var(--txm)",textTransform:"uppercase",letterSpacing:".04em",display:"block",marginBottom:4};
+
+  return h("div",{onClick:e=>{if(e.target===e.currentTarget)onClose();},
+    style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}},
+    h("div",{style:{background:"var(--surf)",borderRadius:14,padding:"24px 26px",width:"100%",maxWidth:380,boxShadow:"0 8px 40px rgba(0,0,0,0.3)"}},
+      h("div",{style:{fontSize:16,fontWeight:700,color:"var(--tx)",marginBottom:4}},
+        esPwd?"Cambiar contraseña":esNuevo?"Nuevo usuario":"Editar usuario"),
+      esPwd&&h("div",{style:{fontSize:12,color:"var(--txm)",marginBottom:16}},modal.user.nombre+" "+modal.user.apellido+" — "+modal.user.email),
+      !esPwd&&h("div",null,
+        h("label",{style:lbl},"Nombre"),
+        h("input",{type:"text",value:nombre,onChange:e=>setNombre(e.target.value),style:inp}),
+        h("label",{style:lbl},"Apellido"),
+        h("input",{type:"text",value:apellido,onChange:e=>setApellido(e.target.value),style:inp}),
+        h("label",{style:lbl},"Usuario (correo @patagonica.cl)"),
+        h("input",{type:"email",value:email,disabled:!esNuevo,onChange:e=>setEmail(e.target.value),
+          style:{...inp,opacity:esNuevo?1:0.6}})
+      ),
+      (esNuevo||esPwd)&&h("div",null,
+        h("label",{style:lbl},esPwd?"Nueva contraseña":"Contraseña inicial"),
+        h("input",{type:"text",value:password,onChange:e=>setPassword(e.target.value),placeholder:"Mínimo 6 caracteres",style:inp})
+      ),
+      !esPwd&&!esNuevo&&h("div",{style:{fontSize:11,color:"var(--txd)",marginBottom:12,marginTop:-4}},"Deja la contraseña en blanco para no cambiarla — usa \"🔑 Cambiar\" para eso."),
+      !esPwd&&!esNuevo&&h("input",{type:"text",value:password,onChange:e=>setPassword(e.target.value),placeholder:"(opcional) nueva contraseña, mínimo 6 caracteres",style:inp}),
+      err&&h("div",{style:{background:"var(--rbg)",border:"1px solid var(--rdim)",borderRadius:8,padding:"8px 12px",color:"var(--red)",fontSize:12,marginBottom:12}},err),
+      h("div",{style:{display:"flex",gap:10,marginTop:4}},
+        h("button",{onClick:onClose,disabled:saving,
+          style:{flex:1,padding:"10px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:8,fontSize:13,fontWeight:600,color:"var(--txm)",cursor:"pointer"}},"Cancelar"),
+        h("button",{onClick:guardar,disabled:saving,
+          style:{flex:1,padding:"10px",background:"var(--acc)",border:"none",borderRadius:8,fontSize:13,fontWeight:700,color:"#fff",cursor:"pointer",opacity:saving?0.7:1}},saving?"Guardando...":"Guardar")
+      )
+    )
   );
 }
 
@@ -9529,7 +9681,7 @@ function App(){
     h("header",{className:(view==="table"||view==="upload")?"fv2":undefined,style:{background:view==="table"?"#0F1B33":"var(--surf)",borderBottom:view==="table"?"1px solid #1C2C4A":"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:49,gap:10}},
       h("div",{style:{display:"flex",alignItems:"center",gap:10}},
         h("div",{className:view==="table"?"fv2-title":undefined,style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px",color:view==="table"?"#fff":"var(--tx)"}},
-          view==="dashboard"?"📊 Dashboard":view==="clientes"?"👥 Clientes":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="cuentas"?"🔌 Cuentas Servicios":view==="vacantes"?"🗺️ Catastro de Sitios":view==="fact-cobrar"?"💰 Facturas x Cobrar":view==="pagos"?"✅ Estado de Pagos":view==="cortijo"?"🏡 El Cortijo":view==="torre2680"?"🏢 Torre 2680":view==="historial-fact"?"📂 Facturación - Nubox Resumen de Ventas":"📋 Facturación"
+          view==="dashboard"?"📊 Dashboard":view==="clientes"?"👥 Clientes":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="cuentas"?"🔌 Cuentas Servicios":view==="vacantes"?"🗺️ Catastro de Sitios":view==="fact-cobrar"?"💰 Facturas x Cobrar":view==="pagos"?"✅ Estado de Pagos":view==="cortijo"?"🏡 El Cortijo":view==="torre2680"?"🏢 Torre 2680":view==="historial-fact"?"📂 Facturación - Nubox Resumen de Ventas":view==="admin"?"🛡️ Administrador":"📋 Facturación"
         ),
         view==="table"&&h("span",{style:{display:"inline-flex",alignItems:"center",gap:6,fontSize:14,fontWeight:600,color:"#8FB0FF",marginLeft:6}},h("span",{className:"fv2-pulse"}),periodo)
       ),
@@ -9905,6 +10057,7 @@ function App(){
     )
     ,view==="ventas"&&h(VentasView,{periodo})
     ,view==="fact-cobrar"&&h(FactxCobrarView,{notify,dashData})
+    ,view==="admin"&&h(AdminUsuariosView,{notify})
     ,view==="pagos"&&h(EstadoPagosView,{notify})
     ,view==="contratos"&&h(ContratosView,{dashData,driveLoading})
     ,view==="cuentas"&&h(CuentasServiciosView,{dashData,driveLoading,notify})

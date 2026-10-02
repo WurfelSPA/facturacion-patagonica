@@ -7,11 +7,19 @@
  * POST ?action=forgot-password → genera link de reset y envía email via Resend
  * GET  ?action=reset-form&token=XX → sirve HTML formulario de nueva clave
  * POST ?action=reset-password  → valida token JWT y actualiza contraseña en Drive
+ * GET  ?action=admin-list-users   → lista usuarios (solo ADMIN_EMAIL, cookie)
+ * POST ?action=admin-upsert-user  → crea/edita nombre+apellido y opcionalmente contraseña (solo ADMIN_EMAIL)
+ * POST ?action=admin-delete-user  → elimina un usuario (solo ADMIN_EMAIL)
  *
  * Login: lee de AUTH_CREDS (env var) primero, Drive como fallback.
  * Forgot-password: token JWT firmado con JWT_SECRET (sin almacenamiento externo).
  * Cambio de contraseña: escribe en Drive (SA necesita ser editor del archivo).
+ * Admin de usuarios (menú "Administrador" en la app): protegido por sesión
+ * propia (cookie), no por ADMIN_SEED_SECRET — ese secreto nunca debe llegar
+ * al navegador. Solo ADMIN_EMAIL puede usar estas acciones.
  */
+
+const ADMIN_EMAIL = 'amelendez@patagonica.cl';
 
 export const config = { api: { bodyParser: true } };
 
@@ -519,6 +527,107 @@ a{display:inline-block;padding:10px 20px;background:#4f46e5;color:#fff;border-ra
         return res.status(500).json({error:'No se pudo guardar la nueva contraseña: '+e.message});
       }
 
+      return res.status(200).json({ok:true});
+    }
+
+    // ── Helper: exige cookie de sesión válida Y que sea ADMIN_EMAIL ──────────
+    async function requireAdmin() {
+      const cookieToken = parseCookie(req.headers.cookie, 'auth_token');
+      const payload = await verifyToken(cookieToken, JWT_SECRET);
+      if (!payload || payload.email !== ADMIN_EMAIL) return null;
+      return payload;
+    }
+    function splitName(name) {
+      const parts = String(name||'').trim().split(/\s+/);
+      return { nombre: parts[0]||'', apellido: parts.slice(1).join(' ') };
+    }
+
+    // ── ADMIN-LIST-USERS ──────────────────────────────────────────────────────
+    if (action==='admin-list-users') {
+      if (!(await requireAdmin())) return res.status(403).json({error:'No autorizado'});
+      let creds;
+      try {
+        const tok = await saToken();
+        creds = await readDriveCredentials(tok);
+      } catch(e) {
+        return res.status(500).json({error:'No se pudo leer usuarios: '+e.message});
+      }
+      const users = Object.keys(creds).map(email => {
+        const u = creds[email];
+        const { nombre, apellido } = u.nombre!=null ? {nombre:u.nombre, apellido:u.apellido||''} : splitName(u.name);
+        return { email, nombre, apellido };
+      }).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+      return res.status(200).json({ok:true, users});
+    }
+
+    // ── ADMIN-UPSERT-USER ─────────────────────────────────────────────────────
+    // Crea un usuario nuevo o edita nombre/apellido de uno existente.
+    // Si viene password, la resetea y marca mustChangePassword:true (el usuario
+    // elige su propia clave en el primer login, mismo flujo que "forgot-password").
+    if (action==='admin-upsert-user') {
+      if (!(await requireAdmin())) return res.status(403).json({error:'No autorizado'});
+      const { email='', nombre='', apellido='', password='' } = req.body || {};
+      const emailKey = email.toLowerCase().trim();
+      if (!emailKey.endsWith('@patagonica.cl'))
+        return res.status(400).json({error:'El correo debe ser del dominio @patagonica.cl'});
+      if (!nombre.trim())
+        return res.status(400).json({error:'El nombre es requerido'});
+
+      let creds;
+      try {
+        const tok = await saToken();
+        creds = await readDriveCredentials(tok);
+      } catch(e) {
+        return res.status(500).json({error:'No se pudo leer usuarios: '+e.message});
+      }
+
+      const existing = creds[emailKey];
+      if (!existing && password.length < 6)
+        return res.status(400).json({error:'Contraseña requerida (mínimo 6 caracteres) para un usuario nuevo'});
+      if (password && password.length > 0 && password.length < 6)
+        return res.status(400).json({error:'La contraseña debe tener al menos 6 caracteres'});
+
+      let hash = existing?.hash, salt = existing?.salt, mustChangePassword = existing?.mustChangePassword ?? false;
+      if (password) {
+        salt = generateSalt();
+        hash = await hashPassword(password, salt);
+        mustChangePassword = true;
+      }
+      creds[emailKey] = { name: `${nombre.trim()} ${apellido.trim()}`.trim(), nombre: nombre.trim(), apellido: apellido.trim(), hash, salt, mustChangePassword };
+
+      try {
+        const tok = await saToken();
+        await writeDriveCredentials(tok, creds);
+      } catch(e) {
+        return res.status(500).json({error:'No se pudo guardar en Drive: '+e.message});
+      }
+      return res.status(200).json({ok:true, email:emailKey, isNew:!existing});
+    }
+
+    // ── ADMIN-DELETE-USER ─────────────────────────────────────────────────────
+    if (action==='admin-delete-user') {
+      const adminPayload = await requireAdmin();
+      if (!adminPayload) return res.status(403).json({error:'No autorizado'});
+      const { email='' } = req.body || {};
+      const emailKey = email.toLowerCase().trim();
+      if (emailKey === ADMIN_EMAIL)
+        return res.status(400).json({error:'No puedes eliminar tu propia cuenta de administrador'});
+
+      let creds;
+      try {
+        const tok = await saToken();
+        creds = await readDriveCredentials(tok);
+      } catch(e) {
+        return res.status(500).json({error:'No se pudo leer usuarios: '+e.message});
+      }
+      if (!creds[emailKey]) return res.status(404).json({error:'Usuario no encontrado'});
+      delete creds[emailKey];
+      try {
+        const tok = await saToken();
+        await writeDriveCredentials(tok, creds);
+      } catch(e) {
+        return res.status(500).json({error:'No se pudo guardar en Drive: '+e.message});
+      }
       return res.status(200).json({ok:true});
     }
 
