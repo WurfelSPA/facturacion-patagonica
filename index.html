@@ -8653,10 +8653,29 @@ function App(){
     const anioMax=compYears.length?Math.max(...compYears.map(v=>v.year)):null;
 
     /* ── Histórico mensual continuo: desde el primer mes con datos (2023)
-       hasta el mes en curso, independiente del año elegido arriba ── */
-    const histMonths=dashData?Object.values(dashData.monthTotals)
-      .filter(v=>v.arr>0||v.srv>0)
-      .sort((a,b)=>a.year-b.year||a.month-b.month):[];
+       hasta el mes en curso, independiente del año elegido arriba.
+       Se recorren TODOS los meses calendario del rango (no solo los que
+       monthTotals trae con datos) para que no queden meses "saltados" en
+       la línea de tiempo cuando a algún mes le faltó la columna en la
+       Planilla o quedó en cero — se completa con 0 en vez de omitirlo. */
+    const histMonths=(()=>{
+      if(!dashData)return[];
+      const conDatos=Object.values(dashData.monthTotals).filter(v=>v.arr>0||v.srv>0);
+      if(!conDatos.length)return[];
+      const porClave={};
+      Object.values(dashData.monthTotals).forEach(v=>{porClave[v.year+"-"+v.month]=v;});
+      const primero=conDatos.reduce((a,b)=>(a.year<b.year||(a.year===b.year&&a.month<b.month))?a:b);
+      const hoy=new Date();
+      const anioFin=hoy.getFullYear(),mesFin=hoy.getMonth()+1;
+      const out=[];
+      let y=primero.year,m=primero.month;
+      while(y<anioFin||(y===anioFin&&m<=mesFin)){
+        const rec=porClave[y+"-"+m];
+        out.push({year:y,month:m,arr:rec?rec.arr:0,srv:rec?rec.srv:0});
+        m++;if(m>12){m=1;y++;}
+      }
+      return out;
+    })();
     const histYears=Array.from(new Set(histMonths.map(v=>v.year))).sort((a,b)=>a-b);
     const histArr=histMonths.map(v=>({key:v.year+"-"+v.month,year:v.year,month:v.month,value:v.arr||0}));
     const histSrv=histMonths.map(v=>({key:v.year+"-"+v.month,year:v.year,month:v.month,value:v.srv||0}));
