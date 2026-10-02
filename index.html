@@ -3461,6 +3461,217 @@ function EstadoPagosView({notify}){
 }
 
 /* ═══════════════════════════════════
+   VISTA CLIENTES (panel por sitio + tabla, ex-Dashboard)
+═══════════════════════════════════ */
+function ClientesView({dashData,driveLoading,notify}){
+  const [dashSearch,setDashSearch]=useState("");
+  const [dashSitio,setDashSitio]=useState("all");
+  const [dashMes,setDashMes]=useState("current"); /* "current" = UF actual, o "YYYY-MM" */
+  const [dashSortCol,setDashSortCol]=useState(null);
+  const [dashSortDir,setDashSortDir]=useState("asc");
+  const [histClient,setHistClient]=useState(null);
+  const [histAnio,setHistAnio]=useState(2026);
+  const [ufActual,setUfActual]=useState(null);
+  const [ufLoading,setUfLoading]=useState(false);
+  const [monthlyUF,setMonthlyUF]=useState({});
+
+  useEffect(()=>{
+    const now=new Date();
+    setUfLoading(true);
+    getUFForMonth(now.getFullYear(),now.getMonth()+1).then(v=>{
+      setUfActual(v);
+      setUfLoading(false);
+    }).catch(()=>setUfLoading(false));
+  },[]);
+
+  useEffect(()=>{
+    if(!dashData)return;
+    const months=Object.values(dashData.monthTotals).filter(m=>m.arr>0);
+    if(months.length===0)return;
+    Promise.all(
+      months.map(m=>getUFForMonth(m.year,m.month).then(v=>({key:`${m.year}-${String(m.month).padStart(2,"0")}`,uf:v})))
+    ).then(results=>{
+      const map={};
+      results.forEach(({key,uf})=>{if(uf)map[key]=uf;});
+      setMonthlyUF(map);
+    });
+  },[dashData]);
+
+  if(!dashData)return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,overflow:"hidden",minHeight:0},className:"fade-up epv2"},
+    driveLoading?h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},h("span",{className:"fv2-loader",style:{width:18,height:18,fontSize:18}}),"Cargando planilla desde Drive..."):
+    h("div",{style:{fontSize:13,color:"var(--txd)"}},"Sin datos — carga la planilla en el Dashboard"));
+
+  const ufRef=ufActual||37000;
+  const siteMapCLP=Object.fromEntries(
+    Object.entries(dashData.siteMap).map(([sitio,info])=>([sitio,{
+      ...info,
+      clpArr:Math.round(info.ufArr*ufRef),
+      clpSrv:Math.round(info.ufSrv*ufRef),
+      clpTotal:Math.round((info.ufArr+info.ufSrv)*ufRef),
+    }]))
+  );
+  const tblMesOpts=[{k:"current",l:"Mes actual"},...Object.entries(dashData.monthTotals).filter(([,v])=>v.arr>0).sort((a,b)=>b[0].localeCompare(a[0])).map(([k,v])=>({k,l:v.label}))];
+  const tblUf=dashMes==="current"?ufRef:(monthlyUF[dashMes]||ufRef);
+  if(dashMes!=="current"&&!monthlyUF[dashMes]){const[yr,mo]=dashMes.split("-").map(Number);getUFForMonth(yr,mo).then(v=>{if(v)setMonthlyUF(p=>({...p,[dashMes]:v}));});}
+  const tblClientsUnsorted=dashData.clients.filter(c=>{
+    const ms=!dashSearch||c.nombre.toLowerCase().includes(dashSearch.toLowerCase())||c.rut.includes(dashSearch);
+    const msite=dashSitio==="all"||(c.sitio||"").trim()===(dashSitio||"").trim();
+    return ms&&msite;
+  });
+  const SORT_GETTERS={
+    "Sitio":c=>c.sitio||"",
+    "Cliente / RUT":c=>c.nombre||"",
+    "Arriendo CLP":c=>c.ufArr>0?c.ufArr*tblUf:null,
+    "Serv.Adm. CLP":c=>c.ufSrv>0?c.ufSrv*tblUf:null,
+    "Total CLP":c=>c.ufTotal>0?c.ufTotal*tblUf:null,
+    "IVA":c=>c.afecto||"",
+    "Término":c=>c.termContrato||"",
+    "Antelac.":c=>c.renovacion||"",
+    "Aviso":c=>c.aviso||"",
+    "F.Reajuste":c=>c.fechaReajuste||"",
+    "% Reaj.":c=>c.pctReaj||"",
+    "Cada":c=>c.cadaAnios!=null?c.cadaAnios:null,
+    "m²":c=>c.m2!=null?c.m2:null,
+    "UF×m²":c=>(c.ufM2!=null&&c.m2>0)?c.ufM2/c.m2:null,
+  };
+  const tblClients=(dashSortCol&&SORT_GETTERS[dashSortCol])?
+    [...tblClientsUnsorted].sort((a,b)=>{
+      const va=SORT_GETTERS[dashSortCol](a),vb=SORT_GETTERS[dashSortCol](b);
+      const an=va==null||va==="",bn=vb==null||vb==="";
+      if(an&&bn)return 0;
+      if(an)return 1; // vacíos siempre al final, sea cual sea la dirección
+      if(bn)return -1;
+      const cmp=(typeof va==="number"&&typeof vb==="number")?va-vb:String(va).localeCompare(String(vb),"es",{numeric:true,sensitivity:"base"});
+      return dashSortDir==="desc"?-cmp:cmp;
+    }):tblClientsUnsorted;
+  const tblUfLabel=dashMes==="current"?`UF hoy: ${tblUf.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`:`UF ${tblMesOpts.find(m=>m.k===dashMes)?.l||""}: ${tblUf.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+
+  return h("main",{style:{flex:1,overflowY:"auto",padding:"18px 22px",display:"flex",flexDirection:"column",gap:16},className:"fade-up epv2"},
+    h("div",{style:{display:"grid",gridTemplateColumns:"200px 1fr",gap:16,alignItems:"start"}},
+      /* Panel lateral sitios */
+      h("div",{className:"dash-card",style:{display:"flex",flexDirection:"column",gap:12,background:"#333B4D",backdropFilter:"none",WebkitBackdropFilter:"none"}},
+        h("div",{style:{fontWeight:700,fontSize:12,color:"var(--tx)",marginBottom:2}},"Clientes por Sitio"),
+        Object.entries(siteMapCLP).filter(([s])=>s&&!/^\d+$/.test(s)).sort((a,b)=>b[1].count-a[1].count).map(([sitio,info])=>{
+          const maxCnt=Math.max(...Object.values(dashData.siteMap).map(s=>s.count));
+          const color=SITIO_C[sitio]||"#888";
+          const isActive=dashSitio===sitio;
+          return h("div",{key:sitio,style:{display:"flex",flexDirection:"column",gap:4}},
+            h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6}},
+              h("button",{
+                onClick:()=>setDashSitio(isActive?"all":sitio),
+                style:{
+                  padding:"2px 9px",borderRadius:10,fontSize:10,fontWeight:700,flexShrink:0,
+                  background:isActive?color:`${color}18`,
+                  color:isActive?"#fff":color,
+                  border:`1px solid ${color}${isActive?"":"40"}`,
+                  cursor:"pointer",transition:"all .15s"
+                }
+              },sitio+(isActive?" ×":"")),
+              h("span",{style:{fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap",flexShrink:0}},
+                info.count+" cli")
+            ),
+            h("div",{style:{fontSize:10,color:"var(--blue)",fontFamily:"'DM Mono',monospace",paddingLeft:2,fontWeight:600}},
+              formatCLPCompact(info.clpTotal)
+            ),
+            h("div",{className:"site-bar-wrap"},
+              h("div",{className:"site-bar-fill",style:{width:`${(info.count/maxCnt)*100}%`,background:color,opacity:isActive?1:0.5}})
+            )
+          );
+        })
+      ),
+      /* Tabla de clientes */
+      h("div",{key:"tbl-"+dashSitio+"-"+dashMes,style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
+      /* Barra de controles */
+      h("div",{style:{padding:"10px 14px",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",background:"var(--surf)"}},
+        h("input",{value:dashSearch,onChange:e=>setDashSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:180}}),
+        h("span",{style:{fontWeight:700,fontSize:12,color:"var(--tx)"}},"Clientes"),
+        h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},tblClients.length+" / "+dashData.clients.length),
+        h("div",{style:{display:"flex",gap:4,flexWrap:"wrap",marginLeft:4}},
+          h("button",{onClick:()=>setDashSitio("all"),className:`pill${dashSitio==="all"?" active":""}`,style:{fontSize:10,padding:"3px 10px"}},"Ver todos"),
+          ...Object.keys(dashData.siteMap).filter(s=>s&&!/^\d+$/.test(s)).sort().map(s=>
+            h("button",{key:s,onClick:()=>setDashSitio(dashSitio===s?"all":s),
+              style:{padding:"3px 9px",borderRadius:10,fontSize:10,fontWeight:700,
+                background:dashSitio===s?(SITIO_C[s]||"#888"):`${SITIO_C[s]||"#888"}18`,
+                color:dashSitio===s?"#fff":(SITIO_C[s]||"#888"),
+                border:`1px solid ${SITIO_C[s]||"#888"}${dashSitio===s?"":"40"}`,
+                cursor:"pointer",transition:"all .15s"}
+            },s)
+          )
+        ),
+        h("select",{value:dashMes,onChange:e=>{setDashMes(e.target.value);},
+          style:{fontSize:11,padding:"4px 8px",borderRadius:7,border:"1px solid var(--bdr)",background:"var(--surf)",color:"var(--tx)",fontFamily:"'DM Mono',monospace",marginLeft:4}},
+          tblMesOpts.map(m=>h("option",{key:m.k,value:m.k},m.l))
+        ),
+        h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},tblUfLabel)
+      ),
+      h("div",{className:"dash-client-hdr"},
+        ["Sitio","Cliente / RUT","Arriendo CLP","Serv.Adm. CLP","Total CLP","IVA","Término","Antelac.","Aviso","F.Reajuste","% Reaj.","Cada","m²","UF×m²",""].map(col=>{
+          const sortable=!!SORT_GETTERS[col];
+          const active=dashSortCol===col;
+          return h("div",{
+            key:col,
+            onClick:sortable?()=>{
+              if(dashSortCol===col)setDashSortDir(d=>d==="asc"?"desc":"asc");
+              else{setDashSortCol(col);setDashSortDir("asc");}
+            }:undefined,
+            title:sortable?"Ordenar por "+col:undefined,
+            style:{display:"flex",alignItems:"center",gap:3,cursor:sortable?"pointer":"default",userSelect:"none",color:active?"var(--tx)":undefined}
+          },col,sortable&&h("span",{style:{fontSize:8,opacity:active?1:.3}},active?(dashSortDir==="asc"?"▲":"▼"):"⇅"));
+        })
+      ),
+      h("div",{key:"rows-"+dashSitio+"-"+tblClients.length,style:{maxHeight:"calc(100vh - 220px)",overflowY:"auto",overflowX:"auto"}},
+        tblClients.length===0?
+          h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados"):
+          tblClients.map(c=>{
+            const color=SITIO_C[c.sitio]||"#888";
+            const clpArr=c.ufArr>0?Math.round(c.ufArr*tblUf):null;
+            const clpSrv=c.ufSrv>0?Math.round(c.ufSrv*tblUf):null;
+            const clpTotal=c.ufTotal>0?Math.round(c.ufTotal*tblUf):null;
+            const isSelected=histClient&&histClient.rut===c.rut&&histClient.sitio===c.sitio;
+            const numDirM=(c.dir||"").match(/(\d+(?:-[A-Za-z0-9]+)?)\s*$/);
+            const edifTienePiso=/piso/i.test(c.edificio||"");
+            const numDir=numDirM?((numDirM[1].includes("-")||!edifTienePiso)?numDirM[1]:"Piso "+numDirM[1]):null;
+            return h("div",{key:c.rut+c.nombre+c.sitio+"_wrap",style:{borderBottom:"1px solid var(--bdr)",background:isSelected?"var(--bbg)":"transparent"}},
+            h("div",{
+              className:"dash-client-row",
+              style:{cursor:"pointer",borderBottom:"none",background:isSelected?"var(--bbg)":"transparent"},
+              onClick:()=>{setHistClient(isSelected?null:c);setHistAnio(2026);},
+              title:isSelected?"Cerrar historial":"Ver historial del cliente"
+            },
+              h("div",{style:{display:"flex",flexDirection:"column",gap:2}},
+                h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${color}18`,color,border:`1px solid ${color}40`,alignSelf:"flex-start"}},c.sitio||"—"),
+                c.edificio&&h("span",{style:{fontSize:8,color:"var(--txd)",fontFamily:"'DM Mono',monospace",paddingLeft:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:52}},c.edificio),
+                numDir&&h("span",{title:c.dir,style:{fontSize:8,color:"var(--txm)",fontFamily:"'JetBrains Mono',monospace",paddingLeft:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:52}},numDir)
+              ),
+              h("div",{style:{flexDirection:"column",alignItems:"flex-start",gap:2}},
+                h("div",{style:{fontWeight:600,fontSize:11,lineHeight:1.3}},c.nombre),
+                h("div",{style:{fontSize:9,color:"var(--txm)",fontFamily:"'JetBrains Mono',monospace"}},c.rut),
+                c.email&&h("a",{href:"mailto:"+c.email,style:{fontSize:9,color:"var(--accl)",fontFamily:"'DM Mono',monospace",textDecoration:"none",userSelect:"text"},title:c.email},c.email)
+              ),
+              h("div",{style:{fontFamily:"'DM Mono',monospace",color:"var(--blue)",fontWeight:600,fontSize:10}},clpArr?formatCLP(clpArr):"—"),
+              h("div",{style:{fontFamily:"'DM Mono',monospace",color:"var(--amber)",fontSize:10}},clpSrv?formatCLP(clpSrv):"—"),
+              h("div",{style:{fontFamily:"'DM Mono',monospace",fontWeight:700,fontSize:10}},clpTotal?formatCLP(clpTotal):"—"),
+              h("div",null,c.afecto?h("span",{style:{padding:"2px 6px",borderRadius:6,fontSize:9,fontWeight:600,background:c.afecto==="Afecto"?"var(--abg)":"var(--bbg)",color:c.afecto==="Afecto"?"var(--amber)":"var(--blue)",border:`1px solid ${c.afecto==="Afecto"?"var(--adim)":"rgba(56,189,248,.35)"}`}},c.afecto):h("span",{style:{color:"var(--txd)"}},"—")),
+              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:c.termContrato?"var(--tx)":"var(--txd)"}},c.termContrato||"—"),
+              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.renovacion||"—"),
+              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.aviso||"—"),
+              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:c.fechaReajuste?"var(--tx)":"var(--txd)"}},c.fechaReajuste||"—"),
+              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.pctReaj||"—"),
+              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.cadaAnios?c.cadaAnios+" años":"—"),
+              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},c.m2!=null?c.m2.toLocaleString("es-CL"):"—"),
+              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)",fontWeight:600}},(c.ufM2!=null&&c.m2>0)?(c.ufM2/c.m2).toLocaleString("es-CL",{minimumFractionDigits:3,maximumFractionDigits:3}):"—"),
+              h("div",{style:{fontSize:10,color:isSelected?"var(--acc)":"var(--txd)",textAlign:"right"}},isSelected?"▲":"📋")
+            ),
+            isSelected&&h(HistPanel,{client:c,anio:histAnio,setAnio:setHistAnio,onClose:()=>setHistClient(null)})
+          );
+          })
+      )
+      )
+    )
+  );
+}
+
+/* ═══════════════════════════════════
    VISTA CONTRATOS
 ═══════════════════════════════════ */
 function ContratosView({dashData,driveLoading}){
@@ -7072,6 +7283,7 @@ function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlo
   const pendFact = stats ? Math.max(0, stats.ok - (sentSet?.size||0)) : 0;
   const items = [
     {id:"dashboard", icon:"📊", label:"Dashboard"},
+    {id:"clientes",  icon:"👥", label:"Clientes"},
     {id:"ventas",    icon:"📈", label:"Detalles Ventas"},
     {id:"factura",   icon:"📋", label:"Facturación"},
     {id:"pagos",     icon:"✅", label:"Estado de Pagos"},
@@ -7253,12 +7465,10 @@ function App(){
   const [procDone,setProcDone]=useState(false);
   const [preview,setPreview]=useState(null);
   const [previewPlanilla,setPreviewPlanilla]=useState(null); /* {grupos,bodyHtml,loading,sending} */
-  const [histClient,setHistClient]=useState(null);
   const [splitLoading,setSplitLoading]=useState(false);
   const [splitResult,setSplitResult]=useState(null);
   const [splitStatus,setSplitStatus]=useState("");
   const [ufSII,setUfSII]=useState(null);
-  const [histAnio,setHistAnio]=useState(2026);
   const [unlocked,setUnlocked]=useState(false);
   const [showPwdModal,setShowPwdModal]=useState(false);
   const [currentUser,setCurrentUser]=React.useState(null);
@@ -7284,12 +7494,26 @@ function App(){
   /* ── DASHBOARD STATE ── */
   const [dashData,setDashData]=useState(null);
   const [dashLoading,setDashLoading]=useState(false);
-  const [dashSearch,setDashSearch]=useState("");
-  const [dashSitio,setDashSitio]=useState("all");
-  const [dashMes,setDashMes]=useState("current"); /* "current" = UF actual, o "YYYY-MM" */
-  const [dashSortCol,setDashSortCol]=useState(null);
-  const [dashSortDir,setDashSortDir]=useState("asc");
   const [compMes,setCompMes]=useState(new Date().getMonth()+1); /* 1-12, mes a comparar entre años */
+  /* Mejor mes por defecto para el comparativo: el mes actual recién empieza y
+     puede no tener historial todavía (el panel se ve "vacío"/cortado) — en
+     cuanto carga la planilla, se reubica solo al mes con MÁS años de datos
+     disponibles (empate: el más cercano hacia atrás desde hoy). */
+  React.useEffect(()=>{
+    if(!dashData)return;
+    const countsPorMes={};
+    Object.values(dashData.monthTotals).forEach(v=>{
+      if(v.arr>0||v.srv>0)countsPorMes[v.month]=(countsPorMes[v.month]||0)+1;
+    });
+    const entries=Object.entries(countsPorMes).map(([m,c])=>({mes:Number(m),count:c}));
+    if(!entries.length)return;
+    const maxCount=Math.max(...entries.map(e=>e.count));
+    if(maxCount<2)return; /* nada con 2+ años, dejar el mes actual tal cual */
+    const mejores=entries.filter(e=>e.count===maxCount);
+    const hoyMes=new Date().getMonth()+1;
+    mejores.sort((a,b)=>((hoyMes-a.mes+12)%12)-((hoyMes-b.mes+12)%12));
+    setCompMes(mejores[0].mes);
+  },[dashData]);
 
   /* CAMBIO 1: estado para UF y conversión a CLP */
   const [ufActual,setUfActual]=useState(null);
@@ -8207,7 +8431,7 @@ function App(){
   /* ══════════════════════════════════════════════════════════
      RENDER DASHBOARD
   ══════════════════════════════════════════════════════════ */
-  const renderDashboard=(curSitio,curMes,curSearch)=>{
+  const renderDashboard=()=>{
     /* CAMBIO 1: todos los totales en CLP usando ufActual */
     const ufRef=ufActual||37000; /* fallback si no cargó */
     const totalUfArr=dashData?Math.round(dashData.clients.reduce((s,c)=>s+c.ufArr,0)*100)/100:0;
@@ -8246,11 +8470,11 @@ function App(){
        color sólido, los anteriores atenuados — no hace falta leyenda porque
        el eje X ya identifica cada barra por año. */
     function renderCompPanel(titulo,color,key,maxV){
-      return h("div",{className:"dash-card",style:{flex:1}},
+      return h("div",{style:{flex:1,minWidth:260,background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:10,padding:"12px 14px"}},
         h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}},
-          h("div",{className:"dash-card-lbl"},titulo+" · "+MESES_COMP[compMes-1]),
+          h("div",{className:"dash-card-lbl"},titulo+" · "+MESES_COMP[compMes-1])
         ),
-        compYears.length===0?h("div",{style:{fontSize:11,color:"var(--txd)",padding:"20px 0",textAlign:"center"}},"Sin datos de "+MESES_COMP[compMes-1]+" en el historial"):
+        compYears.length===0?h("div",{style:{fontSize:11,color:"var(--txm)",padding:"30px 0",textAlign:"center",minHeight:COMP_BAR_H}},"Sin datos de "+MESES_COMP[compMes-1]+" en el historial"):
         h("div",{style:{display:"flex",alignItems:"flex-end",gap:14,height:COMP_BAR_H+40,paddingTop:4}},
           compYears.map((v,i)=>{
             const val=v[key]||0;
@@ -8269,55 +8493,6 @@ function App(){
         )
       );
     }
-
-    /* Totales por sitio en CLP para el desglose */
-    const siteMapCLP=dashData?Object.fromEntries(
-      Object.entries(dashData.siteMap).map(([sitio,info])=>([sitio,{
-        ...info,
-        clpArr:Math.round(info.ufArr*ufRef),
-        clpSrv:Math.round(info.ufSrv*ufRef),
-        clpTotal:Math.round((info.ufArr+info.ufSrv)*ufRef),
-      }]))
-    ):{};
-
-    /* Variables tabla clientes — calculadas en el scope de renderDashboard */
-    const tblMesOpts=[{k:"current",l:"Mes actual"},...Object.entries(dashData?dashData.monthTotals:{}).filter(([,v])=>v.arr>0).sort((a,b)=>b[0].localeCompare(a[0])).map(([k,v])=>({k,l:v.label}))];
-    const tblUf=curMes==="current"?ufRef:(monthlyUF[curMes]||ufRef);
-    if(dashData&&curMes!=="current"&&!monthlyUF[curMes]){const[yr,mo]=curMes.split("-").map(Number);getUFForMonth(yr,mo).then(v=>{if(v)setMonthlyUF(p=>({...p,[curMes]:v}));});}
-    const tblClientsUnsorted=dashData?dashData.clients.filter(c=>{
-      const ms=!curSearch||c.nombre.toLowerCase().includes(curSearch.toLowerCase())||c.rut.includes(curSearch);
-      const msite=curSitio==="all"||(c.sitio||"").trim()===(curSitio||"").trim();
-      return ms&&msite;
-    }):[];
-    /* Encabezados ordenables — cada uno mapea a un valor comparable del cliente
-       (usa tblUf para los montos en CLP, calculados igual que en las filas). */
-    const SORT_GETTERS={
-      "Sitio":c=>c.sitio||"",
-      "Cliente / RUT":c=>c.nombre||"",
-      "Arriendo CLP":c=>c.ufArr>0?c.ufArr*tblUf:null,
-      "Serv.Adm. CLP":c=>c.ufSrv>0?c.ufSrv*tblUf:null,
-      "Total CLP":c=>c.ufTotal>0?c.ufTotal*tblUf:null,
-      "IVA":c=>c.afecto||"",
-      "Término":c=>c.termContrato||"",
-      "Antelac.":c=>c.renovacion||"",
-      "Aviso":c=>c.aviso||"",
-      "F.Reajuste":c=>c.fechaReajuste||"",
-      "% Reaj.":c=>c.pctReaj||"",
-      "Cada":c=>c.cadaAnios!=null?c.cadaAnios:null,
-      "m²":c=>c.m2!=null?c.m2:null,
-      "UF×m²":c=>(c.ufM2!=null&&c.m2>0)?c.ufM2/c.m2:null,
-    };
-    const tblClients=(dashSortCol&&SORT_GETTERS[dashSortCol])?
-      [...tblClientsUnsorted].sort((a,b)=>{
-        const va=SORT_GETTERS[dashSortCol](a),vb=SORT_GETTERS[dashSortCol](b);
-        const an=va==null||va==="",bn=vb==null||vb==="";
-        if(an&&bn)return 0;
-        if(an)return 1; // vacíos siempre al final, sea cual sea la dirección
-        if(bn)return -1;
-        const cmp=(typeof va==="number"&&typeof vb==="number")?va-vb:String(va).localeCompare(String(vb),"es",{numeric:true,sensitivity:"base"});
-        return dashSortDir==="desc"?-cmp:cmp;
-      }):tblClientsUnsorted;
-    const tblUfLabel=curMes==="current"?`UF hoy: ${tblUf.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`:`UF ${tblMesOpts.find(m=>m.k===dashMes)?.l||""}: ${tblUf.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 
     const tickerItems=[
       {icon:"👥",lbl:"Total Clientes",val:dashData?String(dashData.clients.length):"—",color:"var(--acc2)"},
@@ -8390,131 +8565,6 @@ function App(){
         h("div",{style:{display:"flex",gap:14,flexWrap:"wrap"}},
           renderCompPanel("Arriendo","var(--blue)","arr",compMaxArr),
           renderCompPanel("Serv. Administrativos","var(--amber)","srv",compMaxSrv)
-        )
-      ),
-
-      /* ── Layout: Sitios (izq) + Tabla de clientes (der) ── */
-      h("div",{style:{display:"grid",gridTemplateColumns:"200px 1fr",gap:16,alignItems:"start"}},
-        /* Panel lateral sitios */
-        h("div",{className:"dash-card",style:{display:"flex",flexDirection:"column",gap:12,background:"#333B4D",backdropFilter:"none",WebkitBackdropFilter:"none"}},
-          h("div",{style:{fontWeight:700,fontSize:12,color:"var(--tx)",marginBottom:2}},"Clientes por Sitio"),
-          dashData?
-            Object.entries(siteMapCLP).filter(([s])=>s&&!/^\d+$/.test(s)).sort((a,b)=>b[1].count-a[1].count).map(([sitio,info])=>{
-              const maxCnt=Math.max(...Object.values(dashData.siteMap).map(s=>s.count));
-              const color=SITIO_C[sitio]||"#888";
-              const isActive=curSitio===sitio;
-              return h("div",{key:sitio,style:{display:"flex",flexDirection:"column",gap:4}},
-                h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6}},
-                  h("button",{
-                    onClick:()=>setDashSitio(isActive?"all":sitio),
-                    style:{
-                      padding:"2px 9px",borderRadius:10,fontSize:10,fontWeight:700,flexShrink:0,
-                      background:isActive?color:`${color}18`,
-                      color:isActive?"#fff":color,
-                      border:`1px solid ${color}${isActive?"":"40"}`,
-                      cursor:"pointer",transition:"all .15s"
-                    }
-                  },sitio+(isActive?" ×":"")),
-                  h("span",{style:{fontSize:10,color:"var(--txm)",fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap",flexShrink:0}},
-                    info.count+" cli")
-                ),
-                h("div",{style:{fontSize:10,color:"var(--blue)",fontFamily:"'DM Mono',monospace",paddingLeft:2,fontWeight:600}},
-                  formatCLPCompact(info.clpTotal)
-                ),
-                h("div",{className:"site-bar-wrap"},
-                  h("div",{className:"site-bar-fill",style:{width:`${(info.count/maxCnt)*100}%`,background:color,opacity:isActive?1:0.5}})
-                )
-              );
-            }):
-            h("div",{style:{color:"var(--txd)",fontSize:12,textAlign:"center",padding:"20px 0"}},"Sin datos")
-        ),
-        /* Tabla de clientes */
-        dashData&&h("div",{key:"tbl-"+curSitio+"-"+curMes,style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,overflow:"hidden"}},
-        /* Barra de controles */
-        h("div",{style:{padding:"10px 14px",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",background:"var(--surf)"}},
-          h("input",{value:dashSearch,onChange:e=>setDashSearch(e.target.value),placeholder:"Buscar cliente o RUT...",style:{width:180}}),
-          h("span",{style:{fontWeight:700,fontSize:12,color:"var(--tx)"}},"Clientes"),
-          h("span",{style:{fontSize:11,color:"var(--txd)",fontFamily:"'DM Mono',monospace",background:"var(--surf2)",padding:"2px 8px",borderRadius:6}},tblClients.length+" / "+dashData.clients.length),
-          h("div",{style:{display:"flex",gap:4,flexWrap:"wrap",marginLeft:4}},
-            h("button",{onClick:()=>setDashSitio("all"),className:`pill${curSitio==="all"?" active":""}`,style:{fontSize:10,padding:"3px 10px"}},"Ver todos"),
-            ...Object.keys(dashData.siteMap).filter(s=>s&&!/^\d+$/.test(s)).sort().map(s=>
-              h("button",{key:s,onClick:()=>setDashSitio(curSitio===s?"all":s),
-                style:{padding:"3px 9px",borderRadius:10,fontSize:10,fontWeight:700,
-                  background:curSitio===s?(SITIO_C[s]||"#888"):`${SITIO_C[s]||"#888"}18`,
-                  color:curSitio===s?"#fff":(SITIO_C[s]||"#888"),
-                  border:`1px solid ${SITIO_C[s]||"#888"}${curSitio===s?"":"40"}`,
-                  cursor:"pointer",transition:"all .15s"}
-              },s)
-            )
-          ),
-          h("select",{value:curMes,onChange:e=>{setDashMes(e.target.value);},
-            style:{fontSize:11,padding:"4px 8px",borderRadius:7,border:"1px solid var(--bdr)",background:"var(--surf)",color:"var(--tx)",fontFamily:"'DM Mono',monospace",marginLeft:4}},
-            tblMesOpts.map(m=>h("option",{key:m.k,value:m.k},m.l))
-          ),
-          h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},tblUfLabel)
-        ),
-        h("div",{className:"dash-client-hdr"},
-          ["Sitio","Cliente / RUT","Arriendo CLP","Serv.Adm. CLP","Total CLP","IVA","Término","Antelac.","Aviso","F.Reajuste","% Reaj.","Cada","m²","UF×m²",""].map(col=>{
-            const sortable=!!SORT_GETTERS[col];
-            const active=dashSortCol===col;
-            return h("div",{
-              key:col,
-              onClick:sortable?()=>{
-                if(dashSortCol===col)setDashSortDir(d=>d==="asc"?"desc":"asc");
-                else{setDashSortCol(col);setDashSortDir("asc");}
-              }:undefined,
-              title:sortable?"Ordenar por "+col:undefined,
-              style:{display:"flex",alignItems:"center",gap:3,cursor:sortable?"pointer":"default",userSelect:"none",color:active?"var(--tx)":undefined}
-            },col,sortable&&h("span",{style:{fontSize:8,opacity:active?1:.3}},active?(dashSortDir==="asc"?"▲":"▼"):"⇅"));
-          })
-        ),
-        h("div",{key:"rows-"+curSitio+"-"+tblClients.length,style:{maxHeight:"calc(100vh - 320px)",overflowY:"auto",overflowX:"auto"}},
-          tblClients.length===0?
-            h("div",{style:{padding:"32px",textAlign:"center",color:"var(--txd)",fontSize:13}},"Sin resultados"):
-            tblClients.map(c=>{
-              const color=SITIO_C[c.sitio]||"#888";
-              const clpArr=c.ufArr>0?Math.round(c.ufArr*tblUf):null;
-              const clpSrv=c.ufSrv>0?Math.round(c.ufSrv*tblUf):null;
-              const clpTotal=c.ufTotal>0?Math.round(c.ufTotal*tblUf):null;
-              const isSelected=histClient&&histClient.rut===c.rut&&histClient.sitio===c.sitio;
-              const numDirM=(c.dir||"").match(/(\d+(?:-[A-Za-z0-9]+)?)\s*$/);
-              const edifTienePiso=/piso/i.test(c.edificio||"");
-              const numDir=numDirM?((numDirM[1].includes("-")||!edifTienePiso)?numDirM[1]:"Piso "+numDirM[1]):null;
-              return h("div",{key:c.rut+c.nombre+c.sitio+"_wrap",style:{borderBottom:"1px solid var(--bdr)",background:isSelected?"var(--bbg)":"transparent"}},
-              h("div",{
-                className:"dash-client-row",
-                style:{cursor:"pointer",borderBottom:"none",background:isSelected?"var(--bbg)":"transparent"},
-                onClick:()=>{setHistClient(isSelected?null:c);setHistAnio(2026);},
-                title:isSelected?"Cerrar historial":"Ver historial del cliente"
-              },
-                h("div",{style:{display:"flex",flexDirection:"column",gap:2}},
-                  h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${color}18`,color,border:`1px solid ${color}40`,alignSelf:"flex-start"}},c.sitio||"—"),
-                  c.edificio&&h("span",{style:{fontSize:8,color:"var(--txd)",fontFamily:"'DM Mono',monospace",paddingLeft:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:52}},c.edificio),
-                  numDir&&h("span",{title:c.dir,style:{fontSize:8,color:"var(--txm)",fontFamily:"'JetBrains Mono',monospace",paddingLeft:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:52}},numDir)
-                ),
-                h("div",{style:{flexDirection:"column",alignItems:"flex-start",gap:2}},
-                  h("div",{style:{fontWeight:600,fontSize:11,lineHeight:1.3}},c.nombre),
-                  h("div",{style:{fontSize:9,color:"var(--txm)",fontFamily:"'JetBrains Mono',monospace"}},c.rut),
-                  c.email&&h("a",{href:"mailto:"+c.email,style:{fontSize:9,color:"var(--accl)",fontFamily:"'DM Mono',monospace",textDecoration:"none",userSelect:"text"},title:c.email},c.email)
-                ),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",color:"var(--blue)",fontWeight:600,fontSize:10}},clpArr?formatCLP(clpArr):"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",color:"var(--amber)",fontSize:10}},clpSrv?formatCLP(clpSrv):"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontWeight:700,fontSize:10}},clpTotal?formatCLP(clpTotal):"—"),
-                h("div",null,c.afecto?h("span",{style:{padding:"2px 6px",borderRadius:6,fontSize:9,fontWeight:600,background:c.afecto==="Afecto"?"var(--abg)":"var(--bbg)",color:c.afecto==="Afecto"?"var(--amber)":"var(--blue)",border:`1px solid ${c.afecto==="Afecto"?"var(--adim)":"rgba(56,189,248,.35)"}`}},c.afecto):h("span",{style:{color:"var(--txd)"}},"—")),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:c.termContrato?"var(--tx)":"var(--txd)"}},c.termContrato||"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.renovacion||"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.aviso||"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:c.fechaReajuste?"var(--tx)":"var(--txd)"}},c.fechaReajuste||"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.pctReaj||"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.cadaAnios?c.cadaAnios+" años":"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},c.m2!=null?c.m2.toLocaleString("es-CL"):"—"),
-                h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)",fontWeight:600}},(c.ufM2!=null&&c.m2>0)?(c.ufM2/c.m2).toLocaleString("es-CL",{minimumFractionDigits:3,maximumFractionDigits:3}):"—"),
-                h("div",{style:{fontSize:10,color:isSelected?"var(--acc)":"var(--txd)",textAlign:"right"}},isSelected?"▲":"📋")
-              ),
-              isSelected&&h(HistPanel,{client:c,anio:histAnio,setAnio:setHistAnio,onClose:()=>setHistClient(null)})
-            );
-            })
-        )
         )
       ),
 
@@ -9185,7 +9235,7 @@ function App(){
     h("header",{className:(view==="table"||view==="upload")?"fv2":undefined,style:{background:view==="table"?"#0F1B33":"var(--surf)",borderBottom:view==="table"?"1px solid #1C2C4A":"1px solid var(--bdr)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:49,gap:10}},
       h("div",{style:{display:"flex",alignItems:"center",gap:10}},
         h("div",{className:view==="table"?"fv2-title":undefined,style:{fontSize:13,fontWeight:700,letterSpacing:"-0.3px",color:view==="table"?"#fff":"var(--tx)"}},
-          view==="dashboard"?"📊 Dashboard":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="cuentas"?"🔌 Cuentas Servicios":view==="vacantes"?"🗺️ Catastro de Sitios":view==="fact-cobrar"?"💰 Facturas x Cobrar":view==="pagos"?"✅ Estado de Pagos":view==="cortijo"?"🏡 El Cortijo":view==="torre2680"?"🏢 Torre 2680":view==="historial-fact"?"📂 Facturación - Nubox Resumen de Ventas":"📋 Facturación"
+          view==="dashboard"?"📊 Dashboard":view==="clientes"?"👥 Clientes":view==="ventas"?"📈 Detalles Ventas":view==="contratos"?"📄 Contratos":view==="cuentas"?"🔌 Cuentas Servicios":view==="vacantes"?"🗺️ Catastro de Sitios":view==="fact-cobrar"?"💰 Facturas x Cobrar":view==="pagos"?"✅ Estado de Pagos":view==="cortijo"?"🏡 El Cortijo":view==="torre2680"?"🏢 Torre 2680":view==="historial-fact"?"📂 Facturación - Nubox Resumen de Ventas":"📋 Facturación"
         ),
         view==="table"&&h("span",{style:{display:"inline-flex",alignItems:"center",gap:6,fontSize:14,fontWeight:600,color:"#8FB0FF",marginLeft:6}},h("span",{className:"fv2-pulse"}),periodo)
       ),
@@ -9209,7 +9259,8 @@ function App(){
     (view==="table"||view==="upload")&&h("div",{className:"fv2-stream"}),
 
     /* VIEWS */
-    view==="dashboard"&&renderDashboard(dashSitio,dashMes,dashSearch),
+    view==="dashboard"&&renderDashboard(),
+    view==="clientes"&&h(ClientesView,{dashData,driveLoading,notify}),
 
 
     view==="upload"&&h("main",{style:{flex:1,display:"flex",flexDirection:"column",background:"var(--bg)"},className:"fade-up fv2"},
