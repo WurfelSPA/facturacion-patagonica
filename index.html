@@ -2746,8 +2746,10 @@ FORMATO DE SALIDA (obligatorio, no agregues explicaciones fuera de este formato)
 /* ═══════════════════════════════════
    VISTA FACTURAS x COBRAR
 ═══════════════════════════════════ */
-function FactxCobrarView({notify}){
+function FactxCobrarView({notify,dashData}){
   var rowsS=React.useState([]); var rows=rowsS[0]; var setRows=rowsS[1];
+  var ufHoyS=React.useState(null); var ufHoy=ufHoyS[0]; var setUfHoy=ufHoyS[1];
+  React.useEffect(function(){getUFHoy().then(setUfHoy);},[]);
   var loadingS=React.useState(true); var loading=loadingS[0]; var setLoading=loadingS[1];
   var errorS=React.useState(null); var error=errorS[0]; var setError=errorS[1];
   var searchS=React.useState(""); var search=searchS[0]; var setSearch=searchS[1];
@@ -2883,11 +2885,20 @@ function FactxCobrarView({notify}){
 
   React.useEffect(function(){discoverFolder();},[]);
 
+  // ── Sitio de cada cliente, cruzando por RUT contra la Planilla (Dashboard) ──
+  var sitioPorRut={};
+  if(dashData&&dashData.clients){
+    dashData.clients.forEach(function(c){
+      var key=_rutNormMora(c.rut);
+      if(key&&c.sitio)sitioPorRut[key]=c.sitio;
+    });
+  }
+
   // ── Agregar clientes (master) ────────────────────────────────
   var clientMap={};
   rows.forEach(function(r){
     var k=r.rut||r.cliente;
-    if(!clientMap[k]){clientMap[k]={rut:r.rut,nombre:r.cliente,docs:[],total:0,maxDias:0};}
+    if(!clientMap[k]){clientMap[k]={rut:r.rut,nombre:r.cliente,docs:[],total:0,maxDias:0,sitio:sitioPorRut[_rutNormMora(r.rut)]||""};}
     clientMap[k].docs.push(r);
     clientMap[k].total+=r.monto;
     /* "Apertura año X"/"Cierre año X" son traspasos contables (se anulan
@@ -2900,6 +2911,14 @@ function FactxCobrarView({notify}){
   var totalGlobal=clients.reduce(function(s,c){return s+c.total;},0);
   var BUCKETS=["<=30","31-60","61-90","91-365","+365"];
 
+  // ── Deuda agrupada por sitio/sector, para el gráfico junto a la evolución ──
+  var deudaPorSitioMap={};
+  clients.forEach(function(c){
+    var s=c.sitio||"Sin sitio";
+    deudaPorSitioMap[s]=(deudaPorSitioMap[s]||0)+c.total;
+  });
+  var deudaPorSitio=Object.entries(deudaPorSitioMap).map(function(e){return{sitio:e[0],totalClp:e[1]};}).sort(function(a,b){return b.totalClp-a.totalClp;});
+
   // ── Filtrar lista de clientes ────────────────────────────────
   var normQ=function(s){return(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();};
   var q=normQ(search);
@@ -2909,8 +2928,8 @@ function FactxCobrarView({notify}){
     return true;
   });
   if(sort.col){filteredClients=filteredClients.slice().sort(function(a,b){
-    var av=sort.col==="total"?a.total:sort.col==="maxDias"?a.maxDias:sort.col==="docs"?a.docs.length:normQ(a.nombre);
-    var bv=sort.col==="total"?b.total:sort.col==="maxDias"?b.maxDias:sort.col==="docs"?b.docs.length:normQ(b.nombre);
+    var av=sort.col==="total"?a.total:sort.col==="maxDias"?a.maxDias:sort.col==="docs"?a.docs.length:sort.col==="sitio"?(a.sitio||""):normQ(a.nombre);
+    var bv=sort.col==="total"?b.total:sort.col==="maxDias"?b.maxDias:sort.col==="docs"?b.docs.length:sort.col==="sitio"?(b.sitio||""):normQ(b.nombre);
     return sort.dir==="asc"?(typeof av==="number"?av-bv:String(av).localeCompare(String(bv),"es")):(typeof bv==="number"?bv-av:String(bv).localeCompare(String(av),"es"));
   });}
 
@@ -3113,8 +3132,11 @@ function FactxCobrarView({notify}){
         );
       })
     ),
-    /* ── Evolución de la deuda total por corte ── */
-    drvFiles.length>1&&h(EvolucionDeudaChart,{drvFiles:drvFiles,allTot:allTot,parseFCobrar:parseFCobrar}),
+    /* ── Evolución de la deuda total por corte + deuda por sitio ── */
+    drvFiles.length>1&&h("div",{style:{display:"flex",flexWrap:"wrap"}},
+      h("div",{style:{flex:"2 1 520px",minWidth:0}},h(EvolucionDeudaChart,{drvFiles:drvFiles,allTot:allTot,parseFCobrar:parseFCobrar})),
+      deudaPorSitio.length>0&&h("div",{style:{flex:"1 1 260px",minWidth:0,borderLeft:"1px solid var(--bdr)"}},h(SectorDeudaChart,{sitios:deudaPorSitio,ufHoy:ufHoy}))
+    ),
     /* Toolbar */
     h("div",{style:{padding:"10px 24px",borderBottom:"1px solid var(--bdr)",background:"var(--surf)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",flexShrink:0}},
       h("input",{type:"text",placeholder:"Buscar cliente o RUT...",value:search,
@@ -3166,7 +3188,7 @@ function FactxCobrarView({notify}){
         :h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:12}},
           h("thead",null,
             h("tr",{style:{background:"var(--surf)",position:"sticky",top:0,zIndex:2}},
-              [["nombre","Cliente"],["rut","RUT"],["docs","Docs"],["maxDias","Antigüedad"],["total","Total"]].map(function(col){
+              [["nombre","Cliente"],["rut","RUT"],["sitio","Sitio"],["docs","Docs"],["maxDias","Antigüedad"],["total","Total"]].map(function(col){
                 return h("th",{key:col[0],onClick:function(){toggleSort(col[0]);},
                   style:{padding:"10px 14px",textAlign:col[0]==="total"?"right":"left",fontWeight:700,color:"var(--txm)",
                     borderBottom:"2px solid var(--bdr)",fontSize:10,letterSpacing:".07em",textTransform:"uppercase",
@@ -3189,6 +3211,11 @@ function FactxCobrarView({notify}){
                 h("div",{style:{fontWeight:700,fontSize:13}},cli.nombre),
               ),
               h("td",{style:{padding:"12px 14px",color:"var(--txm)",fontFamily:"'JetBrains Mono',monospace",fontSize:11,whiteSpace:"nowrap"}},cli.rut),
+              h("td",{style:{padding:"12px 14px"}},
+                cli.sitio
+                  ?h("span",{style:{fontSize:10,fontWeight:700,padding:"2px 9px",borderRadius:20,background:(SITIO_C[cli.sitio]||"#888")+"22",color:SITIO_C[cli.sitio]||"var(--txm)",border:"1px solid "+(SITIO_C[cli.sitio]||"#888")+"55",whiteSpace:"nowrap"}},cli.sitio)
+                  :h("span",{style:{color:"var(--txd)",fontSize:11}},"—")
+              ),
               h("td",{style:{padding:"12px 14px",color:"var(--txm)",fontSize:12,textAlign:"center"}},
                 h("span",{style:{display:"inline-block",padding:"2px 8px",borderRadius:20,background:"var(--bbg)",color:"var(--acc)",fontWeight:700,fontSize:11}},cli.docs.length)
               ),
@@ -3269,6 +3296,32 @@ function EvolucionDeudaChart({drvFiles,allTot,parseFCobrar}){
           h("text",{x:bx+boxW/2,y:by+29,textAnchor:"middle",fontSize:12,fontWeight:700,fill:"var(--tx)"},fmtCLP(d.tot))
         );
       })()
+    )
+  );
+}
+
+/* Deuda total agrupada por sitio/sector, en UF (cruce por RUT con la
+   Planilla). Pensada para ir al lado derecho de EvolucionDeudaChart. */
+function SectorDeudaChart({sitios,ufHoy}){
+  if(!ufHoy)return h("div",{style:{padding:"14px 24px",background:"var(--surf)",borderBottom:"1px solid var(--bdr)",flexShrink:0,flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--txm)",fontSize:12}},
+    h("span",{className:"fv2-loader",style:{width:16,height:16,fontSize:16,marginRight:8}}),"Cargando UF...");
+  const data=sitios.map(s=>({sitio:s.sitio,uf:s.totalClp/ufHoy}));
+  const maxUf=Math.max(1,...data.map(d=>d.uf));
+  return h("div",{style:{padding:"14px 24px",background:"var(--surf)",borderBottom:"1px solid var(--bdr)",flexShrink:0,flex:1,display:"flex",flexDirection:"column",gap:10,minWidth:0}},
+    h("div",{style:{fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:".07em",textTransform:"uppercase",marginBottom:2}},"Deuda por sitio (UF)"),
+    h("div",{style:{display:"flex",flexDirection:"column",gap:7,overflowY:"auto",maxHeight:200}},
+      data.map(d=>{
+        const color=SITIO_C[d.sitio]||"#888";
+        const pct=Math.max(2,Math.round((d.uf/maxUf)*100));
+        return h("div",{key:d.sitio,style:{display:"flex",alignItems:"center",gap:8}},
+          h("div",{style:{width:48,fontSize:10,fontWeight:700,color,flexShrink:0,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}},d.sitio),
+          h("div",{className:"epv2-bar-track",style:{flex:1,height:14}},
+            h("div",{className:"epv2-bar-fill",title:d.sitio+": "+d.uf.toLocaleString("es-CL",{maximumFractionDigits:1})+" UF",
+              style:{height:"100%",width:pct+"%","--glow":color,background:color}})
+          ),
+          h("div",{style:{width:86,textAlign:"right",fontSize:11,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:"var(--tx)",flexShrink:0}},d.uf.toLocaleString("es-CL",{maximumFractionDigits:1})+" UF")
+        );
+      })
     )
   );
 }
@@ -9832,7 +9885,7 @@ function App(){
       )
     )
     ,view==="ventas"&&h(VentasView,{periodo})
-    ,view==="fact-cobrar"&&h(FactxCobrarView,{notify})
+    ,view==="fact-cobrar"&&h(FactxCobrarView,{notify,dashData})
     ,view==="pagos"&&h(EstadoPagosView,{notify})
     ,view==="contratos"&&h(ContratosView,{dashData,driveLoading})
     ,view==="cuentas"&&h(CuentasServiciosView,{dashData,driveLoading,notify})
