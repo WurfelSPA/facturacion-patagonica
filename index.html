@@ -379,6 +379,63 @@ function formatCLPCompact(pesos){
   return"$"+n.toLocaleString("es-CL");
 }
 
+/* ── Rampa secuencial de un solo tono (claro→oscuro), para series de 12 meses ── */
+function seqRamp(hue,sat,n){
+  const lFrom=82,lTo=34;
+  return Array.from({length:n},(_,i)=>`hsl(${hue},${sat}%,${Math.round(lFrom-i*(lFrom-lTo)/Math.max(1,n-1))}%)`);
+}
+
+/* ── Gráfico de torta/dona en SVG puro (sin librerías) con leyenda lateral ── */
+function DonutChart({segments,size,thickness,centerLbl,centerVal}){
+  size=size||150;thickness=thickness||22;
+  const r=(size-thickness)/2,cx=size/2,cy=size/2;
+  const total=segments.reduce((s,d)=>s+d.value,0);
+  let acc=0;
+  const arcs=segments.filter(d=>d.value>0).map(d=>{
+    const pct=total>0?(d.value/total)*100:0;
+    const dashoffset=-acc;
+    acc+=pct;
+    return h("circle",{key:d.label,cx,cy,r,fill:"none",stroke:d.color,strokeWidth:thickness,
+      pathLength:100,strokeDasharray:`${pct} ${100-pct}`,strokeDashoffset:dashoffset,
+      style:{transition:"stroke-dasharray .4s"}},h("title",null,`${d.label}: ${d.value.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})} UF (${pct.toFixed(1)}%)`));
+  });
+  return h("div",{style:{display:"flex",alignItems:"center",gap:18,flexWrap:"wrap"}},
+    h("div",{style:{position:"relative",width:size,height:size,flexShrink:0}},
+      h("svg",{width:size,height:size,viewBox:`0 0 ${size} ${size}`,style:{transform:"rotate(-90deg)"}},arcs),
+      h("div",{style:{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center",padding:4}},
+        h("div",{style:{fontSize:9,fontWeight:700,letterSpacing:".06em",color:"var(--txd)",textTransform:"uppercase"}},centerLbl),
+        h("div",{style:{fontSize:15,fontWeight:700,fontFamily:"'DM Mono',monospace",color:"var(--tx)",lineHeight:1.15}},centerVal)
+      )
+    ),
+    h("div",{style:{display:"flex",flexDirection:"column",gap:3,minWidth:120,maxHeight:size,overflowY:"auto"}},
+      segments.map(d=>{
+        const pct=total>0?(d.value/total)*100:0;
+        return h("div",{key:d.label,style:{display:"flex",alignItems:"center",gap:6,fontSize:11}},
+          h("span",{style:{width:8,height:8,borderRadius:2,background:d.color,flexShrink:0}}),
+          h("span",{style:{color:"var(--txm)",flex:1}},d.label),
+          h("span",{style:{fontWeight:700,color:"var(--tx)",fontFamily:"'DM Mono',monospace"}},pct.toFixed(1)+"%")
+        );
+      })
+    )
+  );
+}
+
+/* ── Barras de 12 meses (un año), intensidad de color secuencial ── */
+function MonthBarChart({meses,height}){
+  height=height||110;
+  const maxV=Math.max(1,...meses.map(m=>m.value));
+  return h("div",{style:{display:"flex",alignItems:"flex-end",gap:4,height:height+28}},
+    meses.map(m=>{
+      const barH=m.value>0?Math.max(3,Math.round((m.value/maxV)*height)):2;
+      return h("div",{key:m.label,title:`${m.label}: ${m.value.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})} UF`,
+        style:{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flex:1,minWidth:0}},
+        h("div",{style:{width:"100%",maxWidth:22,height:barH,borderRadius:"3px 3px 0 0",background:m.value>0?m.color:"var(--bdr)"}}),
+        h("div",{style:{fontSize:9,fontWeight:600,color:"var(--txd)"}},m.label)
+      );
+    })
+  );
+}
+
 /* ── Google OAuth (Gmail + Drive) ── */
 function loadGisScript(){return new Promise(res=>{if(window.google?.accounts){res();return;}const s=document.createElement("script");s.src="https://accounts.google.com/gsi/client";s.onload=res;document.head.appendChild(s);});}
 let _gToken=null,_gTokenExp=0;
@@ -7494,6 +7551,7 @@ function App(){
   /* ── DASHBOARD STATE ── */
   const [dashData,setDashData]=useState(null);
   const [dashLoading,setDashLoading]=useState(false);
+  const [dashAnio,setDashAnio]=useState(new Date().getFullYear()); /* año de los totales/gráficos del dashboard */
   const [compMes,setCompMes]=useState(new Date().getMonth()+1); /* 1-12, mes a comparar entre años */
   /* Mejor mes por defecto para el comparativo: el mes actual recién empieza y
      puede no tener historial todavía (el panel se ve "vacío"/cortado) — en
@@ -8441,23 +8499,33 @@ function App(){
     const totalClpSrv=Math.round(totalUfSrv*ufRef);
     const totalClp=Math.round(totalUf*ufRef);
     const afectoCount=dashData?dashData.clients.filter(c=>c.afecto==="Afecto").length:0;
+    const MESES_COMP=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 
-    /* Gráfico: últimos 15 meses con datos — CAMBIO 1: valores en CLP */
-    const chartMonths=dashData?Object.entries(dashData.monthTotals)
-      .filter(([,v])=>v.arr>0)
-      .sort((a,b)=>a[0].localeCompare(b[0]))
-      .slice(-15):[];
-    const chartData=chartMonths.map(([key,v])=>{
-      const uf=monthlyUF[key]||ufRef;
-      return{key,label:v.label,arr:Math.round(v.arr*uf),srv:Math.round(v.srv*uf),year:v.year,month:v.month};
-    });
-    const maxVal=chartData.length?Math.max(...chartData.map(v=>v.arr+v.srv)):1;
-    const CHART_H=110;
+    /* ── Totales del año seleccionado (encabezado + gráficos de barras/torta) ── */
+    const anios=dashData?Array.from(new Set(Object.values(dashData.monthTotals).map(v=>v.year))).sort((a,b)=>a-b):[];
+    const anioOptions=Array.from(new Set([...anios,dashAnio])).sort((a,b)=>b-a);
+    const yearRec=dashData?Object.values(dashData.monthTotals).filter(v=>v.year===dashAnio):[];
+    const yearArr=Math.round(yearRec.reduce((s,v)=>s+(v.arr||0),0)*100)/100;
+    const yearSrv=Math.round(yearRec.reduce((s,v)=>s+(v.srv||0),0)*100)/100;
+    const yearTotal=Math.round((yearArr+yearSrv)*100)/100;
+    const yearClpArr=Math.round(yearArr*ufRef),yearClpSrv=Math.round(yearSrv*ufRef),yearClpTotal=Math.round(yearTotal*ufRef);
+
+    const RAMP_BLUE=seqRamp(222,78,12),RAMP_GREEN=seqRamp(158,55,12);
+    function mesesDe(key,ramp){
+      return MESES_COMP.map((lbl,i)=>{
+        const rec=yearRec.find(v=>v.month===i+1);
+        return{label:lbl,value:rec?(rec[key]||0):0,color:ramp[i]};
+      });
+    }
+    const mesesArr=dashData?mesesDe("arr",RAMP_BLUE):[];
+    const mesesSrv=dashData?mesesDe("srv",RAMP_GREEN):[];
+
+    /* ── Resumen de clientes por sitio, en UF (misma posición que antes) ── */
+    const siteSummary=dashData?Object.entries(dashData.siteMap).filter(([s])=>s&&!/^\d+$/.test(s)).sort((a,b)=>b[1].count-a[1].count):[];
 
     /* Comparativo por año de un mismo mes (ej. Julio 2023 vs 2024 vs 2025 vs
        2026) — en UF, la unidad real del contrato, no CLP (evita que un cambio
        del valor UF entre años se vea como "aumento" que no es tal). */
-    const MESES_COMP=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
     const compYears=dashData?Object.values(dashData.monthTotals)
       .filter(v=>v.month===compMes&&(v.arr>0||v.srv>0))
       .sort((a,b)=>a.year-b.year):[];
@@ -8497,13 +8565,45 @@ function App(){
     const tickerItems=[
       {icon:"👥",lbl:"Total Clientes",val:dashData?String(dashData.clients.length):"—",color:"var(--acc2)"},
       {icon:"🏢",lbl:"Arriendo Mensual",val:dashData?`${totalUfArr.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—",sub:dashData?formatCLPCompact(totalClpArr):"",color:"var(--blue)"},
-      {icon:"🧾",lbl:"Serv. Administrativos",val:dashData?`${totalUfSrv.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—",sub:dashData?formatCLPCompact(totalClpSrv):"",color:"var(--amber)"},
-      {icon:"💰",lbl:"Total Mensual",val:dashData?`${totalUf.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—",sub:dashData?formatCLPCompact(totalClp):"",color:"var(--green)"},
+      {icon:"🧾",lbl:"Serv. Administrativos",val:dashData?`${totalUfSrv.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—",sub:dashData?formatCLPCompact(totalClpSrv):"",color:"var(--green)"},
+      {icon:"💰",lbl:"Total Mensual",val:dashData?`${totalUf.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—",sub:dashData?formatCLPCompact(totalClp):"",color:"var(--acc)"},
       {icon:"📊",lbl:"Afecto IVA",val:dashData?String(afectoCount):"—",color:"var(--amber)"},
-      {icon:"◆",lbl:"UF Hoy",val:ufActual?ufActual.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2}):"—",color:"var(--acc)",loading:ufLoading}
+      {icon:"◆",lbl:"UF Hoy",val:ufActual?ufActual.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2}):"—",color:"var(--acc2)",loading:ufLoading}
     ];
 
-    return h("main",{style:{flex:1,overflowY:"auto",padding:"18px 22px",display:"flex",flexDirection:"column",gap:16},className:"fade-up epv2"},
+    /* Sección de un concepto (Arriendo o Serv.Adm): a la izquierda el
+       comparativo entre años de un mismo mes, a la derecha la distribución
+       de los 12 meses del año elegido en barras + torta. */
+    function conceptSection(titulo,icono,colorVar,key,compMax,meses,mostrarSelector){
+      const totalMeses=meses.reduce((s,m)=>s+m.value,0);
+      return h("div",{className:"dash-card",style:{display:"flex",flexDirection:"column",gap:14}},
+        h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}},
+          h("div",{style:{display:"flex",alignItems:"center",gap:8}},
+            h("span",{style:{fontSize:15}},icono),
+            h("div",{style:{fontWeight:700,fontSize:13,color:"var(--tx)"}},titulo+" · "+dashAnio)
+          ),
+          mostrarSelector&&h("div",{style:{display:"flex",alignItems:"center",gap:8}},
+            h("span",{style:{fontSize:11,color:"var(--txm)"}},"Comparar mes entre años:"),
+            h("select",{value:compMes,onChange:e=>setCompMes(Number(e.target.value)),
+              style:{fontSize:11,fontWeight:600,padding:"5px 10px",borderRadius:7,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)"}},
+              MESES_COMP.map((m,i)=>h("option",{key:i,value:i+1},m)))
+          )
+        ),
+        h("div",{style:{display:"grid",gridTemplateColumns:"minmax(230px,320px) 1fr",gap:16,alignItems:"stretch"}},
+          renderCompPanel(titulo,colorVar,key,compMax),
+          h("div",{style:{background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:10,padding:"12px 14px",display:"flex",flexDirection:"column",gap:14}},
+            h("div",{className:"dash-card-lbl"},"Distribución mensual "+dashAnio),
+            h(MonthBarChart,{meses}),
+            h("div",{style:{height:1,background:"var(--bdr)"}}),
+            h(DonutChart,{segments:meses.map(m=>({label:m.label,value:m.value,color:m.color})),
+              centerLbl:"Total "+dashAnio,
+              centerVal:totalMeses.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})+" UF"})
+          )
+        )
+      );
+    }
+
+    return h("main",{style:{flex:1,overflowY:"auto",padding:"18px 22px",display:"flex",flexDirection:"column",gap:16,background:"var(--bg)",color:"var(--tx)"},className:"fade-up fv2"},
 
       /* Banner ticker — recorre los KPIs clave sin parar */
       h("div",{className:"epv2-marquee"},
@@ -8525,7 +8625,18 @@ function App(){
         files.planilla&&h("button",{onClick:()=>{setFiles(p=>({...p,planilla:null}));setDashData(null);},style:{marginLeft:"auto",fontSize:10,padding:"2px 10px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--txm)",cursor:"pointer"}},"↻ Actualizar")
       ),
 
-      /* ── KPIs en CLP ── */
+      /* ── Encabezado: totales del año + selector ── */
+      h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}},
+        h("div",{style:{fontWeight:700,fontSize:14,color:"var(--tx)"}},"Totales del año"),
+        h("div",{style:{display:"flex",alignItems:"center",gap:8}},
+          h("span",{style:{fontSize:11,color:"var(--txm)"}},"Año:"),
+          h("select",{value:dashAnio,onChange:e=>setDashAnio(Number(e.target.value)),
+            style:{fontSize:12,fontWeight:700,padding:"6px 12px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf)",color:"var(--tx)"}},
+            anioOptions.map(a=>h("option",{key:a,value:a},a)))
+        )
+      ),
+
+      /* ── KPIs del año seleccionado ── */
       h("div",{className:"kpi-grid"},
         h("div",{className:"dash-card"},
           h("div",{className:"dash-card-lbl"},"Total Clientes"),
@@ -8533,19 +8644,19 @@ function App(){
           h("div",{className:"dash-card-sub"},dashData?`${Object.keys(dashData.siteMap).filter(s=>dashData.siteMap[s].count>0).length} sitios activos`:"Carga la planilla")
         ),
         h("div",{className:"dash-card"},
-          h("div",{className:"dash-card-lbl"},"Arriendo Mensual"),
-          h("div",{className:"dash-card-val",style:{color:"var(--blue)",fontSize:22}},dashData?`${totalUfArr.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—"),
-          h("div",{className:"dash-card-sub"},dashData?formatCLPCompact(totalClpArr):"s/contrato")
+          h("div",{className:"dash-card-lbl"},"Arriendo "+dashAnio),
+          h("div",{className:"dash-card-val",style:{color:"var(--blue)",fontSize:22}},dashData?`${yearArr.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—"),
+          h("div",{className:"dash-card-sub"},dashData?formatCLPCompact(yearClpArr):"s/contrato")
         ),
         h("div",{className:"dash-card"},
-          h("div",{className:"dash-card-lbl"},"Serv. Administrativos"),
-          h("div",{className:"dash-card-val",style:{color:"var(--amber)",fontSize:22}},dashData?`${totalUfSrv.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—"),
-          h("div",{className:"dash-card-sub"},dashData?formatCLPCompact(totalClpSrv):"cálculo base mensual")
+          h("div",{className:"dash-card-lbl"},"Serv. Administrativos "+dashAnio),
+          h("div",{className:"dash-card-val",style:{color:"var(--green)",fontSize:22}},dashData?`${yearSrv.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—"),
+          h("div",{className:"dash-card-sub"},dashData?formatCLPCompact(yearClpSrv):"cálculo base mensual")
         ),
         h("div",{className:"dash-card"},
-          h("div",{className:"dash-card-lbl"},"Total Mensual"),
-          h("div",{className:"dash-card-val",style:{color:"var(--green)",fontSize:22}},dashData?`${totalUf.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—"),
-          h("div",{className:"dash-card-sub"},dashData?formatCLPCompact(totalClp):"arriendo + serv. adm.")
+          h("div",{className:"dash-card-lbl"},"Total "+dashAnio),
+          h("div",{className:"dash-card-val",style:{color:"var(--acc)",fontSize:22}},dashData?`${yearTotal.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—"),
+          h("div",{className:"dash-card-sub"},dashData?formatCLPCompact(yearClpTotal):"arriendo + serv. adm.")
         ),
         h("div",{className:"dash-card"},
           h("div",{className:"dash-card-lbl"},"Afecto IVA"),
@@ -8554,19 +8665,38 @@ function App(){
         )
       ),
 
-      /* ── Comparativo año a año de un mismo mes ── */
-      h("div",{className:"dash-card",style:{display:"flex",flexDirection:"column",gap:12}},
-        h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}},
-          h("div",{style:{fontWeight:700,fontSize:12,color:"var(--tx)"}},"Comparativo mensual entre años"),
-          h("select",{value:compMes,onChange:e=>setCompMes(Number(e.target.value)),
-            style:{fontSize:11,fontWeight:600,padding:"5px 10px",borderRadius:7,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)"}},
-            MESES_COMP.map((m,i)=>h("option",{key:i,value:i+1},m)))
+      /* ── Clientes por sitio, en UF ── */
+      dashData&&h("div",{className:"dash-card",style:{display:"flex",flexDirection:"column",gap:12}},
+        h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
+          h("div",{className:"dash-card-lbl"},"Clientes por Sitio"),
+          h("div",{style:{fontSize:10,color:"var(--txd)"}},"UF vigentes")
         ),
-        h("div",{style:{display:"flex",gap:14,flexWrap:"wrap"}},
-          renderCompPanel("Arriendo","var(--blue)","arr",compMaxArr),
-          renderCompPanel("Serv. Administrativos","var(--amber)","srv",compMaxSrv)
+        h("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:10}},
+          siteSummary.map(([sitio,info])=>{
+            const color=SITIO_C[sitio]||"#888";
+            return h("div",{key:sitio,style:{border:"1px solid var(--bdr)",borderRadius:9,padding:"10px 12px",background:"var(--surf2)"}},
+              h("div",{style:{display:"flex",alignItems:"center",gap:6,marginBottom:8}},
+                h("span",{style:{width:8,height:8,borderRadius:2,background:color,flexShrink:0}}),
+                h("span",{style:{fontWeight:700,fontSize:12,color:"var(--tx)"}},sitio),
+                h("span",{style:{marginLeft:"auto",fontSize:10,color:"var(--txm)",fontWeight:600}},info.count+(info.count===1?" cliente":" clientes"))
+              ),
+              h("div",{style:{display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:700,fontFamily:"'DM Mono',monospace"}},
+                h("span",{style:{color:"var(--blue)"}},info.ufArr.toLocaleString("es-CL",{maximumFractionDigits:1})+" UF"),
+                h("span",{style:{color:"var(--green)"}},info.ufSrv.toLocaleString("es-CL",{maximumFractionDigits:1})+" UF")
+              ),
+              h("div",{style:{display:"flex",justifyContent:"space-between",fontSize:9,color:"var(--txd)",marginTop:2}},
+                h("span",null,"Arriendo"),h("span",null,"Serv.Adm")
+              )
+            );
+          })
         )
       ),
+
+      /* ── Arriendo: comparativo entre años + distribución mensual del año ── */
+      dashData&&conceptSection("Arriendo","🏢","var(--blue)","arr",compMaxArr,mesesArr,true),
+
+      /* ── Servicios Administrativos: mismos gráficos, en verde ── */
+      dashData&&conceptSection("Servicios Administrativos","🧾","var(--green)","srv",compMaxSrv,mesesSrv,false),
 
       /* Estado carga Drive o upload manual fallback */
       (!files.planilla)&&h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,padding:20}},
