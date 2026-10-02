@@ -8678,12 +8678,14 @@ function App(){
           h("span",{style:{fontSize:15}},icono),
           h("div",{style:{fontWeight:700,fontSize:13,color:"var(--tx)"}},titulo+" · "+dashAnio)
         ),
-        h("div",{style:{display:"grid",gridTemplateColumns:"minmax(230px,320px) 1fr",gap:16,alignItems:"stretch"}},
+        h("div",{style:{display:"grid",gridTemplateColumns:"minmax(230px,300px) 1fr minmax(260px,300px)",gap:16,alignItems:"stretch"}},
           renderCompPanel(titulo,colorVar,key,compMax,mostrarSelector),
           h("div",{style:{background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:10,padding:"12px 14px",display:"flex",flexDirection:"column",gap:14}},
             h("div",{className:"dash-card-lbl"},"Distribución mensual "+dashAnio),
-            h(MonthBarChart,{meses}),
-            h("div",{style:{height:1,background:"var(--bdr)"}}),
+            h(MonthBarChart,{meses})
+          ),
+          h("div",{style:{background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:10,padding:"12px 14px",display:"flex",flexDirection:"column",gap:14}},
+            h("div",{className:"dash-card-lbl"},"Participación mensual "+dashAnio),
             h(DonutChart,{segments:meses.map(m=>({label:m.label,value:m.value,color:m.color})),
               centerLbl:"Total "+dashAnio,
               centerVal:totalMeses.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})+" UF"})
