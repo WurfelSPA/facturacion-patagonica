@@ -739,7 +739,7 @@ async function parsePlanillaParaDashboard(file){
     const v=row3[ci];
     if(typeof v==="number"&&v>40000&&v<50000){
       const{y,m}=serialToYM(v);
-      if(y>=2024&&y<=2026){
+      if(y>=2023&&y<=new Date().getFullYear()+1){
         /* Columna "GC" (Serv. Admin.) del mes — su distancia a la fecha del mes
            varía (6 o 7 columnas según si el bloque incluye "Pagado"), por eso se
            busca dinámicamente en vez de asumir un offset fijo. */
@@ -890,9 +890,11 @@ async function parsePlanillaParaDashboard(file){
   }
   const monthTotals={};
   for(const mc of monthCols){
-    let totalArr=0;
-    for(const c of clients){const v=c.monthly[mc.key];if(v)totalArr+=v;}
-    const totalSrv=clients.reduce((s,c)=>s+c.ufSrv,0);
+    let totalArr=0,totalSrv=0;
+    for(const c of clients){
+      const v=c.monthly[mc.key];if(v)totalArr+=v;
+      const vg=c.monthlyGC[mc.key];if(vg)totalSrv+=vg;
+    }
     monthTotals[mc.key]={
       label:mc.label,
       arr:Math.round(totalArr*100)/100,
@@ -7287,6 +7289,7 @@ function App(){
   const [dashMes,setDashMes]=useState("current"); /* "current" = UF actual, o "YYYY-MM" */
   const [dashSortCol,setDashSortCol]=useState(null);
   const [dashSortDir,setDashSortDir]=useState("asc");
+  const [compMes,setCompMes]=useState(new Date().getMonth()+1); /* 1-12, mes a comparar entre años */
 
   /* CAMBIO 1: estado para UF y conversión a CLP */
   const [ufActual,setUfActual]=useState(null);
@@ -8227,6 +8230,46 @@ function App(){
     const maxVal=chartData.length?Math.max(...chartData.map(v=>v.arr+v.srv)):1;
     const CHART_H=110;
 
+    /* Comparativo por año de un mismo mes (ej. Julio 2023 vs 2024 vs 2025 vs
+       2026) — en UF, la unidad real del contrato, no CLP (evita que un cambio
+       del valor UF entre años se vea como "aumento" que no es tal). */
+    const MESES_COMP=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+    const compYears=dashData?Object.values(dashData.monthTotals)
+      .filter(v=>v.month===compMes&&(v.arr>0||v.srv>0))
+      .sort((a,b)=>a.year-b.year):[];
+    const compMaxArr=compYears.length?Math.max(...compYears.map(v=>v.arr)):1;
+    const compMaxSrv=compYears.length?Math.max(...compYears.map(v=>v.srv)):1;
+    const COMP_BAR_H=100;
+    const anioMax=compYears.length?Math.max(...compYears.map(v=>v.year)):null;
+    /* Panel de un concepto (Arriendo o Serv.Adm): barra por año + etiqueta de
+       valor + variación % vs el año anterior. El año más reciente queda en
+       color sólido, los anteriores atenuados — no hace falta leyenda porque
+       el eje X ya identifica cada barra por año. */
+    function renderCompPanel(titulo,color,key,maxV){
+      return h("div",{className:"dash-card",style:{flex:1}},
+        h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}},
+          h("div",{className:"dash-card-lbl"},titulo+" · "+MESES_COMP[compMes-1]),
+        ),
+        compYears.length===0?h("div",{style:{fontSize:11,color:"var(--txd)",padding:"20px 0",textAlign:"center"}},"Sin datos de "+MESES_COMP[compMes-1]+" en el historial"):
+        h("div",{style:{display:"flex",alignItems:"flex-end",gap:14,height:COMP_BAR_H+40,paddingTop:4}},
+          compYears.map((v,i)=>{
+            const val=v[key]||0;
+            const h_=Math.max(4,Math.round((val/maxV)*COMP_BAR_H));
+            const prev=i>0?compYears[i-1][key]:null;
+            const pct=(prev&&prev>0)?Math.round(((val-prev)/prev)*1000)/10:null;
+            const esActual=v.year===anioMax;
+            return h("div",{key:v.year,style:{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flex:1,minWidth:0}},
+              h("div",{style:{fontSize:10,fontWeight:700,color:esActual?color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},val.toLocaleString("es-CL",{maximumFractionDigits:0})),
+              h("div",{title:v.year+": "+val.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})+" UF",
+                style:{width:"100%",maxWidth:40,height:h_,borderRadius:"4px 4px 0 0",background:color,opacity:esActual?1:.4,transition:"height .3s"}}),
+              h("div",{style:{fontSize:10,fontWeight:700,color:"var(--txd)"}},v.year),
+              pct!=null&&h("div",{style:{fontSize:9,fontWeight:700,color:pct>=0?"var(--green)":"var(--red)"}},(pct>=0?"+":"")+pct+"%")
+            );
+          })
+        )
+      );
+    }
+
     /* Totales por sitio en CLP para el desglose */
     const siteMapCLP=dashData?Object.fromEntries(
       Object.entries(dashData.siteMap).map(([sitio,info])=>([sitio,{
@@ -8333,6 +8376,20 @@ function App(){
           h("div",{className:"dash-card-lbl"},"Afecto IVA"),
           h("div",{className:"dash-card-val",style:{color:"var(--amber)",fontSize:30}},dashData?afectoCount:"—"),
           h("div",{className:"dash-card-sub"},dashData?`${dashData.clients.filter(c=>c.afecto==="Exento").length} exentos de IVA`:"")
+        )
+      ),
+
+      /* ── Comparativo año a año de un mismo mes ── */
+      h("div",{className:"dash-card",style:{display:"flex",flexDirection:"column",gap:12}},
+        h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}},
+          h("div",{style:{fontWeight:700,fontSize:12,color:"var(--tx)"}},"Comparativo mensual entre años"),
+          h("select",{value:compMes,onChange:e=>setCompMes(Number(e.target.value)),
+            style:{fontSize:11,fontWeight:600,padding:"5px 10px",borderRadius:7,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--tx)"}},
+            MESES_COMP.map((m,i)=>h("option",{key:i,value:i+1},m)))
+        ),
+        h("div",{style:{display:"flex",gap:14,flexWrap:"wrap"}},
+          renderCompPanel("Arriendo","var(--blue)","arr",compMaxArr),
+          renderCompPanel("Serv. Administrativos","var(--amber)","srv",compMaxSrv)
         )
       ),
 
