@@ -8278,9 +8278,9 @@ function App(){
 
     const tickerItems=[
       {icon:"👥",lbl:"Total Clientes",val:dashData?String(dashData.clients.length):"—",color:"var(--acc2)"},
-      {icon:"🏢",lbl:"Arriendo Mensual",val:dashData?formatCLPCompact(totalClpArr):"—",color:"var(--blue)"},
-      {icon:"🧾",lbl:"Serv. Administrativos",val:dashData?formatCLPCompact(totalClpSrv):"—",color:"var(--amber)"},
-      {icon:"💰",lbl:"Total Mensual CLP",val:dashData?formatCLPCompact(totalClp):"—",color:"var(--green)"},
+      {icon:"🏢",lbl:"Arriendo Mensual",val:dashData?`${totalUfArr.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—",sub:dashData?formatCLPCompact(totalClpArr):"",color:"var(--blue)"},
+      {icon:"🧾",lbl:"Serv. Administrativos",val:dashData?`${totalUfSrv.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—",sub:dashData?formatCLPCompact(totalClpSrv):"",color:"var(--amber)"},
+      {icon:"💰",lbl:"Total Mensual",val:dashData?`${totalUf.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—",sub:dashData?formatCLPCompact(totalClp):"",color:"var(--green)"},
       {icon:"📊",lbl:"Afecto IVA",val:dashData?String(afectoCount):"—",color:"var(--amber)"},
       {icon:"◆",lbl:"UF Hoy",val:ufActual?ufActual.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2}):"—",color:"var(--acc)",loading:ufLoading}
     ];
@@ -8294,7 +8294,7 @@ function App(){
             h("span",{className:"fv2-pulse",style:{width:6,height:6,"--acc":it.color}}),
             h("span",{style:{fontSize:14}},it.icon),
             h("span",{className:"epv2-marquee-lbl"},it.lbl),
-            it.loading?h("span",{className:"fv2-loader",style:{width:13,height:13,fontSize:13}}):h("span",{className:"epv2-marquee-val",style:{color:it.color}},it.val)
+            it.loading?h("span",{className:"fv2-loader",style:{width:13,height:13,fontSize:13}}):h("span",{className:"epv2-marquee-val",style:{color:it.color}},it.val,it.sub&&h("span",{style:{opacity:.6,fontWeight:500,marginLeft:5}},"· "+it.sub))
           ))
         )
       ),
@@ -8303,7 +8303,7 @@ function App(){
       h("div",{style:{display:"flex",alignItems:"center",gap:8,fontSize:11,color:"var(--txm)",flexWrap:"wrap"}},
         driveLoading&&h("span",{style:{display:"flex",alignItems:"center",gap:6,color:"var(--blue)"}},h("span",{className:"fv2-loader",style:{width:13,height:13,fontSize:13}}),"Cargando planilla desde Drive..."),
         files.planilla&&!driveLoading&&h("span",{style:{background:"var(--gbg)",border:"1px solid var(--gdim)",borderRadius:6,padding:"3px 10px",color:"var(--green)",fontWeight:600,fontSize:11}},"✓ Planilla Facturación · Drive"),
-        h("span",{style:{color:"var(--txd)",marginLeft:2}},"Montos en CLP · mindicador.cl"),
+        h("span",{style:{color:"var(--txd)",marginLeft:2}},"Montos en UF · CLP referencial vía mindicador.cl"),
         files.planilla&&h("button",{onClick:()=>{setFiles(p=>({...p,planilla:null}));setDashData(null);},style:{marginLeft:"auto",fontSize:10,padding:"2px 10px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--txm)",cursor:"pointer"}},"↻ Actualizar")
       ),
 
@@ -8316,18 +8316,18 @@ function App(){
         ),
         h("div",{className:"dash-card"},
           h("div",{className:"dash-card-lbl"},"Arriendo Mensual"),
-          h("div",{className:"dash-card-val",style:{color:"var(--blue)",fontSize:22}},dashData?formatCLPCompact(totalClpArr):"—"),
-          h("div",{className:"dash-card-sub"},dashData?`${totalUfArr.toFixed(0)} UF · ${totalUfArr>0&&ufActual?"$"+Math.round(totalUfArr*ufActual/1000).toLocaleString("es-CL")+"K":""}`:"s/contrato")
+          h("div",{className:"dash-card-val",style:{color:"var(--blue)",fontSize:22}},dashData?`${totalUfArr.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—"),
+          h("div",{className:"dash-card-sub"},dashData?formatCLPCompact(totalClpArr):"s/contrato")
         ),
         h("div",{className:"dash-card"},
           h("div",{className:"dash-card-lbl"},"Serv. Administrativos"),
-          h("div",{className:"dash-card-val",style:{color:"var(--amber)",fontSize:22}},dashData?formatCLPCompact(totalClpSrv):"—"),
-          h("div",{className:"dash-card-sub"},dashData?`${totalUfSrv.toFixed(0)} UF`:"cálculo base mensual")
+          h("div",{className:"dash-card-val",style:{color:"var(--amber)",fontSize:22}},dashData?`${totalUfSrv.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—"),
+          h("div",{className:"dash-card-sub"},dashData?formatCLPCompact(totalClpSrv):"cálculo base mensual")
         ),
         h("div",{className:"dash-card"},
-          h("div",{className:"dash-card-lbl"},"Total Mensual CLP"),
-          h("div",{className:"dash-card-val",style:{color:"var(--green)",fontSize:22}},dashData?formatCLPCompact(totalClp):"—"),
-          h("div",{className:"dash-card-sub"},dashData?`${totalUf.toFixed(0)} UF total`:"arriendo + serv. adm.")
+          h("div",{className:"dash-card-lbl"},"Total Mensual"),
+          h("div",{className:"dash-card-val",style:{color:"var(--green)",fontSize:22}},dashData?`${totalUf.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—"),
+          h("div",{className:"dash-card-sub"},dashData?formatCLPCompact(totalClp):"arriendo + serv. adm.")
         ),
         h("div",{className:"dash-card"},
           h("div",{className:"dash-card-lbl"},"Afecto IVA"),
