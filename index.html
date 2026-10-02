@@ -420,19 +420,31 @@ function DonutChart({segments,size,thickness,centerLbl,centerVal}){
   );
 }
 
-/* ── Barras de 12 meses (un año), intensidad de color secuencial ── */
+/* ── Barras de 12 meses (un año), intensidad de color secuencial, con
+   líneas de referencia en UF a la izquierda (igual que el histórico) ── */
 function MonthBarChart({meses,height}){
   height=height||110;
-  const maxV=Math.max(1,...meses.map(m=>m.value));
-  return h("div",{style:{display:"flex",alignItems:"flex-end",gap:4,height:height+28}},
-    meses.map(m=>{
-      const barH=m.value>0?Math.max(3,Math.round((m.value/maxV)*height)):2;
-      return h("div",{key:m.label,title:`${m.label}: ${m.value.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})} UF`,
-        style:{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flex:1,minWidth:0}},
-        h("div",{style:{width:"100%",maxWidth:22,height:barH,borderRadius:"3px 3px 0 0",background:m.value>0?m.color:"var(--bdr)"}}),
-        h("div",{style:{fontSize:9,fontWeight:600,color:"var(--txd)"}},m.label)
-      );
-    })
+  const LABEL_H=16,GAP=4;
+  const maxV=Math.max(0,...meses.map(m=>m.value));
+  const top=niceMaxUF(maxV||1);
+  const gridVals=[top,top*0.75,top*0.5,top*0.25];
+  return h("div",{style:{display:"flex",gap:8}},
+    h("div",{style:{display:"flex",flexDirection:"column",justifyContent:"space-between",height,fontSize:9,color:"var(--txd)",textAlign:"right",flexShrink:0,width:52}},
+      gridVals.map((v,i)=>h("div",{key:i},Math.round(v).toLocaleString("es-CL")+" UF")),
+      h("div",null,"0 UF")
+    ),
+    h("div",{style:{flex:1,position:"relative",display:"flex",alignItems:"flex-end",gap:4,height:height+LABEL_H+GAP}},
+      gridVals.map((v,i)=>h("div",{key:"g"+i,style:{position:"absolute",left:0,right:0,top:Math.round(height-(v/top)*height),borderTop:"1px dashed var(--bdr)",pointerEvents:"none"}})),
+      h("div",{style:{position:"absolute",left:0,right:0,top:height,borderTop:"1px solid var(--bdr2)",pointerEvents:"none"}}),
+      meses.map(m=>{
+        const barH=m.value>0?Math.max(2,Math.round((m.value/top)*height)):1;
+        return h("div",{key:m.label,title:`${m.label}: ${m.value.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})} UF`,
+          style:{display:"flex",flexDirection:"column",alignItems:"center",gap:GAP,flex:1,minWidth:0,alignSelf:"flex-end"}},
+          h("div",{style:{width:"100%",maxWidth:22,height:barH,borderRadius:"3px 3px 0 0",background:m.value>0?m.color:"var(--bdr)"}}),
+          h("div",{style:{fontSize:9,fontWeight:600,color:"var(--txd)",height:LABEL_H}},m.label)
+        );
+      })
+    )
   );
 }
 
@@ -8604,6 +8616,11 @@ function App(){
        Serv.Adm. usa el mismo mes elegido) para que moverlo no afecte el resto
        del layout. */
     function renderCompPanel(titulo,color,key,maxV,mostrarSelector){
+      const top=niceMaxUF(maxV||1);
+      const gridVals=[top,top*0.75,top*0.5,top*0.25];
+      const VAL_H=14,GAP=4,YEAR_H=14,PCT_H=12;
+      const TOP_PAD=VAL_H+GAP; /* espacio reservado sobre la barra más alta posible */
+      const BOTTOM_H=GAP+YEAR_H+GAP+PCT_H; /* zona fija bajo la barra: año + % */
       return h("div",{style:{flex:1,minWidth:260,background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:10,padding:"12px 14px"}},
         h("div",{style:{display:"flex",flexDirection:"column",gap:6,marginBottom:10}},
           h("div",{className:"dash-card-lbl"},titulo+" · "+MESES_COMP[compMes-1]),
@@ -8615,21 +8632,29 @@ function App(){
           )
         ),
         compYears.length===0?h("div",{style:{fontSize:11,color:"var(--txm)",padding:"30px 0",textAlign:"center",minHeight:COMP_BAR_H}},"Sin datos de "+MESES_COMP[compMes-1]+" en el historial"):
-        h("div",{style:{display:"flex",alignItems:"flex-end",gap:14,height:COMP_BAR_H+40,paddingTop:4}},
-          compYears.map((v,i)=>{
-            const val=v[key]||0;
-            const h_=Math.max(4,Math.round((val/maxV)*COMP_BAR_H));
-            const prev=i>0?compYears[i-1][key]:null;
-            const pct=(prev&&prev>0)?Math.round(((val-prev)/prev)*1000)/10:null;
-            const esActual=v.year===anioMax;
-            return h("div",{key:v.year,style:{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flex:1,minWidth:0}},
-              h("div",{style:{fontSize:10,fontWeight:700,color:esActual?color:"var(--txm)",fontFamily:"'DM Mono',monospace"}},val.toLocaleString("es-CL",{maximumFractionDigits:0})),
-              h("div",{title:v.year+": "+val.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})+" UF",
-                style:{width:"100%",maxWidth:40,height:h_,borderRadius:"4px 4px 0 0",background:color,opacity:esActual?1:.4,transition:"height .3s"}}),
-              h("div",{style:{fontSize:10,fontWeight:700,color:"var(--txd)"}},v.year),
-              pct!=null&&h("div",{style:{fontSize:9,fontWeight:700,color:pct>=0?"var(--green)":"var(--red)"}},(pct>=0?"+":"")+pct+"%")
-            );
-          })
+        h("div",{style:{display:"flex",gap:8}},
+          h("div",{style:{display:"flex",flexDirection:"column",justifyContent:"space-between",height:COMP_BAR_H,marginTop:TOP_PAD,marginBottom:BOTTOM_H,fontSize:9,color:"var(--txd)",textAlign:"right",flexShrink:0,width:50}},
+            gridVals.map((v,i)=>h("div",{key:i},Math.round(v).toLocaleString("es-CL")+" UF")),
+            h("div",null,"0 UF")
+          ),
+          h("div",{style:{flex:1,position:"relative",display:"flex",alignItems:"flex-end",gap:14,height:TOP_PAD+COMP_BAR_H+BOTTOM_H}},
+            gridVals.map((v,i)=>h("div",{key:"g"+i,style:{position:"absolute",left:0,right:0,top:Math.round(TOP_PAD+COMP_BAR_H-(v/top)*COMP_BAR_H),borderTop:"1px dashed var(--bdr)",pointerEvents:"none"}})),
+            h("div",{style:{position:"absolute",left:0,right:0,top:TOP_PAD+COMP_BAR_H,borderTop:"1px solid var(--bdr2)",pointerEvents:"none"}}),
+            compYears.map((v,i)=>{
+              const val=v[key]||0;
+              const h_=val>0?Math.max(2,Math.round((val/top)*COMP_BAR_H)):1;
+              const prev=i>0?compYears[i-1][key]:null;
+              const pct=(prev&&prev>0)?Math.round(((val-prev)/prev)*1000)/10:null;
+              const esActual=v.year===anioMax;
+              return h("div",{key:v.year,style:{display:"flex",flexDirection:"column",alignItems:"center",gap:GAP,flex:1,minWidth:0,alignSelf:"flex-end"}},
+                h("div",{style:{fontSize:10,fontWeight:700,color:esActual?color:"var(--txm)",fontFamily:"'DM Mono',monospace",height:VAL_H}},val.toLocaleString("es-CL",{maximumFractionDigits:0})),
+                h("div",{title:v.year+": "+val.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})+" UF",
+                  style:{width:"100%",maxWidth:40,height:h_,borderRadius:"4px 4px 0 0",background:color,opacity:esActual?1:.4,transition:"height .3s"}}),
+                h("div",{style:{fontSize:10,fontWeight:700,color:"var(--txd)",height:YEAR_H}},v.year),
+                h("div",{style:{fontSize:9,fontWeight:700,height:PCT_H,color:pct!=null?(pct>=0?"var(--green)":"var(--red)"):"transparent"}},pct!=null?(pct>=0?"+":"")+pct+"%":"–")
+              );
+            })
+          )
         )
       );
     }
