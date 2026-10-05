@@ -1,0 +1,53 @@
+name: Emily - cambios por voz
+
+on:
+  issues:
+    types: [opened, labeled]
+
+jobs:
+  emily:
+    # Solo issues con la etiqueta "emily" creados por el dueno del repo.
+    if: >-
+      contains(github.event.issue.labels.*.name, 'emily') &&
+      github.event.issue.user.login == 'WurfelSPA'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: emily-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          claude_args: |
+            --max-turns 40
+            --allowedTools "Edit,Write,Read,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(npx:*),Bash(node:*)"
+          prompt: |
+            Eres el asistente de cambios de codigo de Emily (asistente por voz de Alex). Repositorio: ${{ github.repository }}.
+            Issue #${{ github.event.issue.number }}: ${{ github.event.issue.title }}
+
+            Solicitud (cuerpo del issue):
+            ${{ github.event.issue.body }}
+
+            Instrucciones (responde y escribe en espanol):
+            1. Implementa SOLO lo pedido, de forma minima. No refactorices ni cambies cosas no relacionadas.
+            2. Lee CLAUDE.md y el codigo cercano y sigue las convenciones del repositorio.
+            3. Si existe package.json con script "build", ejecuta `npm ci` (o `npm install`) y luego `npm run build`; el build debe pasar. Si el repo es TypeScript estricto, corrige los errores de tipos que tu cambio introduzca. Si el repo tiene tests, ejecutalos.
+            4. Crea una rama `emily/issue-${{ github.event.issue.number }}`, haz commit y push de esa rama. NUNCA hagas push a la rama por defecto.
+            5. Abre un Pull Request con `gh pr create` hacia la rama por defecto. Titulo con prefijo "[Emily] " seguido de un resumen corto. Cuerpo: resumen breve en espanol de lo cambiado y la linea "Closes #${{ github.event.issue.number }}".
+            6. Comenta en el issue #${{ github.event.issue.number }} con `gh issue comment` el enlace al PR y una frase de resumen.
+            7. Si la solicitud es ambigua, insegura o imposible, no inventes: comenta en el issue explicando por que y no abras PR.
+            8. Nunca toques secretos, archivos .env ni la configuracion de despliegue salvo que se pida explicitamente.
