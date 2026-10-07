@@ -8790,7 +8790,19 @@ function App(){
     const mesesArr=dashData?mesesDe("arr",RAMP_BLUE):[];
     const mesesSrv=dashData?mesesDe("srv",RAMP_GREEN):[];
 
-    /* ── Resumen de clientes por sitio, en UF (misma posición que antes) ── */
+    /* ── Resumen de clientes por sitio, en UF (misma posición que antes) ──
+       Se cruza con dashData.vacantes para sumar, por sitio, cuántos espacios
+       están vacantes y cuánta UF de arriendo dejan de ingresar (último valor
+       facturado antes de quedar vacante, "arriendoActual" de cada vacante). */
+    const vacantesPorSitio={};
+    if(dashData){
+      for(const v of dashData.vacantes){
+        const s=(v.sitio||"Otro").trim();
+        if(!vacantesPorSitio[s])vacantesPorSitio[s]={count:0,ufSinIngresar:0};
+        vacantesPorSitio[s].count++;
+        vacantesPorSitio[s].ufSinIngresar+=v.arriendoActual||0;
+      }
+    }
     const siteSummary=dashData?Object.entries(dashData.siteMap).filter(([s])=>s&&!/^\d+$/.test(s)).sort((a,b)=>b[1].count-a[1].count):[];
 
     /* Comparativo por año de un mismo mes (ej. Julio 2023 vs 2024 vs 2025 vs
@@ -8990,18 +9002,21 @@ function App(){
         h("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:10}},
           siteSummary.map(([sitio,info])=>{
             const color=SITIO_C[sitio]||"#888";
+            const vac=vacantesPorSitio[sitio];
             return h("div",{key:sitio,style:{border:"1px solid var(--bdr)",borderRadius:9,padding:"10px 12px",background:"var(--surf2)"}},
               h("div",{style:{display:"flex",alignItems:"center",gap:6,marginBottom:8}},
                 h("span",{style:{width:8,height:8,borderRadius:2,background:color,flexShrink:0}}),
                 h("span",{style:{fontWeight:700,fontSize:12,color:"var(--tx)"}},sitio),
-                h("span",{style:{marginLeft:"auto",fontSize:10,color:"var(--txm)",fontWeight:600}},info.count+(info.count===1?" cliente":" clientes"))
+                h("span",{style:{marginLeft:"auto",fontSize:10,color:"var(--txm)",fontWeight:600}},info.count+(info.count===1?" cliente":" clientes")),
+                vac&&h("span",{style:{fontSize:10,color:"var(--amber)",fontWeight:700}},vac.count+(vac.count===1?" vacante":" vacantes"))
               ),
-              h("div",{style:{display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:700,fontFamily:"'DM Mono',monospace"}},
+              h("div",{style:{display:"flex",justifyContent:"space-between",gap:8,fontSize:12,fontWeight:700,fontFamily:"'DM Mono',monospace"}},
                 h("span",{style:{color:"var(--blue)"}},info.ufArr.toLocaleString("es-CL",{maximumFractionDigits:1})+" UF"),
-                h("span",{style:{color:"var(--green)"}},info.ufSrv.toLocaleString("es-CL",{maximumFractionDigits:1})+" UF")
+                h("span",{style:{color:"var(--green)"}},info.ufSrv.toLocaleString("es-CL",{maximumFractionDigits:1})+" UF"),
+                vac&&h("span",{style:{color:"var(--amber)"}},vac.ufSinIngresar.toLocaleString("es-CL",{maximumFractionDigits:1})+" UF")
               ),
-              h("div",{style:{display:"flex",justifyContent:"space-between",fontSize:9,color:"var(--txd)",marginTop:2}},
-                h("span",null,"Arriendo"),h("span",null,"Serv.Adm")
+              h("div",{style:{display:"flex",justifyContent:"space-between",gap:8,fontSize:9,color:"var(--txd)",marginTop:2}},
+                h("span",null,"Arriendo"),h("span",null,"Serv.Adm"),vac&&h("span",null,"Sin ingresar")
               )
             );
           })
