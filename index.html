@@ -7524,8 +7524,13 @@ function Sidebar({view,setView,procesar,files,periodo,splitLoading,splitPDF,unlo
   };
   return h("aside",{className:`sidebar${expanded?" expanded":""}`,onMouseEnter:()=>setExpanded(true),onMouseLeave:()=>setExpanded(false)},
     h("div",{className:"sidebar-logo"},
-      h("div",{className:"sidebar-logo-icon"},"⬡"),
-      h("div",null,h("div",{className:"sidebar-logo-text"},"Patagónica"),h("div",{className:"sidebar-logo-sub"},"Inmobiliaria SpA"))
+      h("div",{style:{width:28,height:28,minWidth:28,overflow:"hidden",flexShrink:0,display:"flex",alignItems:"center"}},
+        h("img",{src:"/logo-patagonica.png",alt:"Patagónica",style:{height:16,width:"auto",display:"block"}})
+      ),
+      h("div",null,
+        h("img",{src:"/logo-patagonica.png",alt:"Patagónica",style:{height:14,width:"auto",display:"block"}}),
+        h("div",{className:"sidebar-logo-sub"},"Facturación y cobranza")
+      )
     ),
     h("nav",{className:"sidebar-nav"},
       items.map(item=>h("button",{key:item.id,className:`sidebar-item${isActive(item.id)?" active":""}`,onClick:()=>handleNav(item.id),title:item.label,disabled:item.id==="split"&&splitLoading},
