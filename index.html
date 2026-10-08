@@ -165,11 +165,13 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 .fv2, .fv2 input, .fv2 select{font-family:'DM Sans',sans-serif}
 .fv2-title{font-family:'Space Grotesk',sans-serif;font-weight:600;letter-spacing:-.01em}
 
-/* ── dash-v2: subconjunto del Sistema Visual Patagónica (02 Color, 03
+/* ── pv2: subconjunto del Sistema Visual Patagónica (02 Color, 03
    Tipografía, 04 Formatos, 05 Espaciado/bordes, 07 Botones/Inputs/Franja
-   KPIs) aplicado SOLO al Dashboard — reutiliza los mismos var(--xxx) que ya
-   usa el resto de la app, así que no hace falta tocar el JSX existente. */
-.dash-v2{
+   KPIs) — reutiliza los mismos var(--xxx) que ya usa el resto de la app, así
+   que no hace falta tocar el JSX existente al agregar esta clase a una vista.
+   (se llamó "dash-v2" cuando solo la usaba el Dashboard; ahora es compartida
+   por Dashboard, Facturas x Cobrar, Contratos, Cuentas Servicios y Catastro). */
+.pv2{
   --bg:#FBFAF6;--surf:#FFFFFF;--surf2:#F6F5F0;--surf3:#EFEEE9;
   --bdr:#E6E4DC;--bdr2:#D9D7CE;
   --tx:#1A1D2E;--txm:#6B6E7B;--txd:#9A9CA6;
@@ -179,9 +181,9 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
   --blue:#2B7FA6;--bbg:#E4F4FB;
   --acc:#0F153E;--acc2:#2B7FA6;--accl:#0F153E;
 }
-.dash-v2, .dash-v2 input, .dash-v2 select, .dash-v2 button{font-family:'Inter',system-ui,sans-serif;font-variant-numeric:tabular-nums}
-.dash-v2 .dash-card{border-radius:8px}
-.dash-v2 select{border-radius:6px!important}
+.pv2, .pv2 input, .pv2 select, .pv2 button{font-family:'Inter',system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.pv2 .dash-card{border-radius:8px}
+.pv2 select{border-radius:6px!important}
 .fv2-lbl{font-family:'Space Grotesk',sans-serif;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
 /* Punto "en vivo" — respira suavemente, para datos que vienen de Nubox/Drive en tiempo real.
    Anillo exterior + halo para que se note incluso a tamaño chico. */
@@ -2951,14 +2953,14 @@ function FactxCobrarView({notify,dashData}){
     return sort.dir==="asc"?(typeof av==="number"?av-bv:String(av).localeCompare(String(bv),"es")):(typeof bv==="number"?bv-av:String(bv).localeCompare(String(av),"es"));
   });}
 
-  if(loading){return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center"},className:"fade-up epv2"},
+  if(loading){return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--bg)",color:"var(--tx)"},className:"fade-up fv2 pv2"},
     h("div",{style:{textAlign:"center",color:"var(--txm)"}},
       h("div",{className:"fv2-loader",style:{width:32,height:32,fontSize:32,marginBottom:14}}),
       h("div",{style:{fontSize:13,fontWeight:600}},"Cargando Facturas x Cobrar..."),
       h("div",{style:{fontSize:11,color:"var(--txd)",marginTop:4}},"Leyendo desde Google Drive")
     ));}
 
-  if(error){return h("main",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16},className:"fade-up epv2"},
+  if(error){return h("main",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,background:"var(--bg)",color:"var(--tx)"},className:"fade-up fv2 pv2"},
     h("div",{style:{textAlign:"center",maxWidth:460}},
       h("div",{style:{fontSize:34,marginBottom:10}},"⚠️"),
       h("div",{style:{fontSize:15,fontWeight:700,color:"var(--tx)",marginBottom:6}},"No se pudo cargar desde Drive"),
@@ -2979,7 +2981,7 @@ function FactxCobrarView({notify,dashData}){
     var cli=selClient;
     var bkt=getBucket(cli.maxDias);
     var docsSorted=cli.docs.slice().sort(function(a,b){return b.diasDoc-a.diasDoc;});
-    return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up epv2"},
+    return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0,background:"var(--bg)",color:"var(--tx)"},className:"fade-up fv2 pv2"},
       /* Header detalle */
       h("div",{style:{padding:"14px 24px",borderBottom:"1px solid var(--bdr)",background:"var(--surf)",display:"flex",alignItems:"center",gap:14,flexShrink:0}},
         h("button",{onClick:function(){setSelClient(null);},
@@ -3129,7 +3131,7 @@ function FactxCobrarView({notify,dashData}){
     var monto=clients.filter(function(c){return getBucket(c.maxDias)===b;}).reduce(function(s,c){return s+c.total;},0);
     return{label:bucketLabel(b),count:monto,color:bucketColor(b)};
   });
-  return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up epv2"},
+  return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0,background:"var(--bg)",color:"var(--tx)"},className:"fade-up fv2 pv2"},
     /* ── Cuadro comparativo de cortes ── */
     drvFiles.length>0&&h("div",{style:{padding:"8px 24px",background:"var(--surf)",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",flexShrink:0}},
       h("span",{style:{fontSize:10,fontWeight:700,color:"var(--txd)",letterSpacing:".07em",textTransform:"uppercase",marginRight:8}},"Deuda por corte:"),
@@ -4211,10 +4213,10 @@ function ContratosView({dashData,driveLoading}){
     else cmp=String(va).localeCompare(String(vb),"es");
     return sortDir==="asc"?cmp:-cmp;
   }):contratosList;
-  if(!dashData)return h("main",{style:{flex:1,padding:"40px",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12}},driveLoading?h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},h("span",{className:"spin",style:{fontSize:18}},"⟳"),"Cargando planilla desde Drive..."):h("div",{style:{fontSize:13,color:"var(--txd)"}},"Sin datos — carga la planilla de facturación"));
+  if(!dashData)return h("main",{style:{flex:1,padding:"40px",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,background:"var(--bg)",color:"var(--tx)"},className:"fade-up fv2 pv2"},driveLoading?h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},h("span",{className:"spin",style:{fontSize:18}},"⟳"),"Cargando planilla desde Drive..."):h("div",{style:{fontSize:13,color:"var(--txd)"}},"Sin datos — carga la planilla de facturación"));
   const todosClientes=[...new Map(clients.map(c=>[c.rut,c])).values()].sort((a,b)=>a.nombre.localeCompare(b.nombre));
   const clienteSeleccionado=todosClientes.find(c=>c.rut===borradorCliente)||null;
-  return h("main",{style:{flex:1,overflowY:"auto",padding:"20px 24px",display:"flex",flexDirection:"column",gap:16},className:"fade-up"},
+  return h("main",{style:{flex:1,overflowY:"auto",padding:"20px 24px",display:"flex",flexDirection:"column",gap:16,background:"var(--bg)",color:"var(--tx)"},className:"fade-up fv2 pv2"},
     /* ── Panel generador de borradores ── */
     h("div",{style:{background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:12,padding:"14px 18px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}},
       h("span",{style:{fontSize:11,fontWeight:700,color:"var(--txd)",letterSpacing:".06em",whiteSpace:"nowrap"}},"📄 GENERAR BORRADOR"),
@@ -4870,7 +4872,7 @@ function CatastroSitiosView({dashData,driveLoading,notify}){
   function fmtUF(v){return v==null||isNaN(v)?"—":v.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})+" UF";}
   function fmtUFm2(v){return v==null||isNaN(v)?"—":v.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})+" UF/m²";}
   function ufPorM2(v){return(v.arriendoActual!=null&&v.m2!=null&&v.m2>0)?v.arriendoActual/v.m2:null;}
-  if(!dashData)return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,overflow:"hidden",minHeight:0},className:"fade-up epv2"},
+  if(!dashData)return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,overflow:"hidden",minHeight:0,background:"var(--bg)",color:"var(--tx)"},className:"fade-up fv2 pv2"},
     driveLoading
       ?h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},h("span",{className:"fv2-loader",style:{width:18,height:18,fontSize:18}}),"Cargando planilla desde Drive...")
       :h("div",{style:{fontSize:13,color:"var(--txd)"}},"Sin datos — carga la planilla de facturación")
@@ -4912,7 +4914,7 @@ function CatastroSitiosView({dashData,driveLoading,notify}){
   const COLS=["Sitio","Estado","Edificio","Dirección","m² Total","UF/m²","UF Arriendo","UF Serv Admin","% Arriendo"];
   const totalM2=sitios.reduce((s,v)=>s+(v.m2||0),0);
   const totalArriendoUF=sitios.reduce((s,v)=>s+(v.arriendoActual||0),0);
-  return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up epv2"},
+  return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0,background:"var(--bg)",color:"var(--tx)"},className:"fade-up fv2 pv2"},
     h("div",{style:{padding:"14px 24px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,flexShrink:0,borderBottom:"1px solid var(--bdr)"}},
       h("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
         h("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Buscar sitio, edificio, dirección...",style:{width:220}}),
@@ -6107,7 +6109,7 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
     normQ(c.nombre).includes(q)||normQ(c.sitio).includes(q)||normQ(c.edificio).includes(q)||
     (c.rut&&c.rut.replace(/[.\-]/g,"").includes(q.replace(/[.\-]/g,"")))
   );
-  if(!dashData)return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,overflow:"hidden",minHeight:0},className:"fade-up epv2"},
+  if(!dashData)return h("main",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,overflow:"hidden",minHeight:0,background:"var(--bg)",color:"var(--tx)"},className:"fade-up fv2 pv2"},
     driveLoading
       ?h("div",{style:{display:"flex",alignItems:"center",gap:10,color:"var(--txm)",fontSize:13}},h("span",{className:"fv2-loader",style:{width:18,height:18,fontSize:18}}),"Cargando planilla desde Drive...")
       :h("div",{style:{fontSize:13,color:"var(--txd)"}},"Sin datos \u2014 carga la planilla de facturac\u00e9n")
@@ -6177,7 +6179,7 @@ function CuentasServiciosView({dashData,driveLoading,notify}){
     )),
     h("button",{onClick:actualizarEnel,disabled:enelRefreshing,title:"La sesión de Enel debe estar iniciada",className:"epv2-util-btn",style:{"--ucolor":ENEL_GRN}},enelRefreshing?h("span",{className:"fv2-loader",style:{width:11,height:11,fontSize:11}}):"⟳","Actualizar")
   );
-  return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0},className:"fade-up epv2"},
+  return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0,background:"var(--bg)",color:"var(--tx)"},className:"fade-up fv2 pv2"},
     h("div",{style:{padding:"14px 24px 4px",display:"flex",flexDirection:"column",gap:8,flexShrink:0}},bannerAA,bannerEnel),
     h("div",{style:{padding:"14px 24px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,flexShrink:0,borderBottom:"1px solid var(--bdr)"}},
       h("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
@@ -8979,7 +8981,7 @@ function App(){
       );
     }
 
-    return h("main",{style:{flex:1,overflowY:"auto",padding:"18px 22px",display:"flex",flexDirection:"column",gap:16,background:"var(--bg)",color:"var(--tx)"},className:"fade-up fv2 dash-v2"},
+    return h("main",{style:{flex:1,overflowY:"auto",padding:"18px 22px",display:"flex",flexDirection:"column",gap:16,background:"var(--bg)",color:"var(--tx)"},className:"fade-up fv2 pv2"},
 
       /* Banner ticker — recorre los KPIs clave sin parar */
       h("div",{className:"epv2-marquee"},
