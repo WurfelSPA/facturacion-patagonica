@@ -405,7 +405,7 @@ function seqRamp(hue,sat,n){
 
 /* ── Gráfico de torta/dona en SVG puro (sin librerías) con leyenda lateral ── */
 function DonutChart({segments,size,thickness,centerLbl,centerVal}){
-  size=size||150;thickness=thickness||22;
+  size=size||112;thickness=thickness||16;
   const r=(size-thickness)/2,cx=size/2,cy=size/2;
   const total=segments.reduce((s,d)=>s+d.value,0);
   let acc=0;
@@ -421,14 +421,14 @@ function DonutChart({segments,size,thickness,centerLbl,centerVal}){
     h("div",{style:{position:"relative",width:size,height:size,flexShrink:0}},
       h("svg",{width:size,height:size,viewBox:`0 0 ${size} ${size}`,style:{transform:"rotate(-90deg)"}},arcs),
       h("div",{style:{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center",padding:4}},
-        h("div",{style:{fontSize:9,fontWeight:700,letterSpacing:".06em",color:"var(--txd)",textTransform:"uppercase"}},centerLbl),
-        h("div",{style:{fontSize:15,fontWeight:700,fontFamily:"'DM Mono',monospace",color:"var(--tx)",lineHeight:1.15}},centerVal)
+        h("div",{style:{fontSize:8,fontWeight:700,letterSpacing:".06em",color:"var(--txd)",textTransform:"uppercase"}},centerLbl),
+        h("div",{style:{fontSize:12,fontWeight:700,fontFamily:"'DM Mono',monospace",color:"var(--tx)",lineHeight:1.15}},centerVal)
       )
     ),
-    h("div",{style:{display:"flex",flexDirection:"column",gap:3,minWidth:120,maxHeight:size,overflowY:"auto"}},
+    h("div",{style:{display:"flex",flexDirection:"column",gap:2,minWidth:110,maxHeight:size,overflowY:"auto"}},
       segments.map(d=>{
         const pct=total>0?(d.value/total)*100:0;
-        return h("div",{key:d.label,style:{display:"flex",alignItems:"center",gap:6,fontSize:11}},
+        return h("div",{key:d.label,style:{display:"flex",alignItems:"center",gap:6,fontSize:10}},
           h("span",{style:{width:8,height:8,borderRadius:2,background:d.color,flexShrink:0}}),
           h("span",{style:{color:"var(--txm)",flex:1}},d.label),
           h("span",{style:{fontWeight:700,color:"var(--tx)",fontFamily:"'DM Mono',monospace"}},pct.toFixed(1)+"%")
@@ -441,7 +441,7 @@ function DonutChart({segments,size,thickness,centerLbl,centerVal}){
 /* ── Barras de 12 meses (un año), intensidad de color secuencial, con
    líneas de referencia en UF a la izquierda (igual que el histórico) ── */
 function MonthBarChart({meses,height}){
-  height=height||110;
+  height=height||80;
   const LABEL_H=16,GAP=4;
   const maxV=Math.max(0,...meses.map(m=>m.value));
   const top=niceMaxUF(maxV||1);
@@ -8858,7 +8858,7 @@ function App(){
       .sort((a,b)=>a.year-b.year):[];
     const compMaxArr=compYears.length?Math.max(...compYears.map(v=>v.arr)):1;
     const compMaxSrv=compYears.length?Math.max(...compYears.map(v=>v.srv)):1;
-    const COMP_BAR_H=100;
+    const COMP_BAR_H=75;
     const anioMax=compYears.length?Math.max(...compYears.map(v=>v.year)):null;
 
     /* ── Histórico mensual continuo: desde el primer mes con datos (2023)
@@ -8902,7 +8902,7 @@ function App(){
       const VAL_H=14,GAP=4,YEAR_H=14,PCT_H=12;
       const TOP_PAD=VAL_H+GAP; /* espacio reservado sobre la barra más alta posible */
       const BOTTOM_H=GAP+YEAR_H+GAP+PCT_H; /* zona fija bajo la barra: año + % */
-      return h("div",{style:{flex:1,minWidth:260,background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:10,padding:"12px 14px"}},
+      return h("div",{style:{flex:1,minWidth:260,background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:10,padding:"12px 14px",overflow:"hidden"}},
         h("div",{style:{display:"flex",flexDirection:"column",gap:6,marginBottom:10}},
           h("div",{className:"dash-card-lbl"},titulo+" · "+MESES_COMP[compMes-1]),
           mostrarSelector&&h("div",{style:{display:"flex",alignItems:"center",gap:6}},
@@ -8961,11 +8961,11 @@ function App(){
         ),
         h("div",{style:{display:"grid",gridTemplateColumns:"minmax(230px,300px) 1fr minmax(260px,300px)",gap:16,alignItems:"stretch"}},
           renderCompPanel(titulo,colorVar,key,compMax,mostrarSelector),
-          h("div",{style:{background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:10,padding:"12px 14px",display:"flex",flexDirection:"column",gap:14}},
+          h("div",{style:{background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:10,padding:"12px 14px",display:"flex",flexDirection:"column",gap:10,overflow:"hidden"}},
             h("div",{className:"dash-card-lbl"},"Distribución mensual "+dashAnio),
             h(MonthBarChart,{meses})
           ),
-          h("div",{style:{background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:10,padding:"12px 14px",display:"flex",flexDirection:"column",gap:14}},
+          h("div",{style:{background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:10,padding:"12px 14px",display:"flex",flexDirection:"column",gap:10,overflow:"hidden"}},
             h("div",{className:"dash-card-lbl"},"Participación mensual "+dashAnio),
             h(DonutChart,{segments:meses.map(m=>({label:m.label,value:m.value,color:m.color})),
               centerLbl:"Total "+dashAnio,
@@ -9044,7 +9044,7 @@ function App(){
           h("div",{className:"dash-card-lbl"},"Clientes por Sitio"),
           h("div",{style:{fontSize:10,color:"var(--txd)"}},"UF vigentes")
         ),
-        h("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:10}},
+        h("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:10}},
           siteSummary.map(([sitio,info])=>{
             const color=SITIO_C[sitio]||"#888";
             const vac=vacantesPorSitio[sitio];
@@ -9056,9 +9056,9 @@ function App(){
                 vac&&h("span",{style:{fontSize:10,color:"var(--amber)",fontWeight:700}},vac.count+(vac.count===1?" vacante":" vacantes"))
               ),
               h("div",{style:{display:"flex",justifyContent:"space-between",gap:8,fontSize:12,fontWeight:700,fontFamily:"'DM Mono',monospace"}},
-                h("span",{style:{color:"var(--blue)"}},info.ufArr.toLocaleString("es-CL",{maximumFractionDigits:1})+" UF"),
-                h("span",{style:{color:"var(--green)"}},info.ufSrv.toLocaleString("es-CL",{maximumFractionDigits:1})+" UF"),
-                vac&&h("span",{style:{color:"var(--amber)"}},vac.ufSinIngresar.toLocaleString("es-CL",{maximumFractionDigits:1})+" UF")
+                h("span",{style:{color:"var(--blue)",whiteSpace:"nowrap"}},info.ufArr.toLocaleString("es-CL",{maximumFractionDigits:1})+" UF"),
+                h("span",{style:{color:"var(--green)",whiteSpace:"nowrap"}},info.ufSrv.toLocaleString("es-CL",{maximumFractionDigits:1})+" UF"),
+                vac&&h("span",{style:{color:"var(--amber)",whiteSpace:"nowrap"}},vac.ufSinIngresar.toLocaleString("es-CL",{maximumFractionDigits:1})+" UF")
               ),
               h("div",{style:{display:"flex",justifyContent:"space-between",gap:8,fontSize:9,color:"var(--txd)",marginTop:2}},
                 h("span",null,"Arriendo"),h("span",null,"Serv.Adm"),vac&&h("span",null,"Sin ingresar")
