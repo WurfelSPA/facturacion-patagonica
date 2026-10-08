@@ -5,7 +5,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Facturación — Patagónica Inmobiliaria</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -164,6 +164,24 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 }
 .fv2, .fv2 input, .fv2 select{font-family:'DM Sans',sans-serif}
 .fv2-title{font-family:'Space Grotesk',sans-serif;font-weight:600;letter-spacing:-.01em}
+
+/* ── dash-v2: subconjunto del Sistema Visual Patagónica (02 Color, 03
+   Tipografía, 04 Formatos, 05 Espaciado/bordes, 07 Botones/Inputs/Franja
+   KPIs) aplicado SOLO al Dashboard — reutiliza los mismos var(--xxx) que ya
+   usa el resto de la app, así que no hace falta tocar el JSX existente. */
+.dash-v2{
+  --bg:#FBFAF6;--surf:#FFFFFF;--surf2:#F6F5F0;--surf3:#EFEEE9;
+  --bdr:#E6E4DC;--bdr2:#D9D7CE;
+  --tx:#1A1D2E;--txm:#6B6E7B;--txd:#9A9CA6;
+  --green:#1F7A4D;--gdim:#BFE4CC;--gbg:#E8F3EC;
+  --amber:#B26B00;--adim:#F3DDAE;--abg:#FBF0DC;
+  --red:#B42318;--rdim:#F6C6C2;--rbg:#FBE9E7;
+  --blue:#2B7FA6;--bbg:#E4F4FB;
+  --acc:#0F153E;--acc2:#2B7FA6;--accl:#0F153E;
+}
+.dash-v2, .dash-v2 input, .dash-v2 select, .dash-v2 button{font-family:'Inter',system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.dash-v2 .dash-card{border-radius:8px}
+.dash-v2 select{border-radius:6px!important}
 .fv2-lbl{font-family:'Space Grotesk',sans-serif;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
 /* Punto "en vivo" — respira suavemente, para datos que vienen de Nubox/Drive en tiempo real.
    Anillo exterior + halo para que se note incluso a tamaño chico. */
@@ -8804,7 +8822,7 @@ function App(){
     const yearTotal=Math.round((yearArr+yearSrv)*100)/100;
     const yearClpArr=Math.round(yearArr*ufRef),yearClpSrv=Math.round(yearSrv*ufRef),yearClpTotal=Math.round(yearTotal*ufRef);
 
-    const RAMP_BLUE=seqRamp(222,78,12),RAMP_GREEN=seqRamp(158,55,12);
+    const RAMP_BLUE=seqRamp(201,68,12),RAMP_GREEN=seqRamp(150,60,12);
     function mesesDe(key,ramp){
       return MESES_COMP.map((lbl,i)=>{
         const rec=yearRec.find(v=>v.month===i+1);
@@ -8827,6 +8845,9 @@ function App(){
         vacantesPorSitio[s].ufSinIngresar+=v.arriendoActual||0;
       }
     }
+    const vacTotalCount=Object.values(vacantesPorSitio).reduce((s,v)=>s+v.count,0);
+    const vacTotalUf=Math.round(Object.values(vacantesPorSitio).reduce((s,v)=>s+v.ufSinIngresar,0)*100)/100;
+    const vacTotalClp=Math.round(vacTotalUf*ufRef);
     const siteSummary=dashData?Object.entries(dashData.siteMap).filter(([s])=>s&&!/^\d+$/.test(s)).sort((a,b)=>b[1].count-a[1].count):[];
 
     /* Comparativo por año de un mismo mes (ej. Julio 2023 vs 2024 vs 2025 vs
@@ -8887,7 +8908,7 @@ function App(){
           mostrarSelector&&h("div",{style:{display:"flex",alignItems:"center",gap:6}},
             h("span",{style:{fontSize:10,color:"var(--txm)"}},"Comparar mes:"),
             h("select",{value:compMes,onChange:e=>setCompMes(Number(e.target.value)),
-              style:{fontSize:10,fontWeight:600,padding:"3px 8px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf)",color:"var(--tx)"}},
+              style:{fontSize:10,fontWeight:600,padding:"3px 8px",borderRadius:6,border:"1px solid var(--bdr2)",background:"var(--surf)",color:"var(--tx)"}},
               MESES_COMP.map((m,i)=>h("option",{key:i,value:i+1},m)))
           )
         ),
@@ -8958,7 +8979,7 @@ function App(){
       );
     }
 
-    return h("main",{style:{flex:1,overflowY:"auto",padding:"18px 22px",display:"flex",flexDirection:"column",gap:16,background:"var(--bg)",color:"var(--tx)"},className:"fade-up fv2"},
+    return h("main",{style:{flex:1,overflowY:"auto",padding:"18px 22px",display:"flex",flexDirection:"column",gap:16,background:"var(--bg)",color:"var(--tx)"},className:"fade-up fv2 dash-v2"},
 
       /* Banner ticker — recorre los KPIs clave sin parar */
       h("div",{className:"epv2-marquee"},
@@ -8977,45 +8998,45 @@ function App(){
         driveLoading&&h("span",{style:{display:"flex",alignItems:"center",gap:6,color:"var(--blue)"}},h("span",{className:"fv2-loader",style:{width:13,height:13,fontSize:13}}),"Cargando planilla desde Drive..."),
         files.planilla&&!driveLoading&&h("span",{style:{background:"var(--gbg)",border:"1px solid var(--gdim)",borderRadius:6,padding:"3px 10px",color:"var(--green)",fontWeight:600,fontSize:11}},"✓ Planilla Facturación · Drive"),
         h("span",{style:{color:"var(--txd)",marginLeft:2}},"Montos en UF · CLP referencial vía mindicador.cl"),
-        files.planilla&&h("button",{onClick:()=>{setFiles(p=>({...p,planilla:null}));setDashData(null);},style:{marginLeft:"auto",fontSize:10,padding:"2px 10px",borderRadius:6,border:"1px solid var(--bdr)",background:"var(--surf2)",color:"var(--txm)",cursor:"pointer"}},"↻ Actualizar")
+        files.planilla&&h("button",{onClick:()=>{setFiles(p=>({...p,planilla:null}));setDashData(null);},style:{marginLeft:"auto",height:30,fontSize:12,fontWeight:500,padding:"0 12px",borderRadius:6,border:"1px solid var(--bdr2)",background:"#fff",color:"var(--tx)",cursor:"pointer"}},"↻ Actualizar")
       ),
 
       /* ── Encabezado: totales del año + selector (pegado al título) ── */
       h("div",{style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
         h("div",{style:{fontWeight:700,fontSize:14,color:"var(--tx)"}},"Totales del año"),
         h("select",{value:dashAnio,onChange:e=>setDashAnio(Number(e.target.value)),
-          style:{fontSize:12,fontWeight:700,padding:"6px 12px",borderRadius:8,border:"1px solid var(--bdr)",background:"var(--surf)",color:"var(--tx)"}},
+          style:{height:30,fontSize:12.5,fontWeight:600,padding:"0 10px",borderRadius:6,border:"1px solid var(--bdr2)",background:"var(--surf)",color:"var(--tx)"}},
           anioOptions.map(a=>h("option",{key:a,value:a},a)))
       ),
 
       /* ── KPIs del año seleccionado ── */
-      h("div",{className:"kpi-grid"},
-        h("div",{className:"dash-card"},
-          h("div",{className:"dash-card-lbl"},"Total Clientes"),
-          h("div",{className:"dash-card-val",style:{color:"var(--accl)",fontSize:30}},dashData?dashData.clients.length:"—"),
-          h("div",{className:"dash-card-sub"},dashData?`${Object.keys(dashData.siteMap).filter(s=>dashData.siteMap[s].count>0).length} sitios activos`:"Carga la planilla")
-        ),
-        h("div",{className:"dash-card"},
-          h("div",{className:"dash-card-lbl"},"Arriendo "+dashAnio),
-          h("div",{className:"dash-card-val",style:{color:"var(--blue)",fontSize:22}},dashData?`${yearArr.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—"),
-          h("div",{className:"dash-card-sub"},dashData?formatCLPCompact(yearClpArr):"s/contrato")
-        ),
-        h("div",{className:"dash-card"},
-          h("div",{className:"dash-card-lbl"},"Serv. Administrativos "+dashAnio),
-          h("div",{className:"dash-card-val",style:{color:"var(--green)",fontSize:22}},dashData?`${yearSrv.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—"),
-          h("div",{className:"dash-card-sub"},dashData?formatCLPCompact(yearClpSrv):"cálculo base mensual")
-        ),
-        h("div",{className:"dash-card"},
-          h("div",{className:"dash-card-lbl"},"Total "+dashAnio),
-          h("div",{className:"dash-card-val",style:{color:"var(--acc)",fontSize:22}},dashData?`${yearTotal.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—"),
-          h("div",{className:"dash-card-sub"},dashData?formatCLPCompact(yearClpTotal):"arriendo + serv. adm.")
-        ),
-        h("div",{className:"dash-card"},
-          h("div",{className:"dash-card-lbl"},"Afecto IVA"),
-          h("div",{className:"dash-card-val",style:{color:"var(--amber)",fontSize:30}},dashData?afectoCount:"—"),
-          h("div",{className:"dash-card-sub"},dashData?`${dashData.clients.filter(c=>c.afecto==="Exento").length} exentos de IVA`:"")
-        )
-      ),
+      /* Franja de KPIs: una sola superficie con divisores (07 Componentes),
+         en vez de tarjetas sueltas. CLP abreviado con espacio antes de "M"
+         (04 Formatos: "$548,6 M"), solo dentro de esta franja. */
+      (()=>{
+        const fmtM=v=>"$"+(v/1e6).toLocaleString("es-CL",{minimumFractionDigits:1,maximumFractionDigits:1})+" M";
+        const kpis=[
+          {lbl:"Total Clientes",val:dashData?String(dashData.clients.length):"—",color:"var(--acc)",
+            sub:dashData?`${Object.keys(dashData.siteMap).filter(s=>dashData.siteMap[s].count>0).length} sitios activos`:"Carga la planilla"},
+          {lbl:"Arriendo "+dashAnio,val:dashData?`${yearArr.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—",color:"var(--blue)",
+            sub:dashData?fmtM(yearClpArr):"s/contrato"},
+          {lbl:"Serv. Administrativos "+dashAnio,val:dashData?`${yearSrv.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—",color:"var(--green)",
+            sub:dashData?fmtM(yearClpSrv):"cálculo base mensual"},
+          {lbl:"Total "+dashAnio,val:dashData?`${yearTotal.toLocaleString("es-CL",{maximumFractionDigits:0})} UF`:"—",color:"var(--acc)",
+            sub:dashData?fmtM(yearClpTotal):"arriendo + serv. adm."},
+          {lbl:"Afecto IVA",val:dashData?String(afectoCount):"—",color:"var(--amber)",
+            sub:dashData?`${dashData.clients.filter(c=>c.afecto==="Exento").length} exentos de IVA`:""},
+          {lbl:"Vacantes",val:dashData?`${vacTotalUf.toLocaleString("es-CL",{maximumFractionDigits:0})} UF (sin percibir)`:"—",color:"var(--amber)",
+            sub:dashData?`${vacTotalCount} sitio${vacTotalCount===1?"":"s"} · ${fmtM(vacTotalClp)}`:""},
+        ];
+        return h("div",{className:"dash-card",style:{display:"grid",gridTemplateColumns:"repeat(6,1fr)",padding:0}},
+          kpis.map((k,i)=>h("div",{key:k.lbl,style:{padding:"12px 14px",borderRight:i<kpis.length-1?"1px solid var(--bdr2)":"none",minWidth:0}},
+            h("div",{className:"dash-card-lbl"},k.lbl),
+            h("div",{className:"dash-card-val",style:{color:k.color,fontSize:20}},k.val),
+            h("div",{className:"dash-card-sub"},k.sub)
+          ))
+        );
+      })(),
 
       /* ── Clientes por sitio, en UF ── */
       dashData&&h("div",{className:"dash-card",style:{display:"flex",flexDirection:"column",gap:12}},
