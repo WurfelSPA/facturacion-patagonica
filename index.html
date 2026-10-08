@@ -91,9 +91,9 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 .month-val{font-size:9px;color:var(--txm);font-family:'DM Mono',monospace;text-align:center}
 .month-col:hover .month-seg-arr{background:#185fa5}
 .month-col:hover .month-val{color:var(--tx)}
-.dash-client-hdr{display:grid;grid-template-columns:58px minmax(140px,1fr) 100px 100px 100px 60px 95px 80px 65px 80px 60px 60px 55px 70px 28px;border-bottom:2px solid var(--bdr);background:var(--surf)}
+.dash-client-hdr{display:grid;grid-template-columns:58px 72px minmax(130px,1fr) 130px 100px 100px 100px 60px 95px 80px 65px 80px 60px 60px 55px 70px 28px;border-bottom:2px solid var(--bdr);background:var(--surf)}
 .dash-client-hdr>div{padding:7px 8px;font-size:9px;font-weight:700;color:var(--txd);letter-spacing:.06em;text-transform:uppercase}
-.dash-client-row{display:grid;grid-template-columns:58px minmax(140px,1fr) 100px 100px 100px 60px 95px 80px 65px 80px 60px 60px 55px 70px;border-bottom:1px solid var(--bdr);transition:background .1s;cursor:default}
+.dash-client-row{display:grid;grid-template-columns:58px 72px minmax(130px,1fr) 130px 100px 100px 100px 60px 95px 80px 65px 80px 60px 60px 55px 70px 28px;border-bottom:1px solid var(--bdr);transition:background .1s;cursor:default}
 .dash-client-row:hover>div{background:var(--surf2)}
 .dash-client-row>div{padding:8px 8px;font-size:11px;display:flex;align-items:center}
 .nav-btn{background:transparent;border:1px solid var(--bdr);color:var(--txm);border-radius:8px;padding:5px 14px;font-size:11px;font-weight:500;display:flex;align-items:center;gap:5px}
@@ -3715,7 +3715,9 @@ function ClientesView({dashData,driveLoading,notify}){
   });
   const SORT_GETTERS={
     "Sitio":c=>c.sitio||"",
+    "Edificio":c=>c.edificio||"",
     "Cliente / RUT":c=>c.nombre||"",
+    "Dirección":c=>c.dir||"",
     "Arriendo CLP":c=>c.ufArr>0?c.ufArr*tblUf:null,
     "Serv.Adm. CLP":c=>c.ufSrv>0?c.ufSrv*tblUf:null,
     "Total CLP":c=>c.ufTotal>0?c.ufTotal*tblUf:null,
@@ -3800,7 +3802,7 @@ function ClientesView({dashData,driveLoading,notify}){
         h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},tblUfLabel)
       ),
       h("div",{className:"dash-client-hdr"},
-        ["Sitio","Cliente / RUT","Arriendo CLP","Serv.Adm. CLP","Total CLP","IVA","Término","Antelac.","Aviso","F.Reajuste","% Reaj.","Cada","m²","UF×m²",""].map(col=>{
+        ["Sitio","Edificio","Cliente / RUT","Dirección","Arriendo CLP","Serv.Adm. CLP","Total CLP","IVA","Término","Antelac.","Aviso","F.Reajuste","% Reaj.","Cada","m²","UF×m²",""].map(col=>{
           const sortable=!!SORT_GETTERS[col];
           const active=dashSortCol===col;
           return h("div",{
@@ -3823,9 +3825,6 @@ function ClientesView({dashData,driveLoading,notify}){
             const clpSrv=c.ufSrv>0?Math.round(c.ufSrv*tblUf):null;
             const clpTotal=c.ufTotal>0?Math.round(c.ufTotal*tblUf):null;
             const isSelected=histClient&&histClient.rut===c.rut&&histClient.sitio===c.sitio;
-            const numDirM=(c.dir||"").match(/(\d+(?:-[A-Za-z0-9]+)?)\s*$/);
-            const edifTienePiso=/piso/i.test(c.edificio||"");
-            const numDir=numDirM?((numDirM[1].includes("-")||!edifTienePiso)?numDirM[1]:"Piso "+numDirM[1]):null;
             return h("div",{key:c.rut+c.nombre+c.sitio+"_wrap",style:{borderBottom:"1px solid var(--bdr)",background:isSelected?"var(--bbg)":"transparent"}},
             h("div",{
               className:"dash-client-row",
@@ -3833,15 +3832,16 @@ function ClientesView({dashData,driveLoading,notify}){
               onClick:()=>{setHistClient(isSelected?null:c);setHistAnio(2026);},
               title:isSelected?"Cerrar historial":"Ver historial del cliente"
             },
-              h("div",{style:{display:"flex",flexDirection:"column",gap:2}},
-                h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${color}18`,color,border:`1px solid ${color}40`,alignSelf:"flex-start"}},c.sitio||"—"),
-                c.edificio&&h("span",{style:{fontSize:8,color:"var(--txd)",fontFamily:"'DM Mono',monospace",paddingLeft:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:52}},c.edificio),
-                numDir&&h("span",{title:c.dir,style:{fontSize:8,color:"var(--txm)",fontFamily:"'JetBrains Mono',monospace",paddingLeft:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:52}},numDir)
+              h("div",null,
+                h("span",{style:{padding:"2px 6px",borderRadius:5,fontSize:9,fontWeight:700,background:`${color}18`,color,border:`1px solid ${color}40`,alignSelf:"flex-start"}},c.sitio||"—")
               ),
+              h("div",{style:{fontSize:9.5,color:"var(--txm)",fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}},c.edificio||"—"),
               h("div",{style:{flexDirection:"column",alignItems:"flex-start",gap:2}},
                 h("div",{style:{fontWeight:600,fontSize:11,lineHeight:1.3}},c.nombre),
                 h("div",{style:{fontSize:9,color:"var(--txm)",fontFamily:"'JetBrains Mono',monospace"}},c.rut),
                 c.email&&h("a",{href:"mailto:"+c.email,style:{fontSize:9,color:"var(--accl)",fontFamily:"'DM Mono',monospace",textDecoration:"none",userSelect:"text"},title:c.email},c.email)
+              ),
+              h("div",{title:c.dir,style:{fontSize:9.5,color:"var(--txm)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}},c.dir||"—"
               ),
               h("div",{style:{fontFamily:"'DM Mono',monospace",color:"var(--blue)",fontWeight:600,fontSize:10}},clpArr?formatCLP(clpArr):"—"),
               h("div",{style:{fontFamily:"'DM Mono',monospace",color:"var(--amber)",fontSize:10}},clpSrv?formatCLP(clpSrv):"—"),
@@ -4901,6 +4901,7 @@ function CatastroSitiosView({dashData,driveLoading,notify}){
       case "Sitio":return(v.sitio||"").toLowerCase();
       case "Estado":return v.isVacante?"vacante":"ocupado";
       case "Edificio":return(v.edificio||"").toLowerCase();
+      case "Cliente":return(v.nombre||"").toLowerCase();
       case "Dirección":return(v.dir||"").toLowerCase();
       case "m² Total":return v.m2!=null?v.m2:-Infinity;
       case "UF/m²":{const r=ufPorM2(v);return r!=null?r:-Infinity;}
@@ -4911,7 +4912,7 @@ function CatastroSitiosView({dashData,driveLoading,notify}){
     }
   }
   const sorted=sortCol?[...filtered].sort((a,b)=>{const va=getSortVal(a,sortCol),vb=getSortVal(b,sortCol);const cmp=typeof va==="number"?va-vb:va.localeCompare(vb,"es");return sortDir==="asc"?cmp:-cmp;}):filtered;
-  const COLS=["Sitio","Estado","Edificio","Dirección","m² Total","UF/m²","UF Arriendo","UF Serv Admin","% Arriendo"];
+  const COLS=["Sitio","Estado","Edificio","Cliente","Dirección","m² Total","UF/m²","UF Arriendo","UF Serv Admin","% Arriendo"];
   const totalM2=sitios.reduce((s,v)=>s+(v.m2||0),0);
   const totalArriendoUF=sitios.reduce((s,v)=>s+(v.arriendoActual||0),0);
   return h("main",{style:{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0,background:"var(--bg)",color:"var(--tx)"},className:"fade-up fv2 pv2"},
@@ -4931,7 +4932,7 @@ function CatastroSitiosView({dashData,driveLoading,notify}){
           onClick:()=>{
             const wb=XLSX.utils.book_new();
             const rows=filtered.map(v=>({
-              "Sitio":v.sitio||"","Estado":v.isVacante?"VACANTE":"","Edificio":v.edificio||"","Dirección":v.dir||"",
+              "Sitio":v.sitio||"","Estado":v.isVacante?"VACANTE":"","Edificio":v.edificio||"","Cliente":v.nombre||"","Dirección":v.dir||"",
               "m² Total":v.m2!=null?v.m2:"",
               "UF/m²":ufPorM2(v)!=null?Number(ufPorM2(v).toFixed(2)):"",
               "UF Arriendo":v.arriendoActual!=null?v.arriendoActual:"",
@@ -4991,6 +4992,7 @@ function CatastroSitiosView({dashData,driveLoading,notify}){
                         :h("span",{style:{fontSize:10,color:"var(--txd)"}},"—")
                     ),
                     h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)"}},v.edificio||"—"),
+                    h("td",{style:{padding:"9px 12px",fontSize:10.5,fontWeight:600,color:v.isVacante?"var(--amber)":"var(--tx)",maxWidth:200}},v.nombre||"—"),
                     h("td",{style:{padding:"9px 12px",fontSize:10,color:"var(--txm)",maxWidth:220}},v.dir||"—"),
                     h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--tx)"}},v.m2!=null?v.m2.toLocaleString("es-CL")+" m²":"—"),
                     h("td",{style:{padding:"9px 12px",fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap"},title:v.isVacante?"Calculado con el último arriendo facturado ("+(v.mesActual||"—")+") ÷ m² Total":"Calculado: UF Arriendo ÷ m² Total"},
