@@ -3713,11 +3713,35 @@ function ClientesView({dashData,driveLoading,notify}){
     const msite=dashSitio==="all"||(c.sitio||"").trim()===(dashSitio||"").trim();
     return ms&&msite;
   });
-  /* Piso1/Piso2 de la tabla: para edificios "P. C. L-N" (locales comerciales
-     de A-2 Locales) toman Locales Comerciales; para el resto, Oficina m2. */
+  /* Piso1/Piso2/Bodega/Construido/Terreno de la tabla: si el edificio tiene
+     ficha propia en El Cortijo (plano/Cuadro Superficies), se prefiere ese
+     dato por sobre la Planilla — más confiable, en particular Terreno (la
+     Planilla no trae esa columna; lo que antes se mostraba ahí era en
+     realidad "m2 Totales", no el terreno real). Si no hay ficha para esa
+     unidad (otros sitios del parque, o unidades sin plano propio), se cae
+     de vuelta a la Planilla ("P. C. L-N" toma Locales Comerciales, el
+     resto Oficina m2). */
   function esPCL(edif){return/^P\.?\s*C\.?\s*L/i.test((edif||"").trim());}
-  function piso1Val(c){return esPCL(c.edificio)?c.locP1:c.oficP1;}
-  function piso2Val(c){return esPCL(c.edificio)?c.locP2:c.oficP2;}
+  function superficieCliente(c){
+    const fu=matchFichaPorEdificio(c.sitio,c.edificio);
+    if(fu)return{
+      piso1:fu.oficN1!=null?fu.oficN1:null,
+      piso2:fu.oficN2!=null?fu.oficN2:null,
+      bodP1:fu.bodN1!=null?fu.bodN1:null,
+      bodP2:fu.bodN2!=null?fu.bodN2:null,
+      construido:fichaM2(fu),
+      terreno:fu.terreno!=null?fu.terreno:null,
+      fromFicha:true,
+    };
+    return{
+      piso1:esPCL(c.edificio)?c.locP1:c.oficP1,
+      piso2:esPCL(c.edificio)?c.locP2:c.oficP2,
+      bodP1:c.bodP1,bodP2:c.bodP2,
+      construido:c.totalConstruido,
+      terreno:c.m2,
+      fromFicha:false,
+    };
+  }
   const SORT_GETTERS={
     "Sitio":c=>c.sitio||"",
     "Edificio":c=>c.edificio||"",
@@ -3733,12 +3757,12 @@ function ClientesView({dashData,driveLoading,notify}){
     "F.Reajuste":c=>c.fechaReajuste||"",
     "% Reaj.":c=>c.pctReaj||"",
     "Cada":c=>c.cadaAnios!=null?c.cadaAnios:null,
-    "Piso1":c=>piso1Val(c)!=null?piso1Val(c):null,
-    "Piso2":c=>piso2Val(c)!=null?piso2Val(c):null,
-    "Bodega P1":c=>c.bodP1!=null?c.bodP1:null,
-    "Bodega P2":c=>c.bodP2!=null?c.bodP2:null,
-    "Construido":c=>c.totalConstruido!=null?c.totalConstruido:null,
-    "Terreno":c=>c.m2!=null?c.m2:null,
+    "Piso1":c=>superficieCliente(c).piso1,
+    "Piso2":c=>superficieCliente(c).piso2,
+    "Bodega P1":c=>superficieCliente(c).bodP1,
+    "Bodega P2":c=>superficieCliente(c).bodP2,
+    "Construido":c=>superficieCliente(c).construido,
+    "Terreno":c=>superficieCliente(c).terreno,
     "Arriendo m²":c=>(c.ufM2!=null&&c.m2>0)?c.ufM2/c.m2:null,
   };
   const tblClients=(dashSortCol&&SORT_GETTERS[dashSortCol])?
@@ -3834,6 +3858,7 @@ function ClientesView({dashData,driveLoading,notify}){
             const clpArr=c.ufArr>0?Math.round(c.ufArr*tblUf):null;
             const clpSrv=c.ufSrv>0?Math.round(c.ufSrv*tblUf):null;
             const clpTotal=c.ufTotal>0?Math.round(c.ufTotal*tblUf):null;
+            const sf=superficieCliente(c);
             const isSelected=histClient&&histClient.rut===c.rut&&histClient.sitio===c.sitio;
             return h("div",{key:c.rut+c.nombre+c.sitio+"_wrap",style:{borderBottom:"1px solid var(--bdr)",background:isSelected?"var(--bbg)":"transparent"}},
             h("div",{
@@ -3863,12 +3888,12 @@ function ClientesView({dashData,driveLoading,notify}){
               h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:c.fechaReajuste?"var(--tx)":"var(--txd)"}},c.fechaReajuste||"—"),
               h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.pctReaj||"—"),
               h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.cadaAnios?c.cadaAnios+" años":"—"),
-              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},piso1Val(c)!=null?piso1Val(c).toLocaleString("es-CL"):"—"),
-              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},piso2Val(c)!=null?piso2Val(c).toLocaleString("es-CL"):"—"),
-              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},c.bodP1!=null?c.bodP1.toLocaleString("es-CL"):"—"),
-              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},c.bodP2!=null?c.bodP2.toLocaleString("es-CL"):"—"),
-              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)",fontWeight:600}},c.totalConstruido!=null?c.totalConstruido.toLocaleString("es-CL"):"—"),
-              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)",fontWeight:600}},c.m2!=null?c.m2.toLocaleString("es-CL"):"—"),
+              h("div",{title:sf.fromFicha?"Dato del plano (El Cortijo)":undefined,style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:sf.fromFicha?"var(--green)":"var(--tx)"}},sf.piso1!=null?sf.piso1.toLocaleString("es-CL"):"—"),
+              h("div",{title:sf.fromFicha?"Dato del plano (El Cortijo)":undefined,style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:sf.fromFicha?"var(--green)":"var(--tx)"}},sf.piso2!=null?sf.piso2.toLocaleString("es-CL"):"—"),
+              h("div",{title:sf.fromFicha?"Dato del plano (El Cortijo)":undefined,style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:sf.fromFicha?"var(--green)":"var(--tx)"}},sf.bodP1!=null?sf.bodP1.toLocaleString("es-CL"):"—"),
+              h("div",{title:sf.fromFicha?"Dato del plano (El Cortijo)":undefined,style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:sf.fromFicha?"var(--green)":"var(--tx)"}},sf.bodP2!=null?sf.bodP2.toLocaleString("es-CL"):"—"),
+              h("div",{title:sf.fromFicha?"Dato del plano (El Cortijo)":undefined,style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:sf.fromFicha?"var(--green)":"var(--tx)",fontWeight:600}},sf.construido!=null?sf.construido.toLocaleString("es-CL"):"—"),
+              h("div",{title:sf.fromFicha?"Dato del plano (El Cortijo)":undefined,style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:sf.fromFicha?"var(--green)":"var(--tx)",fontWeight:600}},sf.terreno!=null?sf.terreno.toLocaleString("es-CL"):"—"),
               h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)",fontWeight:600}},(c.ufM2!=null&&c.m2>0)?(c.ufM2/c.m2).toLocaleString("es-CL",{minimumFractionDigits:3,maximumFractionDigits:3}):"—"),
               h("div",{style:{fontSize:10,color:isSelected?"var(--acc)":"var(--txd)",textAlign:"right"}},isSelected?"▲":"📋")
             ),
@@ -5469,7 +5494,7 @@ const CORTIJO_IMG={
 /* Sitio A-2 — carpeta "Lote A-2" (edificios). */
 const CORTIJO_A2=[
   {edif:"Edif. 1",oficN1:114,oficN2:96,bodN1:534,bodN2:0,estac:9,x:77.5,y:71.4,w:4.6,h:5.6},
-  {edif:"Edif. 2 y 2B",oficN1:229,oficN2:229,bodN1:1384,bodN2:0,estac:6,x:72.5,y:71.4,w:4.6,h:5.6,nota:"Edificio 2: 229+229 of. + 955 bodega (6 estac.). Edificio 2-B: 429 bodega, combinado acá, sin dato propio de estacionamientos. Combinados en la Planilla en una sola fila"},
+  {edif:"Edif. 2 y 2B",aliases:["Edif. 2","Edif. 2-B","Edif. 2 B"],oficN1:229,oficN2:229,bodN1:1384,bodN2:0,estac:6,x:72.5,y:71.4,w:4.6,h:5.6,nota:"Edificio 2: 229+229 of. + 955 bodega (6 estac.). Edificio 2-B: 429 bodega, combinado acá, sin dato propio de estacionamientos. Combinados en la Planilla en una sola fila"},
   {edif:"Edif. 3",oficN1:144,oficN2:144,bodN1:576,bodN2:0,estac:13,x:61.7,y:71.4,w:4.6,h:5.6},
   {edif:"Edif. 3-A",oficN1:0,oficN2:0,bodN1:528,bodN2:0,x:62.4,y:89.4,w:5,h:6,nota:"528 bodega, N1 único. Ficha no indica cantidad de estacionamientos"},
   {edif:"Edif. 4-A",m2:816,estac:6,x:56.0,y:71.4,w:4.6,h:5.6,nota:"816 m² incluye Altillo 190 (148+148 oficina N1/N2 + 330 bodega + 190 altillo). ⚠ El contrato unificado de Olympus Corporation (vigente desde 10-02-2026, \"TOF31\") declara 395 m² de oficina para este espacio — la ficha no menciona \"TOF31\" y la oficina real suma solo 296 m² (148+148); confirmar con comercial si hay superficie adicional no reflejada en este plano"},
@@ -5478,7 +5503,7 @@ const CORTIJO_A2=[
   {edif:"Edif. 5-A",oficN1:0,oficN2:0,bodN1:569,bodN2:0,x:45.6,y:70.5,w:4.6,h:5.6,nota:"569 bodega, N1 único — mismo edificio que 5, sin oval propio en el plano de emplazamiento. Ficha no indica cantidad de estacionamientos"},
   {edif:"Edif. 6",bodN1:983,oficN1:233,oficN2:400,bodN2:0,estac:13,x:39.5,y:88.6,w:5,h:6},
   {edif:"Edif. 6-A",bodN1:444,oficN1:193,oficN2:116,bodN2:0,estac:11,x:32.4,y:90.6,w:5,h:6},
-  {edif:"Edif. 7 B 7C",m2:1891,estac:0,x:7,y:73.8,w:6.5,h:9,nota:"Edificio 7B (bodega 943 + of. 153×3 niveles = 1402, 0 estacionamientos) + Edificio 7C (of. 195+147+147 = 489, 0 estacionamientos) — combinación de 2 edificios en más de 2 niveles, no se desglosa en el cuadro Oficina/Bodega. La ficha de Edificio 7C trae un error de imprenta propio (dice TOTAL=1.402,00 M2, cifra que corresponde a 7B, no a la suma real de 489)"},
+  {edif:"Edif. 7 B 7C",aliases:["Edif. 7B","Edif. 7C"],m2:1891,estac:0,x:7,y:73.8,w:6.5,h:9,nota:"Edificio 7B (bodega 943 + of. 153×3 niveles = 1402, 0 estacionamientos) + Edificio 7C (of. 195+147+147 = 489, 0 estacionamientos) — combinación de 2 edificios en más de 2 niveles, no se desglosa en el cuadro Oficina/Bodega. La ficha de Edificio 7C trae un error de imprenta propio (dice TOTAL=1.402,00 M2, cifra que corresponde a 7B, no a la suma real de 489)"},
   {edif:"Edif. 7 H",oficN1:106,oficN2:66,bodN1:0,bodN2:0,estac:3,x:21.5,y:71.5,w:4.5,h:3.5},
   {edif:"Edif. 7 G",oficN1:66,oficN2:66,bodN1:0,bodN2:0,estac:2,x:20.5,y:75.5,w:3,h:3,nota:"Ocupante nuevo desde ene-2026 (\"Dko Home\"), sin contrato de arrendamiento en el expediente aún"},
   {edif:"Edif. 7 F",oficN1:66,oficN2:66,bodN1:0,bodN2:0,estac:3,x:20.5,y:78.5,w:3,h:3},
@@ -5496,15 +5521,15 @@ const CORTIJO_A2=[
 /* Sitio A-2 Locales — carpeta "Lota A-2 Locales" (P.C.L) + locales de
    planta baja de Torre 2680 (Torre L-1/2/3, mismo Sitio A-2). */
 const CORTIJO_A2LOCALES=[
-  {edif:"P. C. L-1",m2:338,x:75.4,y:38.9,w:9,h:16,nota:"169 + 169 (2 niveles). Ficha no indica estacionamientos"},
-  {edif:"P. C. L-2",m2:318,x:64.5,y:11.7,w:9,h:16,nota:"159 + 159 (2 niveles) — el diagrama de la ficha muestra 155, se usa el valor del Cuadro de Superficies. Ficha no indica estacionamientos"},
-  {edif:"P. C. L-3",m2:440,x:53.5,y:18.5,w:9,h:16,nota:"408 (N1) + 32 (N2). La casilla de Estacionamientos en el plano original está sin rellenar (\"X\")"},
-  {edif:"P. C. L-4",m2:131,x:44.5,y:30,w:9,h:16,nota:"Ficha no indica estacionamientos"},
-  {edif:"P. C. L-4A",m2:137,x:44.5,y:30,w:9,h:16,nota:"Mismo edificio que P.C.L-4, ficha separada. No indica estacionamientos"},
-  {edif:"P. C. L-5",m2:220,x:37,y:48,w:9,h:16,nota:"Ficha no indica estacionamientos"},
-  {edif:"P. C. L-6",m2:163,x:37.5,y:69.6,w:9,h:16,nota:"Confirmado visualmente 09-10-2026: la ficha efectivamente trae un segundo valor de 673 m² (Nivel 2) además de 163 (Nivel 1) — total real 836 m², muy superior al tamaño típico de un local de este sitio; no se corrige acá, a verificar con el equipo técnico si es correcto. Ficha no indica estacionamientos"},
+  {edif:"P. C. L-1",oficN1:169,oficN2:169,x:75.4,y:38.9,w:9,h:16,nota:"169 + 169 (2 niveles). Ficha no indica estacionamientos"},
+  {edif:"P. C. L-2",oficN1:159,oficN2:159,x:64.5,y:11.7,w:9,h:16,nota:"159 + 159 (2 niveles) — el diagrama de la ficha muestra 155, se usa el valor del Cuadro de Superficies. Ficha no indica estacionamientos"},
+  {edif:"P. C. L-3",oficN1:408,oficN2:32,x:53.5,y:18.5,w:9,h:16,nota:"408 (N1) + 32 (N2). La casilla de Estacionamientos en el plano original está sin rellenar (\"X\")"},
+  {edif:"P. C. L-4",oficN1:131,x:44.5,y:30,w:9,h:16,nota:"Ficha no indica estacionamientos"},
+  {edif:"P. C. L-4A",oficN1:137,x:44.5,y:30,w:9,h:16,nota:"Mismo edificio que P.C.L-4, ficha separada. No indica estacionamientos"},
+  {edif:"P. C. L-5",oficN1:220,x:37,y:48,w:9,h:16,nota:"Ficha no indica estacionamientos"},
+  {edif:"P. C. L-6",oficN1:163,x:37.5,y:69.6,w:9,h:16,nota:"Confirmado visualmente 09-10-2026: la ficha efectivamente trae un segundo valor de 673 m² (Nivel 2) además de 163 (Nivel 1) — total real 836 m², muy superior al tamaño típico de un local de este sitio; no se corrige acá (queda solo el Nivel 1), a verificar con el equipo técnico si es correcto. Ficha no indica estacionamientos"},
   {edif:"P. C. L-7",m2:null,x:22,y:78.5,w:8,h:14,nota:"Sin ficha propia ubicada aún — la única ficha \"P.C.L-7\" encontrada corresponde por dirección (N°2740) a P.C.L-7-A"},
-  {edif:"P. C. L-7-A",m2:147.5,x:26,y:83,w:8,h:14,nota:"Ficha \"P.C.L.-7.pdf\", dirección N°2740 — posición aproximada, fuera del recorte del plano. No indica estacionamientos"},
+  {edif:"P. C. L-7-A",oficN1:147.5,x:26,y:83,w:8,h:14,nota:"Ficha \"P.C.L.-7.pdf\", dirección N°2740 — posición aproximada, fuera del recorte del plano. No indica estacionamientos"},
   {edif:"P. C. L-9",m2:null,x:26,y:52,w:9,h:16,nota:"Sin ficha propia encontrada en la carpeta"},
   {edif:"Torre L-1",m2:null,x:92,y:35,w:9,h:16,nota:"Local de Torre 2680 (planta baja) — sin ficha propia en esta carpeta, posición aproximada (borde del recorte)"},
   {edif:"Torre L-2",m2:null,x:96,y:30,w:6,h:12,nota:"Local de Torre 2680 (planta baja) — sin ficha propia en esta carpeta, posición aproximada (borde del recorte)"},
@@ -5588,6 +5613,37 @@ function fichaM2(u){
   if(!u)return null;
   if(u.oficN1!=null)return(u.oficN1||0)+(u.oficN2||0)+(u.bodN1||0)+(u.bodN2||0);
   return u.m2!=null?u.m2:null;
+}
+/* Mapa Ubicación de Planilla (CORTIJO_SECTOR_SITIO invertido, con A-2 y
+   A-2 Locales combinados ya que la Planilla no las distingue) → arrays de
+   ficha, para que ClientesView pueda preferir el dato del plano (Cuadro
+   Superficies) por sobre la Planilla en Piso1/Piso2/Bodega/Construido/
+   Terreno, que es más confiable para El Cortijo. */
+const CORTIJO_SITIO_ARR={"A-2":[CORTIJO_A2,CORTIJO_A2LOCALES],"4-A":[CORTIJO_4A],"5-A":[CORTIJO_5A],"B":[CORTIJO_B]};
+function normEdifKey(s){
+  let t=(s||"").toString().toUpperCase();
+  t=t.replace(/EDIFICIO/g,"").replace(/EDIF\.?/g,"");
+  t=t.replace(/P\.\s*C\.?\s*L\.?-?/g,"PCL");
+  t=t.replace(/\(.*?\)/g,"");
+  t=t.replace(/[\s.\-]/g,"");
+  return t.trim();
+}
+/* Busca la unidad de ficha (CORTIJO_A2/A2LOCALES/4A/5A/B) que corresponde
+   a un edificio de la Planilla, comparando el código normalizado (y los
+   alias de unidades combinadas como "Edif. 2 y 2B"). null si el sitio no
+   es de El Cortijo o no hay ficha para ese edificio puntual. */
+function matchFichaPorEdificio(sitio,edificio){
+  const arrs=CORTIJO_SITIO_ARR[sitio];
+  if(!arrs||!edificio)return null;
+  const key=normEdifKey(edificio);
+  if(!key)return null;
+  for(const arr of arrs){
+    for(const u of arr){
+      if(normEdifKey(u.edif)===key)return u;
+      if(u.aliases&&u.aliases.some(a=>normEdifKey(a)===key))return u;
+    }
+  }
+  return null;
 }
 /* Fila(s) CSV de la comparación Ficha (Cuadro Superficies) vs. Planilla
    (Superficie Validada) de un grupo de unidades (un sector de El Cortijo,
