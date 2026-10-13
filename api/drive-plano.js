@@ -130,8 +130,17 @@ export default async function handler(req, res) {
 
     const queryCode = extractCode((numeracion || "").replace(/[^0-9a-z]/gi, "").toLowerCase() || numNorm);
 
+    // Sufijo de "última versión" de una ficha (ej. "Edificio 77 - AI.pdf"
+    // junto a un eventual "Edificio 77.pdf" desactualizado) — se quita antes
+    // de extraer el código del edificio (si no, "77 - AI" se fusiona en
+    // "77ai" al normalizar y deja de matchear la consulta "77"), y el
+    // archivo que lo tiene se prefiere por sobre el que no lo tiene.
+    const VERSION_SUFFIX = /[\s\-_]+AI\s*$/i;
+
     function scoreFile(f) {
-      const n = norm(f.name.replace(/\.pdf$/i, ""));
+      const nameNoExt = f.name.replace(/\.pdf$/i, "");
+      const isLatestVersion = VERSION_SUFFIX.test(nameNoExt);
+      const n = norm(nameNoExt.replace(VERSION_SUFFIX, ""));
       if (!n) return 0;
       // El match del código es OBLIGATORIO — sin él no hay puntaje, aunque
       // la carpeta sea la correcta. Si no, para códigos cortos (ej. "H")
@@ -164,6 +173,7 @@ export default async function handler(req, res) {
       if (!exact && !substr && !letterMatch) return 0;
       let s = exact ? 10 : (letterMatch ? 6 : 3);
       if (folderMatch && f.folder === folderMatch.name) s += 5;
+      if (isLatestVersion) s += 3;
       // preferir nombres cortos (plano general del edificio, no "Piso 2" suelto)
       s -= n.length * 0.01;
       return s;
