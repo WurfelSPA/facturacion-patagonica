@@ -153,8 +153,14 @@ export default async function handler(req, res) {
       // Si la consulta es puramente alfabética y corta, comparar solo el
       // sufijo de letras del código del archivo (sin los dígitos que lo
       // anteceden) — "c" (consulta) vs "2758c"→"c" (archivo).
+      // Exigir carpeta correcta para este caso: un código de 1-2 letras
+      // (ej. "c", "h") coincide por pura casualidad con el sufijo de
+      // CUALQUIER archivo de otra carpeta cuyo nombre termine en esa letra
+      // (ej. "P.C.L- 4 A.pdf" → código "4a" → sin el dígito → "a"), sirviendo
+      // el plano de un edificio totalmente distinto en vez de devolver 404.
       const queryIsLetterOnly = /^[a-z]+$/.test(queryCode);
-      const letterMatch = queryIsLetterOnly && queryCode.length <= 2 && fileCode.replace(/^\d+/, "") === queryCode;
+      const letterMatch = queryIsLetterOnly && queryCode.length <= 2 && fileCode.replace(/^\d+/, "") === queryCode
+        && folderMatch && f.folder === folderMatch.name;
       if (!exact && !substr && !letterMatch) return 0;
       let s = exact ? 10 : (letterMatch ? 6 : 3);
       if (folderMatch && f.folder === folderMatch.name) s += 5;
