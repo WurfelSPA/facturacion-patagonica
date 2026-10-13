@@ -91,9 +91,9 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s}
 .month-val{font-size:9px;color:var(--txm);font-family:'DM Mono',monospace;text-align:center}
 .month-col:hover .month-seg-arr{background:#185fa5}
 .month-col:hover .month-val{color:var(--tx)}
-.dash-client-hdr{display:grid;grid-template-columns:58px 72px minmax(130px,1fr) 130px 100px 100px 100px 60px 95px 80px 65px 80px 60px 60px 55px 70px 28px;border-bottom:2px solid var(--bdr);background:var(--surf)}
+.dash-client-hdr{display:grid;grid-template-columns:58px 72px minmax(130px,1fr) 130px 100px 100px 100px 60px 95px 80px 65px 80px 60px 60px 60px 60px 60px 60px 60px 60px 70px 28px;border-bottom:2px solid var(--bdr);background:var(--surf)}
 .dash-client-hdr>div{padding:7px 8px;font-size:9px;font-weight:700;color:var(--txd);letter-spacing:.06em;text-transform:uppercase}
-.dash-client-row{display:grid;grid-template-columns:58px 72px minmax(130px,1fr) 130px 100px 100px 100px 60px 95px 80px 65px 80px 60px 60px 55px 70px 28px;border-bottom:1px solid var(--bdr);transition:background .1s;cursor:default}
+.dash-client-row{display:grid;grid-template-columns:58px 72px minmax(130px,1fr) 130px 100px 100px 100px 60px 95px 80px 65px 80px 60px 60px 60px 60px 60px 60px 60px 60px 70px 28px;border-bottom:1px solid var(--bdr);transition:background .1s;cursor:default}
 .dash-client-row:hover>div{background:var(--surf2)}
 .dash-client-row>div{padding:8px 8px;font-size:11px;display:flex;align-items:center}
 .nav-btn{background:transparent;border:1px solid var(--bdr);color:var(--txm);border-radius:8px;padding:5px 14px;font-size:11px;font-weight:500;display:flex;align-items:center;gap:5px}
@@ -3713,6 +3713,11 @@ function ClientesView({dashData,driveLoading,notify}){
     const msite=dashSitio==="all"||(c.sitio||"").trim()===(dashSitio||"").trim();
     return ms&&msite;
   });
+  /* Piso1/Piso2 de la tabla: para edificios "P. C. L-N" (locales comerciales
+     de A-2 Locales) toman Locales Comerciales; para el resto, Oficina m2. */
+  function esPCL(edif){return/^P\.?\s*C\.?\s*L/i.test((edif||"").trim());}
+  function piso1Val(c){return esPCL(c.edificio)?c.locP1:c.oficP1;}
+  function piso2Val(c){return esPCL(c.edificio)?c.locP2:c.oficP2;}
   const SORT_GETTERS={
     "Sitio":c=>c.sitio||"",
     "Edificio":c=>c.edificio||"",
@@ -3728,8 +3733,13 @@ function ClientesView({dashData,driveLoading,notify}){
     "F.Reajuste":c=>c.fechaReajuste||"",
     "% Reaj.":c=>c.pctReaj||"",
     "Cada":c=>c.cadaAnios!=null?c.cadaAnios:null,
-    "m²":c=>c.m2!=null?c.m2:null,
-    "UF×m²":c=>(c.ufM2!=null&&c.m2>0)?c.ufM2/c.m2:null,
+    "Piso1":c=>piso1Val(c)!=null?piso1Val(c):null,
+    "Piso2":c=>piso2Val(c)!=null?piso2Val(c):null,
+    "Bodega P1":c=>c.bodP1!=null?c.bodP1:null,
+    "Bodega P2":c=>c.bodP2!=null?c.bodP2:null,
+    "Construido":c=>c.totalConstruido!=null?c.totalConstruido:null,
+    "Terreno":c=>c.m2!=null?c.m2:null,
+    "Arriendo m²":c=>(c.ufM2!=null&&c.m2>0)?c.ufM2/c.m2:null,
   };
   const tblClients=(dashSortCol&&SORT_GETTERS[dashSortCol])?
     [...tblClientsUnsorted].sort((a,b)=>{
@@ -3802,7 +3812,7 @@ function ClientesView({dashData,driveLoading,notify}){
         h("span",{style:{fontSize:10,color:"var(--txd)",fontFamily:"'DM Mono',monospace"}},tblUfLabel)
       ),
       h("div",{className:"dash-client-hdr"},
-        ["Sitio","Edificio","Cliente / RUT","Dirección","Arriendo CLP","Serv.Adm. CLP","Total CLP","IVA","Término","Antelac.","Aviso","F.Reajuste","% Reaj.","Cada","m²","UF×m²",""].map(col=>{
+        ["Sitio","Edificio","Cliente / RUT","Dirección","Arriendo CLP","Serv.Adm. CLP","Total CLP","IVA","Término","Antelac.","Aviso","F.Reajuste","% Reaj.","Cada","Piso1","Piso2","Bodega P1","Bodega P2","Construido","Terreno","Arriendo m²",""].map(col=>{
           const sortable=!!SORT_GETTERS[col];
           const active=dashSortCol===col;
           return h("div",{
@@ -3853,7 +3863,12 @@ function ClientesView({dashData,driveLoading,notify}){
               h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:c.fechaReajuste?"var(--tx)":"var(--txd)"}},c.fechaReajuste||"—"),
               h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.pctReaj||"—"),
               h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)"}},c.cadaAnios?c.cadaAnios+" años":"—"),
-              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},c.m2!=null?c.m2.toLocaleString("es-CL"):"—"),
+              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},piso1Val(c)!=null?piso1Val(c).toLocaleString("es-CL"):"—"),
+              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},piso2Val(c)!=null?piso2Val(c).toLocaleString("es-CL"):"—"),
+              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},c.bodP1!=null?c.bodP1.toLocaleString("es-CL"):"—"),
+              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)"}},c.bodP2!=null?c.bodP2.toLocaleString("es-CL"):"—"),
+              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)",fontWeight:600}},c.totalConstruido!=null?c.totalConstruido.toLocaleString("es-CL"):"—"),
+              h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--tx)",fontWeight:600}},c.m2!=null?c.m2.toLocaleString("es-CL"):"—"),
               h("div",{style:{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--txm)",fontWeight:600}},(c.ufM2!=null&&c.m2>0)?(c.ufM2/c.m2).toLocaleString("es-CL",{minimumFractionDigits:3,maximumFractionDigits:3}):"—"),
               h("div",{style:{fontSize:10,color:isSelected?"var(--acc)":"var(--txd)",textAlign:"right"}},isSelected?"▲":"📋")
             ),
