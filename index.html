@@ -8099,9 +8099,16 @@ function App(){
     autoNuboxRef.current=false;
     /* No reseteamos periodoActivado aquí — se resetea solo al cambiar período desde el selector */
   },[periodo]);
-  /* Resetear periodoActivado al salir de facturación para evitar auto-ejecución al volver */
+  /* Activar el período al entrar a facturación (el período actual queda
+     seleccionado por defecto sin que el usuario "lo elija" desde el
+     selector, así que sin esto el auto-detectar-y-cargar-desde-Drive de
+     abajo nunca corría para el mes en curso — solo para meses anteriores,
+     que el usuario sí selecciona a mano cada vez). Se resetea al salir de
+     facturación para evitar auto-ejecución al volver sin querer. */
   useEffect(()=>{
-    if(view!=="upload"&&view!=="table"){
+    if(view==="upload"||view==="table"){
+      periodoActivado.current=true;
+    }else{
       periodoActivado.current=false;
       autoProcesado.current=false;
       autoNuboxRef.current=false;
