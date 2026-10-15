@@ -141,7 +141,12 @@ function pickBestPdf(files) {
   const pdfs = files.filter(f => f.mimeType === "application/pdf");
   if (!pdfs.length) return null;
   const byDate = (a, b) => new Date(b.modifiedTime || 0) - new Date(a.modifiedTime || 0);
-  const esContrato = f => /contrato/i.test(f.name);
+  // "ctto" (con o sin punto) es la abreviatura real que usan casi todas las
+  // carpetas de Drive — sin ella, ningún archivo matcheaba y la función
+  // caía al último criterio (el PDF modificado más recientemente), que no
+  // tiene por qué ser el contrato (ej. "Carta Cambio de dueño" ganándole a
+  // "Ctto.Banco Estado..." solo por fecha de modificación en Drive).
+  const esContrato = f => /contrato|ctto/i.test(f.name);
   const esTerminoOModif = f => /(t[eé]rmino|modificaci[oó]n)/i.test(f.name);
   const limpios = pdfs.filter(f => esContrato(f) && !esTerminoOModif(f)).sort(byDate);
   if (limpios.length) return limpios[0];
